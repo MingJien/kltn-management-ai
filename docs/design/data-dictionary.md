@@ -1,6 +1,6 @@
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260925_0006. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
+> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260925_0007. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
 
 ## Quy ước
 
@@ -319,7 +319,7 @@
 ### topic_registration
 
 **Mục đích:** Aggregate đăng ký một topic trong một đợt.
-**Trace:** REQ-REG-001..005
+**Trace:** REQ-REG-001..006
 
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -340,8 +340,8 @@
 
 ### registration_member
 
-**Mục đích:** Mọi SV trong đăng ký nhóm; dùng chặn trùng SV/round.
-**Trace:** REQ-REG-001..002
+**Mục đích:** Mọi SV trong đăng ký nhóm; dùng chặn trùng SV/round và lưu phản hồi tham gia riêng của từng người.
+**Trace:** REQ-REG-001..002, REQ-REG-005..006
 
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -350,6 +350,9 @@
 | student_id | UUID | NOT NULL | — | — | student_profile.id | uq_registration_member_registration_id_student_id, uq_registration_member_student_round_active | — | Tham chiếu student_profile.id. | PII | Physical metadata 20260920_0001 |
 | is_coordinator | BOOLEAN | NOT NULL | false | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
 | active | BOOLEAN | NOT NULL | true | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
+| consent_status | VARCHAR(20) | NOT NULL | PENDING | — | — | — | ck_registration_member_consent_consistency | PENDING trước phản hồi; ACCEPTED/DECLINED sau khi chính SV trả lời. Service phải đối chiếu đúng tài khoản với student_id. | PII | Migration 0007 |
+| responded_by_user_id | UUID | NULL | — | — | user_account.id | — | ck_registration_member_consent_consistency | Tài khoản đã tự phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
+| responded_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | ck_registration_member_consent_consistency | Thời điểm phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
 | created_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm tạo record. | PII | Physical metadata 20260920_0001 |
 | updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm cập nhật gần nhất. | PII | Physical metadata 20260920_0001 |
@@ -1131,6 +1134,6 @@
 ## Kiểm soát đồng bộ
 
 - Tổng số bảng: 62.
-- Tổng số field: 614 (sau migration 20260925_0006).
+- Tổng số field: 617 (sau migration 20260925_0007).
 - Migration và model là nguồn physical; thay đổi schema phải cập nhật migration mới và tái sinh tài liệu.
 - Không có field plagiarism verdict; threshold similarity không hard-code 90%.

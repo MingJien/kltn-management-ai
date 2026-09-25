@@ -75,6 +75,9 @@ Các lỗi validation của FastAPI dùng HTTP 422; lỗi quyền/state do servi
 
 ## Contract thiết kế bổ sung
 
+- `POST /topic-registrations/{registrationId}/member-response`: chỉ tài khoản SV có lời mời trong RegistrationMember của bản DRAFT tự gửi `ACCEPT` hoặc `DECLINE`; không nhận userId từ body. Service đối chiếu `StudentProfile.user_id`, lưu `consent_status`, `responded_by_user_id`, `responded_at` và audit. Chỉ khi mọi thành viên active đã ACCEPTED mới cho SUBMITTED. **DESIGN_ONLY**; endpoint prototype hiện chưa áp guard này.
+- Đề tài do SV đề xuất: `POST /topics` tạo đề tài của SV cùng bản nháp đăng ký; sau các xác nhận, nhóm gửi đăng ký **trước** khi TBM xử lý `/topics/{topicId}/department-decision`. Khi TBM APPROVED, giảng viên được phân công mới nhận/từ chối; TBM finalize sau khi GV đồng ý. Guard `Topic.APPROVED` của `POST /topic-registrations` hiện chỉ là lát cắt prototype cho đề tài GV, cần tách nhánh trước runtime thật. **DESIGN_ONLY**.
+
 - `POST /council-minutes/{minuteId}/chair-confirmation` và `.../secretary-confirmation`: MinuteSignatureRequest có minuteVersionId; chỉ đúng role trong quyết định được ký; chữ ký đầu khóa sửa dù state còn PRINTED, đủ hai mới SIGNED. DESIGN_ONLY.
 - `POST /council-minutes/{minuteId}/exports`: OfficialExportRequest có templateVersion/format, result chứa storedFileId/contentHash/templateSourceId. BLOCKED_SOURCE_TEMPLATE với Mẫu 9 local đã điền.
 - `GET /external-resources`: ExternalResource[] chỉ từ allowlist HTTPS server-side. DESIGN_ONLY.

@@ -10,7 +10,7 @@
 - `ARCHIVED_NON_CANONICAL`: snapshot lịch sử, không phải nguồn nghiệp vụ chính.
 - `DUPLICATE_BYTE_IDENTICAL_REMOVED`: bản trùng byte đã được ghi nhận và loại khỏi raw canonical.
 
-Thứ tự xử lý khi có xung đột: P1 = góp ý/chỉ đạo GVHD mới nhất; P2 = quyết định, quy định, kế hoạch, đề cương và biểu mẫu chính thức của Trường/Khoa (văn bản sửa đổi mới hơn có hiệu lực trong phạm vi được sửa); P3 = quyết định đã chốt của chủ dự án, chỉ trong phạm vi thiết kế dự án; P4 = tài liệu chính thức của công nghệ; P5 = nguồn học thuật; P6 = kiến thức chung. Snapshot lịch sử mang nhãn `ARCHIVE`, không tham gia ưu tiên nghiệp vụ. Nếu các nguồn mâu thuẫn mà chưa có căn cứ phân xử, ghi vào `source-conflicts.md`, không tự hợp nhất.
+Thứ tự xử lý khi có xung đột: P1 = góp ý/chỉ đạo GVHD mới nhất; P2 = quyết định, quy định, kế hoạch, đề cương và biểu mẫu chính thức của Trường/Khoa (văn bản sửa đổi mới hơn có hiệu lực trong phạm vi được sửa); P3 = quyết định thiết kế đã chốt của đề tài, chỉ trong phạm vi thiết kế dự án; P4 = tài liệu chính thức của công nghệ; P5 = nguồn học thuật; P6 = kiến thức chung. Snapshot lịch sử mang nhãn `ARCHIVE`, không tham gia ưu tiên nghiệp vụ. Nếu các nguồn mâu thuẫn mà chưa có căn cứ phân xử, ghi vào `source-conflicts.md`, không tự hợp nhất.
 
 Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ chỉ dùng để đối chiếu trên máy, không thuộc bộ source công bố. Bản nộp trên GitHub gồm kết quả phân tích, thiết kế và mã nguồn; có thể đối chiếu chúng theo ID nguồn trong bảng dưới.
 
@@ -18,7 +18,7 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 
 | ID | Nguồn / thẩm quyền | Nhóm | Vị trí gốc | Bản xử lý nội bộ (lưu trên máy) | Trạng thái và cách dùng |
 | --- | --- | --- | --- | --- | --- |
-| SRC-PROJECT-MASTER-001 | Chỉ đạo chủ dự án ngày 19/09/2026 | P3 | User attachment | Không áp dụng | Đã đọc; là quyết định dự án, không giả thành quy định Trường. |
+| SRC-PROJECT-MASTER-001 | Làm rõ thiết kế ngày 19/09/2026 | P3 | User attachment | Không áp dụng | Đã đọc; là quyết định dự án, không giả thành quy định Trường. |
 | SRC-PROJECT-DB-001 | Chỉ đạo hoàn thành NV4 Tuần 1–2 đến hết CSDL ngày 20/09/2026 | P3 | User attachment | `docs/00-sources/project-context-baseline.md` | Đã đọc; chốt phạm vi dừng sau PostgreSQL schema/migration/validation, không triển khai API/UI/AI. |
 | SRC-PROJECT-GIT-001 | Quy tắc quản lý nguồn, tài liệu và Git ngày 21/09/2026 | P3 | User attachment | docs/decisions/ | Đã đọc; xác nhận GitHub Flow gọn: main canonical, Issue/checklist, nhánh ngắn, PR review; không dùng branch theo tuần. |
 | SRC-GVHD-NV4-001 | `giải đáp NV4 tuần 1.docx`, GVHD; Drive sửa 18/09/2026 04:44 UTC | P1 | Drive `1dgRI_9XXwIk0E2eG-xHvWHbTI0jn21Xo`; `source/raw/NghiepVu/giải đáp NV4 tuần 1.drive-20260918.docx` | `source/markdown/NghiepVu/giai-dap-nv4-tuan-1.md` | `READ_NORMALIZED_REDACTED`; bản Drive mới nhất là canonical; tên cá nhân không cần thiết đã được khử. |
@@ -44,7 +44,7 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 | SRC-MAU-11 | Mẫu 11 bảng điểm chính thức | P2 | Drive `1OxX9NfyLczCMkXUgLFfcYNZLd8V4kBxM` | `source/markdown/BieuMau/mau-11-bang-diem-chinh-thuc-schema.md` | `READ_SCHEMA_ONLY_PII_REDACTED`. |
 | SRC-DS-KYSO-001 | Danh sách SV KLTN ký số | P2 | Drive `1AIG0Yx6lMDR7iQgsuL92C-RFUbDcSEL5` | Không nhập nội dung | `RESTRICTED_PII_NOT_TRANSCRIBED`; Mẫu 4 đã đủ schema. |
 | SRC-QD-TLTK-011 | QĐ 885/QĐ-ĐHĐT về trích dẫn/TLTK ngày 22/04/2021 | P2 | Drive `1VS_1CmgecFFYCT3NJOmEJ4Ljiyd0GSBV` | `source/markdown/QuyDinh/quy-dinh-trich-dan-tltk11.md` | `OCR_REVIEWED_WITH_UNCERTAINTY_MARKERS`; 7 trang; phạm vi trực tiếp là sau đại học. |
-| SRC-PROJECT-DEC-20260925 | Quyết định chủ dự án ngày 25/09/2026 cho phạm vi NV4 | P3 | Bản kế hoạch được chủ dự án gửi trực tiếp | docs/decisions/quyet-dinh-du-an-2026-09-25.md | CONFIRMED_PROJECT_DECISION; không thay quy định chính thức. |
+| SRC-PROJECT-DEC-20260925 | Quyết định thiết kế ngày 25/09/2026 cho phạm vi NV4 | P3 | Nội dung làm rõ được cung cấp trực tiếp | docs/decisions/quyet-dinh-du-an-2026-09-25.md | CONFIRMED_PROJECT_DECISION; không thay quy định chính thức. |
 
 ## Bản trùng đã xác minh
 

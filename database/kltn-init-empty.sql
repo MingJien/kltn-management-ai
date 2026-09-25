@@ -1,4 +1,4 @@
--- KLTN PostgreSQL schema, Alembic revision 20260925_0006.
+-- KLTN PostgreSQL schema, Alembic revision 20260925_0007.
 -- Chạy một lần trên database PostgreSQL mới và trống.
 -- Không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
 -- Database đã có bảng phải cập nhật bằng Alembic migration, không chạy lại file này.
@@ -1323,5 +1323,19 @@ INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, ma
 INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('6b93df99-d044-5fce-a447-383a6f10dd06', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', NULL, '4', 'Điểm thưởng (nếu có công bố kết quả nghiên cứu trên tập chí khoa học hoặc hội thảo trong và ngoài nước). Tổng điểm là 10 (kể cả điểm thưởng)', 1.0, 'BONUS', 16);
 
 UPDATE alembic_version SET version_num='20260925_0006' WHERE alembic_version.version_num = '20260925_0005';
+
+-- Running upgrade 20260925_0006 -> 20260925_0007
+
+ALTER TABLE registration_member ADD COLUMN consent_status VARCHAR(20) DEFAULT 'PENDING' NOT NULL;
+
+ALTER TABLE registration_member ADD COLUMN responded_by_user_id UUID;
+
+ALTER TABLE registration_member ADD COLUMN responded_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE registration_member ADD CONSTRAINT fk_registration_member_responded_by_user_id_user_account FOREIGN KEY(responded_by_user_id) REFERENCES user_account (id) ON DELETE RESTRICT;
+
+ALTER TABLE registration_member ADD CONSTRAINT ck_registration_member_consent_consistency CHECK ((consent_status = 'PENDING' AND responded_by_user_id IS NULL AND responded_at IS NULL) OR (consent_status IN ('ACCEPTED','DECLINED') AND responded_by_user_id IS NOT NULL AND responded_at IS NOT NULL));
+
+UPDATE alembic_version SET version_num='20260925_0007' WHERE alembic_version.version_num = '20260925_0006';
 
 COMMIT;

@@ -159,8 +159,9 @@ stateDiagram-v2
 | Topic | DRAFT/RETURNED | submit | proposer | Đủ trường; round nhận đề xuất | SUBMITTED | APPROVED submit lại → 409 |
 | Topic | SUBMITTED | return/reject/approve | TBM | Position đúng department; title change tạo version | RETURNED/REJECTED/APPROVED | Admin approve → 403 |
 | Topic | APPROVED | lock after finalization | TBM | Đăng ký đã chốt hoặc policy đóng đề tài | LOCKED | LOCKED mở lại không policy → 409 |
-| TopicRegistration | DRAFT | submit | SV | Eligibility confirmed; 1–3 member; unique member/round | SUBMITTED | Member có active registration khác → 409 |
-| TopicRegistration | SUBMITTED | accept/reject | GVHD | Đúng candidate/assignment; capacity còn | LECTURER_ACCEPTED/LECTURER_REJECTED | TBM giả lecturer decision → 403 |
+| RegistrationMember | PENDING | tự ACCEPTED/DECLINED | chính SV được mời | Registration DRAFT; tài khoản đúng student_id | ACCEPTED/DECLINED + actor/time | Người điều phối xác nhận thay → 403 |
+| TopicRegistration | DRAFT | submit | SV | Eligibility confirmed; 1–3 member active đều tự ACCEPTED; unique member/round; Topic GV APPROVED hoặc Topic SV còn chờ TBM xét | SUBMITTED | Member có active registration khác → 409 |
+| TopicRegistration | SUBMITTED | accept/reject | GV đề xuất hoặc GVHD được TBM chọn sau xét Topic SV | Topic SV phải được TBM duyệt sau đăng ký; đúng candidate/assignment; capacity còn | LECTURER_ACCEPTED/LECTURER_REJECTED | Người ngoài quyết định → 403 |
 | TopicRegistration | LECTURER_ACCEPTED | finalize/return | TBM | Lock topic; unique thesis/topic/round; chỉ tiêu/conflict đạt | FINALIZED/RETURNED | Race capacity → 409 |
 | TopicRegistration | RETURNED | sửa và nộp lại | SV | Còn trong đợt, version mới, eligibility còn hiệu lực | SUBMITTED | Tự chuyển FINALIZED → 403 |
 | TopicRegistration | DRAFT/SUBMITTED/LECTURER_ACCEPTED/LECTURER_REJECTED/RETURNED | hủy trước chốt | SV hoặc actor được giao theo policy | Chưa tạo Thesis; lưu lý do/lịch sử | CANCELLED | Sau FINALIZED muốn rút phải ghi outcome vào Thesis → 409 |

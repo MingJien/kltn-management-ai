@@ -323,6 +323,11 @@ class RegistrationMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
             ondelete="RESTRICT",
         ),
         UniqueConstraint("registration_id", "student_id"),
+        CheckConstraint(
+            "(consent_status = 'PENDING' AND responded_by_user_id IS NULL AND responded_at IS NULL) OR "
+            "(consent_status IN ('ACCEPTED','DECLINED') AND responded_by_user_id IS NOT NULL AND responded_at IS NOT NULL)",
+            name="consent_consistency",
+        ),
         Index(
             "uq_registration_member_student_round_active",
             "student_id",
@@ -342,6 +347,9 @@ class RegistrationMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
     student_id: Mapped[uuid.UUID] = fk("student_profile.id")
     is_coordinator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    consent_status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING", server_default="PENDING")
+    responded_by_user_id: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    responded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class Thesis(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):

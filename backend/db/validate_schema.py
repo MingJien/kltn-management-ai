@@ -52,7 +52,7 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0006"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0007"
 
             # DB-41: the real Mẫu 6 baseline is present but cannot be used live
             # until the Faculty resolves its conflict with QĐ 2919.
@@ -176,6 +176,26 @@ def main() -> int:
                 student_id=student_ids[0], active=True
             )), "duplicate active student/round")
             passed.append("DB-05")
+
+            # DB-42: each member response has its own actor/time; matching the
+            # actor to that student's account remains a service-level guard.
+            expect_integrity(conn, lambda: conn.execute(m.RegistrationMember.__table__.insert().values(
+                id=uid(), registration_id=registration2_id, round_id=round_id,
+                student_id=student_ids[3], is_coordinator=True, active=True,
+                consent_status="ACCEPTED"
+            )), "accepted member without response evidence")
+            pending_member_id = uid()
+            conn.execute(m.RegistrationMember.__table__.insert().values(
+                id=pending_member_id, registration_id=registration2_id, round_id=round_id,
+                student_id=student_ids[3], is_coordinator=True, active=True
+            ))
+            assert conn.execute(select(m.RegistrationMember.__table__.c.consent_status).where(
+                m.RegistrationMember.__table__.c.id == pending_member_id
+            )).scalar_one() == "PENDING"
+            conn.execute(m.RegistrationMember.__table__.update().where(
+                m.RegistrationMember.__table__.c.id == pending_member_id
+            ).values(consent_status="ACCEPTED", responded_by_user_id=user_ids[3], responded_at=now))
+            passed.append("DB-42")
 
             thesis_id = uid()
             conn.execute(m.Thesis.__table__.insert().values(
@@ -573,7 +593,7 @@ def main() -> int:
             ), "delete referenced account")
             passed.append("DB-18")
 
-            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,42)}
+            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,43)}
             assert set(passed)==expected, sorted(expected-set(passed))
         except Exception as exc:
             print("FAIL "+type(exc).__name__+": "+str(exc))

@@ -46,8 +46,8 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20260925_0006":
-            parser.error("Upgrade the configured development DB to 20260925_0006 first")
+        if version != "20260925_0007":
+            parser.error("Upgrade the configured development DB to 20260925_0007 first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")

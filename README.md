@@ -6,24 +6,35 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 
 | Muốn xem | Tệp |
 | --- | --- |
-| Quyết định mới và điều chưa chốt | [Quyết định 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [điều kiện trước vận hành thật](docs/requirements/open-issues.md), [18 câu hỏi GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
+| Quyết định nghiệp vụ đã chốt | [Quyết định thiết kế 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [18 câu hỏi GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
 | Nghiệp vụ, vai trò, use case, quyền | [Yêu cầu](docs/requirements/business-requirements.md), [quy tắc](docs/requirements/business-rules.md), [quy trình](docs/requirements/business-process.md), [use case](docs/requirements/use-case-catalog.md), [phân quyền](docs/requirements/permission-matrix.md) |
 | CSDL và ý nghĩa bảng/cột | [ERD](docs/design/erd.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [giải thích dễ đọc](docs/design/database-explained.md), [rubric Mẫu 6](docs/design/rubric-mau-6.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
 | Tệp CSDL PostgreSQL | [Tạo database mới](database/kltn-init-empty.sql), [cách dùng](database/README.md). Hai tệp SQL thao tác pgAdmin (`kltn-ai-workbench.sql`, `kltn-ai-updates.sql`) chỉ lưu trên máy. |
-| Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0006; **không chạy lại file SQL tạo mới** |
+| Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0007; **không chạy lại file SQL tạo mới** |
 | API và giao diện | [FastAPI](backend/api/main.py), [OpenAPI runtime](docs/prototype/openapi-runtime.json), [thiết kế API toàn miền](docs/design/openapi.yaml), [React](frontend/src/App.tsx), [wireframe](docs/design/wireframes.md) |
 | AI và biểu mẫu | [Prototype AI](docs/ai/prototype.md), [thiết kế tương đồng](docs/ai/similarity-design.md), [thiết kế xuất biểu mẫu](docs/design/xuat-bieu-mau.md) |
 | Kiểm chứng | [Minh chứng prototype](docs/evidence/prototype-validation.md), [ma trận truy vết](docs/design/traceability-matrix.md) |
 
 ## Trạng thái thực tế
 
-- CSDL có **62 bảng mô hình, 614 cột**; thêm `alembic_version` là **63 bảng, 615 cột vật lý**. `kltn_dev` trên máy kiểm tra ở revision `20260925_0006` và không có dòng `thesis` nghiệp vụ sau test. Các migration cũ 0001/0002 không sửa. Migration 0006 nạp Mẫu 6 đầy đủ ở trạng thái DRAFT; chưa gắn vào đợt chấm thật.
-- Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..41 PASS, gồm COMMENT_ONLY cho góp ý chéo và đầy đủ baseline Mẫu 6.
-- Prototype API chạy luồng SV tự gửi nhóm 1–3 → giảng viên đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm bị từ chối có thể đăng ký lại; đề tài đã chốt bị khóa. 8 pytest PASS, gồm kiểm luồng trên PostgreSQL và 5 tình huống similarity giả lập.
+- CSDL có **62 bảng mô hình, 617 cột**; thêm `alembic_version` là **63 bảng, 618 cột vật lý**. `kltn_dev` trên máy kiểm tra ở revision `20260925_0007` và không có dòng `thesis` nghiệp vụ sau test. Các migration cũ 0001/0002 không sửa. Migration 0006 nạp Mẫu 6 ở trạng thái DRAFT; migration 0007 thêm nơi lưu phản hồi từng thành viên. Prototype đăng ký hiện chưa buộc mỗi thành viên tự xác nhận.
+- Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..42 PASS, gồm COMMENT_ONLY cho góp ý chéo và đầy đủ baseline Mẫu 6.
+- Prototype API chạy lát cắt SV gửi nhóm 1–3 cho đề tài GV đã duyệt → giảng viên đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm bị từ chối có thể đăng ký lại; đề tài đã chốt bị khóa. 8 pytest PASS, gồm kiểm luồng trên PostgreSQL và 5 tình huống similarity giả lập.
 - React có màn đề tài, đăng ký/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. Build/typecheck PASS. Đã chạy trình duyệt với schema PostgreSQL tạm và tài khoản giả lập: SV gửi nhóm 2 người → GV chấp nhận → TBM chốt → React hiển thị Thesis ACTIVE; schema tạm đã xóa.
 - FastEmbed pretrained + Qdrant local truy xuất được corpus giả lập có source_type/provenance; RAG trả citation ở chế độ RETRIEVAL_ONLY. **Không có Gemini key, không có kết luận chất lượng AI trên 7 KLTN, không có ngưỡng 90% đã chốt.**
 - Mẫu 9 đã được thiết kế hai chữ ký Chủ tịch + Thư ký. Binary local là các biên bản đã điền dữ liệu thật, chưa phải mẫu trắng an toàn; **chưa PASS xuất đúng mẫu**. Mẫu 6 còn xung đột cơ cấu điểm với QĐ 2919. SSO thật, xuất biểu mẫu, similarity toàn văn và các use case còn lại là thiết kế/chưa chạy.
 - Docker daemon hiện không chạy; Qdrant **local mode** đã chạy. Qdrant service trong compose chưa được kiểm tra.
+
+## Còn phải hoàn thiện trước bản nộp cuối
+
+| Phần việc | Trạng thái hiện tại | Việc cần có để gọi là đã chạy hoàn chỉnh |
+| --- | --- | --- |
+| Đăng ký nhóm và đề tài SV đề xuất | Prototype chỉ nhận Topic GV đã APPROVED và gửi nhóm ngay; migration 0007 mới lưu được phản hồi từng thành viên. | Từng SV tự xác nhận trong API/UI trước SUBMITTED; nhóm đề xuất và đăng ký trước, TBM xét đề tài sau, GVHD được phân công đồng ý rồi TBM chốt; test đủ hai nhánh. |
+| Điều kiện, chấm điểm, Mẫu 9 | Có mô hình, rubric Mẫu 6 DRAFT và hợp đồng hai chữ ký. | Khoa xác nhận nguồn áp dụng; xây quyền xác nhận, chấm thật, khóa từ chữ ký đầu và xuất đúng mẫu trắng đã kiểm. |
+| AI và kho tài liệu | Đã nạp/truy xuất corpus giả bằng FastEmbed + Qdrant local; similarity chỉ advisory. | Kiểm thử có phép trên tập tài liệu phù hợp, đánh giá sai số và quyền; chỉ bật chính sách ngưỡng nếu Khoa phê duyệt. |
+| Đăng nhập và vận hành | Định danh UUID chỉ chạy DEV/TEST; chưa có SSO hoặc triển khai production. | Tích hợp đăng nhập thật, kiểm thử phân quyền và luồng đầy đủ, cấu hình triển khai/khôi phục. |
+
+Danh sách này mô tả **chức năng chưa được kiểm chứng**, không phải câu hỏi nghiệp vụ chưa quyết định. Khi có mã nguồn và kết quả test cho một mục, cập nhật README cùng [minh chứng](docs/evidence/prototype-validation.md); không giữ nhãn “chưa chạy” sau khi đã chứng minh xong.
 
 ## Chạy trên máy phát triển
 
@@ -70,4 +81,4 @@ Mở `http://127.0.0.1:5173`, nhập UUID demo để chọn đề tài, gửi nh
 
 `backend/`: API, service, AI, model và migrations; `frontend/`: React; `database/`: SQL dựng mới; `docs/requirements,design,ai,decisions,references,evidence,prototype/`: sản phẩm phân tích, thiết kế và minh chứng; `tests/`: kiểm tra tự động; `data/sample,manifests/`: dữ liệu **giả**. `source/raw/` và file thao tác cá nhân luôn ở máy, không thuộc bộ source nộp.
 
-Bộ phân tích, thiết kế và schema CSDL cho phạm vi NV4 hiện tại đã chốt ở [quyết định dự án](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [đối chiếu CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) và [điểm kiểm soát khi vận hành](docs/requirements/open-issues.md). Prototype runtime chỉ chạy các luồng đã nêu trên; quyền xác nhận, chấm thật, Mẫu 9 và similarity toàn văn vẫn cần triển khai/kiểm chứng. Khi Khoa ban hành chính sách mới, cập nhật bằng revision, không sửa lịch sử.
+Các quyết định nghiệp vụ hiện tại nằm trong [tài liệu quyết định](docs/decisions/quyet-dinh-du-an-2026-09-25.md); [đối chiếu CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) cho biết mỗi quyết định được lưu ở đâu. Prototype runtime chỉ chạy các luồng đã nêu trên; quyền xác nhận, chấm thật, Mẫu 9 và similarity toàn văn vẫn cần triển khai/kiểm chứng. Khi Khoa ban hành chính sách mới, cập nhật bằng revision, không sửa lịch sử.

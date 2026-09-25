@@ -15,9 +15,9 @@
 | Tổ chức | Faculty, Department, OrganizationalPosition, PositionAssignment, ResourceAssignment | Scope Bộ môn/Khoa; TBM/Trưởng khoa và quyền tài nguyên theo thời hạn | REQ-AUTH-002, REQ-ELIG-002, `DERIVED` |
 | Năm/đợt | AcademicYear, ThesisRound, RoundPolicy | Đợt chính/bổ sung và policy có version | REQ-ROUND-001, `CONFIRMED_PROJECT_DECISION` |
 | Điều kiện | EligibilitySnapshot, EligibilityException, DefenseEligibilityCheck | Chụp bằng chứng đăng ký/bảo vệ; ngoại lệ chính thức | REQ-ELIG-001..002, REQ-DEF-001 |
-| Chuyên môn | LecturerExpertise, ExpertiseEvidence | Dữ liệu tự khai/version; xác nhận còn OPEN | REQ-EXP-001 |
+| Chuyên môn | LecturerExpertise, ExpertiseEvidence | Dữ liệu tự khai/version; TBM đúng bộ môn kiểm chứng, hồ sơ TBM do Trưởng khoa/người được giao kiểm | REQ-EXP-001 |
 | Đề tài | Topic, TopicTitleVersion, TopicRequirement | Đề xuất, duyệt/chỉnh tên; GPA/kỹ năng/công nghệ/kiến thức mong muốn | REQ-TOPIC-001..003 |
-| Đăng ký | TopicRegistration, RegistrationMember | Một topic/SV/round; nhóm 1–3 | REQ-REG-001..005 |
+| Đăng ký | TopicRegistration, RegistrationMember | Một topic/SV/round; nhóm 1–3 | REQ-REG-001..006 |
 | Thực hiện | Thesis, ThesisMember, MemberWorkAssignment | Hồ sơ KLTN đã chốt; phân công riêng từng SV | REQ-REG-002, REQ-REG-004 |
 | Phân công GV | AdvisorAssignment, ReviewerAssignment | GVHD; GVPB đề cương/KLTN theo tài nguyên/thời gian | REQ-REG-003, REQ-PROP-002, REQ-EVAL-001 |
 | Đề cương | Proposal, ProposalVersion, ProposalReview, SignatureConfirmation | Version bất biến; review; TBM chốt; Trưởng khoa ký | REQ-PROP-001..003 |

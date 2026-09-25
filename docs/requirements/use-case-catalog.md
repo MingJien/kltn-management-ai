@@ -1,8 +1,8 @@
-# Đặc tả Use Case canonical — NV4 Tuần 1
+# Đặc tả Use Case — NV4
 
 ## Quy ước
 
-Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `Permission` luôn được kiểm ở backend theo base role + position/assignment + resource + state; UI không cấp quyền. Trường `Source/Status` phân biệt quy định, quyết định dự án và phần còn OPEN.
+Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `Permission` luôn được kiểm ở backend theo base role + position/assignment + resource + state; UI không cấp quyền. Trường `Source/Status` phân biệt quy định, quyết định dự án và điều kiện cần xác nhận trước vận hành thật.
 
 ### UC-AUTH-001 — Đăng nhập và xác lập ngữ cảnh quyền
 
@@ -32,7 +32,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Precondition / Trigger:** Round tiếp nhận khảo sát / SV tự khai hoặc dữ liệu được đồng bộ.
 - **Input:** tín chỉ đạt, tổng tín chỉ, GPA, tình trạng kỷ luật/truy cứu, evidence/source time.
 - **Main Flow:** lưu snapshot → kiểm QĐ5964/policy version → verifier đối chiếu → confirm hoặc reject có lý do.
-- **Alternative/Exception:** dữ liệu chưa xác nhận giữ `PENDING`; ngoại lệ cần decision_ref; actor cụ thể còn OPEN.
+- **Alternative/Exception:** dữ liệu chưa xác nhận giữ `PENDING`; ngoại lệ cần decision_ref; chỉ người được Khoa giao `ELIGIBILITY_VERIFIER` theo đợt mới xác nhận.
 - **Output / Postcondition:** EligibilitySnapshot bất biến `CONFIRMED/REJECTED`, đủ căn cứ mở đăng ký.
 - **Rule / Permission / Data:** BR-ELIG-001..002; SV chỉ sửa trước submit, verifier đúng round mới confirm; EligibilitySnapshot/Exception.
 - **Source / Status:** SRC-QD-2919, SRC-QD-5964, SRC-GVHD-NV4-001 / rule `CONFIRMED`, actor được Khoa giao theo round.
@@ -64,10 +64,10 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Primary Actor / Supporting Actor:** SV / TBM; GVHD tiềm năng chỉ xem khi được phân công.
 - **Precondition / Trigger:** SV thuộc round và đủ điều kiện / không chọn topic có sẵn.
 - **Input:** title, mô tả, phạm vi Bộ môn/đợt; chưa lưu GVHD đề xuất khi chưa có rule xác định.
-- **Main Flow:** SV gửi đề xuất → TBM xử lý tại UC-TOPIC-003; việc GVHD đồng ý/từ chối áp dụng cho đăng ký ở UC-ASSIGN-001, không phải một state riêng của Topic.
+- **Main Flow:** SV lập đề tài cùng bản nháp đăng ký nhóm; từng thành viên tự xác nhận; nhóm gửi đăng ký trước, sau đó TBM mới xét đề tài tại UC-TOPIC-003. Người được phân công làm GVHD đồng ý trước khi chốt.
 - **Alternative/Exception:** thiếu thông tin thì TBM trả sửa; không tự tạo AdvisorAssignment.
-- **Output / Postcondition:** Topic `DRAFT → SUBMITTED`.
-- **Rule / Permission / Data:** BR-TOPIC-001; SV tạo, TBM đúng scope review; Topic.
+- **Output / Postcondition:** Topic và TopicRegistration cùng được gửi; chưa tạo Thesis.
+- **Rule / Permission / Data:** BR-TOPIC-001, BR-REG-005..006; SV tạo, TBM đúng scope review; Topic.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / `CONFIRMED`.
 
 ### UC-TOPIC-003 — Duyệt và chỉnh tên đề tài
@@ -75,7 +75,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Primary Actor / Supporting Actor:** TBM / proposer.
 - **Precondition / Trigger:** Topic `SUBMITTED` / có đề tài chờ xử lý.
 - **Input:** decision, title chuẩn hóa, reason.
-- **Main Flow:** kiểm scope/khả thi/trùng → tạo TopicTitleVersion nếu chỉnh → approve và mở đăng ký.
+- **Main Flow:** kiểm scope/khả thi/trùng → tạo TopicTitleVersion nếu chỉnh → approve. Với đề tài do GV đề xuất, sau đó mở đăng ký; với đề tài do SV đề xuất, nhóm đã đăng ký trước và tiếp tục bước phân công GVHD.
 - **Alternative/Exception:** return/reject có lý do; title cũ không bị ghi đè.
 - **Output / Postcondition:** `SUBMITTED → APPROVED/RETURNED/REJECTED`.
 - **Rule / Permission / Data:** BR-TOPIC-001..002; chỉ TBM đúng scope approve/chỉnh; Topic, TopicTitleVersion.
@@ -84,34 +84,34 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 ### UC-REG-001 — Đăng ký một đề tài
 
 - **Primary Actor / Supporting Actor:** SV / hệ thống.
-- **Precondition / Trigger:** Eligibility confirmed, round/topic mở / SV chọn topic.
-- **Input:** topicId, danh sách 1–3 studentId, coordinator.
-- **Main Flow:** kiểm từng member chưa có active registration/round → kiểm capacity → tạo registration/member → submit.
+- **Precondition / Trigger:** Eligibility confirmed, round mở; topic GV đã APPROVED hoặc topic SV đang gửi cùng nhóm / SV đăng ký.
+- **Input:** topicId hoặc đề xuất topic SV, danh sách 1–3 studentId, coordinator; từng thành viên tự xác nhận.
+- **Main Flow:** kiểm từng member chưa có active registration/round → tạo DRAFT registration/member → từng thành viên đăng nhập ACCEPTED → kiểm capacity/eligibility → SUBMITTED. Topic do SV đề xuất được TBM xét sau bước này.
 - **Alternative/Exception:** nguyện vọng thứ hai, member trùng, >3, topic đóng hoặc không đủ điều kiện thì `409/422`.
 - **Output / Postcondition:** TopicRegistration `SUBMITTED`; chưa tạo Thesis.
-- **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005; thành viên xác nhận tham gia theo policy; TopicRegistration/RegistrationMember.
+- **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005..006; từng thành viên phải tự xác nhận; TopicRegistration/RegistrationMember.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-MAU-01A/01B / `CONFIRMED_PROJECT_DECISION`; danh sách khóa sau SUBMITTED.
 
 ### UC-REG-002 — Xử lý đăng ký nhóm
 
 - **Primary Actor / Supporting Actor:** SV/coordinator / các thành viên, hệ thống.
-- **Precondition / Trigger:** Round/topic mở, eligibility CONFIRMED / SV tự lập nhóm.
-- **Input:** topicId, member list 1–3; người tạo là coordinator.
-- **Main Flow:** kiểm 1–3 member cùng department và chưa có active registration → SV gửi một registration chung; danh sách khóa khi SUBMITTED.
-- **Alternative/Exception:** thành viên đã đăng ký nơi khác hoặc không đủ điều kiện thì không submit; không có lecturer add/merge. Cơ chế đồng thuận từng thành viên còn cần chốt.
+- **Precondition / Trigger:** Round mở, eligibility CONFIRMED / SV tự lập nhóm.
+- **Input:** topicId hoặc đề tài SV đề xuất, member list 1–3; người tạo là coordinator.
+- **Main Flow:** kiểm 1–3 member cùng department và chưa có active registration → tạo lời mời PENDING → từng SV tự ACCEPTED bằng tài khoản của mình → gửi một registration chung; danh sách khóa khi SUBMITTED.
+- **Alternative/Exception:** thành viên từ chối hoặc còn PENDING, đã đăng ký nơi khác hoặc không đủ điều kiện thì không submit; trước khi gửi có thể sửa bản nháp và giải phóng lời mời bị từ chối. Không có lecturer add/merge.
 - **Output / Postcondition:** membership snapshot gắn registration; `DRAFT → SUBMITTED`.
-- **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005; SV không có quyền nghiệp vụ cao hơn vì coordinator; RegistrationMember.
+- **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005..006; SV không có quyền nghiệp vụ cao hơn vì coordinator; RegistrationMember.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / giới hạn `CONFIRMED_PROJECT_DECISION`; không có thao tác thêm người sau gửi.
 
 ### UC-ASSIGN-001 — GVHD nhận/từ chối và TBM phân công
 
 - **Primary Actor / Supporting Actor:** GVHD, TBM / hệ thống.
-- **Precondition / Trigger:** Registration `SUBMITTED` / GVHD nhận hàng đợi.
+- **Precondition / Trigger:** Registration `SUBMITTED`; topic GV đã duyệt hoặc topic SV chờ TBM xét / actor nhận hàng đợi theo nhánh.
 - **Input:** lecturer decision/reason; department finalization/reason.
-- **Main Flow:** GVHD accept/reject → TBM kiểm chỉ tiêu/conflict → khóa topic → finalize nguyên tử tạo Thesis, member, AdvisorAssignment.
+- **Main Flow:** Nhánh GV đề xuất: GV đề xuất accept/reject đăng ký. Nhánh SV đề xuất: TBM xét topic sau đăng ký, có thể return/reject/approve rồi chọn GVHD; GVHD được chọn accept/reject. Sau đó TBM kiểm chỉ tiêu/conflict → khóa topic → finalize nguyên tử tạo Thesis, member, AdvisorAssignment.
 - **Alternative/Exception:** reject trả SV; vượt chỉ tiêu/conflict/capacity/version conflict thì không finalize.
 - **Output / Postcondition:** `SUBMITTED → LECTURER_ACCEPTED → FINALIZED` hoặc `SUBMITTED → LECTURER_REJECTED`; chỉ nhánh chốt tạo Thesis.
-- **Rule / Permission / Data:** BR-REG-003; GVHD chỉ decision đăng ký liên quan, TBM đúng scope mới finalize; TopicRegistration, Thesis, ThesisMember, AdvisorAssignment.
+- **Rule / Permission / Data:** BR-REG-003, BR-REG-006; GVHD chỉ decision khi là người đề xuất hoặc được TBM phân công, TBM đúng scope mới finalize; TopicRegistration, Thesis, ThesisMember, AdvisorAssignment.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001, SRC-QD-2919 / `CONFIRMED_PROJECT_DECISION`.
 
 ### UC-WORK-001 — Phân công công việc từng thành viên

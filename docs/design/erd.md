@@ -1,6 +1,6 @@
 # ERD logical + physical PostgreSQL
 
-> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0006. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
+> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0007. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
 
 ## Ký hiệu
 
@@ -170,6 +170,9 @@ erDiagram
     uuid registration_id FK,UK
     uuid round_id FK,UK
     uuid student_id FK,UK
+    uuid responded_by_user_id FK
+    varchar consent_status
+    timestamp responded_at
     uuid id PK
   }
   THESIS {
@@ -583,6 +586,7 @@ erDiagram
 | registration_member.registration_id | topic_registration.id | NOT NULL | 0..N / 1 | fk_registration_member_registration_id_round_id_topic_registration |
 | registration_member.round_id | topic_registration.round_id | NOT NULL | 0..N / 1 | fk_registration_member_registration_id_round_id_topic_registration |
 | registration_member.student_id | student_profile.id | NOT NULL | 0..N / 1 | fk_registration_member_student_id_student_profile |
+| registration_member.responded_by_user_id | user_account.id | NULL | 0..N / 0..1 | fk_registration_member_responded_by_user_id_user_account |
 | rubric_assignment.round_id | thesis_round.id | NULL | 0..N / 0..1 | fk_rubric_assignment_round_id_thesis_round |
 | rubric_assignment.rubric_template_id | rubric_template.id | NOT NULL | 0..N / 1 | fk_rubric_assignment_rubric_template_id_rubric_template |
 | rubric_assignment.session_id | defense_session.id | NULL | 0..N / 0..1 | fk_rubric_assignment_session_id_defense_session |
@@ -753,6 +757,6 @@ erDiagram
 - `search_index_metadata.document_version_id` NULL được cho nguồn nhập/official, nhưng `repository_item_id` luôn NOT NULL.
 - `similarity_match.source_repository_item_id` là FK tùy chọn đến nguồn, song song với `source_document_version_id` của tài liệu vận hành.
 
-Dữ liệu thực tế theo PostgreSQL 17 local sau 0006: 62 entity/614 cột; thêm `alembic_version` là 63 bảng/615 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
+Dữ liệu thực tế theo PostgreSQL 17 local sau 0007: 62 entity/617 cột; thêm `alembic_version` là 63 bảng/618 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
 
 Migration 0004 thêm `repository_item.external_source_id` (UNIQUE) và `source_url` (HTTPS); giữ ID nguồn ổn định để đồng bộ PostgreSQL/Qdrant.

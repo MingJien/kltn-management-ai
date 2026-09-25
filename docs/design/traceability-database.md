@@ -10,7 +10,7 @@
 | UC-EXP-001 | REQ-EXP-001 | LecturerExpertise, ExpertiseEvidence | Unique lecturer+version; state SELF_DECLARED; verifier nullable |
 | UC-TOPIC-001/002 | REQ-TOPIC-001/002 | Topic, TopicTitleVersion | Topic→versions 1:N; proposer FK; title version unique |
 | UC-TOPIC-003 | BR-TOPIC-001 | Topic, TopicTitleVersion, PositionAssignment | state/version; decision actor; title history |
-| UC-REG-001/002 | REQ-REG-001/002/005; BR-REG-001/002/005 | TopicRegistration, RegistrationMember | Composite FK; unique active student+round; one coordinator; count app |
+| UC-REG-001/002 | REQ-REG-001/002/005/006; BR-REG-001/002/005/006 | Topic, TopicRegistration, RegistrationMember | Composite FK; unique active student+round; one coordinator; consent actor/time CHECK (0007); count, self-response và thứ tự Topic SV do service kiểm |
 | UC-ASSIGN-001 | REQ/BR-REG-003 | Thesis, ThesisMember, AdvisorAssignment | Atomic finalize; unique Thesis topic/round; active primary advisor |
 | UC-WORK-001 | REQ/BR-REG-004 | MemberWorkAssignment | FK ThesisMember; unique member+version; review state |
 | UC-PROP-001 | REQ-PROP-001; BR-PROP-001 | Proposal, ProposalVersion, StoredFile | 1:1 Thesis; unique version; immutable hash |
@@ -52,7 +52,7 @@ Không phải đoán cardinality. Người Khoa được giao `ELIGIBILITY_VERIF
 
 ### VS-DB-04 — Milestone → progress → GVHD review
 
-`SRC-GVHD-NV4-001 + SRC-MAU-02 + SRC-HP-IN4299N` → REQ-PROG-001/002 → BR-PROG-001 → UC-PROG-001/002 → ProgressMilestone/Report/Review → versioned milestone, report version, reviewer FK. OPEN deadline không cản schema.
+`SRC-GVHD-NV4-001 + SRC-MAU-02 + SRC-HP-IN4299N` → REQ-PROG-001/002 → BR-PROG-001 → UC-PROG-001/002 → ProgressMilestone/Report/Review → versioned milestone, report version, reviewer FK. Ngày cụ thể được nhập theo đợt, không khóa cứng trong schema.
 
 ### VS-DB-05 — Document → versions → similarity record
 

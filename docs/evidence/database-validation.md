@@ -18,6 +18,6 @@ Ngày kiểm chứng: 25/09/2026. Phạm vi: cấu trúc CSDL và ràng buộc �
 
 Khóa ngoại `signature_confirmation(proposal_id, proposal_version_no)` tham chiếu `proposal_version(proposal_id, version_no)`; cặp cột đích có UNIQUE. Do đó xác nhận ký gắn với đúng bản đề cương, không chỉ với đề cương nói chung.
 
-PostgreSQL trực tiếp kiểm tra PK, FK, UNIQUE, CHECK và một số unique index. Các quy tắc cần đếm nhiều dòng hoặc xác minh thẩm quyền, quorum, công thức điểm và khóa sau ký phải được thực thi ở backend trong transaction; xem [quy tắc CSDL](../design/database-rules.md). Các câu hỏi nghiệp vụ đã được chốt cho baseline thiết kế ở [quyết định hiện tại](../requirements/open-issues.md); đoạn này là kết quả lịch sử của revision 0002, không mô tả trạng thái 0005.
+PostgreSQL trực tiếp kiểm tra PK, FK, UNIQUE, CHECK và một số unique index. Các quy tắc cần đếm nhiều dòng hoặc xác minh thẩm quyền, quorum, công thức điểm và khóa sau ký phải được thực thi ở backend trong transaction; xem [quy tắc CSDL](../design/database-rules.md). Các câu hỏi nghiệp vụ đã được chốt cho baseline thiết kế ở [quyết định thiết kế hiện tại](../decisions/quyet-dinh-du-an-2026-09-25.md); đoạn này là kết quả lịch sử của revision 0002, không mô tả trạng thái 0005.
 
 File [SQL tạo CSDL mới](../../database/kltn-init-empty.sql) chỉ dùng với database trống. Khi cập nhật database đã tồn tại, dùng các revision trong [Alembic migrations](../../backend/migrations/versions/) và chạy `alembic upgrade head` sau khi review.
