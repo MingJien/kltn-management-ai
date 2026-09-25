@@ -1,6 +1,6 @@
 # ERD logical + physical PostgreSQL
 
-> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0005. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
+> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0006. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
 
 ## Ký hiệu
 
@@ -753,6 +753,6 @@ erDiagram
 - `search_index_metadata.document_version_id` NULL được cho nguồn nhập/official, nhưng `repository_item_id` luôn NOT NULL.
 - `similarity_match.source_repository_item_id` là FK tùy chọn đến nguồn, song song với `source_document_version_id` của tài liệu vận hành.
 
-Dữ liệu thực tế theo PostgreSQL 17 local sau 0005: 62 entity/614 cột; thêm `alembic_version` là 63 bảng/615 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
+Dữ liệu thực tế theo PostgreSQL 17 local sau 0006: 62 entity/614 cột; thêm `alembic_version` là 63 bảng/615 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
 
 Migration 0004 thêm `repository_item.external_source_id` (UNIQUE) và `source_url` (HTTPS); giữ ID nguồn ổn định để đồng bộ PostgreSQL/Qdrant.

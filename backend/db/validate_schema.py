@@ -52,7 +52,39 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0005"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0006"
+
+            # DB-41: the real Mẫu 6 baseline is present but cannot be used live
+            # until the Faculty resolves its conflict with QĐ 2919.
+            baseline = conn.execute(text("""
+                SELECT id, source_ref, state FROM rubric_template
+                WHERE code = 'MAU-06-HOIDONG' AND version_no = 1
+            """)).mappings().one()
+            assert baseline["source_ref"] == "SRC-MAU-06"
+            criteria = conn.execute(text("""
+                SELECT id, parent_id, code, label, max_points, criterion_type, order_no
+                FROM rubric_criterion WHERE rubric_template_id = :template_id
+                ORDER BY order_no
+            """), {"template_id": baseline["id"]}).mappings().all()
+            assert len(criteria) == 16
+            by_code = {row["code"]: row for row in criteria}
+            assert len(by_code) == 16
+            assert [row["code"] for row in criteria] == [
+                "1", "1.1", "1.2", "1.3", "2", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
+                "3", "3.1", "3.2", "3.3", "4",
+            ]
+            expected_groups = {"1": Decimal("2"), "2": Decimal("4"), "3": Decimal("4")}
+            for code, maximum in expected_groups.items():
+                group = by_code[code]
+                children = [row for row in criteria if row["parent_id"] == group["id"]]
+                assert group["criterion_type"] == "GROUP" and group["max_points"] == maximum
+                assert sum(row["max_points"] for row in children) == maximum
+            assert sum(row["criterion_type"] == "NORMAL" for row in criteria) == 12
+            assert by_code["1.1"]["label"] == "Chuyên cần"
+            assert by_code["3.3"]["label"].startswith("Thuyết trình lưu loát")
+            assert by_code["4"]["criterion_type"] == "BONUS"
+            assert by_code["4"]["max_points"] == Decimal("1")
+            passed.append("DB-41")
 
             faculty_id, department_id = uid(), uid()
             conn.execute(m.Faculty.__table__.insert().values(id=faculty_id, code="SYN-FAC", name="Khoa gia lap"))
@@ -541,7 +573,7 @@ def main() -> int:
             ), "delete referenced account")
             passed.append("DB-18")
 
-            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,41)}
+            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,42)}
             assert set(passed)==expected, sorted(expected-set(passed))
         except Exception as exc:
             print("FAIL "+type(exc).__name__+": "+str(exc))

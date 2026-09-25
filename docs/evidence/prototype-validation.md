@@ -4,12 +4,12 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 
 | Kiểm tra thực chạy | Lệnh / cách chạy | Kết quả |
 | --- | --- | --- |
-| Migration hiện tại | `.\.venv\Scripts\python.exe -m alembic upgrade head` trên `kltn_dev` | PASS; head 20260925_0005 |
+| Migration hiện tại | `.\.venv\Scripts\python.exe -m alembic upgrade head` trên `kltn_dev` | PASS; head 20260925_0006 |
 | Drift model/schema | `.\.venv\Scripts\python.exe -m alembic check` | PASS, “No new upgrade operations detected” |
-| Kiểm thử ràng buộc | `.\.venv\Scripts\python.exe -m backend.db.validate_schema` | PASS DB-01..40; transaction rollback |
+| Kiểm thử ràng buộc | `.\.venv\Scripts\python.exe -m backend.db.validate_schema` | PASS DB-01..41; transaction rollback |
 | Test API/AI | `.\.venv\Scripts\python.exe -m pytest tests -q` | 8 passed; 1 warning về TestClient/httpx của Starlette |
 | Migration từ số 0 | `.\.venv\Scripts\python.exe -m tools.validate_migrations_disposable` | PASS upgrade/check/DB validation/seed giả/downgrade -1/upgrade/check trên schema ngẫu nhiên; chỉ schema đó được xóa |
-| File SQL tạo mới | `.\.venv\Scripts\python.exe -m tools.validate_sql_snapshot` | PASS; 63 bảng, head 20260925_0005 trên schema trống tạm |
+| File SQL tạo mới | `.\.venv\Scripts\python.exe -m tools.validate_sql_snapshot` | PASS; 63 bảng, head 20260925_0006; 16 tiêu chí Mẫu 6 DRAFT trên schema trống tạm |
 | Cấu trúc vật lý `kltn_dev` | SQLAlchemy Inspector | 63 bảng/615 cột; `thesis` 0 row sau test |
 | Build/typecheck React | `npm run build --prefix frontend` | PASS, Vite 7.3.6 |
 | OpenAPI | `openapi_spec_validator.validate` cho design/runtime JSON | PASS cả hai |
@@ -26,6 +26,13 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 - `tools.validate_migrations_disposable`: PASS upgrade/check/DB validation/seed giả/downgrade 1 revision/re-upgrade/check trên schema tạm. `tools.validate_sql_snapshot`: PASS 63 bảng, head 0005 trên schema tạm.
 - `pytest -q`: 8 passed (1 cảnh báo TestClient/httpx). `npm run build --prefix frontend`: PASS. OpenAPI design validator: PASS; 8 file Draw.io parse XML: PASS.
 - DB-40 xác nhận `COMMENT_ONLY` lưu được cho GV góp ý chéo, còn giá trị decision ngoài tập bị từ chối. Quyền chỉ GVHD chính được `CONFIRM` là **hợp đồng service**, chưa có endpoint runtime tương ứng. Việc in lại Mẫu 9 trước chữ ký cũng là **thiết kế**, chưa có bản mẫu trắng để chạy thử.
+
+## Kiểm chứng bổ sung migration 0006
+
+- Đối chiếu migration với `SRC-MAU-06`: cả 16 dòng mã, tên và điểm tối đa khớp biểu mẫu nguồn; 3 nhóm 2/4/4, 12 tiêu chí con, 1 thưởng ≤1. Dữ liệu nạp ở `DRAFT`, chưa có `RubricAssignment` thật.
+- Nâng `kltn_dev` từ 0005 → 0006: PASS. `alembic check`: không có drift. DB-01..41 PASS, gồm DB-41 kiểm rubric thật; dữ liệu thử được rollback.
+- `tools.validate_migrations_disposable`: PASS nâng từ đầu/check/DB validation/seed giả/hạ 0006/nâng lại/check. `tools.validate_sql_snapshot`: PASS trên schema trống, head 0006, 63 bảng và 16 dòng rubric Mẫu 6.
+- `pytest -q`: 8 passed; build React và OpenAPI/Draw.io không đổi do đây là migration dữ liệu. Chưa kiểm runtime chấm thật, và Khoa chưa xác nhận hiệu lực Mẫu 6 khi QĐ 2919 nêu cơ cấu khác.
 
 ## Điều được chứng minh và chưa được chứng minh
 

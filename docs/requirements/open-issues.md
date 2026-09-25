@@ -19,6 +19,6 @@ Phạm vi thiết kế hiện tại đã có quyết định xử lý cho các c
 
 ## Trạng thái thực hiện
 
-- CSDL head `20260925_0005` đã bổ sung `COMMENT_ONLY` bằng Alembic migration; `kltn_dev` được nâng từ 0004, kiểm thử rollback dữ liệu giả. [Đối chiếu CSDL](../design/doi-chieu-quyet-dinh-csdl.md) nêu bảng/cột tương ứng.
+- CSDL head `20260925_0006` đã bổ sung `COMMENT_ONLY` (0005) và rubric Mẫu 6 đầy đủ ở trạng thái DRAFT (0006) bằng Alembic; `kltn_dev` đã nâng tới head, kiểm thử rollback dữ liệu giả. [Đối chiếu CSDL](../design/doi-chieu-quyet-dinh-csdl.md) nêu bảng/cột tương ứng.
 - Prototype hiện chạy một lát cắt đăng ký nhóm và truy xuất AI trên dữ liệu giả. Xác nhận expertise/eligibility, chấm thật, xuất Mẫu 9 và kiểm tra tương đồng toàn văn **chưa phải runtime hoàn chỉnh**; xem [minh chứng](../evidence/prototype-validation.md).
 - Hai việc có nguồn pháp lý mâu thuẫn (OPEN-09/12) được **chốt baseline thiết kế**, giữ điểm kiểm soát trước triển khai thật. Không tự gọi quyết định dự án là văn bản thay thế QĐ của Trường.

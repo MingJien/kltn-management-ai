@@ -1,6 +1,6 @@
 # Giải thích CSDL PostgreSQL cho người mới
 
-Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau các migration `20260920_0001` → `20260925_0005`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 614 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 615 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 614 trong từ điển chỉ tính 62 bảng của mô hình.
+Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau các migration `20260920_0001` → `20260925_0006`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 614 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 615 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 614 trong từ điển chỉ tính 62 bảng của mô hình.
 
 ## Đọc schema như thế nào
 
@@ -218,7 +218,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `rubric_criterion` — nhóm và tiêu chí con của mẫu chấm
 
-`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Mẫu 6 baseline có ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Cơ cấu QĐ2919 khác; Khoa phải xác nhận mẫu có hiệu lực trước khi chấm thật.
+`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Migration 0006 nạp Mẫu 6 DRAFT với ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; xem [bảng rubric đầy đủ](rubric-mau-6.md); **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Cơ cấu QĐ2919 khác; Khoa phải xác nhận mẫu có hiệu lực trước khi chấm thật.
 
 ### `rubric_assignment` — chọn mẫu chấm cho đợt hoặc buổi
 

@@ -1,4 +1,4 @@
--- KLTN PostgreSQL schema, Alembic revision 20260925_0005.
+-- KLTN PostgreSQL schema, Alembic revision 20260925_0006.
 -- Chạy một lần trên database PostgreSQL mới và trống.
 -- Không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
 -- Database đã có bảng phải cập nhật bằng Alembic migration, không chạy lại file này.
@@ -1285,5 +1285,43 @@ ALTER TABLE progress_review DROP CONSTRAINT ck_progress_review_decision;
 ALTER TABLE progress_review ADD CONSTRAINT ck_progress_review_decision CHECK (decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED'));
 
 UPDATE alembic_version SET version_num='20260925_0005' WHERE alembic_version.version_num = '20260925_0004';
+
+-- Running upgrade 20260925_0005 -> 20260925_0006
+
+INSERT INTO rubric_template (id, code, name, version_no, source_ref, state) VALUES ('1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'MAU-06-HOIDONG', 'Mẫu 6 - Phiếu đánh giá Hội đồng', 1, 'SRC-MAU-06', 'DRAFT');
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('0dd2508a-5a90-54ac-a4b3-7cf55787708c', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', NULL, '1', 'Hình thức', 2.0, 'GROUP', 1);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('62db15a8-f465-5eca-a46f-ef739bb83a51', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '0dd2508a-5a90-54ac-a4b3-7cf55787708c', '1.1', 'Chuyên cần', 1.0, 'NORMAL', 2);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('e7d96f4f-0818-543f-af45-8f44fcc200e1', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '0dd2508a-5a90-54ac-a4b3-7cf55787708c', '1.2', 'Cấu trúc khóa luận/đồ án hợp lý, bố cục chặt chẽ, rõ ràng, trình bày theo đúng quy định. Đúng kỹ thuật soạn thảo văn bản, không có dấu hiệu đạo văn.', 0.5, 'NORMAL', 3);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('1556b1ae-9767-5738-a6da-09e991771b43', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '0dd2508a-5a90-54ac-a4b3-7cf55787708c', '1.3', 'Trích dẫn và trình bày tài liệu tham khảo, hình vẽ, bảng biểu rõ ràng, đúng quy định, không có lỗi chính tả, không lỗi in ấn.', 0.5, 'NORMAL', 4);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', NULL, '2', 'Nội dung', 4.0, 'GROUP', 5);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('abbd8794-1f03-5544-b3d1-51543ffca274', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.1', 'Nêu được tính cấp thiết của đề tài, làm rõ tổng quan các công trình nghiên cứu, xác định mục đích, nhiệm vụ, đối tượng, phạm vi, nghiên cứu rõ ràng, hợp lý.', 0.5, 'NORMAL', 6);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('7714905e-9934-5e36-8423-62f18ec79188', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.2', 'Nội dung nghiên cứu: Khối lượng công việc hợp lí; tư liệu phong phú, chính xác, phù hợp mục đích nghiên cứu.', 0.5, 'NORMAL', 7);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('1e288dbb-a1d2-5757-a952-4651ef02db4f', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.3', 'Phương pháp nghiên cứu: Biết vận dụng các phương pháp nghiên cứu phù hợp với nội dung nghiên cứu của đề tài; trình bày nội dung có hệ thống khoa học, logic.', 1.0, 'NORMAL', 8);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('5f166ff2-78d3-53e9-872f-a322c571be85', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.4', 'Khả năng áp dụng các giải thuật hiệu quả, số liệu chính xác; Khả năng giải quyết vấn đề, đầy đủ minh chứng khoa học; Khả năng suy luận, phân tích, tổng hợp tốt; có khả năng sáng tạo.', 1.0, 'NORMAL', 9);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('01adff2f-32e4-5eb3-ade9-0418b049c474', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.5', 'Kết quả nghiên cứu: - Nêu được kết quả đạt được phù hợp với mục tiêu nghiên cứu của đề tài; - Kết quả có giá trị về mặt lý luận và thực tiễn khoa học; - Có đánh giá, nhận xét kết quả, dự đoán tương lai (nếu cần).', 0.5, 'NORMAL', 10);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('d830c181-6f0b-59c1-87e1-e3fb0b4305ec', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'c4366e1d-3640-5941-aa47-bcaf5ef1a90f', '2.6', 'Kết luận, kiến nghị phù hợp với nội dung nghiên cứu.', 0.5, 'NORMAL', 11);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('8c6e81da-5724-5e97-9cb8-5383adb50764', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', NULL, '3', 'Demo và trả lời câu hỏi', 4.0, 'GROUP', 12);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('00d41d33-360d-5db4-a00b-3ed66b0cc129', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '8c6e81da-5724-5e97-9cb8-5383adb50764', '3.1', 'Demo không có lỗi, không vi phạm luật an ninh mạng/luật sở hữu trí tuệ; Có quy trình sử dụng/hướng dẫn sử dụng rõ ràng; Có triển khai, có khả năng ứng dụng.', 1.0, 'NORMAL', 13);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('3a45fcb7-2cee-528c-b1d3-e9b7daeb09cd', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '8c6e81da-5724-5e97-9cb8-5383adb50764', '3.2', 'Giao diện thân thiện, hợp lý; Các chức năng đáp ứng được yêu cầu của đề tài; Độ tin cậy, độ tương thích; Tốc độ, bảo mật, chi phí hợp lý.', 2.0, 'NORMAL', 14);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('a7397279-04c9-5a75-81a8-6e72b9156002', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', '8c6e81da-5724-5e97-9cb8-5383adb50764', '3.3', 'Thuyết trình lưu loát, slide trình chiếu rõ ràng, có sáng tạo; Trả lời đúng, đáp ứng được yêu cầu các câu hỏi đặt ra.', 1.0, 'NORMAL', 15);
+
+INSERT INTO rubric_criterion (id, rubric_template_id, parent_id, code, label, max_points, criterion_type, order_no) VALUES ('6b93df99-d044-5fce-a447-383a6f10dd06', '1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', NULL, '4', 'Điểm thưởng (nếu có công bố kết quả nghiên cứu trên tập chí khoa học hoặc hội thảo trong và ngoài nước). Tổng điểm là 10 (kể cả điểm thưởng)', 1.0, 'BONUS', 16);
+
+UPDATE alembic_version SET version_num='20260925_0006' WHERE alembic_version.version_num = '20260925_0005';
 
 COMMIT;

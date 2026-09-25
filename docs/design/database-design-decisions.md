@@ -54,7 +54,7 @@
 
 ## Ranh giới migration
 
-Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`. Head hiện tại là `20260925_0005` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định mới ngày 25/09 về nhóm, mốc, điều kiện bảo vệ và rubric đã có bảng/cột biểu diễn nên không cần migration giả tạo.
+Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`, `0006` nạp 16 dòng rubric Mẫu 6 trạng thái DRAFT. Head hiện tại là `20260925_0006` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định ngày 25/09 về nhóm, mốc và điều kiện bảo vệ đã có bảng/cột biểu diễn. Mẫu 6 cần một migration dữ liệu thật để mọi database mới/cũ có cùng rubric baseline, nhưng chưa tự kích hoạt chấm.
 
 | ID | Quyết định bổ sung | Hệ quả | Trạng thái |
 | --- | --- | --- | --- |

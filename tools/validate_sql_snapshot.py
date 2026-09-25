@@ -32,10 +32,15 @@ def main() -> int:
             with connection.cursor() as cursor:
                 cursor.execute(script, prepare=False)
                 cursor.execute("SELECT version_num FROM alembic_version")
-                assert cursor.fetchone()[0] == "20260925_0005"
+                assert cursor.fetchone()[0] == "20260925_0006"
                 cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema=%s", (name,))
                 assert cursor.fetchone()[0] == 63
-        print("PASS init SQL on empty disposable schema: 63 tables, head 20260925_0005")
+                cursor.execute("SELECT id, state FROM rubric_template WHERE code='MAU-06-HOIDONG' AND version_no=1")
+                template_id, state = cursor.fetchone()
+                assert state == "DRAFT"
+                cursor.execute("SELECT count(*) FROM rubric_criterion WHERE rubric_template_id=%s", (template_id,))
+                assert cursor.fetchone()[0] == 16
+        print("PASS init SQL on empty disposable schema: 63 tables, head 20260925_0006")
         return 0
     finally:
         with engine.begin() as conn:

@@ -1,6 +1,6 @@
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260925_0005. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; dữ liệu synthetic mới được dùng trong validation.
+> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260925_0006. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
 
 ## Quy ước
 
@@ -1131,6 +1131,6 @@
 ## Kiểm soát đồng bộ
 
 - Tổng số bảng: 62.
-- Tổng số field: 614 (sau migration 20260925_0005).
+- Tổng số field: 614 (sau migration 20260925_0006).
 - Migration và model là nguồn physical; thay đổi schema phải cập nhật migration mới và tái sinh tài liệu.
 - Không có field plagiarism verdict; threshold similarity không hard-code 90%.

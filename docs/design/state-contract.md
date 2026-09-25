@@ -1,6 +1,6 @@
 # Hợp đồng trạng thái NV4 đến hết CSDL
 
-Tài liệu này là danh sách trạng thái canonical cho thiết kế logic và schema head `20260925_0005`. Tên enum giữ nguyên để đối chiếu SQLAlchemy/Alembic. CHECK trong PostgreSQL chỉ giới hạn **tập giá trị**; transition, guard và quyền thuộc application service về sau, chưa được tuyên bố là DB đã enforce. Nguồn nghiệp vụ: `SRC-GVHD-NV4-001`, `SRC-QD-2919`, `SRC-MAU-06/09` và các quyết định thiết kế trong `database-design-decisions.md`.
+Tài liệu này là danh sách trạng thái canonical cho thiết kế logic và schema head `20260925_0006`. Tên enum giữ nguyên để đối chiếu SQLAlchemy/Alembic. CHECK trong PostgreSQL chỉ giới hạn **tập giá trị**; transition, guard và quyền thuộc application service về sau, chưa được tuyên bố là DB đã enforce. Nguồn nghiệp vụ: `SRC-GVHD-NV4-001`, `SRC-QD-2919`, `SRC-MAU-06/09` và các quyết định thiết kế trong `database-design-decisions.md`.
 
 | Aggregate/bảng | Tập trạng thái trong DB | Luồng hợp lệ chính | Guard và actor quyết định | Điểm còn OPEN |
 | --- | --- | --- | --- | --- |

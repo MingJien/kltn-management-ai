@@ -1,6 +1,6 @@
 # Rà soát phạm vi bảng CSDL
 
-Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0005`. Phân loại theo nhu cầu nghiệp vụ, không phải lệnh xóa bảng. Tất cả 62 bảng được tạo trong schema hiện tại; `CORE-NOW` nghĩa là cần cho thiết kế/validation CSDL NV4, còn runtime nghiệp vụ thuộc các vòng triển khai sau. `LATER-PHASE` nghĩa là chưa có workflow kho/AI đầy đủ; một số bảng đã được dùng để thử nạp metadata/chỉ mục AI. `TECHNICAL-SUPPORT` là hạ tầng lưu tệp/audit. API/React/AI prototype hiện có; chỉ các endpoint và màn hình được nêu trong README là runtime.
+Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0006`. Phân loại theo nhu cầu nghiệp vụ, không phải lệnh xóa bảng. Tất cả 62 bảng được tạo trong schema hiện tại; `CORE-NOW` nghĩa là cần cho thiết kế/validation CSDL NV4, còn runtime nghiệp vụ thuộc các vòng triển khai sau. `LATER-PHASE` nghĩa là chưa có workflow kho/AI đầy đủ; một số bảng đã được dùng để thử nạp metadata/chỉ mục AI. `TECHNICAL-SUPPORT` là hạ tầng lưu tệp/audit. API/React/AI prototype hiện có; chỉ các endpoint và màn hình được nêu trong README là runtime.
 
 | Table | Nhóm | Requirement/UC | Lý do | Dùng ngay hay sau |
 | --- | --- | --- | --- | --- |

@@ -6,19 +6,19 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 
 | Muốn xem | Tệp |
 | --- | --- |
-| Quyết định mới và điều chưa chốt | [Quyết định 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [vấn đề còn mở](docs/requirements/open-issues.md), [18 câu hỏi GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
+| Quyết định mới và điều chưa chốt | [Quyết định 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [điều kiện trước vận hành thật](docs/requirements/open-issues.md), [18 câu hỏi GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
 | Nghiệp vụ, vai trò, use case, quyền | [Yêu cầu](docs/requirements/business-requirements.md), [quy tắc](docs/requirements/business-rules.md), [quy trình](docs/requirements/business-process.md), [use case](docs/requirements/use-case-catalog.md), [phân quyền](docs/requirements/permission-matrix.md) |
-| CSDL và ý nghĩa bảng/cột | [ERD](docs/design/erd.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [giải thích dễ đọc](docs/design/database-explained.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
+| CSDL và ý nghĩa bảng/cột | [ERD](docs/design/erd.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [giải thích dễ đọc](docs/design/database-explained.md), [rubric Mẫu 6](docs/design/rubric-mau-6.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
 | Tệp CSDL PostgreSQL | [Tạo database mới](database/kltn-init-empty.sql), [cách dùng](database/README.md). Hai tệp SQL thao tác pgAdmin (`kltn-ai-workbench.sql`, `kltn-ai-updates.sql`) chỉ lưu trên máy. |
-| Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0005; **không chạy lại file SQL tạo mới** |
+| Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0006; **không chạy lại file SQL tạo mới** |
 | API và giao diện | [FastAPI](backend/api/main.py), [OpenAPI runtime](docs/prototype/openapi-runtime.json), [thiết kế API toàn miền](docs/design/openapi.yaml), [React](frontend/src/App.tsx), [wireframe](docs/design/wireframes.md) |
 | AI và biểu mẫu | [Prototype AI](docs/ai/prototype.md), [thiết kế tương đồng](docs/ai/similarity-design.md), [thiết kế xuất biểu mẫu](docs/design/xuat-bieu-mau.md) |
 | Kiểm chứng | [Minh chứng prototype](docs/evidence/prototype-validation.md), [ma trận truy vết](docs/design/traceability-matrix.md) |
 
 ## Trạng thái thực tế
 
-- CSDL có **62 bảng mô hình, 614 cột**; thêm `alembic_version` là **63 bảng, 615 cột vật lý**. `kltn_dev` trên máy kiểm tra ở revision `20260925_0005` và không có dòng `thesis` nghiệp vụ sau test. Các migration cũ 0001/0002 không sửa.
-- Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..40 PASS, gồm COMMENT_ONLY cho góp ý chéo.
+- CSDL có **62 bảng mô hình, 614 cột**; thêm `alembic_version` là **63 bảng, 615 cột vật lý**. `kltn_dev` trên máy kiểm tra ở revision `20260925_0006` và không có dòng `thesis` nghiệp vụ sau test. Các migration cũ 0001/0002 không sửa. Migration 0006 nạp Mẫu 6 đầy đủ ở trạng thái DRAFT; chưa gắn vào đợt chấm thật.
+- Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..41 PASS, gồm COMMENT_ONLY cho góp ý chéo và đầy đủ baseline Mẫu 6.
 - Prototype API chạy luồng SV tự gửi nhóm 1–3 → giảng viên đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm bị từ chối có thể đăng ký lại; đề tài đã chốt bị khóa. 8 pytest PASS, gồm kiểm luồng trên PostgreSQL và 5 tình huống similarity giả lập.
 - React có màn đề tài, đăng ký/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. Build/typecheck PASS. Đã chạy trình duyệt với schema PostgreSQL tạm và tài khoản giả lập: SV gửi nhóm 2 người → GV chấp nhận → TBM chốt → React hiển thị Thesis ACTIVE; schema tạm đã xóa.
 - FastEmbed pretrained + Qdrant local truy xuất được corpus giả lập có source_type/provenance; RAG trả citation ở chế độ RETRIEVAL_ONLY. **Không có Gemini key, không có kết luận chất lượng AI trên 7 KLTN, không có ngưỡng 90% đã chốt.**
