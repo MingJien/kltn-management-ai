@@ -23,3 +23,5 @@ services:
 volumes:
   postgres_data:
     name: kltn_postgres_data
+  qdrant_data:
+    name: kltn_qdrant_data

@@ -34,12 +34,13 @@ PostgreSQL bảo đảm invariant trong một hàng hoặc giữa các hàng có
 | DBR-24 | Mẫu 6 có ba nhóm 2/4/4, 12 tiêu chí con và bonus ≤1; group chỉ tổng hợp, không cộng hai lần; từng item không vượt max, tổng phiếu 0..10 | CHECK cục bộ cho bonus/tổng, FK hierarchy + đối chiếu rubric đầy đủ ở backend | DATABASE + APPLICATION | `rubric_template`, `rubric_criterion.parent_id`, `evaluation_item`, `evaluation`; SRC-MAU-06, CONFLICT-011 |
 | DBR-25 | FinalResult từng SV/session; mean hợp lệ, làm tròn 1 số | UNIQUE + calculation service versioned | DATABASE + APPLICATION | `final_result` |
 | DBR-26 | Bonus nằm trong total; không cộng lần hai | Calculation contract + CHECK | APPLICATION_ENFORCED | `bonus_average` chỉ giải thích |
-| DBR-27 | Minute version/replacement không self-loop, khóa hậu ký | CHECK/UNIQUE + state guard | DATABASE + APPLICATION | `minute_version`, `council_minute` |
+| DBR-27 | Minute version/replacement không self-loop; bản in chưa ký được VOID, khóa từ chữ ký đầu | CHECK/UNIQUE + state guard | DATABASE + APPLICATION | `minute_version`, `council_minute` |
 | DBR-28 | Chỉ Chair đúng Council ký minute | FK + role/scope query | APPLICATION_ENFORCED | `minute_signature.signer_member_id` |
 | DBR-29 | Không cascade delete lịch sử | FK `ON DELETE RESTRICT` | DATABASE_ENFORCED | Toàn bộ FK nghiệp vụ |
 | DBR-30 | Audit không chứa body/secret/PII thô | Chỉ hash/ID/reason tối thiểu | APPLICATION_ENFORCED + REVIEW | `audit_event`, `retrieval_audit` |
 | DBR-31 | GVPB không trùng assignment active cho cùng proposal/thesis; scope phải khớp đối tượng | XOR/scope CHECK + 2 partial unique index | DATABASE_ENFORCED | `reviewer_assignment`; `uq_reviewer_assignment_proposal/thesis` |
 | DBR-32 | Xác nhận/ký đề cương phải trỏ tới phiên bản thật của **cùng** hồ sơ đề cương | FK ghép `(proposal_id, proposal_version_no)` và CHECK dương; backend còn kiểm bản đó là bản được phép ký | DATABASE + APPLICATION | `signature_confirmation`, `fk_signature_confirmation_proposal_version_pair`; DB-26 |
+| DBR-33 | `progress_review.decision=COMMENT_ONLY` cho GV góp ý chéo, không xác nhận tiến độ; CONFIRM/REVISION_REQUIRED chỉ GVHD chính | CHECK tập decision ở DB; quyền và đổi ProgressReport.state ở service | DATABASE + APPLICATION | `progress_review`, migration 0005; DB-40 |
 
 ## Transaction boundary bắt buộc
 
@@ -47,7 +48,7 @@ PostgreSQL bảo đảm invariant trong một hàng hoặc giữa các hàng có
 2. **Nộp version:** kiểm StoredFile CLEAN; cấp versionNo dưới khóa aggregate; insert version bất biến và cập nhật current version trong một transaction.
 3. **Mở phiên/chấm:** khóa DefenseSession; kiểm Council VALIDATED, attendance/quorum, rubric assignment; sau đó mới chuyển READY/SCORING.
 4. **Submit/sửa phiếu:** xác định evaluator từ account→CouncilMember, kiểm present/owner; tính item/bonus/total phía server; dùng optimistic `row_version`.
-5. **Tổng hợp/biên bản:** khóa session; chốt scorer set; ghi FinalResult, MinuteVersion và AuditEvent; sau PRINTED/SIGNED không mutation.
+5. **Tổng hợp/biên bản:** khóa session; chốt scorer set; ghi FinalResult, MinuteVersion và AuditEvent; sau in trước ký có thể sửa qua bản mới và audit; từ chữ ký đầu không sửa.
 6. **Công bố/thu hồi:** cập nhật RepositoryItem và SearchIndexMetadata/outbox trong cùng transaction logic; index ngoài là dữ liệu dẫn xuất.
 
 ## Index phục vụ use case
@@ -61,3 +62,13 @@ PostgreSQL bảo đảm invariant trong một hàng hoặc giữa các hàng có
 ## Xóa và lịch sử
 
 Không cascade delete. Dữ liệu thử nghiệm có thể cleanup bằng transaction riêng trong validation; dữ liệu nghiệp vụ thật dùng state CANCELLED/REVOKED/VOID/ARCHIVED. Bảng version, Evaluation submitted, FinalResult, Signature và AuditEvent là append-only ở application layer.
+
+## Quy tắc corpus 0003
+
+- CHECK `origin_source_consistency` ngăn tài liệu lịch sử/biểu mẫu bị gắn Thesis giả hoặc nguồn chính thức bị gán loại THESIS.
+- CHECK `has_source_reference` yêu cầu ít nhất một nội dung/nguồn tham chiếu; importer vẫn phải xác minh tệp, quyền dùng và provenance ngoài CHECK.
+- Unique `published_document_version_id` vẫn giữ cho managed thesis; NULL cho imported/official được PostgreSQL cho phép nhiều hàng.
+- `source_type` có vocab rõ. Không suy luận chất lượng tài liệu từ type; visibility và authorization ở service/query.
+- Index Qdrant có thể xóa dựng lại từ nguồn đã duyệt; không ghi điểm tương đồng như điểm số nghiệp vụ.
+
+- Migration 0004: `external_source_id` UNIQUE cho upsert manifest; `source_url` chỉ HTTPS; kiểm nguồn tham chiếu chấp nhận URL. Indexer ghi RepositoryItem/SearchIndexMetadata trong PostgreSQL trước, rồi upsert Qdrant; status FAILED khi index lỗi.

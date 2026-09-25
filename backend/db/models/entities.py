@@ -561,7 +561,7 @@ class ProgressReport(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
 class ProgressReview(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "progress_review"
     __table_args__ = (
-        CheckConstraint("decision IN ('CONFIRM','REVISION_REQUIRED')", name="decision"),
+        CheckConstraint("decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED')", name="decision"),
         UniqueConstraint("progress_report_id", "reviewer_id"),
     )
     progress_report_id: Mapped[uuid.UUID] = fk("progress_report.id")
@@ -679,6 +679,7 @@ class SimilarityMatch(UuidPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("input_start >= 0 AND input_end > input_start", name="input_range"),
     )
     check_id: Mapped[uuid.UUID] = fk("similarity_check.id")
+    source_repository_item_id: Mapped[Optional[uuid.UUID]] = fk("repository_item.id", nullable=True)
     source_document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
     source_ref: Mapped[str] = mapped_column(String(500), nullable=False)
     input_start: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -967,11 +968,30 @@ class RepositoryItem(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "repository_item"
     __table_args__ = (
         CheckConstraint("visibility IN ('INTERNAL','PUBLISHED','REVOKED')", name="visibility"),
+        Index("ix_repository_item_source_type_visibility", "source_type", "visibility"),
+        UniqueConstraint("external_source_id"),
+        CheckConstraint("origin_type IN ('MANAGED_THESIS','IMPORTED_DOCUMENT','OFFICIAL_SOURCE')", name="origin_type"),
+        CheckConstraint("source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','REGULATION','FORM','GUIDELINE','SYNTHETIC_TEST')", name="source_type"),
+        CheckConstraint(
+            "(origin_type = 'MANAGED_THESIS' AND source_type = 'THESIS' AND thesis_id IS NOT NULL AND published_document_version_id IS NOT NULL) OR "
+            "(origin_type = 'IMPORTED_DOCUMENT' AND source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','SYNTHETIC_TEST') AND thesis_id IS NULL AND published_document_version_id IS NULL) OR "
+            "(origin_type = 'OFFICIAL_SOURCE' AND source_type IN ('REGULATION','FORM','GUIDELINE') AND thesis_id IS NULL AND published_document_version_id IS NULL)",
+            name="origin_source_consistency",
+        ),
+        CheckConstraint("source_ref IS NOT NULL OR source_url IS NOT NULL OR stored_file_id IS NOT NULL OR published_document_version_id IS NOT NULL", name="has_source_reference"),
+        CheckConstraint("source_url IS NULL OR source_url LIKE 'https://%'", name="source_url_https"),
     )
-    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
-    published_document_version_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("document_version.id", ondelete="RESTRICT"), nullable=False, unique=True
+    thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
+    published_document_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("document_version.id", ondelete="RESTRICT"), nullable=True, unique=True
     )
+    stored_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    origin_type: Mapped[str] = mapped_column(String(30), nullable=False, default="MANAGED_THESIS", server_default="MANAGED_THESIS")
+    external_source_id: Mapped[Optional[str]] = mapped_column(String(200))
+    source_ref: Mapped[Optional[str]] = mapped_column(String(500))
+    source_url: Mapped[Optional[str]] = mapped_column(String(1000))
+    provenance: Mapped[Optional[str]] = mapped_column(Text)
+    source_version: Mapped[Optional[str]] = mapped_column(String(100))
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     abstract: Mapped[Optional[str]] = mapped_column(Text)
     keywords: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
@@ -988,7 +1008,7 @@ class SearchIndexMetadata(UuidPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("state IN ('PENDING','INDEXED','FAILED','REMOVED')", name="state"),
     )
     repository_item_id: Mapped[uuid.UUID] = fk("repository_item.id")
-    document_version_id: Mapped[uuid.UUID] = fk("document_version.id")
+    document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
     index_name: Mapped[str] = mapped_column(String(100), nullable=False)
     index_version: Mapped[str] = mapped_column(String(100), nullable=False)
     embedding_model: Mapped[Optional[str]] = mapped_column(String(150))

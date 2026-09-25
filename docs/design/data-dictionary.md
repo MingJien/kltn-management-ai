@@ -1,6 +1,6 @@
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260924_0002. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; dữ liệu synthetic mới được dùng trong validation.
+> Canonical field dictionary đồng bộ trực tiếp từ SQLAlchemy metadata và các migration 20260920_0001 → 20260925_0006. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
 
 ## Quy ước
 
@@ -120,7 +120,7 @@
 ### resource_assignment
 
 **Mục đích:** Gán quyền theo round/Thesis/Council, gồm verifier điều kiện.
-**Trace:** REQ-ELIG-002, OPEN-11
+**Trace:** REQ-ELIG-002; người Khoa được giao theo round
 
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -581,7 +581,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | progress_report_id | UUID | NOT NULL | — | — | progress_report.id | uq_progress_review_progress_report_id_reviewer_id | — | Tham chiếu progress_report.id. | PII | Physical metadata 20260920_0001 |
 | reviewer_id | UUID | NOT NULL | — | — | lecturer_profile.id | uq_progress_review_progress_report_id_reviewer_id | — | Tham chiếu lecturer_profile.id. | PII | Physical metadata 20260920_0001 |
-| decision | VARCHAR(30) | NOT NULL | — | — | — | — | ck_progress_review_decision | Thuộc tính nghiệp vụ của progress_review. | PII | Physical metadata 20260920_0001 |
+| decision | VARCHAR(30) | NOT NULL | — | — | — | — | ck_progress_review_decision | `COMMENT_ONLY` là góp ý chéo, `CONFIRM`/`REVISION_REQUIRED` chỉ GVHD chính quyết định ở service. | PII | Migration 0005 |
 | comment | TEXT | NOT NULL | — | — | — | — | — | Thuộc tính nghiệp vụ của progress_review. | PII | Physical metadata 20260920_0001 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
 | created_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm tạo record. | PII | Physical metadata 20260920_0001 |
@@ -710,6 +710,7 @@
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | check_id | UUID | NOT NULL | — | — | similarity_check.id | — | — | Tham chiếu similarity_check.id. | NON_PII | Physical metadata 20260920_0001 |
+| source_repository_item_id | UUID | NULL | — | — | repository_item.id | — | — | Trỏ item nguồn của kết quả match kể cả KLTN cũ hay tài liệu ngoài. | NON_PII | Migration 0003 |
 | source_document_version_id | UUID | NULL | — | — | document_version.id | — | — | Tham chiếu document_version.id. | NON_PII | Physical metadata 20260920_0001 |
 | source_ref | VARCHAR(500) | NOT NULL | — | — | — | — | — | Tham chiếu văn bản/minh chứng. | NON_PII | Physical metadata 20260920_0001 |
 | input_start | INTEGER | NOT NULL | — | — | — | — | ck_similarity_match_input_range | Thuộc tính nghiệp vụ của similarity_match. | NON_PII | Physical metadata 20260920_0001 |
@@ -1044,17 +1045,24 @@
 
 ### repository_item
 
-**Mục đích:** Metadata bản KLTN được công bố.
+**Mục đích:** Item kho có thể là KLTN đang quản lý, tài liệu học thuật nhập ngoài hoặc nguồn chính thức được phép dùng.
 **Trace:** REQ-REPO-001
 
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| thesis_id | UUID | NOT NULL | — | — | thesis.id | — | — | Tham chiếu thesis.id. | NON_PII | Physical metadata 20260920_0001 |
-| published_document_version_id | UUID | NOT NULL | — | — | document_version.id | uq_repository_item_published_document_version_id | — | Tham chiếu document_version.id. | NON_PII | Physical metadata 20260920_0001 |
+| thesis_id | UUID | NULL | — | — | thesis.id | — | — | Tham chiếu thesis.id. | NON_PII | Physical metadata 20260920_0001 |
+| published_document_version_id | UUID | NULL | — | — | document_version.id | uq_repository_item_published_document_version_id | — | Tham chiếu document_version.id. | NON_PII | Physical metadata 20260920_0001 |
+| stored_file_id | UUID | NULL | — | — | stored_file.id | — | ck_repository_item_has_source_reference | Tệp lưu cục bộ nếu nguồn imported/official đã được cho phép; không commit binary. | SENSITIVE | Migration 0003 |
+| origin_type | VARCHAR(30) | NOT NULL | MANAGED_THESIS | — | — | — | ck_repository_item_origin_type, ck_repository_item_origin_source_consistency | MANAGED_THESIS/IMPORTED_DOCUMENT/OFFICIAL_SOURCE; quyết định quan hệ Thesis/DocumentVersion hợp lệ. | NON_PII | Migration 0003 |
+| external_source_id | VARCHAR(200) | NULL | — | — | — | uq_repository_item_external_source_id | — | ID nguồn ổn định từ manifest để upsert và rebuild index, không phải khóa Thesis. | NON_PII | Migration 0004 |
+| source_url | VARCHAR(1000) | NULL | — | — | — | — | ck_repository_item_source_url_https | Link HTTPS tới nguồn được phép; không phải link tải file nội bộ. | SENSITIVE | Migration 0004 |
+| source_ref | VARCHAR(500) | NULL | — | — | — | — | ck_repository_item_has_source_reference | Mã nguồn/đường dẫn tham chiếu; không dùng như URL tải công khai. | SENSITIVE | Migration 0003 |
+| provenance | TEXT | NULL | — | — | — | — | — | Nguồn gốc, giấy phép, bối cảnh nhập; app kiểm tra trước khi publish. | SENSITIVE | Migration 0003 |
+| source_version | VARCHAR(100) | NULL | — | — | — | — | — | Phiên bản tài liệu gốc để citation/index có thể truy hồi. | NON_PII | Migration 0003 |
 | title | VARCHAR(500) | NOT NULL | — | — | — | — | — | Tiêu đề/tên nghiệp vụ. | NON_PII | Physical metadata 20260920_0001 |
 | abstract | TEXT | NULL | — | — | — | — | — | Thuộc tính nghiệp vụ của repository_item. | NON_PII | Physical metadata 20260920_0001 |
 | keywords | JSONB | NOT NULL | application | — | — | — | — | Dữ liệu cấu hình/danh sách có schema ở application. | NON_PII | Physical metadata 20260920_0001 |
-| source_type | VARCHAR(50) | NOT NULL | THESIS | — | — | — | — | Thuộc tính nghiệp vụ của repository_item. | NON_PII | Physical metadata 20260920_0001 |
+| source_type | VARCHAR(50) | NOT NULL | THESIS | — | — | ix_repository_item_source_type_visibility | ck_repository_item_source_type | THESIS/CAPSTONE_PROJECT/TERM_PROJECT/COURSE_PROJECT/REGULATION/FORM/GUIDELINE/SYNTHETIC_TEST. | NON_PII | Migration 0003; không trộn loại nguồn. |
 | visibility | VARCHAR(20) | NOT NULL | INTERNAL | — | — | — | ck_repository_item_visibility | Thuộc tính nghiệp vụ của repository_item. | NON_PII | Physical metadata 20260920_0001 |
 | published_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Mốc thời gian nghiệp vụ. | NON_PII | Physical metadata 20260920_0001 |
 | revoked_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Mốc thời gian nghiệp vụ. | NON_PII | Physical metadata 20260920_0001 |
@@ -1071,7 +1079,7 @@
 | Field | PostgreSQL type | Null? | Default | PK | FK | Unique/index | Check | Meaning | PII | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | repository_item_id | UUID | NOT NULL | — | — | repository_item.id | uq_search_index_metadata_repository_item_id_index_name_index_version | — | Tham chiếu repository_item.id. | NON_PII | Physical metadata 20260920_0001 |
-| document_version_id | UUID | NOT NULL | — | — | document_version.id | — | — | Tham chiếu document_version.id. | NON_PII | Physical metadata 20260920_0001 |
+| document_version_id | UUID | NULL | — | — | document_version.id | — | — | Tùy chọn với nguồn imported/official; repository_item_id luôn bắt buộc. | NON_PII | Migration 0003 |
 | index_name | VARCHAR(100) | NOT NULL | — | — | — | uq_search_index_metadata_repository_item_id_index_name_index_version | — | Thuộc tính nghiệp vụ của search_index_metadata. | NON_PII | Physical metadata 20260920_0001 |
 | index_version | VARCHAR(100) | NOT NULL | — | — | — | uq_search_index_metadata_repository_item_id_index_name_index_version | — | Thuộc tính nghiệp vụ của search_index_metadata. | NON_PII | Physical metadata 20260920_0001 |
 | embedding_model | VARCHAR(150) | NULL | — | — | — | — | — | Thuộc tính nghiệp vụ của search_index_metadata. | NON_PII | Physical metadata 20260920_0001 |
@@ -1123,6 +1131,6 @@
 ## Kiểm soát đồng bộ
 
 - Tổng số bảng: 62.
-- Tổng số field: 606 (sau migration 20260924_0002).
+- Tổng số field: 614 (sau migration 20260925_0006).
 - Migration và model là nguồn physical; thay đổi schema phải cập nhật migration mới và tái sinh tài liệu.
 - Không có field plagiarism verdict; threshold similarity không hard-code 90%.

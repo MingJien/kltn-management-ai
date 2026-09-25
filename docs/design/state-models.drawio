@@ -85,7 +85,7 @@
         <mxCell id="14" value="atomic create | system | invariants" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="7">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="17" value="&lt;b&gt;Sơ đồ rút gọn:&lt;/b&gt;&lt;br&gt;Thesis lifecycle và CANCELLED xem state-contract.md; không ghép member sau submit khi OPEN-02 chưa chốt." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+        <mxCell id="17" value="&lt;b&gt;Sơ đồ rút gọn:&lt;/b&gt;&lt;br&gt;Thesis lifecycle và CANCELLED xem state-contract.md; không thêm/đổi member sau SUBMITTED theo quyết định dự án." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
           <mxGeometry x="70" y="690" width="1400" height="100" as="geometry" />
         </mxCell>
         <mxCell id="18" value="RETURNED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" parent="1" vertex="1">
@@ -333,7 +333,7 @@
         <mxCell id="9" value="export | Thư ký | completeness" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="3">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="10" value="void | Thư ký | before print + reason" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="3" target="4">
+        <mxCell id="10" value="void | Thư ký | chưa ai ký + lý do/đối chiếu giấy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="3" target="4">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="11" value="new version | Thư ký | replacement link" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="5">
@@ -342,14 +342,20 @@
         <mxCell id="12" value="mark printed | Thư ký | checksum" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="3" target="6">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="13" value="sign | Chủ tịch | Chair role" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="7">
+        <mxCell id="13" value="sign | Chair + Secretary | đủ hai đúng Hội đồng" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="7">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="14" value="lock | system | signature stored" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="7" target="8">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="15" value="&lt;b&gt;Invalid transition:&lt;/b&gt;&lt;br&gt;Không có transition sửa hậu ký cho tới khi OPEN-07 được chốt." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+        <mxCell id="15" value="&lt;b&gt;Invalid transition:&lt;/b&gt;&lt;br&gt;Được sửa sau in nếu giấy chưa ký; từ chữ ký đầu tiên không sửa điểm/nội dung." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
           <mxGeometry x="70" y="690" width="1400" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="sai khi giấy chưa ký | VOID bản in" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="xuất version mới" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="5" target="3">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

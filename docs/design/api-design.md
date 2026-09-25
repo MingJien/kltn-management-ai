@@ -14,7 +14,7 @@
 | Context | `GET /me` | UC-AUTH-001; trả effective contexts/actions, không cấp quyền từ client. |
 | Năm/đợt | `GET/POST /academic-years`, `GET/POST /thesis-rounds` | UC-ROUND-001. |
 | Điều kiện | `POST /rounds/{id}/eligibility-snapshots`, `POST /eligibility-snapshots/{id}/confirm` | UC-ELIG-001; snapshot bất biến sau confirm. |
-| Expertise | `GET/POST /lecturer-expertise`, `POST /lecturer-expertise/{id}/verify` | UC-EXP-001; verify chỉ bật theo OPEN-01/policy. |
+| Expertise | `GET/POST /lecturer-expertise`, `POST /lecturer-expertise/{id}/verify` | UC-EXP-001; verify theo TBM đúng Bộ môn; nếu tự kiểm thì Trưởng khoa/người được giao. |
 | Topic | `GET/POST /topics`, `PATCH /topics/{id}`, `POST /topics/{id}/department-decision`, `PUT /topics/{id}/requirements` | UC-TOPIC-001..003. |
 | Đăng ký | `POST /topic-registrations`, `POST /.../{id}/lecturer-decision`, `POST /.../{id}/department-finalization` | UC-REG-001/002, UC-ASSIGN-001. |
 | Phân công nhóm | `GET/POST /theses/{id}/work-assignments`, `POST /work-assignments/{id}/advisor-decision` | UC-WORK-001. |
@@ -27,7 +27,7 @@
 | Attendance | `PUT /defense-sessions/{id}/attendance`, `POST /defense-sessions/{id}/open` | Check quorum server-side. |
 | Nhận xét | `POST /theses/{id}/advisor-reviews`, `POST /theses/{id}/reviewer-reviews` | UC-EVAL-001; đúng Mẫu 7/8 và assignment. |
 | Chấm | `POST /defense-sessions/{id}/evaluations`, `PATCH /evaluations/{id}`, `GET /defense-sessions/{id}/final-results` | UC-EVAL-002/003; chỉ evaluator sửa điểm mình trước khóa. |
-| Biên bản | `POST /defense-sessions/{id}/minutes`, `POST /council-minutes/{id}/export`, `.../void`, `.../mark-printed`, `.../chair-confirmation` | UC-MIN-001/002; không có endpoint sửa hậu ký. |
+| Biên bản | `POST /defense-sessions/{id}/minutes`, `POST /council-minutes/{id}/export`, `.../void`, `.../mark-printed`, `.../chair-confirmation` | UC-MIN-001/002; sửa sau in trước chữ ký đầu qua evaluator correction + minute replacement; không có endpoint sửa sau ký. |
 | Kho | `GET /repository/documents`, `GET /repository/documents/{id}/download` | UC-REPO-001; route có authorization. |
 | AI | `POST /ai/chat` | UC-AI-001; read-only, trả citation/link, không file bytes. |
 | Báo cáo | `GET /reports/eligibility`, `/progress`, `/councils`, `/score-summary` | UC-RPT-001; field-level authorization. |
@@ -49,7 +49,33 @@
 ### RAG
 
 - Request chỉ gồm câu hỏi và context selector hợp lệ; backend tự resolve scope.
-- Response gồm answer, citations `{repositoryItemId, documentVersionId, title, route}`, và `evidenceStatus`.
+- Response gồm answer, citations `{repositoryItemId, sourceId, sourceType, originType, sourceVersion, provenance, title, route}`, và `evidenceStatus`.
 - Không trả storage key, raw prompt, raw chunks không cần thiết hoặc download URL vĩnh viễn.
 
 File contract máy đọc: `openapi.yaml`.
+
+## Hợp đồng prototype đang chạy
+
+Nguồn OpenAPI máy đọc được: `docs/prototype/openapi-runtime.json` sinh từ FastAPI. Trong `docs/design/openapi.yaml`, operation có `x-runtime-status=IMPLEMENTED_PROTOTYPE` là endpoint thật; các operation còn lại là contract thiết kế, chưa được triển khai và một số payload/result còn generic cần khóa trước các giai đoạn sau.
+
+| Endpoint | Input có kiểu | Output có kiểu | Guard chính |
+| --- | --- | --- | --- |
+| GET /me/context | X-Dev-User-Id trong DEV/TEST | ContextOut: user_id, base_role, profile IDs, actions | Không bật ngoài DEV/TEST |
+| GET /topics, /topics/{id} | round_id/limit hoặc topic UUID | TopicOut | Chỉ APPROVED trong prototype |
+| GET /eligible-students | round_id UUID | EligibleStudentOut[] | SV cùng bộ môn có snapshot CONFIRMED |
+| POST /topic-registrations | RegistrationCreate: topic_id, member_student_ids[1..3] | RegistrationOut + row_version | SV tạo, có chính mình, capacity/round/eligibility/unique |
+| GET /topic-registrations, /{id} | —/UUID | RegistrationOut[]/RegistrationOut | Thành viên, GV đề xuất hoặc TBM theo scope |
+| POST /{id}/lecturer-decision | LecturerDecision ACCEPT/REJECT + If-Match | RegistrationOut | Chỉ GV đề xuất topic; không ghép thành viên |
+| POST /{id}/department-finalization | If-Match | RegistrationOut + thesis_id | TBM đúng bộ môn, transaction tạo Thesis/member/advisor |
+| GET /theses/{id} | UUID | ThesisOut | Thành viên/GVHD/TBM đúng scope |
+| POST /ai/similar-topics | title, abstract, keywords, domain, limit | SearchResult[] có source_type/provenance | Qdrant filter visibility/scope; score chỉ ranking |
+| POST /ai/chat | question | ChatOut: NO_EVIDENCE/RETRIEVAL_ONLY/citations | Không Gemini key thì answer=null |
+
+Các lỗi validation của FastAPI dùng HTTP 422; lỗi quyền/state do service dùng 403/404/409. `If-Match` hiện là row_version nguyên; finalization lặp được nếu đã FINALIZED và cùng TBM. Đây là API prototype, chưa là hợp đồng production SSO.
+
+## Contract thiết kế bổ sung
+
+- `POST /council-minutes/{minuteId}/chair-confirmation` và `.../secretary-confirmation`: MinuteSignatureRequest có minuteVersionId; chỉ đúng role trong quyết định được ký; chữ ký đầu khóa sửa dù state còn PRINTED, đủ hai mới SIGNED. DESIGN_ONLY.
+- `POST /council-minutes/{minuteId}/exports`: OfficialExportRequest có templateVersion/format, result chứa storedFileId/contentHash/templateSourceId. BLOCKED_SOURCE_TEMPLATE với Mẫu 9 local đã điền.
+- `GET /external-resources`: ExternalResource[] chỉ từ allowlist HTTPS server-side. DESIGN_ONLY.
+- RepositoryItem contract có originType/sourceType/title/visibility/sourceRef/version/provenance. Với nhập ngoài không yêu cầu Thesis giả.

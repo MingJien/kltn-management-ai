@@ -17,7 +17,7 @@ Wireframe low-fidelity; nút chỉ hiển thị khi backend trả action đượ
 | SCR-11 | Attendance/quorum | Có mặt/vắng, has score, guard Chair/Secretary/>2/5 | UC-SESSION-001 |
 | SCR-12 | Nhận xét GVHD/GVPB | Form Mẫu 7/8 theo assignment/version | UC-EVAL-001 |
 | SCR-13 | Chấm từng SV | Rubric, điểm của current evaluator, bonus evidence, lock | UC-EVAL-002/003 |
-| SCR-14 | Biên bản | Completeness, version, void/replacement trước in, Chủ tịch ký | UC-MIN-001/002 |
+| SCR-14 | Biên bản | Completeness, version, void/replacement sau in trước chữ ký đầu, Chủ tịch + Thư ký ký | UC-MIN-001/002 |
 | SCR-15 | Kho/báo cáo | Search/filter/view/download; export theo quyền | UC-REPO-001, UC-RPT-001 |
 | SCR-16 | Chatbot RAG | Câu hỏi, answer, citation, link web, no-evidence | UC-AI-001 |
 
@@ -54,9 +54,9 @@ Wireframe low-fidelity; nút chỉ hiển thị khi backend trả action đượ
 + CHẤM CÁ NHÂN / BIÊN BẢN --------------------------------+
 | SV: [thành viên cụ thể] | Người chấm: current account    |
 | Tiêu chí | Max | Điểm của tôi | Tổng server-calculated   |
-| [Submit] [Sửa điểm của tôi trước khóa]                   |
-| Thư ký: [Tạo version] [Void trước in] [In]               |
-| Chủ tịch: [Ký/xác nhận] -> LOCKED                        |
+| [Submit] [Sửa điểm của tôi nếu giấy chưa ký]                   |
+| Thư ký: [Tạo version] [Đối chiếu giấy] [Void bản in sai chưa ký] [In lại]               |
+| Thư ký: [Ký/xác nhận]  Chủ tịch: [Ký/xác nhận] -> SIGNED khi đủ hai                        |
 +----------------------------------------------------------+
 ~~~
 
@@ -73,6 +73,13 @@ Wireframe low-fidelity; nút chỉ hiển thị khi backend trả action đượ
 
 - 403/404 không làm lộ metadata tài nguyên.
 - 409 hiển thị version/state mới nhất và yêu cầu tải lại.
-- Similarity policy chưa chốt hiển thị `POLICY_NOT_CONFIGURED`, không badge đậu/rớt.
-- Sau in/ký, form điểm và biên bản read-only, nêu audit reference.
+- Similarity baseline hiển thị ADVISORY/POLICY_NOT_CONFIGURED và bằng chứng; không badge đậu/rớt.
+- Sau in và trước chữ ký đầu, chỉ evaluator sửa điểm mình khi Thư ký đối chiếu giấy chưa ký; bản cũ VOID và in lại có mã/giờ mới. Từ chữ ký đầu form điểm và nội dung biên bản read-only, nêu audit reference.
 - Form dùng label rõ, keyboard/focus hợp lý, state không chỉ biểu diễn bằng màu.
+
+## Bổ sung màn hình theo quyết định 25/09
+
+- SCR-05: SV chọn thành viên đủ điều kiện cùng bộ môn và tự gửi nhóm 1–3; không có nút GV thêm/ghép. Khi SUBMITTED, danh sách chỉ đọc. React prototype: /topics và /registrations.
+- SCR-14: hiển thị riêng trạng thái chữ ký Chair và Secretary của đúng Hội đồng; nút xuất đúng mẫu chỉ bật khi template version đã kiểm, sau in và trước chữ ký đầu có thể VOID/replacement sau khi Thư ký đối chiếu giấy; từ chữ ký đầu khóa sửa. Runtime export hiện BLOCKED_SOURCE_TEMPLATE.
+- SCR-15 (AI): hiển thị source_type, title, provenance, score xếp hạng; báo rõ không phải tỉ lệ đạo văn. RAG trả citation/retrieval-only khi chưa có Gemini. React prototype: /ai (tìm đề tài).
+- SCR-16 (nguồn ngoài): nút link-out chỉ cho URL HTTPS allowlist; chưa hiển thị khi chưa có provider được duyệt.

@@ -28,7 +28,7 @@ Giữ ba base role ADMIN, LECTURER, STUDENT. Chức danh tổ chức, phân côn
 
 - API không nhận role/assignment do client tự khẳng định.
 - Mọi thao tác nhạy cảm phải trace tới assignment, CouncilMember hoặc resource ownership.
-- ELIGIBILITY_VERIFIER là assignment cấu hình theo đợt cho đến khi OPEN-11 được chốt.
+- ELIGIBILITY_VERIFIER là assignment cho cán bộ Khoa được chỉ định theo đợt, sau đối chiếu nguồn Phòng Đào tạo; không hard-code cá nhân.
 
 ## Tham chiếu
 

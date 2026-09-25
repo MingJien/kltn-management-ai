@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API hệ thống quản lý KLTN",
-    "version": "0.2.0-week2",
-    "description": "Contract thiết kế NV4 Tuần 2. Mọi quyền được kiểm tra ở backend theo base role, position/assignment, tài nguyên và trạng thái. API không cung cấp Admin business bypass, kết luận đạo văn hoặc sửa hậu ký."
+    "version": "0.3.0-nv4-design",
+    "description": "Thiết kế toàn domain; các operation có x-runtime-status=IMPLEMENTED_PROTOTYPE chạy trong FastAPI. Operation còn lại là thiết kế, chưa gọi runtime PASS."
   },
   "servers": [
     {
@@ -528,38 +528,84 @@
     },
     "/topics": {
       "get": {
-        "tags": [
-          "Đề tài"
+        "summary": "Topics",
+        "operationId": "topics_api_v1_topics_get",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
         ],
-        "operationId": "listTopics",
-        "summary": "Tìm đề tài trong đợt được phép",
         "responses": {
           "200": {
-            "description": "Thành công",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TopicOut"
+                  },
+                  "title": "Response Topics Api V1 Topics Get"
                 }
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
           "422": {
-            "$ref": "#/components/responses/ValidationError"
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
       },
       "post": {
         "tags": [
@@ -779,48 +825,132 @@
     },
     "/topic-registrations": {
       "post": {
-        "tags": [
-          "Đăng ký"
-        ],
-        "operationId": "submitTopicRegistration",
-        "summary": "Nộp một đăng ký đề tài trong đợt",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
+        "summary": "Register",
+        "operationId": "register_api_v1_topic_registrations_post",
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
                 }
-              }
+              ],
+              "title": "X-Dev-User-Id"
             }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
           }
-        },
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RegistrationRequest"
+                "$ref": "#/components/schemas/RegistrationCreate"
               }
             }
           }
-        }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      },
+      "get": {
+        "summary": "Registrations",
+        "operationId": "registrations_api_v1_topic_registrations_get",
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegistrationOut"
+                  },
+                  "title": "Response Registrations Api V1 Topic Registrations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
       }
     },
     "/topic-registrations/{registrationId}/lecturer-decision": {
@@ -2418,7 +2548,8 @@
           "Đánh giá"
         ],
         "operationId": "correctOwnEvaluation",
-        "summary": "Chính người chấm sửa điểm mình trước khóa",
+        "summary": "Chính người chấm sửa phiếu trước chữ ký đầu tiên",
+        "x-guard": "Evaluator sở hữu phiếu; nếu biên bản đã in, Thư ký đối chiếu giấy chưa có chữ ký nào, ghi lý do/audit, VOID bản in cũ rồi tính lại và in version mới; từ chữ ký đầu từ chối.",
         "responses": {
           "200": {
             "description": "Thành công",
@@ -2579,7 +2710,8 @@
           "Biên bản"
         ],
         "operationId": "exportMinute",
-        "summary": "Xuất biên bản trước in",
+        "summary": "Xuất phiên bản biên bản hiện tại trước chữ ký",
+        "x-guard": "Thư ký đúng phiên; tệp/version mới có mã và thời gian; không thay byte bản cũ; từ chữ ký đầu không xuất bản sửa nội dung.",
         "responses": {
           "201": {
             "description": "Thành công",
@@ -2636,7 +2768,8 @@
           "Biên bản"
         ],
         "operationId": "voidMinute",
-        "summary": "Void bản sai trước in và tạo replacement",
+        "summary": "Void bản sai trước chữ ký đầu và tạo replacement",
+        "x-guard": "Thư ký xác nhận giấy đã in chưa có chữ ký nào, lý do/audit bắt buộc; version cũ giữ tệp/hash, version mới liên kết replacement_for_id.",
         "responses": {
           "201": {
             "description": "Thành công",
@@ -2693,7 +2826,8 @@
           "Biên bản"
         ],
         "operationId": "markMinutePrinted",
-        "summary": "Đánh dấu đã in và khóa chỉnh sửa",
+        "summary": "Đánh dấu đã in; chờ Thư ký đối chiếu và chữ ký",
+        "x-guard": "In không khóa sửa; từ chữ ký đầu tiên trên giấy hoặc điện tử mới khóa điểm/nội dung.",
         "responses": {
           "201": {
             "description": "Thành công",
@@ -2746,48 +2880,7 @@
     },
     "/council-minutes/{minuteId}/chair-confirmation": {
       "post": {
-        "tags": [
-          "Biên bản"
-        ],
-        "operationId": "confirmMinuteAsChair",
-        "summary": "Chủ tịch ký hoặc xác nhận biên bản",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
+        "summary": "Xác nhận chữ ký chair trên Mẫu 9",
         "parameters": [
           {
             "name": "minuteId",
@@ -2797,8 +2890,46 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MinuteSignatureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinuteSignatureResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sai quyền"
+          },
+          "409": {
+            "description": "Sai trạng thái/version"
+          }
+        },
+        "x-runtime-status": "DESIGN_ONLY",
+        "x-guard": "Chỉ CouncilMember role tương ứng; state PRINTED; từ chữ ký đầu khóa sửa, SIGNED khi cả Chair và Secretary đã ký đúng MinuteVersion."
       }
     },
     "/repository/documents": {
@@ -2810,11 +2941,14 @@
         "summary": "Tìm metadata KLTN đã được phép công bố",
         "responses": {
           "200": {
-            "description": "Thành công",
+            "description": "Danh sách nguồn trong phạm vi quyền",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CorpusItem"
+                  }
                 }
               }
             }
@@ -2834,7 +2968,8 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           }
-        }
+        },
+        "x-runtime-status": "DESIGN_ONLY"
       }
     },
     "/repository/documents/{repositoryItemId}/download": {
@@ -2886,48 +3021,61 @@
     },
     "/ai/chat": {
       "post": {
-        "tags": [
-          "AI"
-        ],
-        "operationId": "askRepository",
-        "summary": "Hỏi kho bằng RAG chỉ đọc, trả citation và link",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
+        "summary": "Ai Chat",
+        "operationId": "ai_chat_api_v1_ai_chat_post",
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
                 }
-              }
+              ],
+              "title": "X-Dev-User-Id"
             }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
           }
-        },
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AiChatRequest"
+                "$ref": "#/components/schemas/ChatRequest"
               }
             }
           }
-        }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
       }
     },
     "/reports/eligibility": {
@@ -3072,6 +3220,665 @@
             "$ref": "#/components/responses/ValidationError"
           }
         }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Live",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Ready",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/me/context": {
+      "get": {
+        "summary": "Context",
+        "operationId": "context_api_v1_me_context_get",
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/topic-registrations/{registration_id}": {
+      "get": {
+        "summary": "Registration",
+        "operationId": "registration_api_v1_topic_registrations__registration_id__get",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/topic-registrations/{registration_id}/lecturer-decision": {
+      "post": {
+        "summary": "Decide",
+        "operationId": "decide_api_v1_topic_registrations__registration_id__lecturer_decision_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LecturerDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/topic-registrations/{registration_id}/department-finalization": {
+      "post": {
+        "summary": "Finalize",
+        "operationId": "finalize_api_v1_topic_registrations__registration_id__department_finalization_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/ai/similar-topics": {
+      "post": {
+        "summary": "Similar Topics",
+        "operationId": "similar_topics_api_v1_ai_similar_topics_post",
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarTopicRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResult"
+                  },
+                  "title": "Response Similar Topics Api V1 Ai Similar Topics Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/eligible-students": {
+      "get": {
+        "summary": "Eligible Students",
+        "operationId": "eligible_students_api_v1_eligible_students_get",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleStudentOut"
+                  },
+                  "title": "Response Eligible Students Api V1 Eligible Students Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/council-minutes/{minuteId}/secretary-confirmation": {
+      "post": {
+        "summary": "Xác nhận chữ ký secretary trên Mẫu 9",
+        "parameters": [
+          {
+            "name": "minuteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MinuteSignatureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MinuteSignatureResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sai quyền"
+          },
+          "409": {
+            "description": "Sai trạng thái/version"
+          }
+        },
+        "x-runtime-status": "DESIGN_ONLY",
+        "x-guard": "Chỉ CouncilMember role tương ứng; state PRINTED; từ chữ ký đầu khóa sửa, SIGNED khi cả Chair và Secretary đã ký đúng MinuteVersion."
+      }
+    },
+    "/council-minutes/{minuteId}/exports": {
+      "post": {
+        "summary": "Xuất biên bản theo template nguồn chính thức",
+        "parameters": [
+          {
+            "name": "minuteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfficialExportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficialExportResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sai quyền"
+          },
+          "409": {
+            "description": "Sai trạng thái/version"
+          }
+        },
+        "x-runtime-status": "BLOCKED_SOURCE_TEMPLATE"
+      }
+    },
+    "/external-resources": {
+      "get": {
+        "summary": "Các website ngoài đã duyệt theo quyền",
+        "responses": {
+          "200": {
+            "description": "Danh sách cho phép",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExternalResource"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "DESIGN_ONLY",
+        "x-guard": "HTTPS allowlist server-side; không nhận URL người dùng."
+      }
+    },
+    "/topics/{topic_id}": {
+      "get": {
+        "summary": "Topic Detail",
+        "operationId": "topic_detail_api_v1_topics__topic_id__get",
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/theses/{thesis_id}": {
+      "get": {
+        "summary": "Thesis Detail",
+        "operationId": "thesis_detail_api_v1_theses__thesis_id__get",
+        "parameters": [
+          {
+            "name": "thesis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thesis Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesisOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
       }
     }
   },
@@ -3371,6 +4178,876 @@
             "format": "uuid"
           }
         }
+      },
+      "ChatOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NO_EVIDENCE",
+              "RETRIEVAL_ONLY",
+              "ANSWERED"
+            ],
+            "title": "Status"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "provider_status": {
+            "type": "string",
+            "const": "NOT_CONFIGURED",
+            "title": "Provider Status",
+            "default": "NOT_CONFIGURED"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "answer",
+          "citations"
+        ],
+        "title": "ChatOut"
+      },
+      "ChatRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "ChatRequest"
+      },
+      "Citation": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "origin_type": {
+            "type": "string",
+            "title": "Origin Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "provenance": {
+            "type": "string",
+            "title": "Provenance"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "source_version": {
+            "type": "string",
+            "title": "Source Version"
+          },
+          "representation": {
+            "type": "string",
+            "title": "Representation"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_type",
+          "origin_type",
+          "title",
+          "provenance",
+          "source_ref",
+          "source_url",
+          "source_version",
+          "representation",
+          "excerpt"
+        ],
+        "title": "Citation"
+      },
+      "ContextOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "base_role": {
+            "type": "string",
+            "title": "Base Role"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Id"
+          },
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "base_role",
+          "actions"
+        ],
+        "title": "ContextOut"
+      },
+      "EligibleStudentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "student_code": {
+            "type": "string",
+            "title": "Student Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "student_code"
+        ],
+        "title": "EligibleStudentOut"
+      },
+      "ErrorOut": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthOut"
+      },
+      "LecturerDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "REJECT"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "LecturerDecision"
+      },
+      "RegistrationCreate": {
+        "properties": {
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "member_student_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Member Student Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic_id",
+          "member_student_ids"
+        ],
+        "title": "RegistrationCreate"
+      },
+      "RegistrationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "row_version": {
+            "type": "integer",
+            "title": "Row Version"
+          },
+          "member_student_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Member Student Ids"
+          },
+          "lecturer_decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Decided At"
+          },
+          "thesis_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "topic_id",
+          "round_id",
+          "state",
+          "row_version",
+          "member_student_ids"
+        ],
+        "title": "RegistrationOut"
+      },
+      "SearchResult": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "origin_type": {
+            "type": "string",
+            "title": "Origin Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "provenance": {
+            "type": "string",
+            "title": "Provenance"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "source_version": {
+            "type": "string",
+            "title": "Source Version"
+          },
+          "representation": {
+            "type": "string",
+            "title": "Representation"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_type",
+          "origin_type",
+          "title",
+          "score",
+          "provenance",
+          "source_ref",
+          "source_url",
+          "source_version",
+          "representation",
+          "excerpt"
+        ],
+        "title": "SearchResult"
+      },
+      "SimilarTopicRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "abstract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstract"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SimilarTopicRequest"
+      },
+      "TopicOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "type": "integer",
+            "title": "Max Students"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "round_id",
+          "title",
+          "description",
+          "max_students",
+          "state"
+        ],
+        "title": "TopicOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "MinuteSignatureRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "minuteVersionId"
+        ],
+        "properties": {
+          "minuteVersionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MinuteSignatureResult": {
+        "type": "object",
+        "required": [
+          "minuteVersionId",
+          "state",
+          "signedRoles"
+        ],
+        "properties": {
+          "minuteVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PRINTED",
+              "SIGNED"
+            ]
+          },
+          "signedRoles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CHAIR",
+                "SECRETARY"
+              ]
+            }
+          }
+        }
+      },
+      "OfficialExportRequest": {
+        "type": "object",
+        "required": [
+          "templateVersion"
+        ],
+        "properties": {
+          "templateVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "DOCX",
+              "XLSX",
+              "PDF"
+            ]
+          }
+        }
+      },
+      "OfficialExportResult": {
+        "type": "object",
+        "required": [
+          "storedFileId",
+          "templateSourceId",
+          "templateVersion",
+          "contentHash"
+        ],
+        "properties": {
+          "storedFileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "templateSourceId": {
+            "type": "string"
+          },
+          "templateVersion": {
+            "type": "string"
+          },
+          "contentHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "downloadRoute": {
+            "type": "string"
+          }
+        }
+      },
+      "ExternalResource": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "httpsUrl"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "httpsUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "sourceRef": {
+            "type": "string"
+          }
+        }
+      },
+      "CorpusItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "originType",
+          "sourceType",
+          "title",
+          "visibility"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originType": {
+            "type": "string",
+            "enum": [
+              "MANAGED_THESIS",
+              "IMPORTED_DOCUMENT",
+              "OFFICIAL_SOURCE"
+            ]
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "THESIS",
+              "CAPSTONE_PROJECT",
+              "TERM_PROJECT",
+              "COURSE_PROJECT",
+              "REGULATION",
+              "FORM",
+              "GUIDELINE",
+              "SYNTHETIC_TEST"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "INTERNAL",
+              "PUBLISHED",
+              "REVOKED"
+            ]
+          },
+          "sourceRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provenance": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SimilarityAdvisory": {
+        "type": "object",
+        "required": [
+          "status",
+          "uploadBlocked",
+          "matches"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ADVISORY",
+              "POLICY_NOT_CONFIGURED"
+            ]
+          },
+          "uploadBlocked": {
+            "const": false
+          },
+          "lexicalCoveragePct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "semanticCandidateScore": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "metricVersion": {
+            "type": "string"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "repositoryItemId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sourceType": {
+                  "type": "string"
+                },
+                "sourceRef": {
+                  "type": "string"
+                },
+                "lexicalScore": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "semanticScore": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "ThesisOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "member_student_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Member Student Ids"
+          },
+          "advisor_lecturer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Advisor Lecturer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "state",
+          "member_student_ids",
+          "advisor_lecturer_id"
+        ],
+        "title": "ThesisOut"
       }
     }
   }

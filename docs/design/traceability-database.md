@@ -40,7 +40,7 @@
 
 `SRC-QD-5964 + SRC-GVHD-NV4-001` → REQ-ELIG/REG/TOPIC → BR-ELIG/REG/TOPIC → UC-ELIG/TOPIC/REG/ASSIGN → EligibilitySnapshot/Topic/RegistrationMember/Thesis/AdvisorAssignment → composite FK + partial unique + transaction finalize.
 
-Không phải đoán cardinality. OPEN-11 chỉ đổi ai mang ResourceAssignment, không đổi schema. OPEN-02 dùng safe default không ghép hậu submit.
+Không phải đoán cardinality. Người Khoa được giao `ELIGIBILITY_VERIFIER` theo round được lưu ở ResourceAssignment, không đổi schema. Quyết định dự án khóa thành viên sau SUBMITTED; GV không thêm/ghép.
 
 ### VS-DB-02 — Nhóm → coordinator → phân công việc → GVHD
 
@@ -70,3 +70,5 @@ Không phải đoán cardinality. OPEN-11 chỉ đổi ai mang ResourceAssignmen
 - 62 PK UUID; tất cả quan hệ nghiệp vụ chính dùng FK cụ thể; FK mặc định RESTRICT.
 - Các invariant không thể biểu diễn thuần DB đã ghi APPLICATION/TRANSACTION tại `database-rules.md`, không được quảng cáo là database-enforced.
 - Test case: DB-01..DB-26 trong `database-validation.md`; ngày 24/09/2026 đã PASS 26/26 trên PostgreSQL 17.11 native, migration round-trip và Alembic check PASS. Các rule APPLICATION_ENFORCED chưa được các ca schema chứng minh.
+
+- Migration 0003/0004: REQ-CORPUS-001/002 → BR-CORPUS-001/002 → UC-REPO-001 → repository_item (origin_type, source_type, external_source_id, source_ref, source_url, provenance, stored_file_id), search_index_metadata (document_version_id nullable), similarity_match (source_repository_item_id). DB-27..39 kiểm tra constraints và nguồn. Migration 0005 thêm `progress_review.decision=COMMENT_ONLY`, DB-40 kiểm tập giá trị.

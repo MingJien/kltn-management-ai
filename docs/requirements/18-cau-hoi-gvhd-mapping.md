@@ -27,7 +27,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-TOPIC-003, UC-ASSIGN-001, UC-PROP-004, UC-COUNCIL-001, UC-MIN-001.
 - **Entity/data:** OrganizationalPosition, PositionAssignment, AdvisorAssignment, CouncilMember, CouncilMinute.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`.
-- **Ghi chú chủ dự án cần xác nhận:** Bạn hiểu cụm “TBM ký biên bản Hội đồng” là biên bản bảo vệ sau chấm điểm. QĐ2919/Mẫu 9 hiện gắn chữ ký biên bản bảo vệ với Chủ tịch; chưa đổi người ký theo ghi chú này. Xem OPEN-08.
+- **Xác nhận của chủ dự án ngày 25/09/2026:** Mẫu 9 là “Biên bản họp Hội đồng chấm khóa luận tốt nghiệp/đồ án tốt nghiệp”, tức biên bản bảo vệ sau chấm điểm. Chủ tịch và Thư ký ký theo đúng biểu mẫu; không gán TBM. Với phạm vi Mẫu 9, OPEN-08 đã đóng; văn bản khác nếu phát sinh sẽ phân tích riêng.
 
 ## 3. Số đợt KLTN trong năm học
 
@@ -65,8 +65,9 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Actor/quyền:** SV lập nhóm; GVHD/TBM xem/duyệt theo workflow; không ai có lệnh ghép tự do ở safe default.
 - **Use Case:** UC-REG-002.
 - **Entity/data:** Thesis, ThesisMember, TopicRegistration.
-- **Trạng thái:** `CONFIRMED` cho giới hạn/nhóm trưởng; `OPEN` cho ghép sau.
-- **Chưa rõ:** Thời điểm khóa danh sách và điều kiện ghép thêm.
+- **Trạng thái:** `CONFIRMED` cho giới hạn/nhóm trưởng; `CONFIRMED_PROJECT_DECISION` cho khóa thành viên từ khi gửi.
+- **Xác nhận mới của chủ dự án:** Không ghép thêm SV sau khi đăng ký; SV tự ghép nhóm trước khi gửi và giảng viên không tự thêm người. Mô hình/endpoint không cho sửa membership hậu SUBMITTED.
+- **Chưa rõ:** Không còn câu hỏi ghép thêm trong phạm vi hiện tại.
 
 ## 6. Điểm riêng hay chung cho nhóm
 
@@ -98,15 +99,15 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 - **Câu hỏi:** Dữ liệu chuyên môn nào đủ tin cậy, ai quản lý/cập nhật?
 - **Trả lời thực tế:** “GVHD tự khai báo chuyên môn, thì” và dòng rời “Trưởng bộ môn”. Cấu trúc câu không đủ chắc để kết luận TBM là người xác nhận.
-- **Kết luận chắc chắn:** Giảng viên tự khai. Xác nhận/publish chưa có căn cứ chắc; TBM là phương án thiết kế.
+- **Kết luận chắc chắn:** Giảng viên tự khai. Câu trả lời gốc chỉ chắc phần GV tự khai; chủ dự án nay chọn TBM đúng Bộ môn kiểm chứng bằng minh chứng, trừ tự khai của TBM thì Trưởng khoa/người được giao kiểm.
 - **Requirement:** REQ-EXP-001.
-- **Business Rule:** chưa có rule xác nhận; safe design gắn nhãn self-declared.
-- **Actor/quyền:** Giảng viên C/U hồ sơ mình; TBM A ở mức `PROPOSED`.
+- **Business Rule:** tự khai có nhãn SELF_DECLARED; VERIFIED cần minh chứng, actor/time, đúng scope và không tự xác nhận.
+- **Actor/quyền:** Giảng viên C/U hồ sơ mình; TBM đúng Bộ môn kiểm, Trưởng khoa/người được giao xử lý hồ sơ của TBM.
 - **Use Case:** UC-EXP-001.
 - **Entity/data:** LecturerExpertise, ExpertiseEvidence, VerificationStatus.
-- **Trạng thái:** `OPEN`; `PROPOSED_TBM`.
-- **Chưa rõ:** Người xác nhận, nguồn minh chứng và chu kỳ review.
-- **Ghi chú chủ dự án:** Cần chọn rõ người xác nhận chuyên môn (tự lưu, TBM hay Trưởng khoa). Hiện vẫn OPEN-01; không tự cấp quyền xác nhận.
+- **Trạng thái:** `CONFIRMED_PROJECT_DESIGN`; câu trả lời GVHD gốc vẫn giữ nguyên.
+- **Chưa rõ:** Người cụ thể được Khoa phân công và kỳ rà soát là dữ liệu vận hành từng đợt.
+- **Ghi chú chủ dự án:** Đã chọn TBM đúng Bộ môn, chống tự kiểm bằng Trưởng khoa/người được giao; đây là quyết định phần mềm, không giả là văn bản Trường.
 
 ## 9. Quy trình xét duyệt đề cương
 
@@ -131,8 +132,9 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Actor/quyền:** SV cập nhật; GVHD nhận xét/xác nhận; GV khác chỉ góp ý khi được phân công.
 - **Use Case:** UC-PROG-001, UC-PROG-002.
 - **Entity/data:** ProgressMilestone, ProgressReport, ProgressReview.
-- **Trạng thái:** `CONFIRMED` phần quản lý; `OPEN` milestone chi tiết.
-- **Chưa rõ:** Danh sách mốc, tỷ lệ hoàn thành chính xác, hạn theo đợt.
+- **Trạng thái:** `CONFIRMED_PROJECT_DECISION` cho hai checkpoint; lịch cụ thể là dữ liệu cấu hình của từng đợt.
+- **Xác nhận mới của chủ dự án:** GVHD quản lý tiến độ thường kỳ. Lần 1 là góp ý đề cương; lần 2 là báo cáo tiến độ nội bộ dự kiến tháng 12 khi dự án đạt khoảng 70%, giữa các GVHD để góp ý chéo. Đây không phải Hội đồng bảo vệ theo quyết định.
+- **Chưa rõ:** Ngày giờ chính xác và danh sách GVHD góp ý của từng đợt phải nhập từ kế hoạch/phân công được duyệt.
 
 ## 11. Đổi đề tài, rút và gia hạn
 
@@ -183,21 +185,23 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Actor/quyền:** GVHD xác nhận; TBM/Khoa kiểm tra policy.
 - **Use Case:** UC-DEF-001.
 - **Entity/data:** DefenseEligibilityCheck, AdvisorReview, SimilarityCheck.
-- **Trạng thái:** `CONFIRMED` điều kiện Trường; `OPEN` điều kiện riêng Khoa.
-- **Chưa rõ:** Policy Khoa và thời điểm khóa danh sách bảo vệ. Gợi ý của chủ dự án: có cấu hình để người được Khoa giao quyền nhập điều kiện bổ sung; Admin kỹ thuật không tự tạo hay duyệt điều kiện nghiệp vụ.
+- **Trạng thái:** `CONFIRMED` điều kiện Trường; `CONFIRMED_PROJECT_DECISION` rằng hiện chưa thêm tiêu chí Khoa.
+- **Xác nhận mới của chủ dự án:** Trước mắt chỉ dùng điều kiện trong QĐ2919 Điều 7. QĐ5964 cho phép Khoa bổ sung sau này, nhưng chưa có tiêu chí mới được cung cấp.
+- **Chưa rõ:** Thời điểm khóa danh sách bảo vệ do kế hoạch từng đợt quy định; Admin kỹ thuật không tự ban hành tiêu chí.
 
 ## 15. Nhập/sửa điểm và khóa kết quả
 
 - **Câu hỏi:** Thành viên tự nhập hay Thư ký nhập lại; ai sửa sau chốt?
 - **Trả lời thực tế:** Thành viên mở form tự chấm/submit; hệ thống tổng hợp; Thư ký ghi/xuất biên bản. Nhập sai thì chính tác giả sửa trước khi Thư ký in; Thư ký void/thay biên bản sai; bản có chữ ký Chủ tịch.
-- **Kết luận chắc chắn:** Không cho Thư ký sửa điểm thay người chấm. Khóa tại in/ký; sau đó chưa có thủ tục.
+- **Kết luận chắc chắn:** Không cho Thư ký sửa điểm thay người chấm. Theo quyết định mới, in chưa khóa: Thư ký đối chiếu bản giấy, nếu sai và chưa ai ký thì evaluator tự sửa; từ chữ ký đầu khóa điểm/nội dung.
 - **Requirement:** REQ-EVAL-002, REQ-MIN-001..002.
 - **Business Rule:** BR-EVAL-001..002, BR-MIN-001..002.
-- **Actor/quyền:** Thành viên sửa điểm mình trước khóa; Thư ký quản lý minute; Chủ tịch ký.
+- **Actor/quyền:** Thành viên sửa điểm mình trước khóa; Thư ký quản lý và ký minute Mẫu 9; Chủ tịch cùng ký.
 - **Use Case:** UC-EVAL-002, UC-EVAL-003, UC-MIN-001, UC-MIN-002.
 - **Entity/data:** Evaluation, EvaluationItem, CouncilMinute, MinuteVersion, AuditEvent.
-- **Trạng thái:** `CONFIRMED` trước in; `OPEN` sau in/ký.
-- **Chưa rõ:** Thủ tục hậu ký, người phê duyệt và chứng từ điều chỉnh. Chủ dự án gợi ý Chủ tịch tham gia phê duyệt; chưa có nguồn quy định thủ tục nên OPEN-07 vẫn giữ khóa sửa sau ký.
+- **Trạng thái:** `CONFIRMED_PROJECT_DECISION`: sửa sau in trước chữ ký đầu; từ chữ ký đầu khóa.
+- **Quyết định mới của chủ dự án:** Nếu phát hiện sai sau in nhưng trước chữ ký đầu, Thư ký xác nhận giấy chưa ký, VOID bản cũ, evaluator tự sửa phiếu, hệ thống tính lại và in MinuteVersion mới có mã/giờ, liên kết bản cũ và audit. Sau chữ ký đầu chỉ cấp bản sao đúng bản đã ký.
+- **Chưa rõ:** Mẫu 9 chưa có template trắng an toàn để kiểm runtime; quy tắc thiết kế đã chốt, chức năng xuất/in lại chưa chạy.
 
 ## 16. Phiếu/rubric đang dùng
 
@@ -211,7 +215,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Entity/data:** RubricTemplate, RubricCriterion, EvaluationItem, BonusEvidence.
 - **Trạng thái:** `CONFIRMED` baseline thiết kế Mẫu 6; `OPEN` xung đột cơ cấu với QĐ 2919 trước khi vận hành chấm thật.
 - **Chưa rõ:** Khoa xác nhận hiệu lực Mẫu 6 so với QĐ 2919 và version áp dụng cho từng đợt.
-- **Quyết định phạm vi thiết kế:** Dùng đầy đủ Mẫu 6 của Khoa làm baseline mô hình; vẫn giữ OPEN-12 về hiệu lực so với QĐ2919 trước khi chấm thật.
+- **Quyết định phạm vi thiết kế:** Chủ dự án tiếp tục chọn đầy đủ Mẫu 6 của Khoa, cơ cấu 2/4/4 + thưởng tối đa 1 nhưng tổng không quá 10. CONFLICT-011 vẫn cần căn cứ phê duyệt nếu dùng làm phiếu chấm thật trái cơ cấu trong QĐ2919.
 
 ## 17. Phạm vi kho và AI được khai thác
 
@@ -239,3 +243,15 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`; chính sách Trường `OPEN` nhưng không cản thiết kế.
 - **Chưa rõ:** Văn bản tổ chức về nhà cung cấp/retention và danh mục tài liệu cấm gửi nếu có.
 - **Ghi chú thiết kế:** Chỉ gửi đoạn tài liệu đã được kiểm quyền và giảm PII, giữ citation/source/version và nhật ký truy xuất; cần Khoa xác nhận chính sách nhà cung cấp/retention trước khi gửi dữ liệu thuộc diện hạn chế.
+
+## Làm rõ từ quyết định chủ dự án ngày 25/09/2026
+
+Đây là **làm rõ của chủ dự án**, không chép lại hay sửa nội dung trả lời GVHD gốc. Nguồn: SRC-PROJECT-DEC-20260925.
+
+| Liên quan câu | Điều đã chốt | Còn mở |
+| --- | --- | --- |
+| 2, 5 | SV tự lập nhóm 1–3 và gửi đăng ký; GV không ghép/thêm tùy ý; thành viên khóa khi gửi. TBM chốt sau GV đề xuất chấp nhận. | Không cho thêm/đổi người sau gửi theo quyết định hiện tại; đồng thuận từng thành viên chưa có đặc tả chính thức. |
+| 2, 7 | Điều phối viên KLTN theo round/Khoa khác Thư ký Hội đồng theo quyết định; cùng user có thể có hai assignment. GVHD theo dõi tiến độ luận văn đã phân công. | Ngày cụ thể cấu hình theo đợt từ lịch được duyệt. |
+| 12, 14 | Upload không bị similarity threshold chặn; kiểm tra sau upload chỉ advisory cho tới khi metric/version được duyệt. Điều kiện bảo vệ là nhiều yếu tố. | Baseline advisory, không auto-gate; đợt hiện tại không thêm điều kiện riêng Khoa; không suy ra cosine 0,9 = 90%. |
+| 15, 16 | Mẫu 9 đòi chữ ký Chủ tịch và Thư ký đúng Hội đồng; không mặc định TBM ký Mẫu 9. | Được sửa/in version mới khi giấy chưa ai ký; từ chữ ký đầu không sửa. Export runtime chờ mẫu trắng. |
+| 1, 17, 18 | Corpus tách THESIS/CAPSTONE_PROJECT/TERM_PROJECT/COURSE_PROJECT/REGULATION/FORM/GUIDELINE/SYNTHETIC_TEST, giữ nguồn/phiên bản/quyền. Chatbot có thể truy xuất quy định/biểu mẫu được phép; chưa có Gemini key thì retrieval-only. | APA/QĐ885 là baseline dự án; Khoa xác nhận hiệu lực trước auto-reject; chất lượng AI chưa kết luận với khoảng 7 KLTN. |

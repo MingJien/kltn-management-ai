@@ -52,7 +52,39 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260924_0002"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0006"
+
+            # DB-41: the real Mẫu 6 baseline is present but cannot be used live
+            # until the Faculty resolves its conflict with QĐ 2919.
+            baseline = conn.execute(text("""
+                SELECT id, source_ref, state FROM rubric_template
+                WHERE code = 'MAU-06-HOIDONG' AND version_no = 1
+            """)).mappings().one()
+            assert baseline["source_ref"] == "SRC-MAU-06"
+            criteria = conn.execute(text("""
+                SELECT id, parent_id, code, label, max_points, criterion_type, order_no
+                FROM rubric_criterion WHERE rubric_template_id = :template_id
+                ORDER BY order_no
+            """), {"template_id": baseline["id"]}).mappings().all()
+            assert len(criteria) == 16
+            by_code = {row["code"]: row for row in criteria}
+            assert len(by_code) == 16
+            assert [row["code"] for row in criteria] == [
+                "1", "1.1", "1.2", "1.3", "2", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
+                "3", "3.1", "3.2", "3.3", "4",
+            ]
+            expected_groups = {"1": Decimal("2"), "2": Decimal("4"), "3": Decimal("4")}
+            for code, maximum in expected_groups.items():
+                group = by_code[code]
+                children = [row for row in criteria if row["parent_id"] == group["id"]]
+                assert group["criterion_type"] == "GROUP" and group["max_points"] == maximum
+                assert sum(row["max_points"] for row in children) == maximum
+            assert sum(row["criterion_type"] == "NORMAL" for row in criteria) == 12
+            assert by_code["1.1"]["label"] == "Chuyên cần"
+            assert by_code["3.3"]["label"].startswith("Thuyết trình lưu loát")
+            assert by_code["4"]["criterion_type"] == "BONUS"
+            assert by_code["4"]["max_points"] == Decimal("1")
+            passed.append("DB-41")
 
             faculty_id, department_id = uid(), uid()
             conn.execute(m.Faculty.__table__.insert().values(id=faculty_id, code="SYN-FAC", name="Khoa gia lap"))
@@ -265,6 +297,15 @@ def main() -> int:
                 id=uid(), progress_report_id=report_id, reviewer_id=lecturer_ids[0],
                 decision="CONFIRM", comment="Nhan xet gia lap"
             ))
+            conn.execute(m.ProgressReview.__table__.insert().values(
+                id=uid(), progress_report_id=report_id, reviewer_id=lecturer_ids[1],
+                decision="COMMENT_ONLY", comment="Gop y cheo gia lap, khong xac nhan thay GVHD"
+            ))
+            expect_integrity(conn, lambda: conn.execute(m.ProgressReview.__table__.insert().values(
+                id=uid(), progress_report_id=report_id, reviewer_id=lecturer_ids[2],
+                decision="APPROVE_FOR_ADVISOR", comment="Gia tri khong hop le"
+            )), "invalid cross-review decision")
+            passed.append("DB-40")
 
             document_id=uid()
             conn.execute(m.Document.__table__.insert().values(
@@ -301,6 +342,65 @@ def main() -> int:
                 semantic_score=Decimal("0.920000")
             ))
             passed.append("DB-19")
+            # Corpus imported from outside this system must not fabricate an operational Thesis.
+            managed_item_id = uid()
+            conn.execute(m.RepositoryItem.__table__.insert().values(
+                id=managed_item_id, thesis_id=thesis_id,
+                published_document_version_id=document_version_ids[1],
+                origin_type="MANAGED_THESIS", source_type="THESIS",
+                title="Synthetic managed thesis", keywords=[], visibility="INTERNAL"
+            ))
+            passed.append("DB-27")
+            imported = {}
+            for source_type, label in (
+                ("THESIS", "DB-28"), ("CAPSTONE_PROJECT", "DB-29"),
+                ("TERM_PROJECT", "DB-30"), ("COURSE_PROJECT", "DB-31"),
+                ("REGULATION", "DB-32"), ("FORM", "DB-33"),
+            ):
+                item_id = uid()
+                imported[source_type] = item_id
+                conn.execute(m.RepositoryItem.__table__.insert().values(
+                    id=item_id,
+                    origin_type="OFFICIAL_SOURCE" if source_type in ("REGULATION", "FORM") else "IMPORTED_DOCUMENT",
+                    source_type=source_type, source_ref="SYN-" + source_type,
+                    provenance="Synthetic validation source v1", source_version="v1",
+                    title="Synthetic " + source_type, keywords=[], visibility="INTERNAL"
+                ))
+                passed.append(label)
+            expect_integrity(conn, lambda: conn.execute(m.RepositoryItem.__table__.insert().values(
+                id=uid(), origin_type="OFFICIAL_SOURCE", source_type="THESIS",
+                source_ref="SYN-BAD", title="invalid", keywords=[]
+            )), "invalid origin/source combination")
+            expect_integrity(conn, lambda: conn.execute(m.RepositoryItem.__table__.insert().values(
+                id=uid(), origin_type="IMPORTED_DOCUMENT", source_type="THESIS",
+                title="missing provenance reference", keywords=[]
+            )), "missing corpus source reference")
+            passed.append("DB-34")
+            conn.execute(m.SearchIndexMetadata.__table__.insert().values(
+                id=uid(), repository_item_id=imported["THESIS"],
+                index_name="synthetic-corpus", index_version="v1", state="INDEXED"
+            ))
+            passed.append("DB-35")
+            conn.execute(m.SimilarityMatch.__table__.insert().values(
+                id=uid(), check_id=check_id, source_repository_item_id=imported["THESIS"],
+                source_ref="SYN-THESIS", input_start=101, input_end=150
+            ))
+            passed.append("DB-36")
+            conn.execute(m.RepositoryItem.__table__.update().where(
+                m.RepositoryItem.__table__.c.id == imported["THESIS"]
+            ).values(external_source_id="SYN-SOURCE-THESIS", source_url="https://example.invalid/synthetic"))
+            expect_integrity(conn, lambda: conn.execute(m.RepositoryItem.__table__.insert().values(
+                id=uid(), external_source_id="SYN-SOURCE-THESIS",
+                origin_type="IMPORTED_DOCUMENT", source_type="THESIS",
+                source_ref="SYN-DUP", title="duplicate", keywords=[]
+            )), "duplicate external source ID")
+            passed.append("DB-38")
+            expect_integrity(conn, lambda: conn.execute(m.RepositoryItem.__table__.insert().values(
+                id=uid(), external_source_id="SYN-BAD-URL",
+                origin_type="IMPORTED_DOCUMENT", source_type="THESIS",
+                source_url="http://example.invalid", title="bad URL", keywords=[]
+            )), "non-HTTPS corpus URL")
+            passed.append("DB-39")
 
             council_id=uid()
             conn.execute(m.Council.__table__.insert().values(
@@ -452,6 +552,14 @@ def main() -> int:
                 id=uid(), minute_version_id=minute_version_id,
                 signer_member_id=council_member_ids[0], signed_at=now, signature_ref="SYN-SIGN"
             ))
+            conn.execute(m.MinuteSignature.__table__.insert().values(
+                id=uid(), minute_version_id=minute_version_id,
+                signer_member_id=council_member_ids[1], signed_at=now, signature_ref="SYN-SECRETARY-SIGN"
+            ))
+            assert conn.execute(select(m.MinuteSignature.__table__.c.id).where(
+                m.MinuteSignature.__table__.c.minute_version_id == minute_version_id
+            )).fetchall().__len__() == 2
+            passed.append("DB-37")
             passed.append("DB-16")
 
             expect_integrity(conn, lambda: conn.execute(m.StudentProfile.__table__.insert().values(
@@ -465,7 +573,7 @@ def main() -> int:
             ), "delete referenced account")
             passed.append("DB-18")
 
-            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,27)}
+            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,42)}
             assert set(passed)==expected, sorted(expected-set(passed))
         except Exception as exc:
             print("FAIL "+type(exc).__name__+": "+str(exc))

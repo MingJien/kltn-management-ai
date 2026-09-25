@@ -24,7 +24,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** mốc không hợp lệ/chồng trái policy `422`; version conflict `409`.
 - **Output / Postcondition:** round có version policy; `DRAFT → OPEN → CLOSED`.
 - **Rule / Permission / Data:** BR-ROUND-001; position đúng scope; AcademicYear, ThesisRound, RoundPolicy.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-PROJECT-MASTER-001 / `CONFIRMED_PROJECT_DECISION`; deadline `OPEN-06`.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-PROJECT-MASTER-001 / `CONFIRMED_PROJECT_DECISION`; deadline là cấu hình theo round.
 
 ### UC-ELIG-001 — Khảo sát và xác nhận SV đủ điều kiện
 
@@ -35,7 +35,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** dữ liệu chưa xác nhận giữ `PENDING`; ngoại lệ cần decision_ref; actor cụ thể còn OPEN.
 - **Output / Postcondition:** EligibilitySnapshot bất biến `CONFIRMED/REJECTED`, đủ căn cứ mở đăng ký.
 - **Rule / Permission / Data:** BR-ELIG-001..002; SV chỉ sửa trước submit, verifier đúng round mới confirm; EligibilitySnapshot/Exception.
-- **Source / Status:** SRC-QD-2919, SRC-QD-5964, SRC-GVHD-NV4-001 / rule `CONFIRMED`, actor `OPEN-11/PROPOSED`.
+- **Source / Status:** SRC-QD-2919, SRC-QD-5964, SRC-GVHD-NV4-001 / rule `CONFIRMED`, actor được Khoa giao theo round.
 
 ### UC-EXP-001 — Khai báo chuyên môn giảng viên
 
@@ -43,10 +43,10 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Precondition / Trigger:** LecturerProfile hoạt động / giảng viên cập nhật hồ sơ.
 - **Input:** lĩnh vực, từ khóa, minh chứng, version.
 - **Main Flow:** tạo version → lưu evidence → công bố nhãn `SELF_DECLARED`.
-- **Alternative/Exception:** verify bị từ chối nếu OPEN-01 chưa chốt; evidence lỗi không đổi trạng thái verified.
+- **Alternative/Exception:** verify bị từ chối nếu sai chức vụ/scope, tự verify hoặc thiếu minh chứng; evidence lỗi không đổi trạng thái verified.
 - **Output / Postcondition:** hồ sơ chuyên môn versioned; `DRAFT → SELF_DECLARED`; verified chưa kích hoạt.
 - **Rule / Permission / Data:** chủ hồ sơ C/U; LecturerExpertise, ExpertiseEvidence.
-- **Source / Status:** SRC-GVHD-NV4-001 / phần tự khai `CONFIRMED`, verifier `OPEN-01/PROPOSED_TBM`.
+- **Source / Status:** SRC-GVHD-NV4-001 / phần tự khai `CONFIRMED`, verifier TBM đúng Bộ môn; Trưởng khoa/người được giao khi TBM là chủ hồ sơ.
 
 ### UC-TOPIC-001 — Giảng viên đề xuất đề tài
 
@@ -90,18 +90,18 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** nguyện vọng thứ hai, member trùng, >3, topic đóng hoặc không đủ điều kiện thì `409/422`.
 - **Output / Postcondition:** TopicRegistration `SUBMITTED`; chưa tạo Thesis.
 - **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005; thành viên xác nhận tham gia theo policy; TopicRegistration/RegistrationMember.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-MAU-01A/01B / `CONFIRMED`; ghép sau `OPEN-02`.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-MAU-01A/01B / `CONFIRMED_PROJECT_DECISION`; danh sách khóa sau SUBMITTED.
 
 ### UC-REG-002 — Xử lý đăng ký nhóm
 
-- **Primary Actor / Supporting Actor:** SV/coordinator / các thành viên, GVHD.
-- **Precondition / Trigger:** Registration draft/submitted / nhóm khai hoặc xác nhận thành viên.
-- **Input:** member list, coordinator flag, membership confirmation.
-- **Main Flow:** xác nhận 1–3 member → coordinator chỉ điều phối → gửi một registration chung.
-- **Alternative/Exception:** thành viên chưa xác nhận/đã đăng ký nơi khác thì không submit; không có add-member hậu đăng ký.
+- **Primary Actor / Supporting Actor:** SV/coordinator / các thành viên, hệ thống.
+- **Precondition / Trigger:** Round/topic mở, eligibility CONFIRMED / SV tự lập nhóm.
+- **Input:** topicId, member list 1–3; người tạo là coordinator.
+- **Main Flow:** kiểm 1–3 member cùng department và chưa có active registration → SV gửi một registration chung; danh sách khóa khi SUBMITTED.
+- **Alternative/Exception:** thành viên đã đăng ký nơi khác hoặc không đủ điều kiện thì không submit; không có lecturer add/merge. Cơ chế đồng thuận từng thành viên còn cần chốt.
 - **Output / Postcondition:** membership snapshot gắn registration; `DRAFT → SUBMITTED`.
 - **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005; SV không có quyền nghiệp vụ cao hơn vì coordinator; RegistrationMember.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / giới hạn `CONFIRMED`, ghép sau `OPEN-02`.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / giới hạn `CONFIRMED_PROJECT_DECISION`; không có thao tác thêm người sau gửi.
 
 ### UC-ASSIGN-001 — GVHD nhận/từ chối và TBM phân công
 
@@ -178,7 +178,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** mốc ngoài policy phải cấu hình/version; ngày mẫu không thành deadline.
 - **Output / Postcondition:** kế hoạch được GVHD duyệt ở bản phân công công việc; `ProgressMilestone` chuyển `DRAFT → OPEN`, không có enum `APPROVED` cho milestone.
 - **Rule / Permission / Data:** BR-PROG-001; GVHD đúng thesis duyệt; ProgressMilestone, MemberWorkAssignment.
-- **Source / Status:** SRC-MAU-02, SRC-GVHD-NV4-001, SRC-HP-IN4299N / quản lý `CONFIRMED`, chi tiết `OPEN-03/06`.
+- **Source / Status:** SRC-MAU-02, SRC-GVHD-NV4-001, SRC-HP-IN4299N / hai checkpoint `CONFIRMED_PROJECT_DECISION`; ngày theo cấu hình round.
 
 ### UC-PROG-002 — Báo cáo và nhận xét tiến độ
 
@@ -233,7 +233,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** policy chưa ACTIVE trả `POLICY_NOT_CONFIGURED` advisory; job failed có retry; không plagiarism verdict.
 - **Output / Postcondition:** SimilarityCheck/Match + provenance; DocumentVersion `RESULT_AVAILABLE → REVISION_REQUESTED/ACCEPTED`.
 - **Rule / Permission / Data:** BR-SIM-001..003; source match cũng phải qua quyền; SimilarityPolicy/Check/Match, DocumentVersion.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 / boundary `CONFIRMED_PROJECT_DECISION`, metric `OPEN-05`.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 / boundary `CONFIRMED_PROJECT_DECISION`, baseline advisory, không auto-gate.
 
 ### UC-COUNCIL-001 — Cập nhật Hội đồng từ quyết định
 
@@ -266,7 +266,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Alternative/Exception:** local policy chưa có không tự phát minh; similarity advisory không tự chặn.
 - **Output / Postcondition:** DefenseEligibilityCheck `ELIGIBLE/NOT_ELIGIBLE/PENDING_POLICY`.
 - **Rule / Permission / Data:** REQ-DEF-001, BR-SIM-003; GVHD chỉ xác nhận recommendation, verifier theo scope chốt check; AdvisorReview, DocumentVersion, DefenseEligibilityCheck.
-- **Source / Status:** SRC-QD-2919, SRC-MAU-07 / điều kiện Trường `CONFIRMED`, local policy `OPEN-04`.
+- **Source / Status:** SRC-QD-2919, SRC-MAU-07 / điều kiện Trường `CONFIRMED`, đợt hiện tại chỉ dùng điều kiện Trường; local policy nếu Khoa ban hành sau.
 
 ### UC-EVAL-001 — Lập nhận xét GVHD/GVPB
 
@@ -318,41 +318,41 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Precondition / Trigger:** Attendance và FinalResult đủ / Thư ký tạo biên bản.
 - **Input:** sessionId, minute metadata, expected version.
 - **Main Flow:** snapshot attendance/evaluation/result → tạo MinuteVersion → validate completeness → export draft.
-- **Alternative/Exception:** thiếu phiếu/result thì không export; sai trước in chuyển VOID và tạo replacement.
+- **Alternative/Exception:** thiếu phiếu/result thì không export; sai trước chữ ký đầu (kể cả đã in) chuyển VOID và tạo replacement.
 - **Output / Postcondition:** CouncilMinute `DRAFT → EXPORTED` và chuỗi version.
 - **Rule / Permission / Data:** BR-MIN-001..002; chỉ Secretary đúng council; CouncilMinute/Version, Attendance, FinalResult.
 - **Source / Status:** SRC-QD-2919, SRC-MAU-09, SRC-GVHD-NV4-001 / `CONFIRMED`.
 
-### UC-MIN-002 — Ký, khóa hoặc xử lý sai trước in
+### UC-MIN-002 — Kiểm bản in, sửa trước chữ ký và ký khóa
 
 - **Primary Actor / Supporting Actor:** Chủ tịch, Thư ký / hệ thống.
-- **Precondition / Trigger:** MinuteVersion EXPORTED / in, phát hiện sai trước in, hoặc ký.
-- **Input:** void reason/replacedVersion; printed confirmation; chair confirmation.
-- **Main Flow:** nếu sai trước in TK void/replacement → in → CT ký/xác nhận → lock.
-- **Alternative/Exception:** sau PRINTED/SIGNED không có sửa/bypass; yêu cầu hậu ký bị từ chối và dẫn OPEN-07.
-- **Output / Postcondition:** `EXPORTED → VOID/REPLACED` hoặc `EXPORTED → PRINTED → SIGNED → LOCKED`.
-- **Rule / Permission / Data:** BR-MIN-001..002; TK quản lý version, CT sign; MinuteVersion/Signature/AuditEvent.
-- **Source / Status:** SRC-QD-2919, SRC-MAU-09, SRC-GVHD-NV4-001 / trước in `CONFIRMED`, hậu ký `OPEN-07`.
+- **Precondition / Trigger:** MinuteVersion EXPORTED/PRINTED; Thư ký phát hiện sai khi giấy chưa ký, hoặc có chữ ký.
+- **Input:** void reason/replacedVersion; printed confirmation; Chair/Secretary confirmation theo MinuteVersion.
+- **Main Flow:** sau in Thư ký đối chiếu thực tế; nếu sai và giấy chưa có chữ ký, evaluator tự sửa điểm, TK VOID version cũ, hệ thống tính lại/in version mới có mã và thời gian; CT và TK đúng Hội đồng ký, chữ ký đầu khóa sửa dù state còn PRINTED, đủ hai mới SIGNED → lock.
+- **Alternative/Exception:** nếu đã có bất kỳ chữ ký giấy/điện tử nào thì không sửa nội dung/điểm; bản sao dùng đúng version đã ký.
+- **Output / Postcondition:** `EXPORTED/PRINTED → VOID/REPLACED → EXPORTED → PRINTED` khi chưa ai ký, hoặc `EXPORTED → PRINTED → SIGNED → LOCKED`.
+- **Rule / Permission / Data:** BR-MIN-001..002; TK quản lý version và ký; CT ký; MinuteVersion/Signature/AuditEvent.
+- **Source / Status:** SRC-QD-2919, SRC-MAU-09, SRC-GVHD-NV4-001 / sửa sau in trước chữ ký `CONFIRMED_PROJECT_DECISION`; sau chữ ký khóa.
 
 ### UC-REPO-001 — Công bố, tìm kiếm, xem/tải KLTN
 
 - **Primary Actor / Supporting Actor:** Người dùng / actor công bố, repository/index service.
-- **Precondition / Trigger:** Có bản cuối và visibility / publish hoặc search.
-- **Input:** documentVersion, metadata, visibility; query/filter.
-- **Main Flow:** xác nhận bản cuối → publish metadata → index theo quyền → search/view → download qua authorized route.
+- **Precondition / Trigger:** Có bản KLTN vận hành đã công bố hoặc nguồn nhập/official được phép, có visibility / publish hoặc search.
+- **Input:** documentVersion hoặc external_source_id + source_ref/url, origin_type, source_type, provenance, visibility; query/filter.
+- **Main Flow:** validate nguồn → ghi RepositoryItem metadata → index theo quyền → search/view → download qua authorized route.
 - **Alternative/Exception:** draft/PII/restricted không index; revoke chặn PostgreSQL ngay rồi deindex.
 - **Output / Postcondition:** RepositoryItem/SearchIndexMetadata; file được tải khi có quyền.
-- **Rule / Permission / Data:** BR-REPO-001; người dùng đã xác thực theo visibility; RepositoryItem, DocumentVersion, SearchIndexMetadata.
+- **Rule / Permission / Data:** BR-REPO-001; người dùng đã xác thực theo visibility; RepositoryItem, DocumentVersion tùy origin, SearchIndexMetadata.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / nghiệp vụ `CONFIRMED`, kiểm soát kỹ thuật `DERIVED`.
 
 ### UC-AI-001 — Hỏi chatbot RAG và mở nguồn
 
-- **Primary Actor / Supporting Actor:** Người dùng / backend RAG, Qdrant, Gemini.
+- **Primary Actor / Supporting Actor:** Người dùng / backend RAG, Qdrant, LLMProvider tùy chọn.
 - **Precondition / Trigger:** Đã xác thực / người dùng gửi câu hỏi.
 - **Input:** question, context selector hợp lệ.
-- **Main Flow:** resolve scope → authorization trước retrieval → filtered retrieval → chunks tối thiểu/giảm PII → Gemini → trả answer/citation/link.
-- **Alternative/Exception:** không evidence thì nói không đủ dữ liệu; Gemini/Qdrant lỗi không đổi workflow; không gửi full file mặc định.
-- **Output / Postcondition:** answer + citations + web routes; RetrievalAudit metadata; không mutate nghiệp vụ.
+- **Main Flow:** resolve scope → authorization trước retrieval → filtered retrieval → chunks tối thiểu/giảm PII → nếu provider có thì sinh answer; nếu không trả RETRIEVAL_ONLY với citations/link.
+- **Alternative/Exception:** không evidence thì nói không đủ dữ liệu; chưa có Gemini key trả RETRIEVAL_ONLY; Qdrant lỗi trả dependency failure, không đổi workflow; không gửi full file mặc định.
+- **Output / Postcondition:** answer tùy provider + citations + web routes; RetrievalAudit metadata; không mutate nghiệp vụ.
 - **Rule / Permission / Data:** BR-AI-001..002; scope như repository; RepositoryItem, SearchIndexMetadata, RetrievalAudit.
 - **Source / Status:** SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 / `CONFIRMED_PROJECT_DECISION`.
 
