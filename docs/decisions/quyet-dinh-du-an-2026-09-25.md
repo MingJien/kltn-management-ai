@@ -1,6 +1,6 @@
 # Quyết định dự án ngày 25 tháng 9 năm 2026
 
-**Nguồn:** `SRC-PROJECT-DEC-20260925` — chỉ đạo hiện tại của chủ dự án trong bản kế hoạch NV4. Đây là quyết định **của dự án**, không phải quy định do Trường/Khoa ban hành. Khi quy định chính thức hoặc GVHD đưa ra căn cứ mới, cập nhật quyết định và trace trước khi đổi mã.
+**Nguồn:** `SRC-PROJECT-DEC-20260925` — chỉ đạo hiện tại của chủ dự án trong bản kế hoạch NV4. 
 
 | Chủ đề | Quyết định và lý do | Trạng thái |
 | --- | --- | --- |
