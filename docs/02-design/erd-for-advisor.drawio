@@ -1,0 +1,473 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" agent="Codex NV4 database audit" compressed="false" pages="5">
+  <diagram id="erd-1---identity,-tổ-chức-và-đợt" name="ERD 1 — Danh tính, đơn vị và đợt KLTN">
+    <mxGraphModel dx="890" dy="471" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1747" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Khoa&lt;/b&gt;&lt;br&gt;&lt;i&gt;faculty&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN code: VARCHAR(32)&lt;br&gt;NN name: VARCHAR(255)&lt;br&gt;NN active: BOOLEAN&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="40" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Bộ môn&lt;/b&gt;&lt;br&gt;&lt;i&gt;department&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN faculty_id: UUID&lt;br&gt;NN code: VARCHAR(32)&lt;br&gt;NN name: VARCHAR(255)&lt;br&gt;- major_code: VARCHAR(32)&lt;br&gt;NN active: BOOLEAN&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="470" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Tài khoản người dùng&lt;/b&gt;&lt;br&gt;&lt;i&gt;user_account&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN external_subject: VARCHAR(255)&lt;br&gt;NN base_role: VARCHAR(20)&lt;br&gt;NN status: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="910" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Hồ sơ sinh viên&lt;/b&gt;&lt;br&gt;&lt;i&gt;student_profile&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN user_id: UUID&lt;br&gt;NN student_code: VARCHAR(32)&lt;br&gt;FK/NN department_id: UUID&lt;br&gt;NN display_name: VARCHAR(255)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="1350" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Hồ sơ giảng viên&lt;/b&gt;&lt;br&gt;&lt;i&gt;lecturer_profile&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN user_id: UUID&lt;br&gt;NN lecturer_code: VARCHAR(32)&lt;br&gt;FK/NN department_id: UUID&lt;br&gt;NN display_name: VARCHAR(255)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="40" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Chức vụ trong đơn vị&lt;/b&gt;&lt;br&gt;&lt;i&gt;organizational_position&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN code: VARCHAR(40)&lt;br&gt;NN name: VARCHAR(255)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="470" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Phân công chức vụ&lt;/b&gt;&lt;br&gt;&lt;i&gt;position_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN lecturer_id: UUID&lt;br&gt;FK/NN position_id: UUID&lt;br&gt;FK faculty_id: UUID&lt;br&gt;FK department_id: UUID&lt;br&gt;NN effective_from: TIMESTAMP WITH TIME ZONE&lt;br&gt;- effective_to: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:3&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="910" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Năm học&lt;/b&gt;&lt;br&gt;&lt;i&gt;academic_year&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN code: VARCHAR(20)&lt;br&gt;NN starts_on: DATE&lt;br&gt;NN ends_on: DATE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="1350" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Đợt khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;thesis_round&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN academic_year_id: UUID&lt;br&gt;NN code: VARCHAR(32)&lt;br&gt;NN round_type: VARCHAR(20)&lt;br&gt;NN opens_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN closes_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:3&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="30" y="915" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Quy định của đợt&lt;/b&gt;&lt;br&gt;&lt;i&gt;round_policy&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;NN policy_type: VARCHAR(50)&lt;br&gt;NN version: INTEGER&lt;br&gt;NN config_json: JSONB&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;- effective_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:3&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="470" y="915" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Phân quyền theo phạm vi&lt;/b&gt;&lt;br&gt;&lt;i&gt;resource_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN assignment_type: VARCHAR(50)&lt;br&gt;FK/NN user_id: UUID&lt;br&gt;FK round_id: UUID&lt;br&gt;FK thesis_id: UUID&lt;br&gt;FK council_id: UUID&lt;br&gt;NN effective_from: TIMESTAMP WITH TIME ZONE&lt;br&gt;- effective_to: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:3 · CHECK:3&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="910" y="915" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Kết quả xét điều kiện dự khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;eligibility_snapshot&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN student_id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;NN version: INTEGER&lt;br&gt;NN passed_credit_ratio: NUMERIC(5, 4)&lt;br&gt;NN gpa_4: NUMERIC(3, 2)&lt;br&gt;NN discipline_status: VARCHAR(40)&lt;br&gt;NN criminal_case_status: VARCHAR(40)&lt;br&gt;NN evidence_ref: VARCHAR(500)&lt;br&gt;NN captured_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;FK confirmed_by: UUID&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:5&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="1350" y="915" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Ngoại lệ điều kiện dự khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;eligibility_exception&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN snapshot_id: UUID&lt;br&gt;NN official_ref: VARCHAR(500)&lt;br&gt;NN reason: TEXT&lt;br&gt;FK/NN granted_by: UUID&lt;br&gt;NN granted_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="30" y="1305" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Hồ sơ chuyên môn giảng viên&lt;/b&gt;&lt;br&gt;&lt;i&gt;lecturer_expertise&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN lecturer_id: UUID&lt;br&gt;NN version: INTEGER&lt;br&gt;NN labels: JSONB&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;FK verified_by: UUID&lt;br&gt;- verified_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" vertex="1">
+          <mxGeometry height="330" width="390" x="470" y="1305" as="geometry" />
+        </mxCell>
+        <mxCell id="16" parent="1" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" value="&lt;b&gt;Minh chứng chuyên môn&lt;/b&gt;&lt;br&gt;&lt;i&gt;expertise_evidence&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN expertise_id: UUID&lt;br&gt;NN evidence_type: VARCHAR(50)&lt;br&gt;NN reference: VARCHAR(500)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE" vertex="1">
+          <mxGeometry height="330" width="390" x="910" y="1305" as="geometry" />
+        </mxCell>
+        <mxCell id="17" edge="1" parent="1" source="3" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="2" value="faculty_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="18" edge="1" parent="1" source="5" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="3" value="department_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" edge="1" parent="1" source="5" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToOne;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="user_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" edge="1" parent="1" source="6" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToOne;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="user_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" edge="1" parent="1" source="6" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="3" value="department_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" edge="1" parent="1" source="8" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="3" value="department_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" edge="1" parent="1" source="8" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="2" value="faculty_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="24" edge="1" parent="1" source="8" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="6" value="lecturer_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="25" edge="1" parent="1" source="8" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="7" value="position_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="26" edge="1" parent="1" source="10" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="9" value="academic_year_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="27" edge="1" parent="1" source="11" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="10" value="round_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="28" edge="1" parent="1" source="12" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="10" value="round_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="29" edge="1" parent="1" source="12" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="user_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="30" edge="1" parent="1" source="13" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="10" value="round_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="13" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="5" value="student_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="13" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="confirmed_by">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="33" edge="1" parent="1" source="14" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToOne;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="13" value="snapshot_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="14" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="granted_by">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="35" edge="1" parent="1" source="15" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="4" value="verified_by">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" value="lecturer_id" source="15" target="6">
+          <mxGeometry relative="1" as="geometry">
+            </mxGeometry>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="16" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" target="15" value="expertise_id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-title-1" parent="1" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=20;fontStyle=1;fontColor=#17365d;align=left;verticalAlign=middle;" value="ERD 1 — Danh tính, đơn vị và đợt KLTN" vertex="1">
+          <mxGeometry height="42" width="1700" x="40" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-subtitle-1" parent="1" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=12;fontColor=#475569;align=left;verticalAlign=middle;" value="ERD vật lý PostgreSQL • Ký hiệu Crow’s Foot (ERD, không phải sơ đồ lớp UML) • Tên hiển thị tiếng Việt; mã bảng/cột giữ nguyên." vertex="1">
+          <mxGeometry height="34" width="1700" x="40" y="69" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-legend-1" parent="1" style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." vertex="1">
+          <mxGeometry height="65" width="1700" x="40" y="1657" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd-2---topic,-đăng-ký-và-thesis" name="ERD 2 — Đề tài, đăng ký và khóa luận">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1357" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;topic&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK/NN department_id: UUID&lt;br&gt;FK/NN proposer_user_id: UUID&lt;br&gt;NN proposer_type: VARCHAR(20)&lt;br&gt;NN current_title: VARCHAR(500)&lt;br&gt;- description: TEXT&lt;br&gt;NN max_students: INTEGER&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;FK decided_by: UUID&lt;br&gt;- decided_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Lịch sử tên đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;topic_title_version&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN topic_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN title: VARCHAR(500)&lt;br&gt;FK/NN changed_by: UUID&lt;br&gt;- change_reason: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Tiêu chí đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;topic_requirement&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN topic_id: UUID&lt;br&gt;NN requirement_type: VARCHAR(30)&lt;br&gt;- value_text: TEXT&lt;br&gt;- preferred_gpa: NUMERIC(3, 2)&lt;br&gt;NN enforcement: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Đăng ký đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;topic_registration&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK/NN topic_id: UUID&lt;br&gt;FK/NN created_by: UUID&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;- submitted_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;FK lecturer_decided_by: UUID&lt;br&gt;- lecturer_decided_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- lecturer_reason: TEXT&lt;br&gt;FK department_finalized_by: UUID&lt;br&gt;- department_finalized_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Thành viên đăng ký đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;registration_member&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN registration_id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK/NN student_id: UUID&lt;br&gt;NN is_coordinator: BOOLEAN&lt;br&gt;NN active: BOOLEAN&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;thesis&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK/NN topic_id: UUID&lt;br&gt;FK/NN registration_id: UUID&lt;br&gt;FK/NN department_id: UUID&lt;br&gt;NN current_title: VARCHAR(500)&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Sinh viên thực hiện khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;thesis_member&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;FK/NN student_id: UUID&lt;br&gt;NN is_coordinator: BOOLEAN&lt;br&gt;NN active: BOOLEAN&lt;br&gt;NN joined_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- left_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="&lt;b&gt;Phân công công việc thành viên&lt;/b&gt;&lt;br&gt;&lt;i&gt;member_work_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN work_description: TEXT&lt;br&gt;NN expected_output: TEXT&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;FK reviewed_by: UUID&lt;br&gt;- reviewed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- review_comment: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="&lt;b&gt;Phân công giảng viên hướng dẫn&lt;/b&gt;&lt;br&gt;&lt;i&gt;advisor_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;FK/NN lecturer_id: UUID&lt;br&gt;NN assignment_type: VARCHAR(20)&lt;br&gt;FK/NN assigned_by: UUID&lt;br&gt;NN effective_from: TIMESTAMP WITH TIME ZONE&lt;br&gt;- effective_to: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;Phân công giảng viên phản biện&lt;/b&gt;&lt;br&gt;&lt;i&gt;reviewer_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN lecturer_id: UUID&lt;br&gt;FK proposal_id: UUID&lt;br&gt;FK thesis_id: UUID&lt;br&gt;NN review_scope: VARCHAR(20)&lt;br&gt;FK/NN assigned_by: UUID&lt;br&gt;NN assigned_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="topic_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="3" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="topic_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="4" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="topic_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="5" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="registration_id, round_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="topic_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="7" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="registration_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToOne;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="7" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="thesis_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="8" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="thesis_member_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="9" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="thesis_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="10" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="thesis_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="11" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-title-2" value="ERD 2 — Đề tài, đăng ký và khóa luận" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=20;fontStyle=1;fontColor=#17365d;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="20" width="1700" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-subtitle-2" value="ERD vật lý PostgreSQL • Ký hiệu Crow’s Foot (ERD, không phải sơ đồ lớp UML) • Tên hiển thị tiếng Việt; mã bảng/cột giữ nguyên." style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=12;fontColor=#475569;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="69" width="1700" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-legend-2" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="1267" width="1700" height="65" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd-3---đề-cương,-tiến-độ,-tài-liệu" name="ERD 3 — Đề cương, tiến độ và tài liệu">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1747" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Tệp lưu trữ&lt;/b&gt;&lt;br&gt;&lt;i&gt;stored_file&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN storage_key: VARCHAR(500)&lt;br&gt;NN original_name: VARCHAR(500)&lt;br&gt;NN media_type: VARCHAR(150)&lt;br&gt;NN byte_size: INTEGER&lt;br&gt;NN sha256: VARCHAR(64)&lt;br&gt;NN scan_state: VARCHAR(20)&lt;br&gt;- scanned_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Đề cương&lt;/b&gt;&lt;br&gt;&lt;i&gt;proposal&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;- current_version_no: INTEGER&lt;br&gt;NN state: VARCHAR(40)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Phiên bản đề cương&lt;/b&gt;&lt;br&gt;&lt;i&gt;proposal_version&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN proposal_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;FK/NN stored_file_id: UUID&lt;br&gt;FK/NN submitted_by: UUID&lt;br&gt;NN submitted_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN content_sha256: VARCHAR(64)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Nhận xét đề cương&lt;/b&gt;&lt;br&gt;&lt;i&gt;proposal_review&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN proposal_version_id: UUID&lt;br&gt;FK/NN reviewer_assignment_id: UUID&lt;br&gt;FK/NN reviewer_user_id: UUID&lt;br&gt;NN decision: VARCHAR(30)&lt;br&gt;NN comment: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Xác nhận ký duyệt&lt;/b&gt;&lt;br&gt;&lt;i&gt;signature_confirmation&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN proposal_id: UUID&lt;br&gt;FK/NN proposal_version_no: INTEGER&lt;br&gt;NN signature_type: VARCHAR(40)&lt;br&gt;FK/NN signer_user_id: UUID&lt;br&gt;NN confirmed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- official_ref: VARCHAR(500)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Mốc tiến độ&lt;/b&gt;&lt;br&gt;&lt;i&gt;progress_milestone&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;NN code: VARCHAR(50)&lt;br&gt;NN title: VARCHAR(255)&lt;br&gt;NN version_no: INTEGER&lt;br&gt;- due_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- expected_ratio: NUMERIC(5, 2)&lt;br&gt;NN source_type: VARCHAR(20)&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:4&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Báo cáo tiến độ&lt;/b&gt;&lt;br&gt;&lt;i&gt;progress_report&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;FK/NN milestone_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN summary: TEXT&lt;br&gt;- reported_ratio: NUMERIC(5, 2)&lt;br&gt;FK evidence_file_id: UUID&lt;br&gt;FK/NN submitted_by: UUID&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="&lt;b&gt;Nhận xét tiến độ&lt;/b&gt;&lt;br&gt;&lt;i&gt;progress_review&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN progress_report_id: UUID&lt;br&gt;FK/NN reviewer_id: UUID&lt;br&gt;NN decision: VARCHAR(30)&lt;br&gt;NN comment: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="&lt;b&gt;Yêu cầu đổi đề tài&lt;/b&gt;&lt;br&gt;&lt;i&gt;topic_change_request&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;FK/NN requested_by: UUID&lt;br&gt;NN reason: TEXT&lt;br&gt;FK proposed_topic_id: UUID&lt;br&gt;- proposed_title: VARCHAR(500)&lt;br&gt;FK advisor_reviewed_by: UUID&lt;br&gt;- advisor_reviewed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;FK department_decided_by: UUID&lt;br&gt;- department_decided_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;Kết quả thủ tục ngoài hệ thống&lt;/b&gt;&lt;br&gt;&lt;i&gt;external_procedure_outcome&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;NN outcome_type: VARCHAR(20)&lt;br&gt;NN official_ref: VARCHAR(500)&lt;br&gt;NN effective_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;FK evidence_file_id: UUID&lt;br&gt;FK/NN recorded_by: UUID&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="&lt;b&gt;Tài liệu khóa luận&lt;/b&gt;&lt;br&gt;&lt;i&gt;document&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;NN document_type: VARCHAR(50)&lt;br&gt;NN title: VARCHAR(500)&lt;br&gt;NN visibility: VARCHAR(20)&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="&lt;b&gt;Phiên bản tài liệu&lt;/b&gt;&lt;br&gt;&lt;i&gt;document_version&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN document_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;FK/NN stored_file_id: UUID&lt;br&gt;FK/NN submitted_by: UUID&lt;br&gt;NN submitted_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN content_sha256: VARCHAR(64)&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="&lt;b&gt;Quy định kiểm tra tương đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;similarity_policy&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;- metric_code: VARCHAR(100)&lt;br&gt;- threshold_value: NUMERIC(10, 6)&lt;br&gt;NN decision_mode: VARCHAR(20)&lt;br&gt;NN config_json: JSONB&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:4&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="&lt;b&gt;Lần kiểm tra tương đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;similarity_check&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN document_version_id: UUID&lt;br&gt;FK policy_id: UUID&lt;br&gt;NN metric_code: VARCHAR(100)&lt;br&gt;- lexical_coverage_pct: NUMERIC(6, 3)&lt;br&gt;- semantic_candidate_score: NUMERIC(10, 6)&lt;br&gt;- business_status: VARCHAR(40)&lt;br&gt;- model_version: VARCHAR(100)&lt;br&gt;- index_version: VARCHAR(100)&lt;br&gt;- corpus_snapshot: VARCHAR(200)&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="&lt;b&gt;Kết quả đối sánh tài liệu&lt;/b&gt;&lt;br&gt;&lt;i&gt;similarity_match&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN check_id: UUID&lt;br&gt;FK source_document_version_id: UUID&lt;br&gt;NN source_ref: VARCHAR(500)&lt;br&gt;NN input_start: INTEGER&lt;br&gt;NN input_end: INTEGER&lt;br&gt;- matched_text_hash: VARCHAR(64)&lt;br&gt;- lexical_score: NUMERIC(10, 6)&lt;br&gt;- semantic_score: NUMERIC(10, 6)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="stored_file_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="4" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="proposal_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="4" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="proposal_version_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="5" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="proposal_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="evidence_file_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="8" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="milestone_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="8" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="progress_report_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="9" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="evidence_file_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="11" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="document_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="13" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="26" value="stored_file_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="13" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="policy_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="15" target="14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="document_version_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="15" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="source_document_version_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="16" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="30" value="check_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="16" target="15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-title-3" value="ERD 3 — Đề cương, tiến độ và tài liệu" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=20;fontStyle=1;fontColor=#17365d;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="20" width="1700" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-subtitle-3" value="ERD vật lý PostgreSQL • Ký hiệu Crow’s Foot (ERD, không phải sơ đồ lớp UML) • Tên hiển thị tiếng Việt; mã bảng/cột giữ nguyên." style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=12;fontColor=#475569;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="69" width="1700" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-legend-3" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="1657" width="1700" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="signature-version-fk" value="proposal_id + proposal_version_no → proposal_id + version_no" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="4">`r`n          <mxGeometry relative="1" as="geometry" />`r`n        </mxCell>`r`n      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd-4---hội-đồng-và-điểm" name="ERD 4 — Hội đồng và đánh giá">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1747" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Hội đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;council&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK/NN department_id: UUID&lt;br&gt;NN code: VARCHAR(50)&lt;br&gt;NN decision_ref: VARCHAR(500)&lt;br&gt;NN decision_date: DATE&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Thành viên hội đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;council_member&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN council_id: UUID&lt;br&gt;FK/NN lecturer_id: UUID&lt;br&gt;NN role_code: VARCHAR(20)&lt;br&gt;NN role_slot: INTEGER&lt;br&gt;NN active: BOOLEAN&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Buổi bảo vệ&lt;/b&gt;&lt;br&gt;&lt;i&gt;defense_session&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN council_id: UUID&lt;br&gt;NN code: VARCHAR(50)&lt;br&gt;NN scheduled_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN location: VARCHAR(255)&lt;br&gt;NN state: VARCHAR(30)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Khóa luận trong buổi bảo vệ&lt;/b&gt;&lt;br&gt;&lt;i&gt;session_thesis&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN session_id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;NN order_no: INTEGER&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Điểm danh hội đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;council_attendance&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN session_id: UUID&lt;br&gt;FK/NN council_member_id: UUID&lt;br&gt;NN present: BOOLEAN&lt;br&gt;FK/NN recorded_by: UUID&lt;br&gt;NN recorded_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- note: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Kiểm tra điều kiện bảo vệ&lt;/b&gt;&lt;br&gt;&lt;i&gt;defense_eligibility_check&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;FK/NN round_id: UUID&lt;br&gt;FK advisor_review_id: UUID&lt;br&gt;NN discipline_result: VARCHAR(40)&lt;br&gt;NN completion_result: VARCHAR(40)&lt;br&gt;NN advisor_result: VARCHAR(40)&lt;br&gt;- local_policy_result: VARCHAR(40)&lt;br&gt;- similarity_result: VARCHAR(40)&lt;br&gt;NN result: VARCHAR(30)&lt;br&gt;- reason: TEXT&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Nhận xét của giảng viên hướng dẫn&lt;/b&gt;&lt;br&gt;&lt;i&gt;advisor_review&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN advisor_assignment_id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;FK/NN document_version_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN attitude: TEXT&lt;br&gt;NN content_response: TEXT&lt;br&gt;NN presentation: TEXT&lt;br&gt;NN defense_recommendation: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="&lt;b&gt;Nhận xét của giảng viên phản biện&lt;/b&gt;&lt;br&gt;&lt;i&gt;reviewer_review&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN reviewer_assignment_id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;FK/NN document_version_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN presentation: TEXT&lt;br&gt;NN research_quality: TEXT&lt;br&gt;NN contribution: TEXT&lt;br&gt;NN questions: TEXT&lt;br&gt;NN overall: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="&lt;b&gt;Mẫu thang điểm&lt;/b&gt;&lt;br&gt;&lt;i&gt;rubric_template&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;NN code: VARCHAR(50)&lt;br&gt;NN name: VARCHAR(255)&lt;br&gt;NN version_no: INTEGER&lt;br&gt;NN source_ref: VARCHAR(500)&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;Tiêu chí chấm điểm&lt;/b&gt;&lt;br&gt;&lt;i&gt;rubric_criterion&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN rubric_template_id: UUID&lt;br&gt;FK parent_id: UUID&lt;br&gt;NN code: VARCHAR(50)&lt;br&gt;NN label: VARCHAR(500)&lt;br&gt;NN max_points: NUMERIC(4, 2)&lt;br&gt;NN criterion_type: VARCHAR(20)&lt;br&gt;NN order_no: INTEGER&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:2 · CHECK:5&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="&lt;b&gt;Áp dụng thang điểm&lt;/b&gt;&lt;br&gt;&lt;i&gt;rubric_assignment&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN rubric_template_id: UUID&lt;br&gt;FK round_id: UUID&lt;br&gt;FK session_id: UUID&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:2&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="&lt;b&gt;Minh chứng điểm cộng&lt;/b&gt;&lt;br&gt;&lt;i&gt;bonus_evidence&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;NN evidence_type: VARCHAR(100)&lt;br&gt;NN reference: VARCHAR(500)&lt;br&gt;FK stored_file_id: UUID&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="915" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="&lt;b&gt;Phiếu đánh giá&lt;/b&gt;&lt;br&gt;&lt;i&gt;evaluation&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN session_id: UUID&lt;br&gt;FK/NN evaluator_member_id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;FK/NN rubric_assignment_id: UUID&lt;br&gt;NN total_points: NUMERIC(4, 2)&lt;br&gt;NN bonus_points: NUMERIC(4, 2)&lt;br&gt;NN status: VARCHAR(20)&lt;br&gt;- submitted_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- correction_reason: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:4&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="&lt;b&gt;Chi tiết điểm đánh giá&lt;/b&gt;&lt;br&gt;&lt;i&gt;evaluation_item&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN evaluation_id: UUID&lt;br&gt;FK/NN criterion_id: UUID&lt;br&gt;NN points: NUMERIC(4, 2)&lt;br&gt;- comment: TEXT&lt;br&gt;FK bonus_evidence_id: UUID&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="16" value="&lt;b&gt;Kết quả cuối cùng&lt;/b&gt;&lt;br&gt;&lt;i&gt;final_result&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN session_id: UUID&lt;br&gt;FK/NN thesis_member_id: UUID&lt;br&gt;NN scorer_count: INTEGER&lt;br&gt;NN average_score: NUMERIC(4, 2)&lt;br&gt;NN bonus_average: NUMERIC(4, 2)&lt;br&gt;NN final_score: NUMERIC(3, 1)&lt;br&gt;NN calculation_version: INTEGER&lt;br&gt;NN calculated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:5&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="1305" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="17" value="council_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="3" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="18" value="council_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="4" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="session_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="5" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" value="session_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="council_member_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="advisor_review_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="7" target="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="rubric_template_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="11" target="10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="rubric_template_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="12" target="10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="session_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="12" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="26" value="session_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="14" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="evaluator_member_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="14" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="rubric_assignment_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="14" target="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="evaluation_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="15" target="14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="30" value="bonus_evidence_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="15" target="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="31" value="criterion_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="15" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="32" value="session_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="16" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="1000" value="parent_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="11" target="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-title-4" value="ERD 4 — Hội đồng và đánh giá" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=20;fontStyle=1;fontColor=#17365d;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="20" width="1700" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-subtitle-4" value="ERD vật lý PostgreSQL • Ký hiệu Crow’s Foot (ERD, không phải sơ đồ lớp UML) • Tên hiển thị tiếng Việt; mã bảng/cột giữ nguyên." style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=12;fontColor=#475569;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="69" width="1700" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-legend-4" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="1657" width="1700" height="65" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd-5---biên-bản,-kho-và-audit" name="ERD 5 — Biên bản, lưu trữ và nhật ký">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="967" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Biên bản hội đồng&lt;/b&gt;&lt;br&gt;&lt;i&gt;council_minute&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN session_id: UUID&lt;br&gt;NN minute_no: VARCHAR(100)&lt;br&gt;NN current_version_no: INTEGER&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;- printed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- signed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN row_version: INTEGER&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Phiên bản biên bản&lt;/b&gt;&lt;br&gt;&lt;i&gt;minute_version&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN minute_id: UUID&lt;br&gt;NN version_no: INTEGER&lt;br&gt;FK/NN stored_file_id: UUID&lt;br&gt;FK/NN generated_by: UUID&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;FK replacement_for_id: UUID&lt;br&gt;- void_reason: TEXT&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:3&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Chữ ký biên bản&lt;/b&gt;&lt;br&gt;&lt;i&gt;minute_signature&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN minute_version_id: UUID&lt;br&gt;FK/NN signer_member_id: UUID&lt;br&gt;NN signed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- signature_ref: VARCHAR(500)&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:0&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Khóa luận lưu trữ&lt;/b&gt;&lt;br&gt;&lt;i&gt;repository_item&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN thesis_id: UUID&lt;br&gt;FK/NN published_document_version_id: UUID&lt;br&gt;NN title: VARCHAR(500)&lt;br&gt;- abstract: TEXT&lt;br&gt;NN keywords: JSONB&lt;br&gt;NN source_type: VARCHAR(50)&lt;br&gt;NN visibility: VARCHAR(20)&lt;br&gt;- published_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;- revoked_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="135" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Thông tin lập chỉ mục&lt;/b&gt;&lt;br&gt;&lt;i&gt;search_index_metadata&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN repository_item_id: UUID&lt;br&gt;FK/NN document_version_id: UUID&lt;br&gt;NN index_name: VARCHAR(100)&lt;br&gt;NN index_version: VARCHAR(100)&lt;br&gt;- embedding_model: VARCHAR(150)&lt;br&gt;- chunking_version: VARCHAR(100)&lt;br&gt;- external_point_namespace: VARCHAR(200)&lt;br&gt;NN state: VARCHAR(20)&lt;br&gt;- indexed_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;… xem thêm cột trong từ điển dữ liệu&lt;/i&gt;&lt;br&gt;&lt;i&gt;UQ:1 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="&lt;b&gt;Nhật ký truy xuất&lt;/b&gt;&lt;br&gt;&lt;i&gt;retrieval_audit&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK/NN user_id: UUID&lt;br&gt;NN question_hash: VARCHAR(64)&lt;br&gt;NN authorized_scope_hash: VARCHAR(64)&lt;br&gt;NN retrieved_item_count: INTEGER&lt;br&gt;- provider: VARCHAR(100)&lt;br&gt;- model_version: VARCHAR(100)&lt;br&gt;NN outcome: VARCHAR(30)&lt;br&gt;NN correlation_id: UUID&lt;br&gt;NN created_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN updated_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;&lt;i&gt;UQ:0 · CHECK:1&lt;/i&gt;" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="470" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="&lt;b&gt;Sự kiện kiểm toán&lt;/b&gt;&lt;br&gt;&lt;i&gt;audit_event&lt;/i&gt;&lt;br&gt;PK/NN id: UUID&lt;br&gt;FK actor_id: UUID&lt;br&gt;NN action: VARCHAR(100)&lt;br&gt;NN resource_type: VARCHAR(100)&lt;br&gt;NN resource_id: UUID&lt;br&gt;- before_hash: VARCHAR(64)&lt;br&gt;- after_hash: VARCHAR(64)&lt;br&gt;- reason: TEXT&lt;br&gt;NN occurred_at: TIMESTAMP WITH TIME ZONE&lt;br&gt;NN correlation_id: UUID" style="swimlane;horizontal=1;startSize=30;whiteSpace=wrap;html=1;fillColor=#dbeafe;swimlaneFillColor=#ffffff;strokeColor=#55708f;strokeWidth=1.5;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;fontSize=11;fontColor=#142336;shadow=0;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="910" y="525" width="390" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="replacement_for_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERzeroToOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="3" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="minute_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="3" target="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="minute_version_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="4" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="repository_item_id" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-title-5" value="ERD 5 — Biên bản, lưu trữ và nhật ký" style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=20;fontStyle=1;fontColor=#17365d;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="20" width="1700" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-subtitle-5" value="ERD vật lý PostgreSQL • Ký hiệu Crow’s Foot (ERD, không phải sơ đồ lớp UML) • Tên hiển thị tiếng Việt; mã bảng/cột giữ nguyên." style="text;html=1;whiteSpace=wrap;fillColor=none;strokeColor=none;fontSize=12;fontColor=#475569;align=left;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="40" y="69" width="1700" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="advisor-legend-5" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" parent="1" vertex="1">
+          <mxGeometry x="40" y="877" width="1700" height="65" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,55 @@
+# Bí mật và cấu hình runtime
+.env
+.env.*
+!.env.example
+secrets.json
+*.key
+*.pem
+
+# Kết quả build/runtime
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+dist/
+build/
+*.log
+*.egg-info/
+.coverage
+.DS_Store
+Thumbs.db
+
+# Nguồn gốc bất biến hoặc có dữ liệu nhạy cảm
+source/raw/
+source/private/
+source/markdown-private/
+data/raw/
+data/private/
+source/raw/KLTN/
+source/raw/DuLieuThuc/
+source/raw/HoSo/
+source/raw/BangDiem/
+/BieuMau/
+/Thuc Hien/
+
+# Không gian chuyển đổi/render tạm
+tmp/
+postgres-data/
+
+# Tài liệu thao tác cá nhân và bản SQL chụp cấu trúc để học trên máy này
+/docs/02-design/huong-dan-xem-csdl-pgadmin.md
+/docs/02-design/kltn-init-empty.sql
+/docs/02-design/kltn-ai-workbench.sql
+
+# Nguồn tham khảo, nhật ký và tệp thao tác cá nhân chỉ giữ trên máy
+/.github/
+/docs/00-sources/normalization-notes.md
+/docs/00-sources/project-context-baseline.md
+/docs/04-research/
+/docs/99-project-log/
+/source/markdown/
+/frontend/.gitkeep
+/tools/normalize_source.py
+/.c2cignore
+/installed-apps-c-drive-desc.csv
