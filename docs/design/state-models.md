@@ -116,22 +116,23 @@ stateDiagram-v2
   DRAFT --> SUBMITTED: evaluator submit
   SUBMITTED --> CORRECTED: chính evaluator sửa trước khóa
   CORRECTED --> SUBMITTED
-  SUBMITTED --> LOCKED: minute in/ký hoặc phiên khóa
+  SUBMITTED --> LOCKED: từ chữ ký đầu hoặc phiên đã ký/khóa
 ~~~
 
 ~~~mermaid
 stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> EXPORTED
-  EXPORTED --> VOID: sai trước in
+  EXPORTED --> VOID: sai trước chữ ký đầu
   VOID --> REPLACED: tạo version thay thế
   EXPORTED --> PRINTED
-  PRINTED --> SIGNED: Chủ tịch ký/xác nhận
+  PRINTED --> VOID: sai, giấy chưa có chữ ký nào
+  PRINTED --> SIGNED: đủ chữ ký Chair + Secretary đúng Hội đồng
   SIGNED --> LOCKED
 ~~~
 
 - FinalResult được tính lại từ các Evaluation SUBMITTED hợp lệ trước khóa.
-- Sau `PRINTED/SIGNED/LOCKED` không có transition sửa; OPEN-07 phải được giải quyết bằng policy mới.
+- Sau `PRINTED` còn được sửa/in lại nếu Thư ký đối chiếu giấy **chưa có chữ ký nào**; version cũ VOID và bản mới có mã/thời gian. Từ chữ ký đầu tiên không có transition sửa, dù aggregate còn PRINTED tới khi đủ hai chữ ký.
 - Mọi transition nhạy cảm có authorization server-side, optimistic concurrency và AuditEvent.
 
 ## Thesis
@@ -198,16 +199,16 @@ stateDiagram-v2
 | DefenseSession | POSTPONED | reschedule | CT/TK | Lịch mới, quyết định vẫn hiệu lực | SCHEDULED | Tự READY khi chưa điểm danh → 409 |
 | DefenseSession | READY | open defense | CT | Thesis list và eligibility hợp lệ | SCORING | Thesis chưa eligible → 422 |
 | DefenseSession | SCORING | finalize | CT/TK | Phiếu hợp lệ, FinalResult và minute đủ theo policy | FINALIZED | Thiếu phiếu bị coi 0 → 422 |
-| DefenseSession | FINALIZED | close | actor được giao | Biên bản đã ký/khóa | CLOSED | Sửa điểm hậu ký → 409/OPEN-07 |
+| DefenseSession | FINALIZED | close | actor được giao | Biên bản đã ký/khóa | CLOSED | Sửa điểm từ chữ ký đầu → 409 |
 | Evaluation | DRAFT/CORRECTED | submit | evaluator | Present; own form; rubric max; total gồm bonus ≤10 | SUBMITTED | Thư ký nhập thay → 403 |
-| Evaluation | SUBMITTED | correct | chính evaluator | Trước lock/in; có reason | CORRECTED | Người khác sửa → 403 |
+| Evaluation | SUBMITTED | correct | chính evaluator | Trước chữ ký đầu; Thư ký xác nhận bản giấy chưa ký nếu đã in; có reason/audit | CORRECTED | Người khác sửa → 403 |
 | Evaluation | SUBMITTED | lock | hệ thống | Session/minute lock | LOCKED | LOCKED sửa → 409 |
 | CouncilMinute | DRAFT | export | TK | Attendance/result completeness | EXPORTED | Thiếu result → 422 |
-| CouncilMinute | EXPORTED | void | TK | Chưa PRINTED; có reason | VOID | Sau PRINTED void → 409 |
+| CouncilMinute | EXPORTED | void | TK | Chưa có chữ ký; có reason, giấy in cũ được đối chiếu | VOID | Đã có chữ ký void → 409 |
 | CouncilMinute | VOID | tạo bản thay thế | TK | Có reason và MinuteVersion mới liên kết bản sai | REPLACED | Dùng lại bản VOID để ký → 409 |
-| CouncilMinute | EXPORTED | mark printed | TK | Latest non-void version | PRINTED | Void version in → 409 |
-| CouncilMinute | PRINTED | chair confirm | CT | Đúng Chair từ quyết định | SIGNED | TBM ký biên bản bảo vệ → 403 |
-| CouncilMinute | SIGNED | lock | hệ thống | Signature valid | LOCKED | Hậu ký sửa → 409/OPEN-07 |
+| CouncilMinute | EXPORTED | mark printed | TK | Latest non-void version | PRINTED | Version đã VOID → 409 |
+| CouncilMinute | PRINTED | sign/confirm | CT hoặc TK | Cả Chair và Secretary từ quyết định ký đúng MinuteVersion; transaction kiểm đủ hai | SIGNED sau chữ ký thứ hai | Người ngoài/TBM → 403; chữ ký đầu giữ PRINTED nhưng khóa sửa |
+| CouncilMinute | SIGNED | lock | hệ thống | Signature valid | LOCKED | Hậu ký sửa → 409 |
 
 ## Nguyên tắc tránh status explosion
 

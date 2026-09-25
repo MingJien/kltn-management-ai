@@ -1,4 +1,4 @@
--- KLTN PostgreSQL schema, Alembic revision 20260924_0002.
+-- KLTN PostgreSQL schema, Alembic revision 20260925_0005.
 -- Chạy một lần trên database PostgreSQL mới và trống.
 -- Không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
 -- Database đã có bảng phải cập nhật bằng Alembic migration, không chạy lại file này.
@@ -1225,5 +1225,65 @@ ALTER TABLE signature_confirmation ADD CONSTRAINT ck_signature_confirmation_ck_s
 ALTER TABLE signature_confirmation ADD CONSTRAINT fk_signature_confirmation_proposal_version_pair FOREIGN KEY(proposal_id, proposal_version_no) REFERENCES proposal_version (proposal_id, version_no) ON DELETE RESTRICT;
 
 UPDATE alembic_version SET version_num='20260924_0002' WHERE alembic_version.version_num = '20260920_0001';
+
+-- Running upgrade 20260924_0002 -> 20260925_0003
+
+ALTER TABLE repository_item ALTER COLUMN thesis_id DROP NOT NULL;
+
+ALTER TABLE repository_item ALTER COLUMN published_document_version_id DROP NOT NULL;
+
+ALTER TABLE repository_item ADD COLUMN stored_file_id UUID;
+
+ALTER TABLE repository_item ADD COLUMN origin_type VARCHAR(30) DEFAULT 'MANAGED_THESIS' NOT NULL;
+
+ALTER TABLE repository_item ADD COLUMN source_ref VARCHAR(500);
+
+ALTER TABLE repository_item ADD COLUMN provenance TEXT;
+
+ALTER TABLE repository_item ADD COLUMN source_version VARCHAR(100);
+
+ALTER TABLE repository_item ADD CONSTRAINT fk_repository_item_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT;
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_origin_type CHECK (origin_type IN ('MANAGED_THESIS','IMPORTED_DOCUMENT','OFFICIAL_SOURCE'));
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_source_type CHECK (source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','REGULATION','FORM','GUIDELINE','SYNTHETIC_TEST'));
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_origin_source_consistency CHECK ((origin_type = 'MANAGED_THESIS' AND source_type = 'THESIS' AND thesis_id IS NOT NULL AND published_document_version_id IS NOT NULL) OR (origin_type = 'IMPORTED_DOCUMENT' AND source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','SYNTHETIC_TEST') AND thesis_id IS NULL AND published_document_version_id IS NULL) OR (origin_type = 'OFFICIAL_SOURCE' AND source_type IN ('REGULATION','FORM','GUIDELINE') AND thesis_id IS NULL AND published_document_version_id IS NULL));
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_has_source_reference CHECK (source_ref IS NOT NULL OR stored_file_id IS NOT NULL OR published_document_version_id IS NOT NULL);
+
+CREATE INDEX ix_repository_item_source_type_visibility ON repository_item (source_type, visibility);
+
+ALTER TABLE search_index_metadata ALTER COLUMN document_version_id DROP NOT NULL;
+
+ALTER TABLE similarity_match ADD COLUMN source_repository_item_id UUID;
+
+ALTER TABLE similarity_match ADD CONSTRAINT fk_similarity_match_source_repository_item_id_repository_item FOREIGN KEY(source_repository_item_id) REFERENCES repository_item (id) ON DELETE RESTRICT;
+
+UPDATE alembic_version SET version_num='20260925_0003' WHERE alembic_version.version_num = '20260924_0002';
+
+-- Running upgrade 20260925_0003 -> 20260925_0004
+
+ALTER TABLE repository_item ADD COLUMN external_source_id VARCHAR(200);
+
+ALTER TABLE repository_item ADD COLUMN source_url VARCHAR(1000);
+
+ALTER TABLE repository_item ADD CONSTRAINT uq_repository_item_external_source_id UNIQUE (external_source_id);
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_source_url_https CHECK (source_url IS NULL OR source_url LIKE 'https://%');
+
+ALTER TABLE repository_item DROP CONSTRAINT ck_repository_item_ck_repository_item_has_source_reference;
+
+ALTER TABLE repository_item ADD CONSTRAINT ck_repository_item_ck_repository_item_has_source_reference CHECK (source_ref IS NOT NULL OR source_url IS NOT NULL OR stored_file_id IS NOT NULL OR published_document_version_id IS NOT NULL);
+
+UPDATE alembic_version SET version_num='20260925_0004' WHERE alembic_version.version_num = '20260925_0003';
+
+-- Running upgrade 20260925_0004 -> 20260925_0005
+
+ALTER TABLE progress_review DROP CONSTRAINT ck_progress_review_decision;
+
+ALTER TABLE progress_review ADD CONSTRAINT ck_progress_review_decision CHECK (decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED'));
+
+UPDATE alembic_version SET version_num='20260925_0005' WHERE alembic_version.version_num = '20260925_0004';
 
 COMMIT;

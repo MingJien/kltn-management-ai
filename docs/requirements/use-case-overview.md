@@ -36,4 +36,4 @@ flowchart LR
 - `ADMIN` không là actor duyệt nghiệp vụ.
 - AI/RAG chỉ đọc theo quyền và trả citation/link.
 - Rút/gia hạn được giải quyết ngoài hệ thống; hệ thống ghi kết quả.
-- Không có use case sửa điểm/biên bản sau ký cho đến khi OPEN-07 được chốt.
+- Có use case sửa phiếu và in lại biên bản khi giấy chưa ai ký; từ chữ ký đầu không sửa điểm/nội dung.

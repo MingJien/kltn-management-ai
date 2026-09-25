@@ -18,10 +18,10 @@
 | --- | --- | --- |
 | identity_access | account, profile, position, assignment authorization | Duyệt topic/điểm/biên bản |
 | rounds_eligibility | year, round, policy, eligibility | Tự tạo ngoại lệ |
-| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | Tự ghép SV khi OPEN-02 |
+| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | SV tự lập nhóm trước gửi; không thêm người sau SUBMITTED |
 | proposal_progress | proposal/version/review/signature, milestone/report/change/outcome | Duyệt rút/gia hạn online |
 | documents_similarity | file/document/version, policy/check/match | Kết luận đạo văn |
-| councils_evaluation | council/session/attendance/reviews/rubric/evaluation/result/minute | Tự chọn Chair; sửa hậu ký |
+| councils_evaluation | council/session/attendance/reviews/rubric/evaluation/result/minute | Tự chọn Chair; sửa từ chữ ký đầu |
 | repository_search | publish/visibility/search/download/index lifecycle | Truy cập storage không guard |
 | ai_assistant | authorize, retrieve, minimize, Gemini, citation | Workflow mutation/download bytes |
 | reporting_audit | read model/export/audit metadata | Bypass resource authorization |
@@ -83,7 +83,7 @@ flowchart TD
 | Malware/extract lỗi | File ở quarantine; không tạo version khả dụng/index. |
 | Concurrency | HTTP 409 + version mới nhất; không ghi đè im lặng. |
 | Visibility revoke | PostgreSQL đổi trước, outbox deindex/reindex; query filter vẫn chặn ngay. |
-| Post-sign correction | Từ chối do OPEN-07; không Admin override. |
+| Post-sign correction | Từ chữ ký đầu từ chối mọi sửa điểm/nội dung; trước chữ ký đầu Thư ký đối chiếu bản in và tạo version mới. |
 
 ## Bảo mật/vận hành
 
@@ -92,3 +92,7 @@ flowchart TD
 - Dữ liệu nhạy cảm mã hóa theo môi trường, backup/restore kiểm thử, retention có policy.
 - Metric/log không dùng PII làm label; mọi service dùng correlation ID.
 - Hosting, SSO, region/provider, retention và SLA là quyết định triển khai, không giả thành nghiệp vụ.
+
+## Runtime prototype từ 25/09/2026
+
+Cấu trúc giữ modular monolith: `backend/api` nhận HTTP/validate DTO; `backend/services` thực thi use case và transaction; `backend/db` giữ mô hình và migration; `backend/ai` xử lý nguồn, embedding, truy xuất; `frontend` là React shell. PostgreSQL giữ nghiệp vụ và metadata corpus, Qdrant local/service giữ index có thể rebuild. FastAPI chỉ dùng `X-Dev-User-Id` khi `KLTN_ENV=development|test` và `KLTN_DEV_AUTH=true`; production fail closed trước khi có SSO. Xuất biểu mẫu đi qua template adapter/version như [thiết kế riêng](xuat-bieu-mau.md); hiện không có runtime export exact Mẫu 9.

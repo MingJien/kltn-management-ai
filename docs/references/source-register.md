@@ -27,6 +27,7 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 | SRC-QD-2919-DUP | `QĐ_ KLTN.pdf` | P2 | Drive `1AoE7O26Y35xnNVoBN-9f3frs4hMaY4iK` | Tham chiếu SRC-QD-2919 | `DUPLICATE_BYTE_IDENTICAL_REMOVED`. |
 | SRC-QD-5964 | QĐ 5964/QĐ-ĐHĐT ngày 16/08/2024 | P2 | Drive `12Azwk8tiP9KAlQupUph7vKLBuMcph82q` | `source/markdown/QuyDinh/qd-5964-sua-doi-kltn.md` | `READ_NORMALIZED_REDACTED`; nguồn hiện hành cho điều kiện học vụ. |
 | SRC-HP-IN4299N | Đề cương học phần IN4299N ngày 05/09/2026 | P2 | Drive `1Wyj2RASereW0qyB9U4Xigbms9waJNUIb` | `source/markdown/QuyDinh/in4299n-khoa-luan-tot-nghiep.md` | `READ_NORMALIZED_REDACTED`. |
+| SRC-CTDT-CNPM-2024 | Khung chương trình đào tạo Khoa học máy tính, chuyên ngành Công nghệ phần mềm, khóa 2024 | P2 | https://qao.dthu.edu.vn/Media/Files/24ctdt/khmt-cong-nghe-phan-mem.pdf | Không sao chép vào repository | `READ_PUBLIC_PRIMARY`; mục IV tách IN4299N và học phần thay thế; đối chiếu CONFLICT-007. |
 | SRC-KH-2026 | Kế hoạch KLTN 2026–2027, Khoa CN&KT | P2 | Drive `1sCjTUJvFA1LakG2_aJgA3m_L7zUFIHdq` | `source/markdown/KeHoach/ke-hoach-trien-khai-kltn-2026-2027.md` | `READ_NORMALIZED_REDACTED`; không hard-code ngày có xung đột. |
 | SRC-MAU-01A | Mẫu 1a đăng ký cá nhân | P2 | Drive `1S_AaUZgxUJT7IVuUUzWZjpziUvGVqU9T` | `source/markdown/BieuMau/mau-1a-don-dang-ky-kltn.md` | `READ_NORMALIZED_REDACTED`. |
 | SRC-MAU-01B | Mẫu 1b đăng ký nhóm | P2 | Drive `1aj7yisvXtR-hrEMUtJadD1VCcSK4_DUn` | `source/markdown/BieuMau/mau-1b-don-dang-ky-kltn-nhom.md` | `READ_NORMALIZED_REDACTED`; bố cục 2 SV là mẫu cũ, rule hiện hành tối đa 3. |
@@ -43,6 +44,7 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 | SRC-MAU-11 | Mẫu 11 bảng điểm chính thức | P2 | Drive `1OxX9NfyLczCMkXUgLFfcYNZLd8V4kBxM` | `source/markdown/BieuMau/mau-11-bang-diem-chinh-thuc-schema.md` | `READ_SCHEMA_ONLY_PII_REDACTED`. |
 | SRC-DS-KYSO-001 | Danh sách SV KLTN ký số | P2 | Drive `1AIG0Yx6lMDR7iQgsuL92C-RFUbDcSEL5` | Không nhập nội dung | `RESTRICTED_PII_NOT_TRANSCRIBED`; Mẫu 4 đã đủ schema. |
 | SRC-QD-TLTK-011 | QĐ 885/QĐ-ĐHĐT về trích dẫn/TLTK ngày 22/04/2021 | P2 | Drive `1VS_1CmgecFFYCT3NJOmEJ4Ljiyd0GSBV` | `source/markdown/QuyDinh/quy-dinh-trich-dan-tltk11.md` | `OCR_REVIEWED_WITH_UNCERTAINTY_MARKERS`; 7 trang; phạm vi trực tiếp là sau đại học. |
+| SRC-PROJECT-DEC-20260925 | Quyết định chủ dự án ngày 25/09/2026 cho phạm vi NV4 | P3 | Bản kế hoạch được chủ dự án gửi trực tiếp | docs/decisions/quyet-dinh-du-an-2026-09-25.md | CONFIRMED_PROJECT_DECISION; không thay quy định chính thức. |
 
 ## Bản trùng đã xác minh
 

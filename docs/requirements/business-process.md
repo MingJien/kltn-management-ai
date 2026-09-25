@@ -35,7 +35,7 @@ flowchart TB
     A5["Duyệt/chỉnh tên/mở topic"]
     A10["Chốt topic và phân công GVHD"]
   end
-  subgraph XNDK["Người xác nhận điều kiện theo assignment đợt — OPEN-11"]
+  subgraph XNDK["Cán bộ Khoa được giao xác nhận theo đợt"]
     A2{"Snapshot đã đối chiếu, xác nhận đủ điều kiện chung?"}
   end
   subgraph SYS["Hệ thống"]
@@ -55,7 +55,7 @@ flowchart TB
   A9 -- Đồng ý --> A10 --> A11 --> AE
 ~~~
 
-Ghi chú: người xác nhận điều kiện phải có assignment `ELIGIBILITY_VERIFIER` theo đợt, chưa mặc định là TBM/Admin (`OPEN-11`). Expertise verifier là `OPEN-01`; ghép thêm SV sau đăng ký là `OPEN-02`. GPA mong muốn của topic không tự loại SV nếu SV đạt điều kiện chung.
+Ghi chú: người xác nhận điều kiện là cán bộ Khoa được giao `ELIGIBILITY_VERIFIER` theo đợt sau đối chiếu nguồn Phòng Đào tạo, không mặc định TBM/Admin. Expertise do TBM đúng Bộ môn kiểm hoặc Trưởng khoa/người được giao khi TBM tự khai; không ghép thêm SV sau khi gửi theo quyết định dự án. GPA mong muốn của topic không tự loại SV nếu SV đạt điều kiện chung.
 
 ## B. Đề cương + phản biện/góp ý + xác nhận/ký
 
@@ -109,13 +109,18 @@ flowchart TB
     C4["Nhận xét/xác nhận tiến độ"]
     C7A["Nhận xét yêu cầu đổi"]
   end
+  subgraph DIEUPHOI["Người điều phối KLTN theo đợt"]
+    C5["Sắp lịch góp ý đề cương và báo cáo nội bộ khoảng 70%"]
+  end
+  subgraph GVCHEO["GVHD được phân công góp ý chéo"]
+    C5A["Góp ý báo cáo nội bộ lần 2"]
+  end
   subgraph TBM["Trưởng Bộ môn"]
-    C5["Tổ chức checkpoint đề cương và khoảng 70%"]
     C7B{"Duyệt đổi?"}
     C9["Ghi kết quả rút/gia hạn chính thức"]
   end
   CE(("Kết thúc chu kỳ/đã cập nhật trạng thái"))
-  CS --> C1 --> C2 --> C3 --> C4 --> C5 --> C6
+  CS --> C1 --> C2 --> C3 --> C4 --> C5 --> C5A --> C6
   C6 -- Không --> C3
   C6 -- Đổi topic --> C7 --> C7A --> C7B
   C7B -- Đồng ý --> C10["Version topic/assignment"] --> CE
@@ -123,7 +128,7 @@ flowchart TB
   C6 -- Rút/gia hạn --> C8 --> C9 --> CE
 ~~~
 
-Milestone chi tiết và deadline theo round là cấu hình `OPEN-03/06`, không hard-code từ mẫu.
+GVHD quản lý tiến độ Thesis của mình; hai checkpoint đã biết là góp ý đề cương và báo cáo nội bộ lần 2 khoảng 70% trong tháng 12. Người điều phối nhập ngày từ kế hoạch đợt đã duyệt; GVHD khác chỉ góp ý khi được phân công. Không dùng Council bảo vệ để cấp quyền cho buổi nội bộ. Ngày cụ thể không hard-code từ mẫu có năm sai (CONFLICT-002).
 
 ## D. Nộp tài liệu + tương đồng + sửa/nộp lại
 
@@ -152,7 +157,7 @@ flowchart TB
   D6 -- Xác nhận --> D8["Cho đi tiếp bước đủ điều kiện"] --> DE
 ~~~
 
-`90%` không được hiểu là cosine 0,9. Exact metric là `OPEN-05`.
+`90%` không được hiểu là cosine 0,9. Baseline chỉ báo cáo tham khảo, không có ngưỡng tự chặn.
 
 ## E. Quyết định Hội đồng + phiên bảo vệ + attendance
 
@@ -186,34 +191,21 @@ Hệ thống không tự chọn Chủ tịch. Attendance chỉ tạo quyền ch�
 
 ~~~mermaid
 flowchart TB
-  FS(("Bắt đầu: phiên đủ quorum"))
-  subgraph TV["Từng thành viên Hội đồng hiện diện"]
-    F1["Nhập Evaluation cho từng SV"]
-    F2{"Cần sửa trước khóa?"}
-    F3["Chính người nhập sửa điểm mình"]
-  end
-  subgraph SYS["Hệ thống"]
-    F4["Tính trung bình phiếu hợp lệ; làm tròn 1 chữ số"]
-    F5["Mỗi phiếu: bonus ≤1, total ≤10\nFinal = trung bình total; không cộng bonus lần hai"]
-  end
-  subgraph TK["Thư ký"]
-    F6["Tạo/xuất CouncilMinute"]
-    F7{"Sai trước in?"}
-    F8["Void version sai; tạo replacement"]
-    F9["In biên bản"]
-  end
-  subgraph CT["Chủ tịch"]
-    F10["Ký/xác nhận biên bản"]
-  end
-  FE(("Kết thúc: hồ sơ bị khóa"))
-  FS --> F1 --> F2
-  F2 -- Có --> F3 --> F1
-  F2 -- Không --> F4 --> F5 --> F6 --> F7
-  F7 -- Có --> F8 --> F6
-  F7 -- Không --> F9 --> F10 --> F11["Khóa PRINTED/SIGNED"] --> FE
+  FS(("Phiên đủ quorum")) --> F1["Mỗi thành viên hiện diện chấm từng SV"]
+  F1 --> F2["Hệ thống tính tổng từng phiếu: thưởng ≤1, tổng ≤10"]
+  F2 --> F3["Tính trung bình phiếu hợp lệ, làm tròn 1 chữ số"]
+  F3 --> F4["Thư ký xuất và in Mẫu 9 phiên bản hiện tại"]
+  F4 --> F5{"Thư ký đối chiếu bản giấy: sai và chưa ai ký?"}
+  F5 -- Có --> F6["Thư ký ghi lý do, xác nhận giấy chưa ký; VOID bản in cũ"]
+  F6 --> F7["Chính người chấm sửa phiếu của mình; ghi audit"]
+  F7 --> F3
+  F5 -- Không --> F8["Chủ tịch hoặc Thư ký ký bản đúng"]
+  F8 --> F9["Từ chữ ký đầu: khóa điểm, nội dung, version"]
+  F9 --> F10["Người còn lại ký cùng version; state SIGNED"]
+  F10 --> FE(("Hồ sơ đã ký, bất biến"))
 ~~~
 
-Sau in/ký không có đường sửa; thủ tục hậu ký là `OPEN-07`.
+Nếu bản in sai trước chữ ký đầu, bản cũ và tệp/hash vẫn lưu; bản mới có `minute_no` + `version_no`, thời gian tạo và `replacement_for_id`. Sau chữ ký đầu tiên, kể cả ký trên giấy nhưng chưa nhập vào hệ thống, **không sửa điểm/nội dung**; chỉ cấp lại bản sao đúng version đã ký và lưu lần xuất. Thư ký đối chiếu thực tế, không được nhập điểm thay thành viên Hội đồng.
 
 ## G. Lưu trữ + tra cứu + chatbot RAG
 
@@ -244,3 +236,11 @@ flowchart TB
 ~~~
 
 Gemini là quyết định dự án; không ghi thành quy định Trường. Download luôn qua web endpoint có authorization.
+
+## Quy trình làm rõ ngày 25/09/2026
+
+- Đăng ký: SV đủ điều kiện tự chọn 1–3 SV cùng bộ môn và gửi nhóm; từ thời điểm SUBMITTED danh sách bất biến, không ghép/thêm/đổi thành viên. Giảng viên đề xuất đề tài chấp nhận/từ chối, không ghép thành viên. TBM đúng bộ môn chốt; một transaction tạo Thesis, ThesisMember và AdvisorAssignment. Đề tài do SV đề xuất cần workflow riêng.
+- Điều phối KLTN theo round nhận lịch chính thức và sắp hai buổi góp ý nội bộ; GVHD xác nhận progress của Thesis được phân công, GVHD khác có assignment chỉ góp ý chéo. Không suy ra quyền Secretary Hội đồng.
+- Nộp tài liệu: lưu DocumentVersion trước; kiểm tương đồng chạy sau và trả bằng chứng advisory; sinh viên có thể nộp version sửa. Chỉ policy được duyệt sau này mới xem xét gate ở finalization.
+- Mẫu 9: Thư ký đối chiếu bản giấy. Bản in sai trước chữ ký đầu được VOID và in lại với version/mã/thời gian mới; người chấm tự sửa điểm. Từ chữ ký đầu khóa sửa dù state còn PRINTED; khi đủ Chair và Secretary mới SIGNED. Không có bypass TBM.
+- Chatbot: phân quyền → lọc corpus/nguồn → retrieval → citation; thiếu Gemini key trả RETRIEVAL_ONLY, không chế tạo câu trả lời. Văn bản nguồn là dữ liệu.

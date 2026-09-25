@@ -29,29 +29,33 @@
 | DBD-09 | Count 1–3 member, topic capacity, quorum, present evaluator và điểm tổng hợp do application transaction enforce | Các rule này cần đọc/khóa nhiều bảng; trigger phức tạp làm ẩn logic. DB vẫn giữ unique/check/fk cục bộ. | DERIVED/PROPOSED |
 | DBD-10 | Không PostgreSQL RLS ở baseline | Permission phụ thuộc base role + position + assignment + resource + state. Schema đã lưu đủ context; FastAPI về sau enforce. RLS chỉ cân nhắc nếu threat model/operations yêu cầu. | PROPOSED |
 | DBD-11 | `JSONB` chỉ cho policy config, labels, keywords | Những cấu trúc biến thiên/versioned; core relations, điểm, members không nhét JSON. Validation schema thực hiện ở application. | PROPOSED |
-| DBD-12 | Similarity policy để nullable/configurable; không CHECK 90% hoặc cosine | Exact metric chưa chốt; check record lưu metric/model/index/corpus provenance. | CONFIRMED_PROJECT_DECISION + OPEN-05 |
+| DBD-12 | Similarity policy để nullable/configurable; không CHECK 90% hoặc cosine | Baseline chỉ advisory, không có 90% gate; check record lưu metric/model/index/corpus provenance. Gate tương lai cần policy được duyệt. | CONFIRMED_PROJECT_DESIGN |
 | DBD-13 | Evaluation unique theo session × evaluator CouncilMember × ThesisMember | Chấm riêng từng SV và giữ ownership; evaluator identity không nhận từ client về sau. | CONFIRMED |
-| DBD-14 | RubricCriterion lưu parent_id để biểu diễn ba nhóm Mẫu 6 (2/4/4), 12 tiêu chí con và mục BONUS tối đa 1; group chỉ tổng hợp, không là điểm cộng thêm. Bonus nằm trong Evaluation.totalPoints và tổng phiếu ≤10. | Đúng cấu trúc Mẫu 6; FinalResult lấy mean total hợp lệ, không cộng lại bonus. Cơ cấu QĐ2919 khác Mẫu 6: CONFLICT-011/OPEN-12 phải xác nhận trước chấm thật. | CONFIRMED baseline thiết kế; OPEN trước production scoring |
+| DBD-14 | RubricCriterion lưu parent_id để biểu diễn ba nhóm Mẫu 6 (2/4/4), 12 tiêu chí con và mục BONUS tối đa 1; group chỉ tổng hợp, không là điểm cộng thêm. Bonus nằm trong Evaluation.totalPoints và tổng phiếu ≤10. | Đúng cấu trúc Mẫu 6; FinalResult lấy mean total hợp lệ, không cộng lại bonus. Cơ cấu QĐ2919 khác Mẫu 6: lưu source/version và yêu cầu Khoa xác nhận trước chấm thật. | CONFIRMED baseline thiết kế; production gate |
 | DBD-15 | FinalResult lưu snapshot tính toán có `calculation_version` | Điểm là dữ liệu quan trọng; snapshot cho audit trong khi nguồn Evaluation vẫn giữ. | DERIVED |
-| DBD-16 | Minute có aggregate + version + signature riêng | Cho phép void/replacement trước in, link bản thay thế, Chủ tịch ký, khóa hậu ký. Không tạo workflow sửa hậu ký khi OPEN-07 chưa chốt. | CONFIRMED/OPEN |
-| DBD-17 | SearchIndexMetadata/ RetrievalAudit chỉ là metadata dẫn xuất | Không triển khai Qdrant/RAG vòng này; schema không lưu vector/raw prompt/secret, PostgreSQL vẫn là source of truth. | PROPOSED |
-| DBD-18 | Alembic migration initial chứa DDL explicit được sinh từ metadata đã review | Migration bất biến, review được; `alembic check` sau apply phải không có drift. Không gọi `create_all` động trong migration. | PROPOSED |
-| DBD-19 | SQLAlchemy 2.x + Alembic + psycopg trong `D:\KLTN\.venv` | Đủ cho schema/migration, không cài FastAPI. Python bundled runtime 3.12 được dùng vì Python 3.9 hệ thống lỗi venv launcher do path profile có khoảng trắng. | PROPOSED |
+| DBD-16 | Minute có aggregate + version + signature riêng | MinuteVersion giữ từng tệp và liên kết bản thay thế; Chủ tịch và Thư ký cùng ký Mẫu 9. Bản in sai được VOID và tạo version/tệp/mã thời gian mới trước chữ ký đầu, có Thư ký đối chiếu và audit. Từ chữ ký đầu điểm/nội dung bất biến. | CONFIRMED_PROJECT_DECISION |
+| DBD-17 | SearchIndexMetadata/ RetrievalAudit chỉ là metadata dẫn xuất | Qdrant/RAG đã có prototype trên dữ liệu giả; schema chỉ lưu metadata dẫn xuất, không lưu vector/raw prompt/secret. PostgreSQL vẫn là source of truth. | PROPOSED |
+| DBD-18 | Alembic migration initial chứa DDL explicit được sinh từ metadata đã review | Các migration bất biến và review được; `alembic check` sau apply phải không có drift. Không gọi `create_all` động trong migration. | PROPOSED |
+| DBD-19 | SQLAlchemy 2.x + Alembic + psycopg trong `D:\KLTN\.venv` | Đủ cho schema/migration và prototype FastAPI. Python bundled runtime 3.12 được dùng vì Python 3.9 hệ thống lỗi venv launcher do path profile có khoảng trắng. | PROPOSED |
 | DBD-20 | Không seed dữ liệu thật; validation dùng mã/tên synthetic rõ ràng | Ngăn PII vào Git/log; seed reference chỉ thêm khi thực sự cần. | DERIVED |
 
-## Vấn đề chưa chốt và cách schema giữ linh hoạt
+## Quyết định nghiệp vụ và phần backend phải kiểm
 
-| OPEN | Cách biểu diễn an toàn |
+| Chủ đề | Cách biểu diễn an toàn |
 | --- | --- |
-| OPEN-01 verifier expertise | `verified_by/verified_at` nullable; mặc định SELF_DECLARED. |
-| OPEN-02 ghép SV sau đăng ký | Không có workflow mutation; member/version/history cho phép bổ sung migration sau khi policy chốt. |
-| OPEN-03/06 milestone/deadline | `ProgressMilestone` và `RoundPolicy` versioned. |
-| OPEN-04 điều kiện riêng Khoa | `RoundPolicy.config_json` + `DefenseEligibilityCheck.local_policy_result`. |
-| OPEN-05 metric 90% | `SimilarityPolicy.metric_code/threshold/config_json` nullable, mặc định ADVISORY. |
-| OPEN-07 sửa hậu ký | Minute/Evaluation khóa; không có transition bypass. |
-| OPEN-08 hai loại biên bản | Biên bản bảo vệ theo Chair; không gán TBM signer khi chưa phân biệt loại. |
-| OPEN-11 người xác nhận điều kiện | `ResourceAssignment` theo round; không hard-code Admin/TBM. |
+| Verifier expertise | `verified_by/verified_at` nullable; TBM đúng Bộ môn hoặc Trưởng khoa/người được giao khi TBM tự khai; service cấm tự verify. |
+| Mốc tiến độ và ngày đợt | `ProgressMilestone` và `RoundPolicy` versioned; GVHD theo dõi, GVHD được phân công góp ý chéo ở checkpoint nội bộ. |
+| Điều kiện bảo vệ đợt này | Dùng QĐ2919 Điều 7; `RoundPolicy.config_json` và `DefenseEligibilityCheck.local_policy_result` dành cho tiêu chí Khoa nếu có văn bản sau này. |
+| Similarity baseline | `SimilarityPolicy.metric_code/threshold/config_json` nullable; chỉ ADVISORY, không 90% gate. |
+| Bản in và chữ ký | Bản PRINTED chưa ký có thể VOID/in version mới sau Thư ký đối chiếu; từ chữ ký đầu Minute/Evaluation khóa nội dung. |
+| Mẫu 9 | Chủ tịch + Thư ký ký theo CouncilMember; không gán TBM. |
+| Xác nhận điều kiện | `ELIGIBILITY_VERIFIER` được Khoa giao theo round sau đối chiếu nguồn Phòng Đào tạo; không hard-code Admin/TBM. |
+| Góp ý chéo | Migration 0005 cho `COMMENT_ONLY`; service phải chỉ cho GVHD chính đổi trạng thái tiến độ, GVHD khác được giao chỉ góp ý. |
 
 ## Ranh giới migration
 
-Migration `20260920_0001_create_initial_kltn_schema` tạo 62 bảng. Revision kế tiếp `20260924_0002_bind_proposal_signature_version` bổ sung cột/FK ghép để chữ ký đề cương trỏ đúng phiên bản; nếu đã có chữ ký cũ, migration dừng thay vì tự đoán bản được ký. Mọi thay đổi tiếp theo phải có revision mới; không sửa migration đã áp dụng. Ngày 24/09/2026 hai revision đã qua upgrade/downgrade/re-upgrade trong schema kiểm thử riêng, DB-01..26 và Alembic check PASS trên PostgreSQL 17.11 native.
+Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`. Head hiện tại là `20260925_0005` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định mới ngày 25/09 về nhóm, mốc, điều kiện bảo vệ và rubric đã có bảng/cột biểu diễn nên không cần migration giả tạo.
+
+| ID | Quyết định bổ sung | Hệ quả | Trạng thái |
+| --- | --- | --- | --- |
+| DBD-21 | Corpus tách nguồn vận hành/nhập/official | 0003 thêm origin/source, 0004 thêm external_source_id và source_url; tài liệu nhập không giả Thesis. | CONFIRMED_PROJECT_DECISION |

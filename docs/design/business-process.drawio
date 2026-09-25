@@ -429,10 +429,10 @@
         <mxCell id="11" value="Tạo/version biên bản" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="1295" y="295" width="170" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="12" value="In biên bản" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+        <mxCell id="12" value="In + Thư ký đối chiếu; sai khi chưa ký → VOID/in lại" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="70" y="347" width="170" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="13" value="Chủ tịch ký/xác nhận" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+        <mxCell id="13" value="Chủ tịch + Thư ký ký; chữ ký đầu khóa sửa" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry x="315" y="467" width="170" height="58" as="geometry" />
         </mxCell>
         <mxCell id="14" value="LOCKED" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;doubleEllipse=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">

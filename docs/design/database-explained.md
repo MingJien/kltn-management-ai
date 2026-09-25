@@ -1,6 +1,6 @@
 # Giải thích CSDL PostgreSQL cho người mới
 
-Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau hai migration `20260920_0001` → `20260924_0002`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 606 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 607 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 606 trong từ điển chỉ tính 62 bảng của mô hình.
+Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau các migration `20260920_0001` → `20260925_0005`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 614 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 615 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 614 trong từ điển chỉ tính 62 bảng của mô hình.
 
 ## Đọc schema như thế nào
 
@@ -140,7 +140,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `progress_milestone` — mốc tiến độ theo đợt
 
-`round_id`: đợt; `code`, `title`: mã và tên mốc; `version_no`: phiên bản lịch; `due_at`: hạn; `expected_ratio`: mức hoàn thành dự kiến; `source_type`: căn cứ lập mốc; `state`: hiệu lực. Có `id`, `created_at`, `updated_at`, `row_version`. Không khóa cứng tất cả mốc khi GVHD mới nêu mốc đề cương và khoảng 70%.
+`round_id`: đợt; `code`, `title`: mã và tên mốc; `version_no`: phiên bản lịch; `due_at`: hạn; `expected_ratio`: mức hoàn thành dự kiến; `source_type`: căn cứ lập mốc; `state`: hiệu lực. Có `id`, `created_at`, `updated_at`, `row_version`. Hai checkpoint đã biết là góp ý đề cương và báo cáo nội bộ dự kiến tháng 12 khi đạt khoảng 70%; GVHD theo dõi thường kỳ, GVHD khác chỉ góp ý nếu được phân công. Không khóa cứng ngày vào schema.
 
 ### `progress_report` — SV báo cáo tiến độ khóa luận
 
@@ -148,7 +148,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `progress_review` — GVHD nhận xét tiến độ
 
-`progress_report_id`: bản báo cáo; `reviewer_id`: người nhận xét; `decision`: đánh giá/xác nhận; `comment`: góp ý. Có `id`, `created_at`, `updated_at`. Phân quyền GVHD đúng khóa luận cần backend kiểm.
+`progress_report_id`: bản báo cáo; `reviewer_id`: GV nhận xét; `decision`: `COMMENT_ONLY` cho GV góp ý chéo, `CONFIRM` hoặc `REVISION_REQUIRED` cho GVHD chính; `comment`: nội dung góp ý. Có `id`, `created_at`, `updated_at`. PostgreSQL chặn giá trị decision ngoài tập; backend phải kiểm assignment, chỉ GVHD chính được đổi `progress_report.state`.
 
 ### `topic_change_request` — yêu cầu đổi đề tài trên hệ thống
 
@@ -218,7 +218,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `rubric_criterion` — nhóm và tiêu chí con của mẫu chấm
 
-`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Mẫu 6 baseline có ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Xung đột với cơ cấu QĐ2919 vẫn là `OPEN-12` trước khi chấm thật.
+`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Mẫu 6 baseline có ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Cơ cấu QĐ2919 khác; Khoa phải xác nhận mẫu có hiệu lực trước khi chấm thật.
 
 ### `rubric_assignment` — chọn mẫu chấm cho đợt hoặc buổi
 
@@ -244,23 +244,23 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `council_minute` — biên bản của buổi bảo vệ
 
-`session_id`: buổi; `minute_no`: số biên bản; `current_version_no`: bản hiện hành; `state`: nháp/in/ký; `printed_at`, `signed_at`: mốc khóa. Có `id`, `created_at`, `updated_at`, `row_version`. Thư ký lập biên bản, Chủ tịch ký; không cho Admin sửa điểm hoặc biên bản đã ký.
+`session_id`: buổi; `minute_no`: số biên bản; `current_version_no`: bản hiện hành; `state`: nháp/in/ký; `printed_at`: lúc in để Thư ký đối chiếu, chưa khóa sửa; `signed_at`: mốc đủ chữ ký. Quyền sửa thực tế bị khóa ngay từ chữ ký đầu, kể cả khi aggregate vẫn ở PRINTED. Có `id`, `created_at`, `updated_at`, `row_version`. Thư ký lập biên bản, cả Chủ tịch và Thư ký ký Mẫu 9; không cho Admin sửa điểm hoặc biên bản đã ký.
 
 ### `minute_version` — từng bản biên bản
 
-`minute_id`: biên bản cha; `version_no`: thứ tự; `stored_file_id`: file xuất; `generated_by`: người tạo; `state`: nháp/void/ký; `replacement_for_id`: bản bị thay; `void_reason`: lý do hủy. Có `id`, `created_at`, `updated_at`. Không xóa bản sai; giữ đường thay thế để audit.
+`minute_id`: biên bản cha; `version_no`: thứ tự; `stored_file_id`: file xuất; `generated_by`: người tạo; `state`: nháp/void/ký; `replacement_for_id`: bản in cũ bị thay; `void_reason`: lý do VOID. Có `id`, `created_at`, `updated_at`. Nếu giấy chưa ai ký, Thư ký VOID bản sai và tạo bản mới có `version_no`/thời gian khác, giữ file/hash bản cũ để audit. Từ chữ ký đầu không thay nội dung.
 
 ### `minute_signature` — chữ ký biên bản
 
-`minute_version_id`: bản được ký; `signer_member_id`: thành viên Hội đồng ký; `signed_at`: lúc ký; `signature_ref`: tham chiếu bằng chứng chữ ký. Có `id`, `created_at`, `updated_at`. Backend phải xác nhận signer thật sự là Chủ tịch đúng Hội đồng; FK một mình không thể chứng minh vai trò đó.
+`minute_version_id`: bản được ký; `signer_member_id`: thành viên Hội đồng ký; `signed_at`: lúc ký; `signature_ref`: tham chiếu bằng chứng chữ ký. Có `id`, `created_at`, `updated_at`. Backend phải xác nhận hai người ký là Chủ tịch và Thư ký đúng Hội đồng, cùng MinuteVersion; FK một mình không chứng minh vai trò. Chữ ký đầu khóa mọi sửa điểm/nội dung.
 
 ### `repository_item` — bản KLTN được công bố trong kho
 
-`thesis_id`: khóa luận nguồn; `published_document_version_id`: **đúng bản** được công bố; `title`, `abstract`, `keywords`: metadata tra cứu; `source_type`: nguồn; `visibility`: ai xem được; `published_at`, `revoked_at`: thời điểm công bố/thu hồi. Có `id`, `created_at`, `updated_at`, `row_version`. Bản nháp và dữ liệu cá nhân không tự biến thành tài liệu công khai; backend kiểm đăng nhập/quyền trước khi tải.
+`origin_type` phân biệt KLTN đang vận hành (`MANAGED_THESIS`), tài liệu nhập được phép (`IMPORTED_DOCUMENT`) và nguồn chính thức (`OFFICIAL_SOURCE`); `source_type` chi tiết hóa loại nguồn. `thesis_id`/`published_document_version_id` bắt buộc với KLTN đang vận hành nhưng NULL ở hai loại khác; `stored_file_id`, `source_ref`, `source_url`, `external_source_id`, `source_version`, `provenance` giữ tệp/nguồn/phiên bản và ID đồng bộ. `title`, `abstract`, `keywords` phục vụ tra cứu; `visibility`, `published_at`, `revoked_at` kiểm quyền và hiệu lực. Có `id`, `created_at`, `updated_at`, `row_version`. Không tạo Thesis/SV giả cho KLTN cũ; backend kiểm quyền trước khi tải.
 
 ### `search_index_metadata` — liên kết tới chỉ mục tìm kiếm
 
-`repository_item_id`, `document_version_id`: item và bản được lập chỉ mục; `index_name`, `index_version`: chỉ mục/phiên bản; `embedding_model`, `chunking_version`: cách xử lý; `external_point_namespace`: vùng định danh điểm ở Qdrant; `state`, `indexed_at`: tình trạng/lúc lập chỉ mục. Có `id`, `created_at`, `updated_at`. PostgreSQL là nguồn gốc; chỉ mục/vector ngoài có thể xây lại.
+`repository_item_id`: item; `document_version_id` tùy chọn vì tài liệu nhập/nguồn chính thức không có DocumentVersion vận hành; `index_name`, `index_version`: chỉ mục/phiên bản; `embedding_model`, `chunking_version`: cách xử lý; `external_point_namespace`: vùng định danh điểm ở Qdrant; `state`, `indexed_at`: tình trạng/lúc lập chỉ mục. Có `id`, `created_at`, `updated_at`. PostgreSQL là nguồn gốc; chỉ mục/vector ngoài có thể xây lại.
 
 ### `retrieval_audit` — dấu vết một lần tra cứu AI
 
@@ -277,7 +277,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 | Câu | Dữ liệu chính | Cách sử dụng / giới hạn |
 | --- | --- | --- |
 | 1 | `stored_file`, `advisor_review`, `reviewer_review`, `council_minute`, `final_result` | Giữ các loại hồ sơ/phiếu đã có; bộ mẫu nội bộ bổ sung vẫn `OPEN`. |
-| 2 | `position_assignment`, `resource_assignment`, `advisor_assignment`, `signature_confirmation`, `minute_signature` | Phân biệt TBM chốt, Trưởng khoa ký, Thư ký lập, Chủ tịch ký. |
+| 2 | `position_assignment`, `resource_assignment`, `advisor_assignment`, `signature_confirmation`, `minute_signature` | Phân biệt TBM chốt, Trưởng khoa ký, Thư ký lập và ký, Chủ tịch cùng ký Mẫu 9. |
 | 3 | `academic_year`, `thesis_round` | Một năm có đợt chính và bổ sung. |
 | 4 | `topic_registration`, `registration_member` | Một đăng ký hoạt động/SV/đợt; không có nhiều nguyện vọng. |
 | 5 | `topic.max_students`, `registration_member`, `thesis_member` | 1–3 SV; ghép thêm sau đăng ký còn `OPEN`. |
@@ -289,15 +289,15 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 | 11 | `topic_change_request`, `external_procedure_outcome` | Đổi đề tài trong hệ thống; rút/gia hạn ghi kết quả thủ tục ngoài. |
 | 12 | `repository_item`, `document_version` | Xem/tải bản đã công bố theo visibility; khách chưa đăng nhập còn `OPEN`. |
 | 13 | `council`, `defense_session`, `session_thesis` | Một Hội đồng nhiều buổi, một buổi nhiều KLTN. |
-| 14 | `defense_eligibility_check`, `advisor_review` | Điều kiện Trường có căn cứ; điều kiện riêng Khoa còn `OPEN`. |
-| 15 | `evaluation`, `council_minute`, `minute_version`, `audit_event` | Người chấm sửa phiếu mình trước khóa; thủ tục hậu ký còn `OPEN`. |
-| 16 | `rubric_template`, `rubric_criterion`, `evaluation_item`, `bonus_evidence` | Lưu đầy đủ Mẫu 6; hiệu lực so với QĐ2919 còn `OPEN-12`. |
+| 14 | `defense_eligibility_check`, `advisor_review` | Điều kiện Trường có căn cứ; đợt hiện tại không thêm tiêu chí Khoa. |
+| 15 | `evaluation`, `council_minute`, `minute_version`, `audit_event` | Người chấm sửa phiếu mình sau in nếu giấy chưa ký; Thư ký VOID/in version mới; từ chữ ký đầu khóa. |
+| 16 | `rubric_template`, `rubric_criterion`, `evaluation_item`, `bonus_evidence` | Lưu đầy đủ Mẫu 6; Khoa phải xác nhận hiệu lực trước chấm thật. |
 | 17 | `repository_item`, `search_index_metadata` | Metadata và bản công bố phục vụ tra cứu; AI chỉ trỏ tới nguồn được phép. |
 | 18 | `retrieval_audit`, `search_index_metadata` | Thiết kế giảm PII và kiểm quyền trước truy xuất; chính sách gửi chunks ra Gemini cấp Trường còn `OPEN`. |
 
 ## 7. Giới hạn thực thi cần hiểu rõ
 
-PostgreSQL trực tiếp bảo đảm PK, FK, `UNIQUE`, `CHECK` và partial unique index. Các điều kiện cần **đếm nhiều dòng, kiểm chức vụ/quyền, đối chiếu trạng thái hoặc tính tổng** cần service FastAPI trong transaction: số SV 1–3, sức chứa đề tài, đủ năm thành viên Hội đồng và quorum, người chấm có mặt, tổng tiêu chí theo rubric, điểm trung bình, khóa sau in/ký, công bố và quyền tải. [Danh mục ràng buộc](database-rules.md) ghi rõ cái nào DB đã chặn và cái nào ứng dụng phải làm. 26 ca validation hiện có chủ yếu chứng minh schema/constraint, **không chứng minh API nghiệp vụ đã được xây dựng**.
+PostgreSQL trực tiếp bảo đảm PK, FK, `UNIQUE`, `CHECK` và partial unique index. Các điều kiện cần **đếm nhiều dòng, kiểm chức vụ/quyền, đối chiếu trạng thái hoặc tính tổng** cần service FastAPI trong transaction: số SV 1–3, sức chứa đề tài, đủ năm thành viên Hội đồng và quorum, người chấm có mặt, tổng tiêu chí theo rubric, điểm trung bình, khóa từ chữ ký đầu, bản in chưa ký có thể VOID/in version mới sau Thư ký đối chiếu giấy, công bố và quyền tải. [Danh mục ràng buộc](database-rules.md) ghi rõ cái nào DB đã chặn và cái nào ứng dụng phải làm. 40 ca validation hiện có chủ yếu chứng minh schema/constraint, **không chứng minh API nghiệp vụ đã được xây dựng**.
 
 Khi sửa thiết kế: bắt đầu từ câu hỏi GVHD/nguồn → requirement/rule → use case → bảng/cột và state → migration Alembic mới → cập nhật từ điển/ERD/trace → chạy PostgreSQL validation. Không sửa migration `20260920_0001` đã áp dụng, không dùng `Base.metadata.create_all()` thay Alembic, và không đưa dữ liệu thật/secret vào Git.
 
@@ -308,3 +308,8 @@ Khi sửa thiết kế: bắt đầu từ câu hỏi GVHD/nguồn → requiremen
 - Khi cần thêm/sửa/xóa cấu trúc, bắt đầu từ nguồn/câu trả lời GVHD → requirement/rule → use case → model SQLAlchemy → **migration Alembic mới** → từ điển/ERD/trace → validation PostgreSQL. Mỗi database đã có bảng chỉ cần áp dụng revision mới, không dựng lại từ file init.
 - Khi chỉ xem dữ liệu, dùng SELECT hoặc View/Edit Data trong pgAdmin. SQL trong file chỉ là câu lệnh; lưu file không sửa database. Khi sửa dữ liệu thử, kiểm tra điều kiện WHERE và database đang kết nối; không đưa hồ sơ, điểm hoặc secret thật vào Git.
 - Migration là lịch sử để các máy khác dựng cùng cấu trúc. Không sửa migration đã chạy, không dùng Base.metadata.create_all() thay Alembic, không xem file init như bản cập nhật cho database hiện có.
+## Bổ sung corpus ở migration 0003
+
+`repository_item` không chỉ là bản công bố KLTN đang quản lý nữa. `origin_type` phân biệt: MANAGED_THESIS phải có `thesis_id` và `published_document_version_id`; IMPORTED_DOCUMENT cho KLTN cũ/đồ án/niên luận/bài tập lớn và không cần Thesis giả; OFFICIAL_SOURCE cho quy định/biểu mẫu/hướng dẫn. `source_type` lưu loại nghiệp vụ chi tiết. CHECK chặn các cặp origin/source sai và yêu cầu ít nhất một nguồn nội dung qua version tài liệu, `stored_file_id`, `source_ref` hoặc `source_url` HTTPS. `source_ref` là dấu vết nguồn, không tự chứng minh tệp đã tồn tại; importer phải kiểm lại quyền và provenance.
+
+`search_index_metadata.document_version_id` nay tùy chọn vì index của tài liệu nhập chỉ cần `repository_item_id`. `similarity_match.source_repository_item_id` giúp dẫn về item nguồn; vẫn giữ `source_document_version_id` cho tài liệu vận hành cũ. PostgreSQL lưu metadata và quyền; Qdrant chỉ là chỉ mục dẫn xuất có thể dựng lại.

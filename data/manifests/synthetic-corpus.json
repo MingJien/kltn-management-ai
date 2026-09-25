@@ -1,0 +1,35 @@
+{
+  "sources": [
+    {
+      "source_id": "SYN-TOPIC-001",
+      "source_type": "THESIS",
+      "origin_type": "IMPORTED_DOCUMENT",
+      "title": "Ứng dụng quản lý lịch làm đồ án",
+      "abstract": "Mô hình hóa đăng ký đề tài và theo dõi tiến độ nhóm sinh viên.",
+      "keywords": ["quản lý", "lịch", "đồ án"],
+      "domain": "Công nghệ thông tin",
+      "major": "Kỹ thuật phần mềm",
+      "source_ref": "SYN-TOPIC-001",
+      "visibility": "PUBLISHED",
+      "anonymized": true,
+      "evaluation_only": true,
+      "provenance": "Dữ liệu giả lập, chỉ dùng thử pipeline",
+      "source_version": "v1",
+      "allowed_scopes": ["INTERNAL", "PUBLIC"]
+    },
+    {
+      "source_id": "SYN-GUIDE-001",
+      "source_type": "GUIDELINE",
+      "origin_type": "OFFICIAL_SOURCE",
+      "title": "Hướng dẫn GIẢ LẬP để thử truy xuất",
+      "source_ref": "SYN-GUIDE-001",
+      "visibility": "PUBLISHED",
+      "local_file": "sample/huong-dan-gia-lap.txt",
+      "anonymized": true,
+      "evaluation_only": true,
+      "provenance": "Tài liệu giả lập kiểm thử, không phải quy định của Trường",
+      "source_version": "v1",
+      "allowed_scopes": ["INTERNAL", "PUBLIC"]
+    }
+  ]
+}
