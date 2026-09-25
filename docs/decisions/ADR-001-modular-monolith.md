@@ -33,6 +33,6 @@ Chọn FastAPI modular monolith, chia module theo ownership nghiệp vụ trong 
 
 ## Tham chiếu
 
-- [Yêu cầu nghiệp vụ](../01-requirements/business-requirements.md)
-- [Kiến trúc hệ thống](../02-design/architecture.md)
-- [Quyết định thiết kế CSDL](../02-design/database-design-decisions.md)
+- [Yêu cầu nghiệp vụ](../requirements/business-requirements.md)
+- [Kiến trúc hệ thống](../design/architecture.md)
+- [Quyết định thiết kế CSDL](../design/database-design-decisions.md)

@@ -304,7 +304,10 @@
         <mxCell id="advisor-legend-3" value="PK = khóa chính; FK = khóa ngoại; NN = bắt buộc; UQ = duy nhất; CHECK = điều kiện kiểm tra; “–” = cho phép trống.&lt;br&gt;Crow’s Foot: vòng tròn = 0; gạch = 1; chân quạ = nhiều. Nhãn cạnh là cột FK.&lt;br&gt;Các trang là lát cắt theo nhóm; liên kết giữa nhóm chưa thể hiện bằng đường nối — xem đầy đủ FK trong data-dictionary.md." style="text;html=1;whiteSpace=wrap;fillColor=#f1f5f9;strokeColor=#cbd5e1;rounded=0;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=12;" parent="1" vertex="1">
           <mxGeometry x="40" y="1657" width="1700" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="signature-version-fk" value="proposal_id + proposal_version_no → proposal_id + version_no" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="4">`r`n          <mxGeometry relative="1" as="geometry" />`r`n        </mxCell>`r`n      </root>
+        <mxCell id="signature-version-fk" value="proposal_id + proposal_version_no → proposal_id + version_no" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#536579;strokeWidth=1.5;startArrow=ERzeroToMany;endArrow=ERmandOne;startSize=14;endSize=14;fontSize=10;fontColor=#334155;labelBackgroundColor=#ffffff;jumpStyle=gap;jumpSize=8;" parent="1" edge="1" source="6" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
     </mxGraphModel>
   </diagram>
   <diagram id="erd-4---hội-đồng-và-điểm" name="ERD 4 — Hội đồng và đánh giá">

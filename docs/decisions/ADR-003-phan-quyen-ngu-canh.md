@@ -32,6 +32,6 @@ Giữ ba base role ADMIN, LECTURER, STUDENT. Chức danh tổ chức, phân côn
 
 ## Tham chiếu
 
-- [Actor và vai trò](../01-requirements/actors-and-roles.md)
-- [Ma trận phân quyền](../01-requirements/permission-matrix.md)
-- [OPEN canonical](../01-requirements/open-issues.md)
+- [Actor và vai trò](../requirements/actors-and-roles.md)
+- [Ma trận phân quyền](../requirements/permission-matrix.md)
+- [OPEN canonical](../requirements/open-issues.md)

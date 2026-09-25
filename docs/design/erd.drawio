@@ -280,7 +280,10 @@
         <mxCell id="30" value="N:1 check_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="16" target="15">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="signature-version-fk" value="N:1 proposal_id + proposal_version_no → proposal_id + version_no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="4">`r`n          <mxGeometry relative="1" as="geometry" />`r`n        </mxCell>`r`n      </root>
+        <mxCell id="signature-version-fk" value="N:1 proposal_id + proposal_version_no → proposal_id + version_no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
     </mxGraphModel>
   </diagram>
   <diagram id="erd-4---hội-đồng-và-điểm" name="ERD 4 - Hội đồng và điểm">

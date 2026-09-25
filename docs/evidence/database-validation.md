@@ -1,6 +1,6 @@
 # Kết quả kiểm chứng CSDL PostgreSQL
 
-Phạm vi: cấu trúc CSDL và ràng buộc đã thiết kế cho dự án KLTN. Kiểm chứng trên PostgreSQL 17.11 cài trực tiếp, không dùng hồ sơ hoặc điểm thật.
+Ngày kiểm chứng: 25/09/2026. Phạm vi: cấu trúc CSDL và ràng buộc đã thiết kế cho dự án KLTN. Kiểm chứng trên PostgreSQL 17.11 cài trực tiếp, không dùng hồ sơ hoặc điểm thật.
 
 | Nội dung | Kết quả |
 | --- | --- |
@@ -14,6 +14,6 @@ Phạm vi: cấu trúc CSDL và ràng buộc đã thiết kế cho dự án KLTN
 
 Khóa ngoại `signature_confirmation(proposal_id, proposal_version_no)` tham chiếu `proposal_version(proposal_id, version_no)`; cặp cột đích có UNIQUE. Do đó xác nhận ký gắn với đúng bản đề cương, không chỉ với đề cương nói chung.
 
-PostgreSQL trực tiếp kiểm tra PK, FK, UNIQUE, CHECK và một số unique index. Các quy tắc cần đếm nhiều dòng hoặc xác minh thẩm quyền, quorum, công thức điểm và khóa sau ký phải được thực thi ở backend trong transaction; xem [quy tắc CSDL](database-rules.md). Mười hai điểm nghiệp vụ chưa có quyết định cuối nằm trong [danh sách OPEN](../01-requirements/open-issues.md).
+PostgreSQL trực tiếp kiểm tra PK, FK, UNIQUE, CHECK và một số unique index. Các quy tắc cần đếm nhiều dòng hoặc xác minh thẩm quyền, quorum, công thức điểm và khóa sau ký phải được thực thi ở backend trong transaction; xem [quy tắc CSDL](../design/database-rules.md). Mười hai điểm nghiệp vụ chưa có quyết định cuối nằm trong [danh sách OPEN](../requirements/open-issues.md).
 
 File [SQL tạo CSDL mới](../../database/schema-postgresql.sql) chỉ dùng với database trống. Khi cập nhật database đã tồn tại, dùng các revision trong [Alembic migrations](../../backend/migrations/versions/) và chạy `alembic upgrade head` sau khi review.

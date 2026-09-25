@@ -272,7 +272,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ## 6. 18 câu GVHD được dữ liệu hỗ trợ ra sao
 
-Đọc [mapping từng câu](../01-requirements/18-cau-hoi-gvhd-mapping.md) để xem **câu trả lời thật, nguồn, mức chắc chắn và chỗ còn mở**. Bảng dưới là đường nhanh từ câu hỏi đến cấu trúc CSDL:
+Đọc [mapping từng câu](../requirements/18-cau-hoi-gvhd-mapping.md) để xem **câu trả lời thật, nguồn, mức chắc chắn và chỗ còn mở**. Bảng dưới là đường nhanh từ câu hỏi đến cấu trúc CSDL:
 
 | Câu | Dữ liệu chính | Cách sử dụng / giới hạn |
 | --- | --- | --- |

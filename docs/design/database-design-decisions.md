@@ -9,10 +9,10 @@
 
 ## ADR liên quan
 
-- [ADR-001 — Backend FastAPI theo modular monolith](../adr/ADR-001-modular-monolith.md)
-- [ADR-002 — PostgreSQL là nguồn dữ liệu giao dịch chính](../adr/ADR-002-postgresql-source-of-truth.md)
-- [ADR-003 — Phân quyền theo vai trò nền và ngữ cảnh tài nguyên](../adr/ADR-003-phan-quyen-ngu-canh.md)
-- [ADR-004 — Gemini chỉ dùng ở backend cho RAG có kiểm soát](../adr/ADR-004-rag-gemini-an-toan.md)
+- [ADR-001 — Backend FastAPI theo modular monolith](../decisions/ADR-001-modular-monolith.md)
+- [ADR-002 — PostgreSQL là nguồn dữ liệu giao dịch chính](../decisions/ADR-002-postgresql-source-of-truth.md)
+- [ADR-003 — Phân quyền theo vai trò nền và ngữ cảnh tài nguyên](../decisions/ADR-003-phan-quyen-ngu-canh.md)
+- [ADR-004 — Gemini chỉ dùng ở backend cho RAG có kiểm soát](../decisions/ADR-004-rag-gemini-an-toan.md)
 
 ## Quyết định
 

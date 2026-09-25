@@ -1,6 +1,6 @@
 # ERD logical + physical PostgreSQL
 
-> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260924_0002. Draw.io 5 trang là ảnh thiết kế ban đầu; quan hệ mới của chữ ký với phiên bản đề cương được thể hiện tại đây và trong từ điển dữ liệu. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
+> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260924_0002. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
 
 ## Ký hiệu
 

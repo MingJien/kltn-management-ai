@@ -32,6 +32,6 @@ PostgreSQL lưu state, quyền ngữ cảnh, metadata/version, kết quả kiể
 
 ## Tham chiếu
 
-- [Quyết định thiết kế CSDL](../02-design/database-design-decisions.md)
-- [ERD](../02-design/erd.md)
-- [Thiết kế similarity/RAG](../03-ai/similarity-design.md)
+- [Quyết định thiết kế CSDL](../design/database-design-decisions.md)
+- [ERD](../design/erd.md)
+- [Thiết kế similarity/RAG](../ai/similarity-design.md)

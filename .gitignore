@@ -38,14 +38,15 @@ tmp/
 postgres-data/
 
 # Tài liệu thao tác cá nhân và bản SQL chụp cấu trúc để học trên máy này
-/docs/02-design/huong-dan-xem-csdl-pgadmin.md
-/docs/02-design/kltn-init-empty.sql
-/docs/02-design/kltn-ai-workbench.sql
+/docs/02-design/
+
+
 
 # Nguồn tham khảo, nhật ký và tệp thao tác cá nhân chỉ giữ trên máy
-/.github/
-/docs/00-sources/normalization-notes.md
-/docs/00-sources/project-context-baseline.md
+/.github/ISSUE_TEMPLATE/
+/.github/pull_request_template.md
+/docs/00-sources/
+
 /docs/04-research/
 /docs/99-project-log/
 /source/markdown/
@@ -53,3 +54,7 @@ postgres-data/
 /tools/normalize_source.py
 /.c2cignore
 /installed-apps-c-drive-desc.csv
+
+# Quy tắc làm việc và ghi chú cá nhân (không thuộc source nộp)
+/AGENTS.md
+/local/

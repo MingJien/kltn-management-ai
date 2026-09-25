@@ -32,6 +32,6 @@ Backend kiểm tra authorization trước retrieval, lọc payload Qdrant theo v
 
 ## Tham chiếu
 
-- [Kiến trúc hệ thống](../02-design/architecture.md)
-- [Thiết kế similarity/RAG](../03-ai/similarity-design.md)
-- [Yêu cầu nghiệp vụ](../01-requirements/business-requirements.md)
+- [Kiến trúc hệ thống](../design/architecture.md)
+- [Thiết kế similarity/RAG](../ai/similarity-design.md)
+- [Yêu cầu nghiệp vụ](../requirements/business-requirements.md)
