@@ -6,7 +6,7 @@ CONFIRMED_PROJECT_DECISION.
 
 ## Bối cảnh
 
-Chủ dự án cho phép dùng Gemini cho RAG trên dữ liệu nội bộ. Nguồn nghiệp vụ không quy định đây là dịch vụ của Trường, vì vậy không được diễn giải quyết định này thành quy định chính thức.
+Thiết kế của đề tài cho phép dùng Gemini cho RAG trên dữ liệu nội bộ. Nguồn nghiệp vụ không quy định đây là dịch vụ của Trường, vì vậy không được diễn giải quyết định này thành quy định chính thức.
 
 ## Phương án
 

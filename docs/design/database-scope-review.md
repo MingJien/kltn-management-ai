@@ -1,6 +1,6 @@
 # Rà soát phạm vi bảng CSDL
 
-Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0006`. Phân loại theo nhu cầu nghiệp vụ, không phải lệnh xóa bảng. Tất cả 62 bảng được tạo trong schema hiện tại; `CORE-NOW` nghĩa là cần cho thiết kế/validation CSDL NV4, còn runtime nghiệp vụ thuộc các vòng triển khai sau. `LATER-PHASE` nghĩa là chưa có workflow kho/AI đầy đủ; một số bảng đã được dùng để thử nạp metadata/chỉ mục AI. `TECHNICAL-SUPPORT` là hạ tầng lưu tệp/audit. API/React/AI prototype hiện có; chỉ các endpoint và màn hình được nêu trong README là runtime.
+Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0007`. Phân loại theo nhu cầu nghiệp vụ, không phải lệnh xóa bảng. Tất cả 62 bảng được tạo trong schema hiện tại; `CORE-NOW` nghĩa là cần cho thiết kế/validation CSDL NV4, còn runtime nghiệp vụ thuộc các vòng triển khai sau. `LATER-PHASE` nghĩa là chưa có workflow kho/AI đầy đủ; một số bảng đã được dùng để thử nạp metadata/chỉ mục AI. `TECHNICAL-SUPPORT` là hạ tầng lưu tệp/audit. API/React/AI prototype hiện có; chỉ các endpoint và màn hình được nêu trong README là runtime.
 
 | Table | Nhóm | Requirement/UC | Lý do | Dùng ngay hay sau |
 | --- | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0006`
 | `proposal` | CORE-NOW | REQ-PROP-001..003; UC đối chiếu tại `traceability-database.md` | Aggregate đề cương một-một với Thesis. | Schema/DB validation ngay; nghiệp vụ runtime sau |
 | `proposal_review` | CORE-NOW | REQ-PROP-002; UC đối chiếu tại `traceability-database.md` | Nhận xét trỏ đúng proposal version và assignment. | Schema/DB validation ngay; nghiệp vụ runtime sau |
 | `proposal_version` | CORE-NOW | REQ-PROP-001; UC đối chiếu tại `traceability-database.md` | Mỗi lần nộp/sửa đề cương là một version bất biến. | Schema/DB validation ngay; nghiệp vụ runtime sau |
-| `registration_member` | CORE-NOW | REQ-REG-001..002; UC đối chiếu tại `traceability-database.md` | Mọi SV trong đăng ký nhóm; dùng chặn trùng SV/round. | Prototype lưu nhóm 1–3 và chặn trùng SV/đợt; workflow đầy đủ sau |
+| `registration_member` | CORE-NOW | REQ-REG-001..002; UC đối chiếu tại `traceability-database.md` | Mọi SV trong đăng ký nhóm; chặn trùng SV/round và lưu phản hồi PENDING/ACCEPTED/DECLINED. | Schema 0007 có chứng cứ phản hồi; prototype chưa có từng SV tự xác nhận |
 | `repository_item` | LATER-PHASE | REQ-REPO-001; UC đối chiếu tại `traceability-database.md` | Metadata KLTN quản lý hoặc nguồn học thuật/chính thức nhập có loại và provenance. | Prototype nạp metadata nguồn ngoài; workflow công bố sau |
 | `resource_assignment` | CORE-NOW | REQ-ELIG-002; người Khoa được giao theo round; UC đối chiếu tại `traceability-database.md` | Gán quyền theo round/Thesis/Council, gồm verifier điều kiện. | Schema/DB validation ngay; nghiệp vụ runtime sau |
 | `retrieval_audit` | LATER-PHASE | REQ-AI-002; UC đối chiếu tại `traceability-database.md` | Audit retrieval tối thiểu, không lưu raw prompt/chunk. | Schema ngay; runtime kho/AI sau |
@@ -62,7 +62,7 @@ Baseline: SQLAlchemy metadata và migrations `20260920_0001` → `20260925_0006`
 | `thesis_round` | CORE-NOW | REQ-ROUND-001; UC đối chiếu tại `traceability-database.md` | Đợt chính/bổ sung và thời gian tiếp nhận. | Prototype kiểm cửa sổ nhận đăng ký; workflow đầy đủ sau |
 | `topic` | CORE-NOW | REQ-TOPIC-001..003; UC đối chiếu tại `traceability-database.md` | Đề tài được đề xuất/duyệt trong một đợt. | Prototype chọn đề tài APPROVED và khóa khi chốt; workflow đầy đủ sau |
 | `topic_change_request` | CORE-NOW | REQ-CHANGE-001; UC đối chiếu tại `traceability-database.md` | Workflow đổi đề tài trong hệ thống. | Schema/DB validation ngay; nghiệp vụ runtime sau |
-| `topic_registration` | CORE-NOW | REQ-REG-001..005; UC đối chiếu tại `traceability-database.md` | Aggregate đăng ký một topic trong một đợt. | Prototype SV gửi → GV quyết định → TBM chốt; workflow đầy đủ sau |
+| `topic_registration` | CORE-NOW | REQ-REG-001..006; UC đối chiếu tại `traceability-database.md` | Aggregate đăng ký một topic trong một đợt. | Prototype SV gửi → GV quyết định → TBM chốt; workflow đầy đủ sau |
 | `topic_requirement` | CORE-NOW | REQ-TOPIC-003; UC đối chiếu tại `traceability-database.md` | Tiêu chí mong muốn của GVHD, enforcement DESIRED. | Schema/DB validation ngay; nghiệp vụ runtime sau |
 | `topic_title_version` | CORE-NOW | REQ-TOPIC-001; UC đối chiếu tại `traceability-database.md` | Lịch sử chỉnh tên đề tài. | Schema/DB validation ngay; nghiệp vụ runtime sau |
 | `user_account` | CORE-NOW | REQ-AUTH-001..003; UC đối chiếu tại `traceability-database.md` | Một tài khoản định danh và base role cho mỗi người. | Prototype định danh DEV/TEST; SSO production sau |

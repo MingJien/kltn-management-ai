@@ -43,7 +43,7 @@
         <mxCell id="2" value="&lt;b&gt;Topic&lt;/b&gt;&lt;br&gt;Topic&lt;br&gt;TopicTitleVersion&lt;br&gt;TopicRequirement&lt;br&gt;&lt;i&gt;REQ-TOPIC-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
           <mxGeometry x="90" y="90" width="360" height="220" as="geometry" />
         </mxCell>
-        <mxCell id="3" value="&lt;b&gt;Registration&lt;/b&gt;&lt;br&gt;TopicRegistration&lt;br&gt;RegistrationMember&lt;br&gt;&lt;i&gt;REQ-REG-001..005&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+        <mxCell id="3" value="&lt;b&gt;Registration&lt;/b&gt;&lt;br&gt;TopicRegistration&lt;br&gt;RegistrationMember&lt;br&gt;&lt;i&gt;REQ-REG-001..006&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
           <mxGeometry x="590" y="90" width="360" height="220" as="geometry" />
         </mxCell>
         <mxCell id="4" value="&lt;b&gt;Thesis&lt;/b&gt;&lt;br&gt;Thesis&lt;br&gt;ThesisMember&lt;br&gt;&lt;i&gt;REQ-REG-002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">

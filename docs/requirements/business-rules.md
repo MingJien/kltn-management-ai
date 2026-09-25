@@ -1,4 +1,4 @@
-# Quy tắc nghiệp vụ — NV4 Tuần 1
+# Quy tắc nghiệp vụ — NV4
 
 | ID | Quy tắc | Trạng thái | Nguồn |
 | --- | --- | --- | --- |
@@ -13,7 +13,8 @@
 | BR-REG-002 | Thesis có 1–3 thành viên; tối đa một coordinator và coordinator không có quyền nghiệp vụ cao hơn thành viên. | CONFIRMED | REQ-REG-002 |
 | BR-REG-003 | GVHD accept/reject; TBM mới là bên finalize topic và advisor assignment. | CONFIRMED_PROJECT_DECISION | REQ-REG-003 |
 | BR-REG-004 | Mỗi thành viên phải có work allocation; GVHD duyệt trước khi dùng làm bằng chứng đánh giá cá nhân. | CONFIRMED | REQ-REG-004 |
-| BR-REG-005 | SV tự lập nhóm trước khi gửi; membership bất biến từ SUBMITTED. Không có mutation thêm/ghép/đổi thành viên hậu gửi cho SV, GV hay Admin trong phạm vi hiện tại. | CONFIRMED_PROJECT_DECISION | REQ-REG-005 |
+| BR-REG-005 | SV tự lập nhóm; từng thành viên active phải tự ACCEPTED trước SUBMITTED. Membership bất biến từ SUBMITTED; SV, GV và Admin không thêm/ghép/đổi người hậu gửi. | CONFIRMED_PROJECT_DECISION | REQ-REG-005 |
+| BR-REG-006 | Với đề tài SV đề xuất, nhóm đăng ký trước khi TBM xét đề tài; sau đó TBM duyệt/return/reject, GVHD được phân công đồng ý và TBM mới finalize. Không dùng guard Topic.APPROVED trước đăng ký cho nhánh này. | CONFIRMED_PROJECT_DESIGN / RUNTIME_PENDING | REQ-TOPIC-002, REQ-REG-003, REQ-REG-006 |
 | BR-PROP-001 | ProposalVersion bất biến; nhận xét trỏ đúng version; không ghi đè file đã nộp. | DERIVED | REQ-PROP-001 |
 | BR-PROP-002 | Thứ tự chốt: GVHD xác nhận → TBM chốt nội dung → Trưởng khoa ký/xác nhận văn bản. | CONFIRMED_PROJECT_DECISION | REQ-PROP-002..003 |
 | BR-PROG-001 | GVHD quản lý và xác nhận tiến độ Thesis được phân công. Mốc góp ý đề cương và mốc nội bộ khoảng 70% trong tháng 12 được lưu theo round/version; ngày cụ thể lấy từ kế hoạch được duyệt. | CONFIRMED_PROJECT_DECISION | REQ-PROG-001..002 |
@@ -31,7 +32,7 @@
 | BR-DEF-001 | Đợt hiện tại áp dụng đúng Điều 7 QĐ2919; chưa có tiêu chí bảo vệ riêng của Khoa. Policy Khoa nếu ban hành sau này phải version theo round và không được hồi tố ngầm; similarity advisory không tự loại SV. | CONFIRMED_PROJECT_DECISION | REQ-DEF-001..002 |
 | BR-EVAL-001 | Evaluation duy nhất theo `(session, evaluator, thesisMember)`; chỉ chính evaluator sửa khi chưa khóa/in. | CONFIRMED | REQ-EVAL-002, REQ-MIN-001 |
 | BR-EVAL-002 | Final score = trung bình số học các evaluation hợp lệ của người hiện diện/chấm, làm tròn 1 chữ số; không dùng điểm chung cho nhóm. | CONFIRMED | REQ-COUNCIL-003, REQ-EVAL-002 |
-| BR-EVAL-003 | Rubric Mẫu 6 gồm ba group 2,0/4,0/4,0 với 12 tiêu chí con đúng mã/thứ tự/max point; group chỉ tổng hợp, không là điểm cộng thêm. Mục thưởng tối đa 1,0; `totalPoints ≤ 10`. FinalResult là trung bình `totalPoints` của các phiếu hợp lệ rồi làm tròn 1 chữ số; `bonusAverage` chỉ để giải thích, không cộng lần hai. | CONFIRMED baseline Mẫu 6; CONFLICT-011 OPEN trước vận hành | REQ-EVAL-003 |
+| BR-EVAL-003 | Rubric Mẫu 6 gồm ba group 2,0/4,0/4,0 với 12 tiêu chí con đúng mã/thứ tự/max point; group chỉ tổng hợp, không là điểm cộng thêm. Mục thưởng tối đa 1,0; `totalPoints ≤ 10`. FinalResult là trung bình `totalPoints` của các phiếu hợp lệ rồi làm tròn 1 chữ số; `bonusAverage` chỉ để giải thích, không cộng lần hai. | CONFIRMED baseline Mẫu 6; CONFLICT-011: Khoa xác nhận hiệu lực trước chấm thật | REQ-EVAL-003 |
 | BR-MIN-001 | Sau in, trước chữ ký đầu: Thư ký đối chiếu bản giấy chưa ký; bản in sai thành VOID có lý do/audit; evaluator tự sửa phiếu, hệ thống tính lại FinalResult và tạo MinuteVersion mới liên kết bản cũ, mã phiên bản/thời gian khác để in lại. Không overwrite file cũ. | CONFIRMED_PROJECT_DECISION | REQ-MIN-001..002 |
 | BR-MIN-002 | Mẫu 9 do Chair và Secretary đúng Council cùng ký. Từ chữ ký đầu tiên (kể cả bản giấy chưa nhập hệ thống) không sửa điểm/nội dung; state vẫn PRINTED đến khi đủ hai chữ ký, sau đó SIGNED. | CONFIRMED_PROJECT_DECISION | REQ-MIN-001..002, SRC-MAU-09 |
 | BR-AUDIT-001 | Mọi accept/reject/finalize/sign/void/score change/visibility change phải có audit event gồm actor, time, resource, before/after và lý do. | DERIVED | Toàn bộ yêu cầu có thẩm quyền |

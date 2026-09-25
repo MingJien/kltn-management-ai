@@ -1,6 +1,6 @@
 # Giải thích CSDL PostgreSQL cho người mới
 
-Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau các migration `20260920_0001` → `20260925_0006`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 614 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 615 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 614 trong từ điển chỉ tính 62 bảng của mô hình.
+Tài liệu này giải thích **vì sao có từng bảng và từng cột nghiệp vụ**. [Từ điển dữ liệu](data-dictionary.md) là nơi tra kiểu PostgreSQL, `NULL`, mặc định, khóa, chỉ mục và `CHECK` chính xác. Tên cột ở đây là tên thật sau các migration `20260920_0001` → `20260925_0007`; các cột dùng chung được giải thích một lần ở dưới. Schema có **62 bảng của mô hình, 617 cột** (gồm bảng lõi, phần mở rộng dự kiến và bảng hỗ trợ). PostgreSQL còn có bảng kỹ thuật `alembic_version` để ghi migration đã áp dụng: pgAdmin vì thế hiện **63 bảng và 618 cột vật lý** khi đếm cả `alembic_version.version_num`; con số 617 trong từ điển chỉ tính 62 bảng của mô hình.
 
 ## Đọc schema như thế nào
 
@@ -44,7 +44,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `resource_assignment` — quyền theo hồ sơ cụ thể
 
-`assignment_type`: loại nhiệm vụ, như xác nhận điều kiện; `user_id`: người được giao; `round_id`, `thesis_id`, `council_id`: **đúng một** tài nguyên được giao; `effective_from`, `effective_to`: thời hạn; `state`: hiệu lực. Có `id`, `created_at`, `updated_at`, `row_version`. Cách này giữ câu hỏi GVHD chưa rõ về người xác nhận điều kiện ở mức cấu hình, không mặc định Admin hoặc TBM có quyền.
+`assignment_type`: loại nhiệm vụ, như xác nhận điều kiện; `user_id`: người được giao; `round_id`, `thesis_id`, `council_id`: **đúng một** tài nguyên được giao; `effective_from`, `effective_to`: thời hạn; `state`: hiệu lực. Có `id`, `created_at`, `updated_at`, `row_version`. Khoa giao người giữ quyền ELIGIBILITY_VERIFIER theo từng đợt; không mặc định Admin hoặc TBM có quyền.
 
 ### `academic_year` — năm học
 
@@ -94,7 +94,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `registration_member` — SV thuộc đăng ký nhóm
 
-`registration_id`: đăng ký; `round_id`: đợt được sao lại để áp unique theo SV/đợt, composite FK giữ khớp đăng ký; `student_id`: SV; `is_coordinator`: nhóm trưởng điều phối, không là chủ nhiệm học thuật; `active`: còn thuộc đăng ký hoạt động. Có `id`, `created_at`, `updated_at`. Backend phải đồng bộ `active` khi hủy/từ chối; DB không tự đếm đủ 1–3 người.
+`registration_id`: đăng ký; `round_id`: đợt được sao lại để áp unique theo SV/đợt, composite FK giữ khớp đăng ký; `student_id`: SV; `is_coordinator`: nhóm trưởng điều phối, không là chủ nhiệm học thuật; `active`: còn thuộc đăng ký hoạt động. `consent_status` bắt đầu `PENDING`, rồi chính SV chọn `ACCEPTED` hoặc `DECLINED`; `responded_by_user_id` và `responded_at` lưu tài khoản/thời điểm phản hồi. CHECK bảo đảm phản hồi có đủ người và thời điểm, FK bảo đảm tài khoản tồn tại. Service phải xác nhận tài khoản phản hồi **đúng** `student_id`, không cho gửi nhóm khi còn PENDING/DECLINED, đồng bộ `active` khi hủy/từ chối và kiểm số người 1–3. Có `id`, `created_at`, `updated_at`. Migration 0007 thêm các cột bằng giá trị mặc định PENDING để không giả rằng dữ liệu cũ đã được từng SV đồng ý; endpoint xác nhận và guard gửi nhóm vẫn phải xây.
 
 ### `thesis` — khóa luận đã được hình thành
 
@@ -202,7 +202,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `defense_eligibility_check` — điều kiện bảo vệ từng SV
 
-`thesis_member_id`, `round_id`: SV trong KLTN và đợt; `advisor_review_id`: văn bản/phiếu GVHD; `discipline_result`, `completion_result`, `advisor_result`: ba điều kiện cấp Trường; `local_policy_result`: tiêu chí riêng Khoa nếu được ban hành; `similarity_result`: kết quả liên quan; `result`: quyết định tổng; `reason`: giải thích; `checked_by`: người kiểm. Có `id`, `created_at`, `updated_at`. Không tự bịa tiêu chí Khoa đang `OPEN`.
+`thesis_member_id`, `round_id`: SV trong KLTN và đợt; `advisor_review_id`: văn bản/phiếu GVHD; `discipline_result`, `completion_result`, `advisor_result`: ba điều kiện cấp Trường; `local_policy_result`: tiêu chí riêng Khoa nếu được ban hành; `similarity_result`: kết quả liên quan; `result`: quyết định tổng; `reason`: giải thích; `checked_by`: người kiểm. Có `id`, `created_at`, `updated_at`. Đợt hiện tại không có tiêu chí Khoa bổ sung; nếu về sau có, phải nhập policy có nguồn và phiên bản.
 
 ### `advisor_review` — phiếu nhận xét GVHD theo SV
 
@@ -276,24 +276,24 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 | Câu | Dữ liệu chính | Cách sử dụng / giới hạn |
 | --- | --- | --- |
-| 1 | `stored_file`, `advisor_review`, `reviewer_review`, `council_minute`, `final_result` | Giữ các loại hồ sơ/phiếu đã có; bộ mẫu nội bộ bổ sung vẫn `OPEN`. |
+| 1 | `stored_file`, `advisor_review`, `reviewer_review`, `council_minute`, `final_result` | Giữ các loại hồ sơ/phiếu đã có; nếu Khoa cung cấp thêm mẫu nội bộ, phải đối chiếu trước khi bổ sung. |
 | 2 | `position_assignment`, `resource_assignment`, `advisor_assignment`, `signature_confirmation`, `minute_signature` | Phân biệt TBM chốt, Trưởng khoa ký, Thư ký lập và ký, Chủ tịch cùng ký Mẫu 9. |
 | 3 | `academic_year`, `thesis_round` | Một năm có đợt chính và bổ sung. |
 | 4 | `topic_registration`, `registration_member` | Một đăng ký hoạt động/SV/đợt; không có nhiều nguyện vọng. |
-| 5 | `topic.max_students`, `registration_member`, `thesis_member` | 1–3 SV; ghép thêm sau đăng ký còn `OPEN`. |
+| 5 | `topic.max_students`, `registration_member`, `thesis_member` | 1–3 SV; từng người tự xác nhận trước gửi, không ghép/thay thành viên sau SUBMITTED. |
 | 6 | `member_work_assignment`, `evaluation`, `final_result` | Phân công việc và chấm riêng từng SV. |
 | 7 | `position_assignment`, `advisor_assignment` | TBM chốt phân công GVHD theo quyền ngữ cảnh. |
-| 8 | `lecturer_expertise`, `expertise_evidence` | GV tự khai; ai xác nhận còn `OPEN`. |
+| 8 | `lecturer_expertise`, `expertise_evidence` | GV tự khai; TBM đúng bộ môn kiểm chứng, hồ sơ TBM do Trưởng khoa/người được giao kiểm. |
 | 9 | `proposal_version`, `proposal_review`, `signature_confirmation` | Giữ từng vòng góp ý, chốt nội dung và ký văn bản. |
 | 10 | `progress_milestone`, `progress_report`, `progress_review` | Mốc/lịch cấu hình; GVHD nhận xét. |
 | 11 | `topic_change_request`, `external_procedure_outcome` | Đổi đề tài trong hệ thống; rút/gia hạn ghi kết quả thủ tục ngoài. |
-| 12 | `repository_item`, `document_version` | Xem/tải bản đã công bố theo visibility; khách chưa đăng nhập còn `OPEN`. |
+| 12 | `repository_item`, `document_version` | Xem/tải bản đã công bố theo visibility; quyền khách chưa đăng nhập chưa được mở trong thiết kế hiện tại. |
 | 13 | `council`, `defense_session`, `session_thesis` | Một Hội đồng nhiều buổi, một buổi nhiều KLTN. |
 | 14 | `defense_eligibility_check`, `advisor_review` | Điều kiện Trường có căn cứ; đợt hiện tại không thêm tiêu chí Khoa. |
 | 15 | `evaluation`, `council_minute`, `minute_version`, `audit_event` | Người chấm sửa phiếu mình sau in nếu giấy chưa ký; Thư ký VOID/in version mới; từ chữ ký đầu khóa. |
 | 16 | `rubric_template`, `rubric_criterion`, `evaluation_item`, `bonus_evidence` | Lưu đầy đủ Mẫu 6; Khoa phải xác nhận hiệu lực trước chấm thật. |
 | 17 | `repository_item`, `search_index_metadata` | Metadata và bản công bố phục vụ tra cứu; AI chỉ trỏ tới nguồn được phép. |
-| 18 | `retrieval_audit`, `search_index_metadata` | Thiết kế giảm PII và kiểm quyền trước truy xuất; chính sách gửi chunks ra Gemini cấp Trường còn `OPEN`. |
+| 18 | `retrieval_audit`, `search_index_metadata` | Thiết kế giảm PII và kiểm quyền trước truy xuất; chỉ dùng dữ liệu được phép và giảm PII; gửi dữ liệu hạn chế cần chính sách nhà cung cấp/retention được xác nhận. |
 
 ## 7. Giới hạn thực thi cần hiểu rõ
 
@@ -304,7 +304,7 @@ Khi sửa thiết kế: bắt đầu từ câu hỏi GVHD/nguồn → requiremen
 
 ## 8. Xem và cập nhật CSDL về sau
 
-- Trong pgAdmin, mở database cần xem → Schemas → public → Tables; mở Columns, Constraints và Indexes của từng bảng. Hai database trên máy chủ dự án hiện dùng PostgreSQL native; thông số kết nối và thao tác từng cú nhấp nằm trong tài liệu pgAdmin **chỉ lưu trên máy**, không đưa vào GitHub.
+- Trong pgAdmin, mở database cần xem → Schemas → public → Tables; mở Columns, Constraints và Indexes của từng bảng. Hai database trên máy phát triển hiện dùng PostgreSQL native; thông số kết nối và thao tác từng cú nhấp nằm trong tài liệu pgAdmin **chỉ lưu trên máy**, không đưa vào GitHub.
 - Khi cần thêm/sửa/xóa cấu trúc, bắt đầu từ nguồn/câu trả lời GVHD → requirement/rule → use case → model SQLAlchemy → **migration Alembic mới** → từ điển/ERD/trace → validation PostgreSQL. Mỗi database đã có bảng chỉ cần áp dụng revision mới, không dựng lại từ file init.
 - Khi chỉ xem dữ liệu, dùng SELECT hoặc View/Edit Data trong pgAdmin. SQL trong file chỉ là câu lệnh; lưu file không sửa database. Khi sửa dữ liệu thử, kiểm tra điều kiện WHERE và database đang kết nối; không đưa hồ sơ, điểm hoặc secret thật vào Git.
 - Migration là lịch sử để các máy khác dựng cùng cấu trúc. Không sửa migration đã chạy, không dùng Base.metadata.create_all() thay Alembic, không xem file init như bản cập nhật cho database hiện có.

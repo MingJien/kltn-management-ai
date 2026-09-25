@@ -5,7 +5,6 @@
 - **CONFIRMED:** xuất phát từ nghiệp vụ/nguồn chính thức.
 - **DERIVED:** cần thiết để thực thi requirement đã xác nhận.
 - **PROPOSED:** lựa chọn kỹ thuật có thể thay đổi mà không đổi nghiệp vụ.
-- **OPEN:** chưa đủ căn cứ; schema phải tránh khóa cứng.
 
 ## ADR liên quan
 
@@ -38,6 +37,7 @@
 | DBD-18 | Alembic migration initial chứa DDL explicit được sinh từ metadata đã review | Các migration bất biến và review được; `alembic check` sau apply phải không có drift. Không gọi `create_all` động trong migration. | PROPOSED |
 | DBD-19 | SQLAlchemy 2.x + Alembic + psycopg trong `D:\KLTN\.venv` | Đủ cho schema/migration và prototype FastAPI. Python bundled runtime 3.12 được dùng vì Python 3.9 hệ thống lỗi venv launcher do path profile có khoảng trắng. | PROPOSED |
 | DBD-20 | Không seed dữ liệu thật; validation dùng mã/tên synthetic rõ ràng | Ngăn PII vào Git/log; seed reference chỉ thêm khi thực sự cần. | DERIVED |
+| DBD-21 | Lưu `consent_status`, `responded_by_user_id`, `responded_at` trên mỗi RegistrationMember | Không coi việc nhóm trưởng nhập tên là sự đồng ý của bạn khác. Migration 0007 giữ dữ liệu cũ PENDING; CHECK yêu cầu actor/time khi phản hồi. Service đối chiếu actor với StudentProfile và chỉ submit khi mọi thành viên active ACCEPTED. | CONFIRMED_PROJECT_DESIGN; service pending |
 
 ## Quyết định nghiệp vụ và phần backend phải kiểm
 
@@ -50,11 +50,12 @@
 | Bản in và chữ ký | Bản PRINTED chưa ký có thể VOID/in version mới sau Thư ký đối chiếu; từ chữ ký đầu Minute/Evaluation khóa nội dung. |
 | Mẫu 9 | Chủ tịch + Thư ký ký theo CouncilMember; không gán TBM. |
 | Xác nhận điều kiện | `ELIGIBILITY_VERIFIER` được Khoa giao theo round sau đối chiếu nguồn Phòng Đào tạo; không hard-code Admin/TBM. |
+| Đồng thuận nhóm và đề tài SV | RegistrationMember lưu phản hồi từng SV; Topic.proposer_type=STUDENT cùng TopicRegistration cho phép nhóm đăng ký trước, TBM xét Topic sau; service/API theo nhánh chưa triển khai. |
 | Góp ý chéo | Migration 0005 cho `COMMENT_ONLY`; service phải chỉ cho GVHD chính đổi trạng thái tiến độ, GVHD khác được giao chỉ góp ý. |
 
 ## Ranh giới migration
 
-Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`, `0006` nạp 16 dòng rubric Mẫu 6 trạng thái DRAFT. Head hiện tại là `20260925_0006` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định ngày 25/09 về nhóm, mốc và điều kiện bảo vệ đã có bảng/cột biểu diễn. Mẫu 6 cần một migration dữ liệu thật để mọi database mới/cũ có cùng rubric baseline, nhưng chưa tự kích hoạt chấm.
+Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`, `0006` nạp 16 dòng rubric Mẫu 6 trạng thái DRAFT, `0007` lưu phản hồi từng thành viên trước khi gửi đăng ký. Head hiện tại là `20260925_0007` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định ngày 25/09 về mốc và điều kiện bảo vệ đã có bảng/cột biểu diễn. Xác nhận tham gia nhóm được bổ sung ở 0007; service tự xác nhận và nhánh đề tài do SV đề xuất vẫn phải xây trước khi mở đăng ký thật. Mẫu 6 đã được nạp bằng migration dữ liệu 0006 để mọi database mới/cũ có cùng rubric baseline, nhưng chưa tự kích hoạt chấm.
 
 | ID | Quyết định bổ sung | Hệ quả | Trạng thái |
 | --- | --- | --- | --- |

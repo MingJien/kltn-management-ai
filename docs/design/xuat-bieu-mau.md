@@ -24,7 +24,7 @@ Adapter điền đúng vị trí/tables theo Mẫu 3 chính thức; PDF chỉ sa
 | evaluator role/person, student, thesis title | CouncilMember/DefenseSession/ThesisMember/Thesis | Member phải có mặt và thuộc đúng phiên |
 | item_scores, comment | EvaluationItem, RubricCriterion | 3 nhóm 2/4/4; tiêu chí con theo version |
 | bonus, total, recommendation | Evaluation, BonusEvidence | Bonus tối đa 1, tổng kể cả bonus tối đa 10, không cộng lại khi tính trung bình |
-| template_version, rubric_version | SRC-MAU-06, RubricTemplate | CONFLICT-011 còn OPEN trước chấm thật |
+| template_version, rubric_version | SRC-MAU-06, RubricTemplate | CONFLICT-011 cần Khoa xác nhận hiệu lực trước chấm thật |
 
 Tệp XLSX local có sheet “Mẫu” với công thức nhóm và tổng; có điểm ví dụ trong ô nhập, vì vậy phải làm sạch cell ví dụ và so khớp công thức/merged cells/print area trước khi dùng làm template phát hành.
 

@@ -7,7 +7,7 @@
 | Điều kiện | QĐ 5964, QĐ 2919 | REQ-ELIG-001..002, REQ-DEF-001 | BR-ELIG-001..002 | UC-ELIG-001, UC-DEF-001 | Người Khoa được giao; CONFLICT-006 |
 | Expertise | GVHD | REQ-EXP-001 | safe label self-declared | UC-EXP-001 | TBM/Trưởng khoa theo scope |
 | Topic/yêu cầu GVHD | GVHD, QĐ 2919, quyết định dự án | REQ-TOPIC-001..003 | BR-TOPIC-001..002 | UC-TOPIC-001..003 | — |
-| Đăng ký/nhóm | GVHD, QĐ 2919, Mẫu 1a/1b | REQ-REG-001..005 | BR-REG-001..005 | UC-REG-001/002, UC-ASSIGN-001 | CONFLICT-005; khóa thành viên sau gửi |
+| Đăng ký/nhóm | GVHD, QĐ 2919, Mẫu 1a/1b | REQ-REG-001..006 | BR-REG-001..006 | UC-REG-001/002, UC-ASSIGN-001 | CONFLICT-005; từng thành viên tự xác nhận trước gửi, khóa sau gửi; đề tài SV xét sau đăng ký |
 | Phân công cá nhân | GVHD, Mẫu 2 | REQ-REG-004 | BR-REG-004 | UC-WORK-001 | — |
 | Đề cương | GVHD, QĐ 2919, Mẫu 3 | REQ-PROP-001..003 | BR-PROP-001..002 | UC-PROP-001..004 | — |
 | Tiến độ | GVHD, Mẫu 2, IN4299N | REQ-PROG-001..002 | BR-PROG-001..002 | UC-PROG-001/002 | Ngày theo round; CONFLICT-002/004 |
@@ -24,5 +24,5 @@
 
 - 18 câu hỏi GVHD: đối chiếu đủ tại `18-cau-hoi-gvhd-mapping.md`.
 - Bảy luồng A–G: có trong `business-process.md` và `business-process.drawio`.
-- Mỗi requirement có ít nhất một nguồn; mỗi use case có requirement; mọi OPEN có safe default.
+- Mỗi requirement có ít nhất một nguồn; mỗi use case có requirement; mọi điều kiện chưa có nguồn áp dụng có giá trị mặc định an toàn.
 - Không có base role hoặc use case “cán bộ KLTN”; không có Admin bypass; không có use case AI duyệt/chấm/ký.

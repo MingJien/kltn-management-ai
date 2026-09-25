@@ -41,6 +41,7 @@ PostgreSQL bảo đảm invariant trong một hàng hoặc giữa các hàng có
 | DBR-31 | GVPB không trùng assignment active cho cùng proposal/thesis; scope phải khớp đối tượng | XOR/scope CHECK + 2 partial unique index | DATABASE_ENFORCED | `reviewer_assignment`; `uq_reviewer_assignment_proposal/thesis` |
 | DBR-32 | Xác nhận/ký đề cương phải trỏ tới phiên bản thật của **cùng** hồ sơ đề cương | FK ghép `(proposal_id, proposal_version_no)` và CHECK dương; backend còn kiểm bản đó là bản được phép ký | DATABASE + APPLICATION | `signature_confirmation`, `fk_signature_confirmation_proposal_version_pair`; DB-26 |
 | DBR-33 | `progress_review.decision=COMMENT_ONLY` cho GV góp ý chéo, không xác nhận tiến độ; CONFIRM/REVISION_REQUIRED chỉ GVHD chính | CHECK tập decision ở DB; quyền và đổi ProgressReport.state ở service | DATABASE + APPLICATION | `progress_review`, migration 0005; DB-40 |
+| DBR-34 | Mỗi RegistrationMember phản hồi PENDING → ACCEPTED/DECLINED bởi chính SV trước khi nhóm SUBMITTED; không giả consent khi người điều phối nhập danh sách | CHECK trạng thái/actor/time và FK user; service kiểm responded_by_user_id khớp StudentProfile.user_id, đủ 1–3 ACCEPTED | DATABASE + APPLICATION | migration 0007; DB-42; runtime guard còn phải xây |
 
 ## Transaction boundary bắt buộc
 

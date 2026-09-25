@@ -649,7 +649,8 @@
               }
             }
           }
-        }
+        },
+        "x-design-note": "Đề tài do SV đề xuất được tạo cùng bản nháp đăng ký nhóm; TBM xét sau khi nhóm gửi, không yêu cầu Topic.APPROVED trước đăng ký."
       }
     },
     "/topics/{topicId}": {
@@ -820,7 +821,8 @@
               "format": "uuid"
             }
           }
-        ]
+        ],
+        "x-design-note": "Với Topic do SV đề xuất, TBM xử lý sau khi registration của nhóm đã SUBMITTED; sau APPROVED phải có GVHD được phân công đồng ý trước finalization."
       }
     },
     "/topic-registrations": {
@@ -899,7 +901,8 @@
           }
         },
         "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed.",
+        "x-design-note": "Prototype hiện chỉ nhận Topic.APPROVED do GV đề xuất và gửi nhóm ngay. Thiết kế cuối yêu cầu từng thành viên tự ACCEPTED trước SUBMITTED; với Topic do SV đề xuất, đăng ký trước rồi TBM xét đề tài."
       },
       "get": {
         "summary": "Registrations",
@@ -3879,6 +3882,66 @@
         },
         "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
         "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+      }
+    },
+    "/topic-registrations/{registrationId}/member-response": {
+      "post": {
+        "tags": [
+          "TopicRegistration"
+        ],
+        "summary": "Từng sinh viên tự xác nhận hoặc từ chối tham gia nhóm",
+        "description": "Hợp đồng thiết kế; endpoint chưa có trong prototype. Danh tính người phản hồi lấy từ phiên đăng nhập, không nhận userId từ body. Chỉ phản hồi khi đăng ký còn DRAFT.",
+        "operationId": "respond_to_registration_invitation_design",
+        "parameters": [
+          {
+            "name": "registrationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "decision"
+                ],
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPT",
+                      "DECLINE"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trạng thái phản hồi và thời điểm được lưu cho đúng RegistrationMember."
+          },
+          "403": {
+            "description": "Tài khoản không phải thành viên được mời."
+          },
+          "409": {
+            "description": "Đăng ký đã gửi/khóa hoặc phản hồi không hợp lệ."
+          }
+        },
+        "x-runtime-status": "DESIGN_ONLY",
+        "x-guards": [
+          "actor_user_id phải trùng StudentProfile.user_id của RegistrationMember",
+          "registration.state=DRAFT",
+          "mọi thành viên active ACCEPTED trước khi service chuyển SUBMITTED"
+        ]
       }
     }
   },

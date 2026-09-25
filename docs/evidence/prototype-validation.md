@@ -4,13 +4,13 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 
 | Kiểm tra thực chạy | Lệnh / cách chạy | Kết quả |
 | --- | --- | --- |
-| Migration hiện tại | `.\.venv\Scripts\python.exe -m alembic upgrade head` trên `kltn_dev` | PASS; head 20260925_0006 |
+| Migration hiện tại | `.\.venv\Scripts\python.exe -m alembic upgrade head` trên `kltn_dev` | PASS; head 20260925_0007 |
 | Drift model/schema | `.\.venv\Scripts\python.exe -m alembic check` | PASS, “No new upgrade operations detected” |
-| Kiểm thử ràng buộc | `.\.venv\Scripts\python.exe -m backend.db.validate_schema` | PASS DB-01..41; transaction rollback |
+| Kiểm thử ràng buộc | `.\.venv\Scripts\python.exe -m backend.db.validate_schema` | PASS DB-01..42; transaction rollback |
 | Test API/AI | `.\.venv\Scripts\python.exe -m pytest tests -q` | 8 passed; 1 warning về TestClient/httpx của Starlette |
 | Migration từ số 0 | `.\.venv\Scripts\python.exe -m tools.validate_migrations_disposable` | PASS upgrade/check/DB validation/seed giả/downgrade -1/upgrade/check trên schema ngẫu nhiên; chỉ schema đó được xóa |
-| File SQL tạo mới | `.\.venv\Scripts\python.exe -m tools.validate_sql_snapshot` | PASS; 63 bảng, head 20260925_0006; 16 tiêu chí Mẫu 6 DRAFT trên schema trống tạm |
-| Cấu trúc vật lý `kltn_dev` | SQLAlchemy Inspector | 63 bảng/615 cột; `thesis` 0 row sau test |
+| File SQL tạo mới | `.\.venv\Scripts\python.exe -m tools.validate_sql_snapshot` | PASS; 63 bảng, head 20260925_0007; 16 tiêu chí Mẫu 6 DRAFT và ba cột consent trên schema trống tạm |
+| Cấu trúc vật lý `kltn_dev` | SQLAlchemy Inspector | 63 bảng/618 cột; `thesis` và `topic_registration` đều 0 row sau test |
 | Build/typecheck React | `npm run build --prefix frontend` | PASS, Vite 7.3.6 |
 | OpenAPI | `openapi_spec_validator.validate` cho design/runtime JSON | PASS cả hai |
 | Draw.io | XML parse cho ERD/state/wireframe được sửa | PASS |
@@ -34,13 +34,20 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 - `tools.validate_migrations_disposable`: PASS nâng từ đầu/check/DB validation/seed giả/hạ 0006/nâng lại/check. `tools.validate_sql_snapshot`: PASS trên schema trống, head 0006, 63 bảng và 16 dòng rubric Mẫu 6.
 - `pytest -q`: 8 passed; build React và OpenAPI/Draw.io không đổi do đây là migration dữ liệu. Chưa kiểm runtime chấm thật, và Khoa chưa xác nhận hiệu lực Mẫu 6 khi QĐ 2919 nêu cơ cấu khác.
 
+## Kiểm chứng bổ sung migration 0007
+
+- Trước khi nâng, `kltn_dev` ở 0006 và không có đăng ký/thành viên thật. Nâng lên 0007: PASS; 63 bảng/618 cột vật lý, 0 `thesis` và 0 `topic_registration` sau test. Dữ liệu cũ nếu có sẽ mặc định `PENDING`, không bị coi là đã đồng ý.
+- `tools.validate_migrations_disposable`: PASS nâng/check/DB validation/seed giả/hạ 0007/nâng lại/check. `tools.validate_sql_snapshot`: PASS trên schema trống, head 0007, 16 tiêu chí Mẫu 6 và đủ ba cột consent.
+- DB-01..42 PASS; DB-42 chứng minh CHECK đòi actor/thời điểm cho `ACCEPTED` và default `PENDING`. `alembic check` không thấy drift. `pytest -q`: 8 passed; React build PASS; OpenAPI design được bổ sung operation `DESIGN_ONLY` và đã validate PASS; các sơ đồ Draw.io parse XML PASS.
+- **Chưa được chứng minh bằng runtime:** đúng SV tự bấm xác nhận, không gửi khi còn PENDING/DECLINED, và nhánh SV đăng ký trước rồi TBM xét đề tài. Prototype cũ vẫn cho nhóm gửi trực tiếp với Topic GV APPROVED; không dùng endpoint đó để đăng ký thật.
+
 ## Điều được chứng minh và chưa được chứng minh
 
 - Test tích hợp dùng PostgreSQL thật, kiểm SV tự gửi nhóm, trùng active registration bị từ chối, GV không được tạo/ghép, giảng viên khác không được quyết định, TBM khác không được chốt, tạo Thesis + 3 ThesisMember + AdvisorAssignment cùng transaction, reject giải phóng đăng ký, dev auth bị tắt ở production.
 - DB-27..39 kiểm MANAGED_THESIS, imported THESIS/CAPSTONE_PROJECT/TERM_PROJECT/COURSE_PROJECT, REGULATION/FORM, cặp origin sai bị chặn, index metadata không cần DocumentVersion, SimilarityMatch trỏ RepositoryItem, hai row chữ ký Mẫu 9, source ID duy nhất và URL HTTPS. **Hai row chữ ký chỉ là khả năng dữ liệu; chưa chứng minh service chuyển SIGNED đúng role.**
 - Qdrant unit test dùng vector giả lập để kiểm filter quyền, source type, revoke/deindex/reindex và citation. Thêm 5 ca kiểm chức năng: sao chép, sửa nhẹ, diễn đạt lại, cùng chủ đề khác nội dung, không liên quan; mọi ca vẫn advisory, không tự chặn hoặc phán đạo văn. Vector giả không phải kết quả đánh giá AI. Model thật chỉ chạy smoke trên 2 nguồn **giả lập**. Chưa nhập 7 KLTN thật, chưa đo precision/recall, chưa chọn threshold, chưa kiểm similarity toàn văn với 5 tình huống controlled.
 - Docker daemon không chạy, nên Qdrant container chưa được thử; Qdrant local mode đã chạy. Gemini chưa có key, không có generation thật; FakeLLM chưa cần trong runtime.
-- Mẫu 9 local là các biên bản đã điền thông tin thật. Chủ dự án xác nhận chưa có mẫu trắng được duyệt/đánh dấu field; chưa có runtime exact export, test layout hay service hai chữ ký. Trạng thái BLOCKED_SOURCE_TEMPLATE. Mẫu 6 còn CONFLICT-011.
+- Mẫu 9 local là các biên bản đã điền thông tin thật. Hiện chưa có mẫu trắng được duyệt và đánh dấu field; chưa có runtime exact export, test layout hay service hai chữ ký. Trạng thái BLOCKED_SOURCE_TEMPLATE. Mẫu 6 còn CONFLICT-011.
 - React đã chạy browser toàn luồng bằng dữ liệu giả trên schema tạm; chưa có SSO production. Kiểm thị giác pixel và browser console vẫn chưa PASS. API design rộng hơn runtime; các operation `DESIGN_ONLY` chưa được coi là PASS.
 
 Các giới hạn này được giữ trong README/thiết kế để người xem không nhầm thiết kế với phần đã chạy.

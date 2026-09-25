@@ -1,11 +1,10 @@
-# Yêu cầu nghiệp vụ — NV4 Tuần 1
+# Yêu cầu nghiệp vụ — NV4
 
 ## Trạng thái
 
-- `CONFIRMED`: được nguồn chính thức hoặc quyết định chủ dự án xác nhận.
+- `CONFIRMED`: được nguồn chính thức hoặc quyết định thiết kế của đề tài xác nhận.
 - `DERIVED`: suy ra trực tiếp từ nhiều nguồn đã đọc, không mở rộng thẩm quyền.
 - `PROPOSED`: phương án thiết kế có thể đổi khi Khoa chốt chính sách.
-- `OPEN`: chưa đủ căn cứ để chốt.
 
 ## Tài khoản và thẩm quyền
 
@@ -28,14 +27,15 @@
 | ID | Yêu cầu | Trạng thái | Nguồn |
 | --- | --- | --- | --- |
 | REQ-TOPIC-001 | Giảng viên đề xuất đề tài theo chuyên môn; TBM duyệt và có thể chỉnh tên cho chính xác. | CONFIRMED | SRC-GVHD-NV4-001, SRC-QD-2919 |
-| REQ-TOPIC-002 | SV có thể đề xuất đề tài; đề tài chỉ dùng sau khi GVHD đồng ý và TBM chấp nhận/chốt. | CONFIRMED | SRC-GVHD-NV4-001, SRC-QD-2919 |
+| REQ-TOPIC-002 | SV có thể lập đề tài và đăng ký nhóm trước; TBM xét nội dung đề tài sau khi nhóm gửi, có thể yêu cầu sửa/từ chối/duyệt. GVHD được phân công đồng ý rồi TBM mới chốt để tạo Thesis. | CONFIRMED_PROJECT_DESIGN | SRC-GVHD-NV4-001, SRC-QD-2919, SRC-PROJECT-DEC-20260925 |
 | REQ-TOPIC-003 | Đề tài có thể lưu GPA mong muốn, kỹ năng, công nghệ, kiến thức và yêu cầu khác của GVHD. GPA cao hơn 2,50 là tiêu chí mong muốn, không tự biến thành điều kiện chung của Khoa. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-MASTER-001 |
 | REQ-EXP-001 | GV tự khai chuyên môn/lĩnh vực/từ khóa với minh chứng; TBM đúng bộ môn kiểm chứng, trừ hồ sơ của chính TBM thì Trưởng khoa/người được giao kiểm. Không tự xác nhận. | CONFIRMED_PROJECT_DESIGN | SRC-GVHD-NV4-001, SRC-PROJECT-DEC-20260925 |
 | REQ-REG-001 | SV đủ điều kiện chọn đúng một đề tài và có tối đa một đăng ký còn hiệu lực trong một đợt; không có nguyện vọng xếp hạng thứ hai. | CONFIRMED | SRC-GVHD-NV4-001 |
 | REQ-REG-002 | Một đề tài có 1–3 SV. Nhóm trưởng chỉ điều phối, không phải chủ nhiệm đề tài. | CONFIRMED | SRC-QD-2919, SRC-GVHD-NV4-001 |
-| REQ-REG-003 | GVHD đồng ý/từ chối đăng ký; TBM chốt đề tài và phân công GVHD. | CONFIRMED_PROJECT_DECISION | SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 |
+| REQ-REG-003 | Với đề tài do GV đề xuất, GV đề xuất nhận/từ chối nhóm rồi TBM chốt. Với đề tài do SV đề xuất, TBM xét đề tài sau đăng ký, người được phân công làm GVHD đồng ý rồi TBM chốt. | CONFIRMED_PROJECT_DECISION | SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 |
 | REQ-REG-004 | Nhóm khai phân công công việc theo từng SV; GVHD duyệt. Phân công là căn cứ đánh giá cá nhân. | CONFIRMED | SRC-GVHD-NV4-001, SRC-MAU-02 |
-| REQ-REG-005 | SV tự lập nhóm 1–3 trước khi gửi; từ SUBMITTED không thêm/ghép/đổi thành viên trong phạm vi hiện tại. Giảng viên không có thao tác thêm thành viên. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-DEC-20260925 |
+| REQ-REG-005 | SV tự lập nhóm 1–3; từng thành viên tự xác nhận bằng tài khoản của mình trước SUBMITTED. Từ SUBMITTED không thêm/ghép/đổi thành viên; giảng viên không có thao tác thêm thành viên. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-DEC-20260925 |
+| REQ-REG-006 | Lưu PENDING/ACCEPTED/DECLINED, tài khoản và thời điểm phản hồi cho từng RegistrationMember. Service chỉ cho gửi khi mọi thành viên active đã ACCEPTED bởi chính tài khoản của mình; chưa triển khai trong prototype. | CONFIRMED_PROJECT_DESIGN / RUNTIME_PENDING | SRC-PROJECT-DEC-20260925 |
 
 ## Đề cương, tiến độ và thay đổi
 
@@ -72,7 +72,7 @@
 | REQ-DEF-001 | Đợt hiện tại chỉ dùng điều kiện bảo vệ cấp Trường: không bị kỷ luật từ cảnh cáo toàn Trường, hoàn thành KLTN và có GVHD đồng ý bằng văn bản. Khoa hiện không bổ sung tiêu chí riêng; tiêu chí mới nếu được ban hành về sau phải có nguồn và version theo đợt. | CONFIRMED / CONFIRMED_PROJECT_DECISION | SRC-QD-2919, SRC-MAU-07, SRC-PROJECT-DEC-20260925 |
 | REQ-EVAL-001 | GVHD có phiếu nhận xét/quyết định cho bảo vệ; GVPB có phiếu nhận xét; mỗi phiếu lưu theo đúng assignment và version. | CONFIRMED | SRC-MAU-07, SRC-MAU-08, SRC-GVHD-NV4-001 |
 | REQ-EVAL-002 | Mỗi thành viên Hội đồng tự nhập điểm cho từng SV; hệ thống tổng hợp trung bình cộng và làm tròn 1 chữ số thập phân. SV cùng đề tài có điểm riêng. | CONFIRMED | SRC-QD-2919, SRC-HP-IN4299N, SRC-GVHD-NV4-001 |
-| REQ-EVAL-003 | Rubric theo Mẫu 6 phải lưu ba nhóm Hình thức 2,0 (1.1–1.3), Nội dung 4,0 (2.1–2.6), Demo/trả lời 4,0 (3.1–3.3), thứ tự và điểm tối đa từng tiêu chí. Điểm thưởng là mục riêng tối đa 1,0 trong phiếu; tổng phiếu kể cả thưởng không quá 10. Điểm cuối là trung bình tổng điểm các phiếu hợp lệ, làm tròn một chữ số, không cộng thưởng lần hai. | CONFIRMED baseline Mẫu 6; CONFLICT-011 OPEN trước vận hành | SRC-MAU-06, SRC-QD-2919 |
+| REQ-EVAL-003 | Rubric theo Mẫu 6 phải lưu ba nhóm Hình thức 2,0 (1.1–1.3), Nội dung 4,0 (2.1–2.6), Demo/trả lời 4,0 (3.1–3.3), thứ tự và điểm tối đa từng tiêu chí. Điểm thưởng là mục riêng tối đa 1,0 trong phiếu; tổng phiếu kể cả thưởng không quá 10. Điểm cuối là trung bình tổng điểm các phiếu hợp lệ, làm tròn một chữ số, không cộng thưởng lần hai. | CONFIRMED baseline Mẫu 6; CONFLICT-011: Khoa xác nhận hiệu lực trước chấm thật | SRC-MAU-06, SRC-QD-2919 |
 | REQ-MIN-001 | Thư ký lập/xuất Mẫu 9; Chủ tịch và Thư ký đúng CouncilMember ký. Sau in nhưng trước chữ ký đầu tiên, Thư ký đối chiếu bản giấy; sai thì chính người chấm sửa phiếu của mình, ghi lý do/audit, bản in cũ VOID và tạo version mới để in lại. Chỉ SIGNED khi đủ hai chữ ký. | CONFIRMED_PROJECT_DECISION | SRC-MAU-09, SRC-PROJECT-DEC-20260925 |
 | REQ-MIN-002 | Từ chữ ký đầu tiên trên giấy hoặc điện tử, khóa điểm/nội dung/biên bản; sau đó chỉ cấp bản sao đúng bản đã ký và ghi lần xuất, không tạo bản sửa nội dung. Thư ký không sửa điểm thay người chấm. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-DEC-20260925 |
 | REQ-RPT-001 | Chỉ giữ thống kê/báo cáo trace được về quản lý danh sách, tiến độ, Hội đồng, điểm, kho và kế hoạch; báo cáo mới ngoài phạm vi là `PROPOSED`. | DERIVED | SRC-HP-IN4299N, SRC-MAU-04, SRC-MAU-10, SRC-MAU-11 |
@@ -90,14 +90,15 @@ Phần mô tả ở các mục trên là nội dung normative. Bảng này bổ 
 | REQ-ELIG-001 | SV, đơn vị xác nhận | GPA, tín chỉ, tình trạng, nguồn | Snapshot đủ/không đủ điều kiện | QĐ5964 |
 | REQ-ELIG-002 | SV, ELIGIBILITY_VERIFIER | Snapshot, evidence, assignment | Xác nhận/từ chối có actor/time | Người Khoa được giao theo round |
 | REQ-TOPIC-001 | Giảng viên, TBM | Đề xuất, chuyên môn, title | Topic được duyệt/trả lại/từ chối | Lưu title history |
-| REQ-TOPIC-002 | SV, GVHD, TBM | Đề xuất SV, GVHD dự kiến | Topic được chấp nhận trước đăng ký | Không tự mở đăng ký |
+| REQ-TOPIC-002 | SV, TBM, GVHD được phân công | Đề tài SV, nhóm đã tự xác nhận | Đăng ký gửi trước; TBM xét đề tài sau; GVHD đồng ý trước khi chốt | Không yêu cầu Topic.APPROVED trước đăng ký nhánh SV |
 | REQ-TOPIC-003 | GVHD/TBM | GPA/kỹ năng/công nghệ/kiến thức mong muốn | TopicRequirement có enforcement DESIRED | Không là eligibility hard rule |
-| REQ-EXP-001 | Giảng viên; verifier OPEN | Lĩnh vực, từ khóa, evidence | Hồ sơ self-declared/versioned | TBM verify chỉ PROPOSED |
+| REQ-EXP-001 | Giảng viên; TBM đúng bộ môn hoặc Trưởng khoa/người được giao | Lĩnh vực, từ khóa, evidence | Hồ sơ self-declared/versioned và xác nhận có actor/time | Người khai không tự xác nhận |
 | REQ-REG-001 | SV đủ điều kiện | Round, một topic, members | Một registration hoạt động/SV/round | Unique qua RegistrationMember |
 | REQ-REG-002 | Nhóm SV | 1–3 member, coordinator | Nhóm hợp lệ, coordinator tối đa một | Coordinator không thêm quyền duyệt |
 | REQ-REG-003 | GVHD, TBM | Registration, decision, reason | Lecturer decision rồi finalization/assignment | Transaction tạo Thesis |
 | REQ-REG-004 | Thành viên, GVHD | Work description/output | Work assignment được duyệt | Theo từng ThesisMember |
-| REQ-REG-005 | SV/GVHD/TBM | Danh sách nhóm tại thời điểm gửi | Không có mutation thành viên sau SUBMITTED | Quyết định chủ dự án |
+| REQ-REG-005 | SV/GVHD/TBM | Danh sách nhóm tại thời điểm gửi | Không có mutation thành viên sau SUBMITTED | Quyết định thiết kế 25/09 |
+| REQ-REG-006 | Từng SV được mời; service đăng ký | Phản hồi, tài khoản, thời điểm | PENDING/ACCEPTED/DECLINED có chứng cứ; chỉ gửi khi đủ ACCEPTED | CSDL đã lưu, API/UI và guard chưa triển khai |
 | REQ-PROP-001 | SV | File sạch, proposal hiện tại | ProposalVersion bất biến | VersionNo unique |
 | REQ-PROP-002 | SV/GVHD/GVPB/TBM/Trưởng khoa | Version, review, decision | Chuỗi state đúng thứ tự | Tách chốt nội dung và ký |
 | REQ-PROP-003 | Reviewer/Trưởng khoa | Review form, confirmation | Review/signature metadata và bản in | Không overwrite version |

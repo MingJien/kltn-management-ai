@@ -1,6 +1,6 @@
 # Quy trình nghiệp vụ tổng thể và các luồng con
 
-Mỗi luồng dùng swimlane bằng `subgraph`. Nhánh `OPEN/PROPOSED` được ghi rõ; không tự thêm phê duyệt ngoài nguồn.
+Mỗi luồng dùng swimlane bằng `subgraph`. Điều kiện cấu hình hoặc xác nhận trước vận hành được ghi rõ; không tự thêm phê duyệt ngoài nguồn.
 
 ## Tổng thể
 
@@ -239,7 +239,7 @@ Gemini là quyết định dự án; không ghi thành quy định Trường. Do
 
 ## Quy trình làm rõ ngày 25/09/2026
 
-- Đăng ký: SV đủ điều kiện tự chọn 1–3 SV cùng bộ môn và gửi nhóm; từ thời điểm SUBMITTED danh sách bất biến, không ghép/thêm/đổi thành viên. Giảng viên đề xuất đề tài chấp nhận/từ chối, không ghép thành viên. TBM đúng bộ môn chốt; một transaction tạo Thesis, ThesisMember và AdvisorAssignment. Đề tài do SV đề xuất cần workflow riêng.
+- Đăng ký: SV đủ điều kiện lập nhóm 1–3 người cùng bộ môn; **mỗi thành viên tự xác nhận** lời mời bằng tài khoản của mình trước khi gửi. Từ SUBMITTED danh sách bất biến, không ghép/thêm/đổi người. Với đề tài do GV đề xuất đã duyệt, GV đề xuất chấp nhận/từ chối nhóm; với đề tài do SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài, GVHD được phân công đồng ý sau đó. TBM đúng bộ môn chốt; một transaction tạo Thesis, ThesisMember và AdvisorAssignment. Prototype hiện chỉ chạy nhánh đề tài do GV đề xuất và chưa có xác nhận từng thành viên.
 - Điều phối KLTN theo round nhận lịch chính thức và sắp hai buổi góp ý nội bộ; GVHD xác nhận progress của Thesis được phân công, GVHD khác có assignment chỉ góp ý chéo. Không suy ra quyền Secretary Hội đồng.
 - Nộp tài liệu: lưu DocumentVersion trước; kiểm tương đồng chạy sau và trả bằng chứng advisory; sinh viên có thể nộp version sửa. Chỉ policy được duyệt sau này mới xem xét gate ở finalization.
 - Mẫu 9: Thư ký đối chiếu bản giấy. Bản in sai trước chữ ký đầu được VOID và in lại với version/mã/thời gian mới; người chấm tự sửa điểm. Từ chữ ký đầu khóa sửa dù state còn PRINTED; khi đủ Chair và Secretary mới SIGNED. Không có bypass TBM.

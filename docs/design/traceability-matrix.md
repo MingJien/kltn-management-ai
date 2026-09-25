@@ -1,4 +1,4 @@
-# Ma trận truy vết Tuần 1 → Tuần 2
+# Ma trận truy vết yêu cầu → thiết kế → kiểm thử
 
 | Trace | Requirement / UC | Entity chính | API | Màn hình | Kiểm thử chấp nhận | Trạng thái |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -7,7 +7,7 @@
 | TRC-03 | REQ-ELIG-001..002 / UC-ELIG-001 | EligibilitySnapshot/Exception | `/rounds/{id}/eligibility-snapshots` | SCR-03 | GPA 2,49 hoặc credit <70% bị chặn nếu không có ngoại lệ; snapshot có nguồn. | CONFIRMED |
 | TRC-04 | REQ-EXP-001 / UC-EXP-001 | LecturerExpertise/Evidence | `/lecturer-expertise` | SCR-04 | Hồ sơ tự khai có nhãn; TBM đúng Bộ môn kiểm chứng, tự khai của TBM do Trưởng khoa/người được giao kiểm. | CONFIRMED_PROJECT_DESIGN |
 | TRC-05 | REQ-TOPIC-001..003 / UC-TOPIC-001..003 | Topic, TitleVersion, TopicRequirement | `/topics`, `/topics/{id}/requirements` | SCR-04 | TBM chỉnh tên có history; preferred GPA không auto reject. | CONFIRMED |
-| TRC-06 | REQ-REG-001..005 / UC-REG-001/002 | TopicRegistration, RegistrationMember | `/topic-registrations` | SCR-05 | Một active registration/SV/round; 1–3 SV; không nguyện vọng 2; không ghép hậu đăng ký mặc định. | CONFIRMED_PROJECT_DECISION |
+| TRC-06 | REQ-REG-001..006 / UC-REG-001/002 | TopicRegistration, RegistrationMember | `/topic-registrations` | SCR-05 | Một active registration/SV/round; 1–3 SV tự xác nhận trước gửi; không nguyện vọng 2; không ghép sau SUBMITTED. | CONFIRMED_PROJECT_DECISION |
 | TRC-07 | REQ-REG-003..004 / UC-ASSIGN-001, UC-WORK-001 | AdvisorAssignment, MemberWorkAssignment | `/department-finalization`, `/work-assignments` | SCR-05/06 | GVHD accept/reject; TBM finalize; work allocation phải được GVHD duyệt. | CONFIRMED |
 | TRC-08 | REQ-PROP-001..003 / UC-PROP-001..004 | Proposal/Version/Review/Signature | `/proposal-versions`, `/proposals/...` | SCR-07 | Resubmit tạo version; TBM chốt trước Trưởng khoa ký; có bản in. | CONFIRMED_PROJECT_DECISION |
 | TRC-09 | REQ-PROG-001..002 / UC-PROG-001/002 | Milestone, ProgressReport/Review | `/milestones`, `/progress-reports` | SCR-08 | GVHD xác nhận; lịch cấu hình, không hard-code. | CONFIRMED_PROJECT_DECISION; ngày theo round |
@@ -27,13 +27,13 @@
 
 - `RoundPolicy`, storage abstraction, outbox/reindex, optimistic concurrency và AuditEvent là `PROPOSED` kỹ thuật để thực thi requirement; không phải quy định Trường.
 - Không có entity/API/screen cho auto Chair, plagiarism verdict, Admin business override, online approval rút/gia hạn hoặc sửa hậu ký.
-- Các ID OPEN cũ đã được chốt cho thiết kế trong `open-issues.md`; vận hành thật vẫn cần Khoa chỉ định người và xác nhận hiệu lực Mẫu 6/QĐ885.
+- Các câu hỏi nghiệp vụ đã được chốt trong [quyết định thiết kế](../decisions/quyet-dinh-du-an-2026-09-25.md); trước khi vận hành thật, Khoa cần phân công người xác nhận và làm rõ hiệu lực Mẫu 6/QĐ885.
 
 ## Truy vết bổ sung từ quyết định 25/09/2026
 
 | Source → Requirement → Rule | Use case / quyền / state | Entity/column | API → màn hình | Test / trạng thái |
 | --- | --- | --- | --- | --- |
-| SRC-PROJECT-DEC-20260925 → REQ-REG-005 → BR-REG-005 | UC-REG-001/002; SV tự lập, GV không ghép; SUBMITTED khóa member | topic_registration, registration_member; unique active student/round | POST /topic-registrations → SCR-05 /topics | test_registration_vertical_slice PASS; đồng thuận từng member chưa đặc tả; khóa sau gửi |
+| SRC-PROJECT-DEC-20260925 → REQ-REG-005..006 → BR-REG-005 | UC-REG-001/002; SV tự lập, từng member tự xác nhận; SUBMITTED khóa member | topic_registration, registration_member consent fields (0007); unique active student/round | POST /topic-registrations + member-response DESIGN_ONLY → SCR-05 | CSDL DB-42 PASS; prototype chưa có self-response và chỉ dùng Topic GV APPROVED |
 | SRC-PROJECT-DEC-20260925 → REQ-REG-003 → BR-REG-003 | UC-ASSIGN-001; GV đề xuất quyết định; TBM position đúng scope finalize | Thesis, ThesisMember, AdvisorAssignment, row_version | POST lecturer-decision, department-finalization → SCR-05 /registrations, /theses/:id | integration test PASS, một transaction |
 | SRC-PROJECT-DEC-20260925 → REQ-ROUND-002 → BR-ROUND-002 | UC-ROUND-001; KLTN_COORDINATOR theo round khác Secretary | ResourceAssignment.round_id/assignment_type; CouncilMember.role_code | context/round milestones thiết kế → SCR-02/08 | Design-only; ngày theo round |
 | SRC-MAU-09 + SRC-PROJECT-DEC-20260925 → REQ-MIN-001/REQ-EXPORT-001 → BR-MIN-002/BR-EXPORT-001 | UC-MIN-001/002; Secretary + Chair, PRINTED → SIGNED khi đủ hai | MinuteSignature, CouncilMinute, StoredFile | design-only signature/export → SCR-14 | DB-37 PASS cho 2 row; role service/export chưa PASS, BLOCKED_SOURCE_TEMPLATE |
