@@ -1,0 +1,143 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" modified="2026-09-20T14:09:15.414212+00:00" agent="Codex NV4 database audit" version="26.0.0" compressed="false">
+  <diagram id="domain-1---identity-và-học-kỳ" name="Domain 1 - Identity và học kỳ">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Identity&lt;/b&gt;&lt;br&gt;UserAccount&lt;br&gt;StudentProfile&lt;br&gt;LecturerProfile&lt;br&gt;&lt;i&gt;REQ-AUTH-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Organization&lt;/b&gt;&lt;br&gt;Faculty&lt;br&gt;Department&lt;br&gt;PositionAssignment&lt;br&gt;ResourceAssignment&lt;br&gt;&lt;i&gt;REQ-AUTH-002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Academic&lt;/b&gt;&lt;br&gt;AcademicYear&lt;br&gt;ThesisRound&lt;br&gt;RoundPolicy&lt;br&gt;&lt;i&gt;REQ-ROUND-001&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="1090" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Eligibility&lt;/b&gt;&lt;br&gt;EligibilitySnapshot&lt;br&gt;EligibilityException&lt;br&gt;&lt;i&gt;REQ-ELIG-001/002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Expertise&lt;/b&gt;&lt;br&gt;LecturerExpertise&lt;br&gt;ExpertiseEvidence&lt;br&gt;&lt;i&gt;REQ-EXP-001&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="scope" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="student/verifier" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="lecturer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="domain-2---topic-và-thực-hiện" name="Domain 2 - Topic và thực hiện">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Topic&lt;/b&gt;&lt;br&gt;Topic&lt;br&gt;TopicTitleVersion&lt;br&gt;TopicRequirement&lt;br&gt;&lt;i&gt;REQ-TOPIC-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Registration&lt;/b&gt;&lt;br&gt;TopicRegistration&lt;br&gt;RegistrationMember&lt;br&gt;&lt;i&gt;REQ-REG-001..005&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Thesis&lt;/b&gt;&lt;br&gt;Thesis&lt;br&gt;ThesisMember&lt;br&gt;&lt;i&gt;REQ-REG-002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="1090" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Assignments&lt;/b&gt;&lt;br&gt;AdvisorAssignment&lt;br&gt;ReviewerAssignment&lt;br&gt;&lt;i&gt;REQ-REG-003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Work&lt;/b&gt;&lt;br&gt;MemberWorkAssignment&lt;br&gt;&lt;i&gt;REQ-REG-004&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="finalize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="3" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="domain-3---hồ-sơ-thực-hiện" name="Domain 3 - Hồ sơ thực hiện">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Proposal&lt;/b&gt;&lt;br&gt;Proposal&lt;br&gt;ProposalVersion&lt;br&gt;ProposalReview&lt;br&gt;SignatureConfirmation&lt;br&gt;&lt;i&gt;REQ-PROP-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Progress&lt;/b&gt;&lt;br&gt;ProgressMilestone&lt;br&gt;ProgressReport&lt;br&gt;ProgressReview&lt;br&gt;&lt;i&gt;REQ-PROG-001/002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Change&lt;/b&gt;&lt;br&gt;TopicChangeRequest&lt;br&gt;ExternalProcedureOutcome&lt;br&gt;&lt;i&gt;REQ-CHANGE-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="1090" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Documents&lt;/b&gt;&lt;br&gt;StoredFile&lt;br&gt;Document&lt;br&gt;DocumentVersion&lt;br&gt;&lt;i&gt;REQ-DOC-001&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Similarity&lt;/b&gt;&lt;br&gt;SimilarityPolicy&lt;br&gt;SimilarityCheck&lt;br&gt;SimilarityMatch&lt;br&gt;&lt;i&gt;REQ-SIM-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="file" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="evidence" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="3" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="version" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="5" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="evidence" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="domain-4---bảo-vệ-và-lưu-trữ" name="Domain 4 - Bảo vệ và lưu trữ">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="&lt;b&gt;Council&lt;/b&gt;&lt;br&gt;Council&lt;br&gt;CouncilMember&lt;br&gt;DefenseSession&lt;br&gt;SessionThesis&lt;br&gt;CouncilAttendance&lt;br&gt;&lt;i&gt;REQ-COUNCIL-001..003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="&lt;b&gt;Reviews&lt;/b&gt;&lt;br&gt;DefenseEligibilityCheck&lt;br&gt;AdvisorReview&lt;br&gt;ReviewerReview&lt;br&gt;&lt;i&gt;REQ-DEF/EVAL-001&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="&lt;b&gt;Scoring&lt;/b&gt;&lt;br&gt;RubricTemplate&lt;br&gt;RubricCriterion&lt;br&gt;RubricAssignment&lt;br&gt;Evaluation&lt;br&gt;EvaluationItem&lt;br&gt;FinalResult&lt;br&gt;&lt;i&gt;REQ-EVAL-002/003&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="1090" y="90" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="&lt;b&gt;Minutes&lt;/b&gt;&lt;br&gt;CouncilMinute&lt;br&gt;MinuteVersion&lt;br&gt;MinuteSignature&lt;br&gt;&lt;i&gt;REQ-MIN-001/002&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="90" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="&lt;b&gt;Repository&lt;/b&gt;&lt;br&gt;RepositoryItem&lt;br&gt;SearchIndexMetadata&lt;br&gt;RetrievalAudit&lt;br&gt;AuditEvent&lt;br&gt;&lt;i&gt;REQ-REPO/AI/AUDIT&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+          <mxGeometry x="590" y="410" width="360" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="session/member" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="attendance/evaluator" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="2" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="complete" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="4" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="5" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
