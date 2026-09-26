@@ -1,6 +1,6 @@
 # Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
-Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **prototype dùng tiếp được**: PostgreSQL, FastAPI, React và thử nghiệm truy xuất AI trên dữ liệu giả lập. Chưa phải hệ thống production; không có hồ sơ sinh viên hoặc 7 KLTN thật trong Git.
+Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **prototype dùng tiếp được**: PostgreSQL, FastAPI, React và thử nghiệm truy xuất AI trên dữ liệu giả lập. PostgreSQL là nguồn dữ liệu nghiệp vụ chính; AI chỉ hỗ trợ tra cứu và tương đồng, không tự chấm đạo văn. Chưa phải hệ thống production; không có hồ sơ sinh viên hoặc 7 KLTN thật trong Git.
 
 ## Nên mở gì trước?
 
@@ -8,8 +8,8 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 | --- | --- |
 | Quyết định nghiệp vụ đã chốt | [Quyết định thiết kế 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [18 câu hỏi GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
 | Nghiệp vụ, vai trò, use case, quyền | [Yêu cầu](docs/requirements/business-requirements.md), [quy tắc](docs/requirements/business-rules.md), [quy trình](docs/requirements/business-process.md), [use case](docs/requirements/use-case-catalog.md), [phân quyền](docs/requirements/permission-matrix.md) |
-| CSDL và ý nghĩa bảng/cột | [ERD](docs/design/erd.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [giải thích dễ đọc](docs/design/database-explained.md), [rubric Mẫu 6](docs/design/rubric-mau-6.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
-| Tệp CSDL PostgreSQL | [Tạo database mới](database/kltn-init-empty.sql), [cách dùng](database/README.md). Hai tệp SQL thao tác pgAdmin (`kltn-ai-workbench.sql`, `kltn-ai-updates.sql`) chỉ lưu trên máy. |
+| CSDL và ý nghĩa bảng/cột | [ERD tổng thể](docs/design/erd.md), [ERD theo 6 cụm](docs/design/erd-clusters/README.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [giải thích dễ đọc](docs/design/database-explained.md), [rubric Mẫu 6](docs/design/rubric-mau-6.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
+| Tệp CSDL PostgreSQL | [Tạo database mới](database/kltn-db-baseline.sql), [cách dùng](database/README.md). Hai tệp SQL thao tác pgAdmin (`kltn-ai-workbench.sql`, `kltn-ai-updates.sql`) chỉ lưu trên máy. |
 | Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0007; **không chạy lại file SQL tạo mới** |
 | API và giao diện | [FastAPI](backend/api/main.py), [OpenAPI runtime](docs/prototype/openapi-runtime.json), [thiết kế API toàn miền](docs/design/openapi.yaml), [React](frontend/src/App.tsx), [wireframe](docs/design/wireframes.md) |
 | AI và biểu mẫu | [Prototype AI](docs/ai/prototype.md), [thiết kế tương đồng](docs/ai/similarity-design.md), [thiết kế xuất biểu mẫu](docs/design/xuat-bieu-mau.md) |
@@ -49,7 +49,7 @@ py -m venv .venv
 .\.venv\Scripts\python.exe -m backend.db.validate_schema
 ```
 
-Để dựng database mới, mở `database/kltn-init-empty.sql` và chạy toàn bộ file trên **database mới, trống**. Để xem bảng/cột/khóa, dùng các truy vấn chỉ đọc trong `database/kltn-ai-workbench.sql`. Với database đã có bảng, dùng Alembic migration trong `backend/migrations/versions/`; không chạy lại file init.
+Để dựng database mới, mở `database/kltn-db-baseline.sql` và chạy toàn bộ file trên **database mới, trống**. Để xem bảng/cột/khóa, dùng các truy vấn chỉ đọc trong `database/kltn-ai-workbench.sql`. Với database đã có bảng, dùng Alembic migration trong `backend/migrations/versions/`; không chạy lại file baseline.
 
 **3. Tạo dữ liệu demo tùy chọn.** Chỉ chạy trên database phát triển mà bạn cho phép chứa dữ liệu **giả lập**:
 

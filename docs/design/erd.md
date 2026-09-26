@@ -2,6 +2,8 @@
 
 > ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0007. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
 
+Bộ [6 ERD theo cụm nghiệp vụ](erd-clusters/README.md) được tái sinh từ schema PostgreSQL `kltn_ai` đang chạy, có PNG/SVG và kiểm PK/FK đối chiếu SQLAlchemy. ERD trên trang này vẫn là mục tra tổng thể.
+
 ## Ký hiệu
 
 - PK: khóa chính; FK: khóa ngoại; UK: thuộc ít nhất một unique constraint/index.

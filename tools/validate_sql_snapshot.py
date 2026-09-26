@@ -1,4 +1,4 @@
-"""Apply database/kltn-init-empty.sql to a new temporary schema only."""
+"""Apply database/kltn-db-baseline.sql to a new temporary schema only."""
 from __future__ import annotations
 
 import os
@@ -22,7 +22,7 @@ def main() -> int:
         assert conn.execute(text("select count(*) from pg_namespace where nspname=:n"), {"n": name}).scalar_one() == 0
         conn.execute(text(f'CREATE SCHEMA "{name}"'))
     try:
-        script = Path("database/kltn-init-empty.sql").read_text(encoding="utf-8-sig")
+        script = Path("database/kltn-db-baseline.sql").read_text(encoding="utf-8-sig")
         with psycopg.connect(
             host=url.host, port=url.port, dbname=url.database,
             user=url.username, password=url.password,
