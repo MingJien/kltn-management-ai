@@ -19,7 +19,7 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 | ID | Nguồn / thẩm quyền | Nhóm | Vị trí gốc | Bản xử lý nội bộ (lưu trên máy) | Trạng thái và cách dùng |
 | --- | --- | --- | --- | --- | --- |
 | SRC-PROJECT-MASTER-001 | Làm rõ thiết kế ngày 19/09/2026 | P3 | User attachment | Không áp dụng | Đã đọc; là quyết định dự án, không giả thành quy định Trường. |
-| SRC-PROJECT-DB-001 | Chỉ đạo hoàn thành NV4 Tuần 1–2 đến hết CSDL ngày 20/09/2026 | P3 | User attachment | `docs/00-sources/project-context-baseline.md` | Đã đọc; chốt phạm vi dừng sau PostgreSQL schema/migration/validation, không triển khai API/UI/AI. |
+| SRC-PROJECT-DB-001 | Chỉ đạo hoàn thành NV4 Tuần 1–2 đến hết CSDL ngày 20/09/2026 | P3 | User attachment | Nội dung còn hiệu lực đã chuyển vào README và tài liệu quyết định hiện hành | Đã đọc; đây là phạm vi tại mốc 20/09. Yêu cầu về sau mở rộng công việc sang API, giao diện và thử nghiệm AI; xem trạng thái hiện hành trong README và quyết định dự án. |
 | SRC-PROJECT-GIT-001 | Quy tắc quản lý nguồn, tài liệu và Git ngày 21/09/2026 | P3 | User attachment | docs/decisions/ | Đã đọc; xác nhận GitHub Flow gọn: main canonical, Issue/checklist, nhánh ngắn, PR review; không dùng branch theo tuần. |
 | SRC-GVHD-NV4-001 | `giải đáp NV4 tuần 1.docx`, GVHD; Drive sửa 18/09/2026 04:44 UTC | P1 | Drive `1dgRI_9XXwIk0E2eG-xHvWHbTI0jn21Xo`; `source/raw/NghiepVu/giải đáp NV4 tuần 1.drive-20260918.docx` | `source/markdown/NghiepVu/giai-dap-nv4-tuan-1.md` | `READ_NORMALIZED_REDACTED`; bản Drive mới nhất là canonical; tên cá nhân không cần thiết đã được khử. |
 | SRC-LOCAL-NV4-001 | Hai snapshot local ngày 17/09/2026 | ARCHIVE | `source/raw/_archive/NghiepVu/` | `source/markdown/NghiepVu/nv4-tuan-1-local-snapshot-manifest.md` | `ARCHIVED_NON_CANONICAL`; chỉ đối chiếu lịch sử. |
@@ -57,4 +57,4 @@ Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ ch�
 
 Các nguồn thiết yếu Tuần 1 đã được đọc/chuẩn hóa hoặc trích schema an toàn. `SRC-DS-KYSO-001` không cần sao chép vì không bổ sung cấu trúc ngoài Mẫu 4. Đoạn OCR không chắc, ngày mẫu có xung đột và dữ liệu PII không được dùng xác lập rule.
 
-Project Context Baseline canonical: `docs/00-sources/project-context-baseline.md`; baseline đã được đối chiếu với sổ nguồn, 18 câu hỏi và các xung đột trước khi thiết kế CSDL.
+Chỉ đạo ngày 20/09 là mốc lịch sử, không còn là mô tả đầy đủ phạm vi hiện tại. Xem [README](../../README.md) để biết phạm vi và trạng thái sản phẩm; xem [quyết định dự án](../decisions/quyet-dinh-du-an-2026-09-25.md) và [18 câu hỏi GVHD](../requirements/18-cau-hoi-gvhd-mapping.md) để tra lựa chọn nghiệp vụ. Nguồn chính thức của Trường/Khoa vẫn có ưu tiên cao hơn quyết định thiết kế dự án.

@@ -1,6 +1,6 @@
--- KLTN PostgreSQL schema, Alembic revision 20260925_0007.
+-- KLTN PostgreSQL database baseline, Alembic revision 20260925_0007.
 -- Chạy một lần trên database PostgreSQL mới và trống.
--- Không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
+-- Tạo schema và nạp rubric Mẫu 6 DRAFT; không có dữ liệu sinh viên/đề tài/hồ sơ.
 -- Database đã có bảng phải cập nhật bằng Alembic migration, không chạy lại file này.
 BEGIN;
 
