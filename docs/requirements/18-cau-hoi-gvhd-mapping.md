@@ -67,7 +67,9 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Entity/data:** Thesis, ThesisMember, TopicRegistration.
 - **Trạng thái:** `CONFIRMED` cho giới hạn/nhóm trưởng; `CONFIRMED_PROJECT_DECISION` cho khóa thành viên từ khi gửi.
 - **Làm rõ trong thiết kế ngày 25/09:** Không ghép thêm SV sau khi đăng ký; SV tự ghép nhóm trước khi gửi và giảng viên không tự thêm người. Mô hình/endpoint không cho sửa membership hậu SUBMITTED.
+- **Làm rõ mới nhất:** Mỗi thành viên phải tự xác nhận bằng tài khoản của mình trước khi gửi. Nếu nhóm do SV đề xuất đề tài, nhóm đăng ký trước; TBM xét nội dung đề tài sau.
 - **Chưa rõ:** Không còn câu hỏi ghép thêm trong phạm vi hiện tại.
+- **Trạng thái triển khai:** Migration 0007 lưu phản hồi và người/thời điểm xác nhận; prototype API/UI chưa buộc từng SV xác nhận và chưa hỗ trợ nhánh đề tài SV đề xuất. Đây là phần code còn thiếu, không phải quyết định nghiệp vụ còn mở.
 
 ## 6. Điểm riêng hay chung cho nhóm
 
@@ -244,14 +246,19 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Chưa rõ:** Văn bản tổ chức về nhà cung cấp/retention và danh mục tài liệu cấm gửi nếu có.
 - **Ghi chú thiết kế:** Chỉ gửi đoạn tài liệu đã được kiểm quyền và giảm PII, giữ citation/source/version và nhật ký truy xuất; cần Khoa xác nhận chính sách nhà cung cấp/retention trước khi gửi dữ liệu thuộc diện hạn chế.
 
-## Làm rõ từ quyết định thiết kế ngày 25/09/2026
+## Làm rõ từ các quyết định thiết kế cập nhật đến ngày 28/09/2026
 
-Đây là **làm rõ trong quyết định thiết kế**, không chép lại hay sửa nội dung trả lời GVHD gốc. Nguồn: SRC-PROJECT-DEC-20260925.
+Đây là **làm rõ trong quyết định thiết kế**, không chép lại hay sửa nội dung trả lời GVHD gốc. Quyết định được xác nhận trong các trao đổi từ ngày 25 đến 28/09/2026 và lưu tại `docs/decisions/quyet-dinh-du-an-2026-09-25.md`. Bảng dưới tách quyết định đã chốt khỏi việc phần mềm đã làm tới đâu.
 
-| Liên quan câu | Điều đã chốt | Còn mở |
+| Liên quan câu | Quyết định thiết kế đã chốt | Trạng thái triển khai hoặc điều kiện còn lại |
 | --- | --- | --- |
-| 2, 5 | SV tự lập nhóm 1–3 và gửi đăng ký; GV không ghép/thêm tùy ý; thành viên khóa khi gửi. TBM chốt sau GV đề xuất chấp nhận. | Không thêm/đổi người sau gửi. Theo làm rõ mới, từng thành viên phải tự xác nhận bằng tài khoản của mình trước khi gửi; đề tài SV đề xuất được đăng ký trước rồi TBM xét sau. Hai nhánh runtime này chưa được triển khai. |
-| 2, 7 | Điều phối viên KLTN theo round/Khoa khác Thư ký Hội đồng theo quyết định; cùng user có thể có hai assignment. GVHD theo dõi tiến độ luận văn đã phân công. | Ngày cụ thể cấu hình theo đợt từ lịch được duyệt. |
-| 12, 14 | Upload không bị similarity threshold chặn; kiểm tra sau upload chỉ advisory cho tới khi metric/version được duyệt. Điều kiện bảo vệ là nhiều yếu tố. | Baseline advisory, không auto-gate; đợt hiện tại không thêm điều kiện riêng Khoa; không suy ra cosine 0,9 = 90%. |
-| 15, 16 | Mẫu 9 đòi chữ ký Chủ tịch và Thư ký đúng Hội đồng; không mặc định TBM ký Mẫu 9. | Được sửa/in version mới khi giấy chưa ai ký; từ chữ ký đầu không sửa. Export runtime chờ mẫu trắng. |
-| 1, 17, 18 | Corpus tách THESIS/CAPSTONE_PROJECT/TERM_PROJECT/COURSE_PROJECT/REGULATION/FORM/GUIDELINE/SYNTHETIC_TEST, giữ nguồn/phiên bản/quyền. Chatbot có thể truy xuất quy định/biểu mẫu được phép; chưa có Gemini key thì retrieval-only. | APA/QĐ885 là baseline dự án; Khoa xác nhận hiệu lực trước auto-reject; chất lượng AI chưa kết luận với khoảng 7 KLTN. |
+| 2, 5 | SV tự lập nhóm 1–3; mỗi thành viên tự xác nhận bằng tài khoản riêng trước khi gửi; không ghép/thêm người sau khi gửi. Với đề tài SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài sau. Với đề tài GV đã duyệt, GV đề xuất nhận/từ chối trước khi TBM chốt. | Migration 0007 lưu được phản hồi thành viên, nhưng API/UI chưa yêu cầu đủ xác nhận và chưa hỗ trợ nhánh SV đề xuất. Chưa dùng prototype hiện tại để đăng ký thật. |
+| 2, 7, 8 | Khoa giao người `ELIGIBILITY_VERIFIER` theo đợt để đối chiếu nguồn Phòng Đào tạo rồi xác nhận snapshot; TBM đúng Bộ môn kiểm chứng chuyên môn GV bằng minh chứng, còn hồ sơ tự khai của TBM do Trưởng khoa/người được giao kiểm. Điều phối viên KLTN khác Thư ký Hội đồng. TBM đúng Bộ môn chốt phân công GVHD. | Người thật, lịch và scope phân quyền phải được Khoa phân công. API xác nhận snapshot, kiểm chứng chuyên môn và quản lý assignment đầy đủ chưa chạy. |
+| 10 | GVHD quản lý tiến độ; lần 1 góp ý đề cương, lần 2 dự kiến tháng 12 khoảng 70% để GVHD khác góp ý chéo `COMMENT_ONLY`. | Luồng báo cáo/duyệt tiến độ chưa chạy. Ngày/giờ và người tham gia mỗi đợt lấy từ kế hoạch/phân công được duyệt. |
+| 11, 14 | Thay đổi đề tài đi theo workflow; rút/gia hạn ghi kết quả thủ tục ngoài. Đợt hiện tại chỉ dùng Điều 7 QĐ2919 để xét bảo vệ, không thêm điều kiện riêng của Khoa. | Runtime thay đổi đề tài, snapshot điều kiện và người xác nhận thật chưa đầy đủ. Danh sách, thời điểm khóa và kết quả thủ tục ngoài lấy theo nguồn được duyệt. |
+| Quyết định similarity | Kiểm tra tương đồng chỉ là thông tin tham khảo; không tự chặn nộp/bảo vệ và không gọi cosine 0,9 là 90% giống. | Chưa đánh giá trên tập văn bản được phép, chưa có metric/ngưỡng được duyệt và chưa có kiểm tra toàn văn đủ chuẩn. |
+| 12, 17, 18 | Người dùng được truy xuất nội dung đã công bố theo quyền; chatbot trả nguồn/link. Thiết kế APA theo QĐ885 là baseline; lần thử hiện dùng retrieval-only, chưa cần Gemini. | Cần xác định quyền công bố/tải và chính sách gửi dữ liệu/retention. Khoa xác nhận APA có áp dụng cho KLTN đại học trước khi bật auto-reject; chưa đánh giá chất lượng AI trên khoảng 7 KLTN thật. |
+| 15 | Được sửa sau khi in nếu chưa có chữ ký; Thư ký đối chiếu giấy, bản cũ được đánh dấu hết hiệu lực và phát hành phiên bản mới có dấu vết. Từ chữ ký đầu tiên khóa điểm/nội dung. | Quy tắc đã chốt nhưng service/versioning và kiểm thử runtime chưa có. |
+| 15, Mẫu 9 | Biên bản họp Hội đồng chấm KLTN/ĐATN có Chủ tịch và Thư ký ký; không gán TBM thay vai trò này. | Chưa có mẫu trắng chính thức để kiểm xuất. Không dùng bản đã điền thông tin thật làm template hoặc đưa lên Git. |
+| 16 | Baseline thiết kế Mẫu 6 Khoa 2/4/4, 12 tiêu chí con, thưởng tối đa 1 và tổng không quá 10. | Rubric đang `DRAFT`; cơ cấu này khác QĐ2919. Cần xác nhận mẫu có hiệu lực trước khi dùng chấm thật. |
+| 1, 17, 18 | APA theo QĐ885 là baseline thiết kế. Kho phân loại nguồn và chatbot chỉ truy xuất tài liệu được quyền xem, có nguồn trích dẫn; bản thử nghiệm chưa cần Gemini. | Cần xác nhận phạm vi áp dụng APA cho KLTN đại học, chính sách quyền công bố/PII và việc gửi nội dung tới nhà cung cấp AI. Chất lượng chưa được đánh giá trên khoảng 7 KLTN thật. |
