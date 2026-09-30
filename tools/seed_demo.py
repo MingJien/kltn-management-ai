@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import create_engine, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import load_local_env
@@ -33,6 +34,10 @@ def ensure(session: Session, cls, identity_key: str, **values):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true", help="Actually insert synthetic demo records")
+    parser.add_argument(
+        "--database", choices=("kltn_dev",), default="kltn_dev",
+        help="Development database that receives demo records (default: kltn_dev)",
+    )
     args = parser.parse_args()
     load_local_env()
     if not args.execute:
@@ -42,7 +47,8 @@ def main() -> None:
         parser.error("KLTN_ENV must be development or test")
     if not os.getenv("DATABASE_URL"):
         parser.error("DATABASE_URL is missing")
-    engine = create_engine(os.environ["DATABASE_URL"])
+    database_url = make_url(os.environ["DATABASE_URL"]).set(database=args.database)
+    engine = create_engine(database_url)
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
@@ -101,7 +107,7 @@ def main() -> None:
                proposer_user_id=lecturer_users[0].id, proposer_type="LECTURER",
                current_title="Đề tài quản lý KLTN giả lập", max_students=3, state="APPROVED")
     engine.dispose()
-    print("Synthetic demo users only:")
+    print(f"Synthetic demo users in {args.database}:")
     for label, user in [
         ("SV 1", student_users[0]), ("SV 2", student_users[1]),
         ("SV 3", student_users[2]), ("GV de xuat", lecturer_users[0]),

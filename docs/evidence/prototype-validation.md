@@ -54,18 +54,16 @@ Các giới hạn này được giữ trong README/thiết kế để người x
 
 ## Kiểm chứng bổ sung ngày 30/09/2026
 
-Lần chạy này kết nối trực tiếp tới `kltn_ai` trên PostgreSQL 17.11 tại `127.0.0.1:5432`, bằng `kltn_app`; Alembic revision là `20260925_0007`. CSDL có 63 bảng vật lý/618 cột. Trước khi seed, các bảng nghiệp vụ đăng ký và người dùng demo còn rỗng; rubric Mẫu 6 đã có 1 template DRAFT và 16 tiêu chí do migration tạo.
+CSDL demo được xác minh là `kltn_dev` trên PostgreSQL 17.11, user `kltn_app`, port 5432. Tiến trình kiểm tra được cấu hình tạm để nhắm đúng database này; `.env` không bị sửa. `kltn_ai` và `kltn_dev` đều ở Alembic revision `20260925_0007`, mỗi database có 63 bảng vật lý/618 cột.
 
-| Kiểm tra thực chạy | Kết quả |
+| Kiểm tra thực chạy trên `kltn_dev` | Kết quả |
 | --- | --- |
-| `alembic current` | PASS, `20260925_0007 (head)` trên `kltn_ai` |
-| `alembic check` | PASS, không có upgrade operation mới |
-| `backend.db.validate_schema` | PASS, DB-01..42; dữ liệu kiểm tra được rollback |
-| `pytest tests -q --basetemp .\tmp\pytest-run-20260930-nv4demo-01 -p no:cacheprovider` | PASS, 8 test; 1 cảnh báo tương thích `TestClient/httpx` |
-| `tools.seed_demo --execute` | PASS khi đặt `KLTN_ENV=development` trong phiên PowerShell; sinh 5 tài khoản, 3 hồ sơ SV, 2 GV, 1 đợt, 3 snapshot đủ điều kiện và 1 đề tài giả. Chạy lại không nhân đôi bản ghi; thời gian mở/đóng của đợt demo được làm mới. |
-| API smoke test sau seed | PASS: tài khoản SV/GV/TBM giả đều lấy được ngữ cảnh (HTTP 200); SV thấy 1 đề tài và 0 đăng ký nhóm. Chỉ chạy GET, không ghi thêm dữ liệu. |
+| Alembic current/check | PASS, `20260925_0007 (head)`; không có upgrade operation mới |
+| `backend.db.validate_schema` | PASS DB-01..42; dữ liệu kiểm tra được rollback |
+| `pytest tests -q --basetemp .\tmp\pytest-run-20260930-kltn-dev-01 -p no:cacheprovider` | PASS, 8 test; 1 cảnh báo tương thích `TestClient/httpx` của Starlette |
+| Bộ seed demo | PASS, 5 tài khoản, 3 hồ sơ SV, 2 GV, 1 đợt, 3 snapshot điều kiện, 1 đề tài giả; chưa tạo đăng ký nhóm hoặc Thesis |
+| API GET với UUID giả lập SV/GV/TBM | PASS, `/health/ready`, `/api/v1/me/context` và `/api/v1/topics` trả HTTP 200; SV thấy một đề tài và 0 đăng ký |
+| `topic_registration` sau kiểm tra GET | 0 row |
 | `git diff --check` | PASS |
 
-Seed không ghi `KLTN_ENV` vào `.env`; biến chỉ áp dụng cho lệnh hiện tại. Lần chạy đầu transaction đã commit nhưng phần in UUID kết thúc lỗi do Python Windows không mã hóa được nhãn tiếng Việt trong console cp1258. Nhãn đầu ra đã đổi sang ASCII, sau đó lệnh chạy lại thành công và xác nhận không tạo bản ghi trùng. Bộ kiểm tra cũng được sửa để dùng lại mã chức danh chuẩn đã có hoặc tạo chúng trong transaction rollback; trước đó test chèn trùng `DEPARTMENT_HEAD` trên CSDL đã seed. Thư mục pytest mặc định của Windows bị từ chối quyền truy cập, nên lần kiểm tra dùng thư mục tạm mới bên trong `D:\KLTN\tmp` và tắt pytest cache.
-
-Seed mới chỉ tạo dữ liệu thử cho prototype trên CSDL local. Chưa chạy lại browser end-to-end sau seed; chưa có luồng từng thành viên tự xác nhận, đề tài do SV đề xuất, SSO thật, tiến độ, chấm điểm runtime hoặc xuất Mẫu 9 đúng biểu mẫu.
+Bộ demo chỉ dùng dữ liệu tổng hợp. Endpoint prototype hiện trình diễn tra cứu đề tài và lát cắt đăng ký đề tài do giảng viên đề xuất; giao diện chưa thực hiện từng thành viên tự xác nhận, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9. Trình diễn trên giao diện sau seed vẫn cần kiểm tra thủ công trước khi báo cáo hoàn tất NV4.
