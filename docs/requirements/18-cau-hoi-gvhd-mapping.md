@@ -215,9 +215,9 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Actor/quyền:** Thành viên HĐ chấm; TBM/Khoa quản lý rubric version theo thẩm quyền.
 - **Use Case:** UC-RUBRIC-001, UC-EVAL-002.
 - **Entity/data:** RubricTemplate, RubricCriterion, EvaluationItem, BonusEvidence.
-- **Trạng thái:** `CONFIRMED` baseline thiết kế Mẫu 6; Cần Khoa xác nhận hiệu lực Mẫu 6 do cơ cấu khác QĐ2919 trước khi vận hành chấm thật.
-- **Chưa rõ:** Khoa xác nhận hiệu lực Mẫu 6 so với QĐ 2919 và version áp dụng cho từng đợt.
-- **Quyết định phạm vi thiết kế:** Thiết kế hiện chọn đầy đủ Mẫu 6 của Khoa, cơ cấu 2/4/4 + thưởng tối đa 1 nhưng tổng không quá 10. CONFLICT-011 vẫn cần căn cứ phê duyệt nếu dùng làm phiếu chấm thật trái cơ cấu trong QĐ2919.
+- **Trạng thái:** `CONFIRMED` — Mẫu 6 Khoa 2/4/4, đủ 12 tiêu chí con, thưởng tối đa 1 và tổng phiếu không quá 10 là baseline của dự án. Không còn quyết định thiết kế mở ở mục này.
+- **Tình trạng triển khai:** Rubric trong CSDL ở `DRAFT` vì chưa có runtime chấm điểm và chưa gán version cho đợt chấm thật; đây là trạng thái chức năng, không phải chờ chọn lại cơ cấu.
+- **Truy vết nguồn:** QĐ2919 có mô tả cơ cấu khác; giữ khác biệt trong `CONFLICT-011` để không làm mất căn cứ nguồn. Nếu Khoa ban hành biểu mẫu mới, thêm version mới và giữ lịch sử.
 
 ## 17. Phạm vi kho và AI được khai thác
 
@@ -260,5 +260,5 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 | 12, 17, 18 | Người dùng được truy xuất nội dung đã công bố theo quyền; chatbot trả nguồn/link. Thiết kế APA theo QĐ885 là baseline; lần thử hiện dùng retrieval-only, chưa cần Gemini. | Cần xác định quyền công bố/tải và chính sách gửi dữ liệu/retention. Khoa xác nhận APA có áp dụng cho KLTN đại học trước khi bật auto-reject; chưa đánh giá chất lượng AI trên khoảng 7 KLTN thật. |
 | 15 | Được sửa sau khi in nếu chưa có chữ ký; Thư ký đối chiếu giấy, bản cũ được đánh dấu hết hiệu lực và phát hành phiên bản mới có dấu vết. Từ chữ ký đầu tiên khóa điểm/nội dung. | Quy tắc đã chốt nhưng service/versioning và kiểm thử runtime chưa có. |
 | 15, Mẫu 9 | Biên bản họp Hội đồng chấm KLTN/ĐATN có Chủ tịch và Thư ký ký; không gán TBM thay vai trò này. | Chưa có mẫu trắng chính thức để kiểm xuất. Không dùng bản đã điền thông tin thật làm template hoặc đưa lên Git. |
-| 16 | Baseline thiết kế Mẫu 6 Khoa 2/4/4, 12 tiêu chí con, thưởng tối đa 1 và tổng không quá 10. | Rubric đang `DRAFT`; cơ cấu này khác QĐ2919. Cần xác nhận mẫu có hiệu lực trước khi dùng chấm thật. |
+| 16 | Baseline Mẫu 6 của Khoa đã chốt: 2/4/4, 12 tiêu chí con, thưởng tối đa 1, tổng phiếu không quá 10. | `DRAFT` chỉ vì runtime chấm điểm/gán version cho đợt thật chưa được triển khai; không còn câu hỏi thiết kế chờ trả lời. |
 | 1, 17, 18 | APA theo QĐ885 là baseline thiết kế. Kho phân loại nguồn và chatbot chỉ truy xuất tài liệu được quyền xem, có nguồn trích dẫn; bản thử nghiệm chưa cần Gemini. | Cần xác nhận phạm vi áp dụng APA cho KLTN đại học, chính sách quyền công bố/PII và việc gửi nội dung tới nhà cung cấp AI. Chất lượng chưa được đánh giá trên khoảng 7 KLTN thật. |

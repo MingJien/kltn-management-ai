@@ -1,6 +1,6 @@
 # Rubric Mẫu 6 — baseline dữ liệu
 
-Migration [`20260925_0006_mau6_baseline.py`](../../backend/migrations/versions/20260925_0006_mau6_baseline.py) nạp bản thiết kế từ `SRC-MAU-06` vào `rubric_template` và `rubric_criterion`. `code=MAU-06-HOIDONG`, `version_no=1`, `state=DRAFT`. DRAFT nghĩa là **chưa được gắn vào đợt hoặc phiên chấm thật**; Khoa phải xác nhận hiệu lực vì QĐ 2919 nêu cơ cấu khác.
+Migration [`20260925_0006_mau6_baseline.py`](../../backend/migrations/versions/20260925_0006_mau6_baseline.py) nạp baseline thiết kế từ `SRC-MAU-06` vào `rubric_template` và `rubric_criterion`. `code=MAU-06-HOIDONG`, `version_no=1`, `state=DRAFT`. DRAFT nghĩa là **chưa được gắn vào đợt hoặc phiên chấm thật** vì runtime chấm điểm/gán rubric theo đợt chưa triển khai. Mẫu 6 (2/4/4, thưởng tối đa 1, tổng tối đa 10) là baseline thiết kế đã chốt của dự án; khác biệt nguồn với QĐ2919 được lưu để truy vết, không làm mở lại lựa chọn baseline.
 
 | Mã | Nhóm cha | Nội dung tiêu chí | Điểm tối đa | Kiểu |
 | --- | --- | --- | ---: | --- |

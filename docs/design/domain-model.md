@@ -27,7 +27,7 @@
 | Tương đồng | SimilarityPolicy, SimilarityCheck, SimilarityMatch | Policy/metric có version; bằng chứng lexical/semantic | REQ-SIM-001..003 |
 | Hội đồng | Council, CouncilMember, DefenseSession, SessionThesis, CouncilAttendance | Hội đồng theo quyết định; nhiều phiên/KLTN; attendance/quorum | REQ-COUNCIL-001..003 |
 | Nhận xét | AdvisorReview, ReviewerReview | Phiếu Mẫu 7/8 theo assignment/version | REQ-EVAL-001 |
-| Chấm điểm | RubricTemplate, RubricCriterion(parent_id), RubricAssignment, Evaluation, EvaluationItem, BonusEvidence, FinalResult | Chấm từng SV; rubric Mẫu 6 gồm ba nhóm 2/4/4 và 12 tiêu chí con, group không cộng lặp; bonus ≤1, tổng phiếu ≤10; trung bình/làm tròn | REQ-EVAL-002..003; xác nhận mẫu có hiệu lực trước chấm thật |
+| Chấm điểm | RubricTemplate, RubricCriterion(parent_id), RubricAssignment, Evaluation, EvaluationItem, BonusEvidence, FinalResult | Chấm từng SV; rubric Mẫu 6 gồm ba nhóm 2/4/4 và 12 tiêu chí con, group không cộng lặp; bonus ≤1, tổng phiếu ≤10; trung bình/làm tròn | REQ-EVAL-002..003; baseline Mẫu 6 đã chốt, chấm thật cần runtime và version theo đợt |
 | Biên bản | CouncilMinute, MinuteVersion, MinuteSignature | Thư ký lập/version/void và ký; Chủ tịch cùng ký; khóa sau đủ hai chữ ký | REQ-MIN-001..002 |
 | Kho/RAG | RepositoryItem, SearchIndexMetadata, RetrievalAudit | Metadata công bố, visibility/index version, retrieval audit | REQ-REPO-001, REQ-AI-001..002 |
 | Kiểm soát | AuditEvent | Dấu vết thay đổi nhạy cảm, không chứa body/PII | BR-AUDIT-001, `PROPOSED` control |

@@ -15,7 +15,7 @@
 | Tài liệu/version | QĐ 2919, Mẫu 3 | REQ-DOC-001 | BR-DOC-001 | UC-DOC-001 | — |
 | Tương đồng | GVHD, quyết định dự án | REQ-SIM-001..003 | BR-SIM-001..003 | UC-SIM-001 | Baseline advisory |
 | Hội đồng/phiên/attendance | QĐ 2919, GVHD, Mẫu 4/9 | REQ-COUNCIL-001..003 | BR-COUNCIL-001..002 | UC-COUNCIL-001, UC-SESSION-001 | — |
-| Nhận xét/rubric/chấm | Mẫu 6/7/8, QĐ 2919, IN4299N | REQ-EVAL-001..003 | BR-EVAL-001..003 | UC-EVAL-001..003, UC-RUBRIC-001 | Khoa xác nhận trước chấm thật; CONFLICT-011 |
+| Nhận xét/rubric/chấm | Mẫu 6/7/8, QĐ 2919, IN4299N | REQ-EVAL-001..003 | BR-EVAL-001..003 | UC-EVAL-001..003, UC-RUBRIC-001 | Baseline Mẫu 6 của dự án đã chốt; runtime chấm thật chưa triển khai |
 | Biên bản | QĐ 2919, GVHD, Mẫu 9 | REQ-MIN-001..002 | BR-MIN-001..002 | UC-MIN-001/002 | Sửa sau in trước chữ ký đầu; CONFLICT-009 đã chốt Mẫu 9 |
 | Kho và AI | GVHD, QĐ 2919, quyết định dự án | REQ-REPO-001, REQ-AI-001..002 | BR-REPO-001, BR-AI-001..002 | UC-REPO-001, UC-AI-001 | chính sách Trường về Gemini chưa có nhưng không cản design |
 | Báo cáo | Mẫu 4/10/11, IN4299N | REQ-RPT-001 | BR-AUDIT-001 | UC-RPT-001 | — |
