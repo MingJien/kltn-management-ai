@@ -17,7 +17,7 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 
 ## Trạng thái thực tế
 
-- CSDL local hiện được cấu hình là `kltn_ai` trên PostgreSQL 17.11, cổng 5432, revision `20260925_0007`: **62 bảng mô hình/617 cột**, hoặc **63 bảng vật lý/618 cột** nếu tính `alembic_version`. Ngày 30/09 đã nạp bộ dữ liệu giả cho prototype (5 tài khoản, 3 sinh viên, 2 giảng viên, 1 đợt, 1 đề tài); chưa có đăng ký nhóm hay Thesis. `kltn_dev` vẫn là database riêng cùng revision, không phải đích cấu hình hiện tại. Các migration cũ 0001/0002 không sửa; rubric Mẫu 6 ở DRAFT; migration 0007 lưu được phản hồi thành viên nhưng prototype đăng ký chưa buộc từng SV tự xác nhận.
+- Hai database local cùng ở PostgreSQL 17.11, revision `20260925_0007`, **63 bảng vật lý/618 cột** (`62 bảng mô hình/617 cột` cộng `alembic_version`). `kltn_ai` là database chính để theo dõi schema; `kltn_dev` là database phát triển để chạy prototype với dữ liệu giả. Bộ seed tạo 5 tài khoản, 3 sinh viên, 2 giảng viên, 1 đợt, 3 snapshot điều kiện và 1 đề tài; chưa tạo đăng ký nhóm hoặc Thesis. Migration 0007 lưu được phản hồi thành viên, nhưng runtime chưa bắt từng SV tự xác nhận.
 - Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..42 PASS, gồm COMMENT_ONLY cho góp ý chéo và đầy đủ baseline Mẫu 6.
 - Prototype API chạy lát cắt SV gửi nhóm 1–3 cho đề tài GV đã duyệt → giảng viên đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm bị từ chối có thể đăng ký lại; đề tài đã chốt bị khóa. 8 pytest PASS, gồm kiểm luồng trên PostgreSQL và 5 tình huống similarity giả lập.
 - React có màn đề tài, đăng ký/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. Build/typecheck PASS. Đã chạy trình duyệt với schema PostgreSQL tạm và tài khoản giả lập: SV gửi nhóm 2 người → GV chấp nhận → TBM chốt → React hiển thị Thesis ACTIVE; schema tạm đã xóa.
@@ -51,27 +51,25 @@ py -m venv .venv
 
 Để dựng database mới, mở `database/kltn-db-baseline.sql` và chạy toàn bộ file trên **database mới, trống**. Để xem bảng/cột/khóa, dùng các truy vấn chỉ đọc trong `database/kltn-ai-workbench.sql`. Với database đã có bảng, dùng Alembic migration trong `backend/migrations/versions/`; không chạy lại file baseline.
 
-**3. Tạo dữ liệu demo tùy chọn.** Chỉ chạy trên database phát triển mà bạn cho phép chứa dữ liệu **giả lập**:
+**3. Tạo dữ liệu demo tùy chọn.** Lệnh dưới đây luôn nhắm `kltn_dev`, kể cả khi `.env` đang trỏ `kltn_ai`. Chỉ chạy trên database phát triển:
 
 ```powershell
 $env:KLTN_ENV = 'development'
 try {
-    .\.venv\Scripts\python.exe -m tools.seed_demo --execute
+    .\.venv\Scripts\python.exe -m tools.seed_demo --execute --database kltn_dev
 } finally {
     Remove-Item Env:KLTN_ENV -ErrorAction SilentlyContinue
 }
 ```
 
-`KLTN_ENV` chỉ tồn tại trong lần chạy này. Lệnh in UUID của SV1–SV3, GV đề xuất và TBM. Chạy lại không tạo bản ghi trùng, nhưng sẽ làm mới thời gian mở/đóng của đợt demo. Không chạy trên database chứa dữ liệu thật. Bộ test tự động tạo dữ liệu giả riêng trong transaction rồi rollback.
+`KLTN_ENV` chỉ tồn tại trong lần chạy này. Lệnh in UUID của SV1–SV3, GV đề xuất và TBM. Chạy lại không tạo bản ghi trùng, nhưng sẽ làm mới thời gian mở/đóng của đợt demo. Bộ test tự động tạo dữ liệu giả riêng trong transaction rồi rollback.
 
 **4. Chạy API và React** trong hai terminal riêng.
 
-Terminal 1 — backend API:
+Terminal 1 — backend API dùng dữ liệu demo từ `kltn_dev` (không đổi `.env`):
 
 ```powershell
-$env:KLTN_ENV = 'development'
-$env:KLTN_DEV_AUTH = 'true'
-.\.venv\Scripts\python.exe -m uvicorn backend.api.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m tools.run_demo_api
 ```
 
 Terminal 2 — giao diện React (chạy `npm ci` lần đầu hoặc khi lockfile đổi):
@@ -81,7 +79,7 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Chạy API và giao diện ở hai terminal riêng; chỉ terminal API cần hai biến trên. Khi dừng API bằng Ctrl+C, gõ `Remove-Item Env:KLTN_ENV, Env:KLTN_DEV_AUTH -ErrorAction SilentlyContinue` trong terminal đó. Mở `http://127.0.0.1:5173`, nhập UUID demo để chọn đề tài, gửi nhóm, đổi sang UUID GV để chấp nhận, rồi UUID TBM để chốt. Swagger ở `http://127.0.0.1:8000/docs`. Prototype dùng header phát triển; production trả 503 cho header này cho tới khi tích hợp SSO.
+Chạy API và giao diện ở hai terminal riêng. Tiến trình API tự chọn `kltn_dev` và chỉ bật UUID giả lập trong tiến trình đó. Mở `http://127.0.0.1:5173`, nhập UUID demo để xem đề tài. Swagger ở `http://127.0.0.1:8000/docs`. Prototype dùng header phát triển; production trả 503 cho header này cho tới khi tích hợp SSO.
 
 **5. Thử AI không có Docker.** Đặt `QDRANT_LOCAL_PATH=tmp/qdrant-prototype` và bỏ/để trống `QDRANT_URL` trong `.env`, rồi chạy:
 
