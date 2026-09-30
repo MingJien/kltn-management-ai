@@ -1,19 +1,18 @@
 # Đối chiếu 18 câu hỏi GVHD
 
-Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả lời là một đoạn liên tục, không đánh số theo câu hỏi; mapping dưới đây chỉ gắn nội dung khi có căn cứ ngữ nghĩa rõ. Các lựa chọn thiết kế được chốt sau buổi làm rõ được ghi `CONFIRMED_PROJECT_DECISION`, không gán cho GVHD.
+Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả lời là một đoạn liên tục, không đánh số theo câu hỏi
 
 ## 1. Còn quy trình/hướng dẫn/biểu mẫu nội bộ nào khác?
 
 - **Câu hỏi:** Ngoài quy định chung và file Drive, Khoa còn quy trình, hướng dẫn, biểu mẫu hoặc báo cáo nội bộ nào cần bám theo?
-- **Trả lời thực tế:** Đoạn trả lời mô tả quy trình vận hành, nhắc phiếu nhận xét GVHD/GVPB, phiếu chấm, biên bản, bảng điểm và cụm “Có mẫu 3 (4 sau này)”; chưa liệt kê một bộ tài liệu nội bộ bổ sung hoàn chỉnh.
-- **Kết luận chắc chắn:** Bộ Drive hiện có là nguồn làm việc; các biểu mẫu 1a–11 đã được kiểm kê. Không được khẳng định không còn tài liệu khác.
+- **Trả lời thực tế:** Đoạn trả lời mô tả quy trình vận hành, nhắc phiếu nhận xét GVHD/GVPB, phiếu chấm, biên bản, bảng điểm 
+- **Kết luận chắc chắn:** Bộ Drive hiện tại https://drive.google.com/drive/folders/1cqHQJiAM8gZyMwssqx3ur5fAR1upEiVX?usp=sharing hiện có là nguồn làm việc; các biểu mẫu 1a–11 
 - **Requirement:** REQ-EVAL-001, REQ-MIN-001, REQ-RPT-001.
 - **Business Rule:** BR-AUDIT-001.
 - **Actor/quyền:** GVHD, GVPB, Thư ký, Chủ tịch; quyền theo assignment.
 - **Use Case:** UC-RPT-001, UC-EVAL-001, UC-MIN-001.
 - **Entity/data:** SourceRecord, ReviewForm, CouncilMinute, FinalResult.
 - **Trạng thái:** Đã kiểm kê bộ nguồn Drive hiện có; nếu Khoa cung cấp thêm biểu mẫu thì đối chiếu và phiên bản hóa.
-- **Chưa rõ:** “Mẫu 3 (4 sau này)” chỉ mẫu nào và còn báo cáo nội bộ nào chưa có trên Drive.
 
 
 ## 2. Phân trách nhiệm giữa cán bộ KLTN, TBM và Trưởng khoa
@@ -27,7 +26,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-TOPIC-003, UC-ASSIGN-001, UC-PROP-004, UC-COUNCIL-001, UC-MIN-001.
 - **Entity/data:** OrganizationalPosition, PositionAssignment, AdvisorAssignment, CouncilMember, CouncilMinute.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`.
-- **Làm rõ ngày 25/09/2026:** Mẫu 9 là “Biên bản họp Hội đồng chấm khóa luận tốt nghiệp/đồ án tốt nghiệp”, tức biên bản bảo vệ sau chấm điểm. Chủ tịch và Thư ký ký theo đúng biểu mẫu; không gán TBM. Với phạm vi Mẫu 9, quyết định về người ký đã chốt; văn bản khác nếu phát sinh sẽ phân tích riêng.
+** Mẫu 9 là “Biên bản họp Hội đồng chấm khóa luận tốt nghiệp/đồ án tốt nghiệp”, tức biên bản bảo vệ sau chấm điểm. Chủ tịch và Thư ký ký theo đúng biểu mẫu; không gán TBM. Với phạm vi Mẫu 9, quyết định về người ký đã chốt; văn bản khác nếu phát sinh sẽ phân tích riêng.
 
 ## 3. Số đợt KLTN trong năm học
 
@@ -40,7 +39,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-ROUND-001.
 - **Entity/data:** AcademicYear, ThesisRound.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`.
-- **Chưa rõ:** Số đợt bổ sung tối đa và lịch cụ thể từng năm. Kế hoạch hiện dự kiến chỉ một đợt bổ sung; cần Khoa xác nhận trước khi giới hạn cứng.
+- **Cần làm rõ sau hoặc tự thiết kế* Số đợt bổ sung tối đa và lịch cụ thể từng năm. Kế hoạch hiện dự kiến chỉ một đợt bổ sung; cần xác nhận trước khi giới hạn cứng.
 
 ## 4. Một hay nhiều nguyện vọng đề tài
 
@@ -53,28 +52,24 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-REG-001.
 - **Entity/data:** TopicRegistration, StudentProfile, ThesisRound.
 - **Trạng thái:** `CONFIRMED`.
-- **Chưa rõ:** Không.
 
 ## 5. Đăng ký nhóm và ghép thêm SV
 
 - **Câu hỏi:** Nhóm đăng ký ngay từ đầu hay có thể ghép thêm sau?
-- **Trả lời thực tế:** Một đề tài tối đa 3 SV, SV tự đăng ký, có nhóm trưởng nhưng không là chủ nhiệm; không có câu trả lời rõ về ghép thêm sau đăng ký.
-- **Kết luận chắc chắn:** 1–3 SV; coordinator chỉ điều phối. Không suy diễn quyền ghép thêm.
+- **Trả lời thực tế:** Một đề tài tối đa 3 SV, SV tự đăng ký, có nhóm trưởng nhưng không là chủ nhiệm; Không ghép thêm SV sau khi đăng ký; SV tự ghép nhóm trước khi gửi và giảng viên không tự thêm người.( Mô hình/endpoint không cho sửa membership hậu SUBMITTED.)
 - **Requirement:** REQ-REG-002, REQ-REG-005.
 - **Business Rule:** BR-REG-002, BR-REG-005.
 - **Actor/quyền:** SV lập nhóm; GVHD/TBM xem/duyệt theo workflow; không ai có lệnh ghép tự do ở safe default.
 - **Use Case:** UC-REG-002.
 - **Entity/data:** Thesis, ThesisMember, TopicRegistration.
 - **Trạng thái:** `CONFIRMED` cho giới hạn/nhóm trưởng; `CONFIRMED_PROJECT_DECISION` cho khóa thành viên từ khi gửi.
-- **Làm rõ trong thiết kế ngày 25/09:** Không ghép thêm SV sau khi đăng ký; SV tự ghép nhóm trước khi gửi và giảng viên không tự thêm người. Mô hình/endpoint không cho sửa membership hậu SUBMITTED.
-- **Làm rõ mới nhất:** Mỗi thành viên phải tự xác nhận bằng tài khoản của mình trước khi gửi. Nếu nhóm do SV đề xuất đề tài, nhóm đăng ký trước; TBM xét nội dung đề tài sau.
-- **Chưa rõ:** Không còn câu hỏi ghép thêm trong phạm vi hiện tại.
-- **Trạng thái triển khai:** Migration 0007 lưu phản hồi và người/thời điểm xác nhận; prototype API/UI chưa buộc từng SV xác nhận và chưa hỗ trợ nhánh đề tài SV đề xuất. Đây là phần code còn thiếu, không phải quyết định nghiệp vụ còn mở.
+- **Làm rõ thêm:** Mỗi thành viên phải tự xác nhận bằng tài khoản của mình trước khi gửi. Nếu nhóm do SV đề xuất đề tài, nhóm đăng ký trước; TBM xét nội dung đề tài sau.
+- **Trạng thái triển khai:** Migration 0007 lưu phản hồi và người/thời điểm xác nhận; prototype API/UI chưa buộc từng SV xác nhận và chưa hỗ trợ nhánh đề tài SV đề xuất. (Đây là phần code còn thiếu, không phải quyết định nghiệp vụ còn mở.)
 
 ## 6. Điểm riêng hay chung cho nhóm
 
 - **Câu hỏi:** KLTN 2–3 SV được quản lý điểm riêng hay chung?
-- **Trả lời thực tế:** SV tự chia việc dưới sự đồng ý GVHD; GVHD/GVPB đánh giá; cùng khóa luận có thể khác điểm vì phân công và câu hỏi riêng.
+- **Trả lời thực tế:** SV tự chia việc dưới sự đồng ý GVHD; GVHD/GVPB đánh giá; cùng khóa luận có thể khác điểm vì phân công GVPB và câu hỏi riêng.
 - **Kết luận chắc chắn:** Điểm/kết quả theo từng SV; phải lưu work allocation theo thành viên.
 - **Requirement:** REQ-REG-004, REQ-EVAL-002.
 - **Business Rule:** BR-REG-004, BR-EVAL-001..002.
@@ -82,12 +77,12 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-WORK-001, UC-EVAL-002.
 - **Entity/data:** MemberWorkAssignment, Evaluation, FinalResult.
 - **Trạng thái:** `CONFIRMED`.
-- **Chưa rõ:** Trọng số trực tiếp của work allocation trong rubric nếu có.
+- **Chưa rõ:** Trọng số trực tiếp theo mẫu 6(2,4,4,1+, nhưng không quá 10)
 
 ## 7. Ai phê duyệt phân công GVHD
 
 - **Câu hỏi:** Cán bộ KLTN, TBM hay Trưởng khoa phê duyệt chính thức?
-- **Trả lời thực tế:** “Phê duyệt và chốt đề tài, phân công GVHD là Trưởng Bộ môn.”
+- **Trả lời thực tế:** “Phê duyệt và chốt đề tài, phân công GVHD là Trưởng Bộ môn.”(cần thêm chữ ký danh sách ở từng đợt)
 - **Kết luận chắc chắn:** TBM chốt/phân công; Trưởng khoa ký/xác nhận danh sách/văn bản nếu quy trình yêu cầu.
 - **Requirement:** REQ-REG-003.
 - **Business Rule:** BR-REG-003.
@@ -95,12 +90,11 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-ASSIGN-001.
 - **Entity/data:** AdvisorAssignment, PositionAssignment.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`.
-- **Chưa rõ:** Có cần thêm chữ ký danh sách ở từng đợt hay không.
 
 ## 8. Nguồn và người quản lý chuyên môn giảng viên
 
 - **Câu hỏi:** Dữ liệu chuyên môn nào đủ tin cậy, ai quản lý/cập nhật?
-- **Trả lời thực tế:** “GVHD tự khai báo chuyên môn, thì” và dòng rời “Trưởng bộ môn”. Cấu trúc câu không đủ chắc để kết luận TBM là người xác nhận.
+- **Trả lời thực tế:** “GVHD tự khai báo chuyên môn,TBM là người xác nhận.
 - **Kết luận chắc chắn:** Giảng viên tự khai. Câu trả lời gốc chỉ chắc phần GV tự khai; thiết kế hiện chọn TBM đúng Bộ môn kiểm chứng bằng minh chứng, trừ tự khai của TBM thì Trưởng khoa/người được giao kiểm.
 - **Requirement:** REQ-EXP-001.
 - **Business Rule:** tự khai có nhãn SELF_DECLARED; VERIFIED cần minh chứng, actor/time, đúng scope và không tự xác nhận.
@@ -108,8 +102,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-EXP-001.
 - **Entity/data:** LecturerExpertise, ExpertiseEvidence, VerificationStatus.
 - **Trạng thái:** `CONFIRMED_PROJECT_DESIGN`; câu trả lời GVHD gốc vẫn giữ nguyên.
-- **Chưa rõ:** Người cụ thể được Khoa phân công và kỳ rà soát là dữ liệu vận hành từng đợt.
-- **Ghi chú thiết kế:** Đã chọn TBM đúng Bộ môn, chống tự kiểm bằng Trưởng khoa/người được giao; đây là quyết định phần mềm, không giả là văn bản Trường.
+- **Ghi chú thiết kế:** Đã chọn TBM đúng Bộ môn, chống tự kiểm bằng Trưởng khoa/người được giao; đây là quyết định phần mềm
 
 ## 9. Quy trình xét duyệt đề cương
 
@@ -162,7 +155,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-REPO-001.
 - **Entity/data:** RepositoryItem, RepositoryVisibility, SearchIndexMetadata.
 - **Trạng thái:** `CONFIRMED` về nghiệp vụ hiện tại; kiểm soát kỹ thuật `DERIVED`.
-- **Chưa rõ:** Có cho khách chưa đăng nhập và tài liệu nào bị loại khỏi công bố. Mặc định thiết kế: chỉ tài khoản đã đăng nhập và được cấp quyền xem/tải; quyền khách công khai cần Khoa chốt danh mục tài liệu và phạm vi trước khi bật.
+ Mặc định thiết kế: chỉ tài khoản đã đăng nhập và được cấp quyền xem/tải; quyền khách công khai cần Khoa chốt danh mục tài liệu và phạm vi trước khi bật.
 
 ## 13. Một Hội đồng đánh giá bao nhiêu KLTN
 
@@ -180,7 +173,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 ## 14. Điều kiện riêng của Khoa để bảo vệ
 
 - **Câu hỏi:** Ngoài điều kiện Trường, Khoa có điều kiện riêng nào?
-- **Trả lời thực tế:** Không có câu trả lời trực tiếp, tách bạch. Đoạn khác nói GVHD quyết định cho bảo vệ và tương đồng cao phải sửa.
+- **Trả lời thực tế:**. Đoạn khác nói GVHD quyết định cho bảo vệ và tương đồng cao phải sửa.
 - **Kết luận chắc chắn:** Điều kiện cấp Trường lấy từ Điều 7 QĐ 2919: không bị kỷ luật ở mức cấm, hoàn thành KLTN, có GVHD đồng ý bằng văn bản. Điều kiện riêng Khoa vẫn chưa rõ.
 - **Requirement:** REQ-DEF-001, REQ-SIM-003.
 - **Business Rule:** BR-SIM-003.
@@ -203,7 +196,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Entity/data:** Evaluation, EvaluationItem, CouncilMinute, MinuteVersion, AuditEvent.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`: sửa sau in trước chữ ký đầu; từ chữ ký đầu khóa.
 - **Quyết định thiết kế ngày 25/09:** Nếu phát hiện sai sau in nhưng trước chữ ký đầu, Thư ký xác nhận giấy chưa ký, VOID bản cũ, evaluator tự sửa phiếu, hệ thống tính lại và in MinuteVersion mới có mã/giờ, liên kết bản cũ và audit. Sau chữ ký đầu chỉ cấp bản sao đúng bản đã ký.
-- **Chưa rõ:** Mẫu 9 chưa có template trắng an toàn để kiểm runtime; quy tắc thiết kế đã chốt, chức năng xuất/in lại chưa chạy.
+- **Theo mẫu 9:** 
 
 ## 16. Phiếu/rubric đang dùng
 
@@ -217,8 +210,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Entity/data:** RubricTemplate, RubricCriterion, EvaluationItem, BonusEvidence.
 - **Trạng thái:** `CONFIRMED` — Mẫu 6 Khoa 2/4/4, đủ 12 tiêu chí con, thưởng tối đa 1 và tổng phiếu không quá 10 là baseline của dự án. Không còn quyết định thiết kế mở ở mục này.
 - **Tình trạng triển khai:** Rubric trong CSDL ở `DRAFT` vì chưa có runtime chấm điểm và chưa gán version cho đợt chấm thật; đây là trạng thái chức năng, không phải chờ chọn lại cơ cấu.
-- **Truy vết nguồn:** QĐ2919 có mô tả cơ cấu khác; giữ khác biệt trong `CONFLICT-011` để không làm mất căn cứ nguồn. Nếu Khoa ban hành biểu mẫu mới, thêm version mới và giữ lịch sử.
-
+- **Truy vết nguồn:** QĐ2919 có mô tả cơ cấu khác; giữ khác biệt trong `CONFLICT-011` để không làm mất căn cứ nguồn.
 ## 17. Phạm vi kho và AI được khai thác
 
 - **Câu hỏi:** AI/đối tượng khác dùng metadata hay toàn văn; file được xem/tải thế nào?
@@ -235,7 +227,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 ## 18. Có được gửi retrieved chunks sang Gemini?
 
 - **Câu hỏi:** Có được gửi nội dung/đoạn truy xuất sang Gemini hay chỉ metadata/ẩn danh?
-- **Trả lời thực tế:** File GVHD không có câu trả lời riêng, rõ và đủ căn cứ cho việc truyền dữ liệu sang Gemini. Các câu sau chỉ nói chatbot tra cứu/link và phạm vi full text.
+- **Trả lời thực tế:**chatbot tra cứu/link và phạm vi full text.
 - **Kết luận chắc chắn:** Không giả đây là quy định Trường. Thiết kế đã chọn ở cấp thiết kế: authorization trước retrieval, chỉ gửi chunks cần thiết, giảm PII, key backend-only, log an toàn.
 - **Requirement:** REQ-AI-002.
 - **Business Rule:** BR-AI-001.
@@ -248,7 +240,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 ## Làm rõ từ các quyết định thiết kế cập nhật đến ngày 28/09/2026
 
-Đây là **làm rõ trong quyết định thiết kế**, không chép lại hay sửa nội dung trả lời GVHD gốc. Quyết định được xác nhận trong các trao đổi từ ngày 25 đến 28/09/2026 và lưu tại `docs/decisions/quyet-dinh-du-an-2026-09-25.md`. Bảng dưới tách quyết định đã chốt khỏi việc phần mềm đã làm tới đâu.
+Đây là **làm rõ trong quyết định thiết kế**, lưu tại `docs/decisions/quyet-dinh-du-an-2026-09-25.md`.
 
 | Liên quan câu | Quyết định thiết kế đã chốt | Trạng thái triển khai hoặc điều kiện còn lại |
 | --- | --- | --- |
