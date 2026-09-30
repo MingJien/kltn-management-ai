@@ -103,9 +103,9 @@ def main() -> None:
     engine.dispose()
     print("Synthetic demo users only:")
     for label, user in [
-        ("Sinh viên 1", student_users[0]), ("Sinh viên 2", student_users[1]),
-        ("Sinh viên 3", student_users[2]), ("GV đề xuất", lecturer_users[0]),
-        ("Trưởng Bộ môn", lecturer_users[1]),
+        ("SV 1", student_users[0]), ("SV 2", student_users[1]),
+        ("SV 3", student_users[2]), ("GV de xuat", lecturer_users[0]),
+        ("Truong Bo mon", lecturer_users[1]),
     ]:
         print(label, user.id)
 
