@@ -1,11 +1,13 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useParams } from "react-router-dom";
 import {
-  Context, EligibleStudent, Registration, SearchHit, Topic, Thesis, ChatResult, request,
+  AuthenticationMode, Context, EligibleStudent, Registration, SearchHit, Topic, Thesis, ChatResult,
+  request, setDevelopmentAuthEnabled, universityLoginUrl,
 } from "./api";
 
 function App() {
   const [userId, setUserId] = useState(sessionStorage.getItem("kltn-dev-user") || "");
+  const [authMode, setAuthMode] = useState<AuthenticationMode | "loading">("loading");
   const [context, setContext] = useState<Context | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +18,7 @@ function App() {
     try {
       const result = await request<Context>("/me/context", id);
       setContext(result);
-      sessionStorage.setItem("kltn-dev-user", id);
+      if (id) sessionStorage.setItem("kltn-dev-user", id);
     } catch (cause) {
       setContext(null);
       setError(String(cause));
@@ -26,8 +28,28 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (userId) void connect(userId);
-  }, []); // initial session restore only
+    void (async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/auth/config`, { credentials: "include" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const config = await response.json() as { mode: AuthenticationMode };
+        setAuthMode(config.mode);
+        setDevelopmentAuthEnabled(config.mode === "development");
+        if (config.mode === "development" && userId) await connect(userId);
+        if (config.mode === "university_oidc") {
+          try { await connect(""); } catch { /* A signed-in session may not exist yet. */ }
+        }
+      } catch (cause) {
+        setAuthMode("unavailable");
+        setError(`Không kết nối được dịch vụ đăng nhập: ${String(cause)}`);
+      }
+    })();
+  }, []);
+
+  async function signOut() {
+    try { await request<void>("/auth/logout", "", { method: "POST" }); }
+    finally { setContext(null); setUserId(""); sessionStorage.removeItem("kltn-dev-user"); }
+  }
 
   return (
     <div className="app">
@@ -43,19 +65,21 @@ function App() {
         <section className="hero">
           <p className="eyebrow">NỀN TẢNG QUẢN LÝ KHÓA LUẬN</p>
           <h1>Đăng ký đề tài và theo dõi quyết định</h1>
-          <p>Giao diện thử nghiệm nối với PostgreSQL qua FastAPI. Chỉ dùng tài khoản giả lập trong môi trường phát triển.</p>
+          <p>{authMode === "university_oidc" ? "Đăng nhập bằng tài khoản Trường. Hệ thống tự tìm tài khoản KLTN tương ứng." : "Giao diện thử nghiệm nối với PostgreSQL qua FastAPI."}</p>
         </section>
         <section className="identity panel">
-          <div><h2>Ngữ cảnh người dùng</h2><p>Nhập UUID tài khoản thử nghiệm đã có trong database.</p></div>
-          <form onSubmit={(event) => { event.preventDefault(); void connect(userId); }}>
-            <label htmlFor="dev-user">User ID</label>
-            <div className="inline"><input id="dev-user" value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="UUID của tài khoản thử nghiệm" /><button disabled={loading}>Kết nối</button></div>
-          </form>
+          <div><h2>Tài khoản</h2><p>{authMode === "university_oidc" ? "Đăng nhập tập trung qua hệ thống xác thực của Trường." : "Định danh chỉ để thử nghiệm trên máy phát triển."}</p></div>
+          {authMode === "development" && <form onSubmit={(event) => { event.preventDefault(); void connect(userId); }}>
+            <label htmlFor="dev-user">UUID thử nghiệm (chỉ DEV/TEST)</label>
+            <div className="inline"><input id="dev-user" value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="UUID tài khoản giả lập" /><button disabled={loading}>Kết nối</button></div>
+          </form>}
+          {authMode === "university_oidc" && !context && <div><a className="login-button" style={{ display: "inline-flex", alignItems: "center", minHeight: 44, padding: "10px 16px", borderRadius: 8, background: "#0b7380", color: "#fff", fontWeight: 700, textDecoration: "none" }} href={universityLoginUrl()}>Đăng nhập bằng tài khoản Trường</a></div>}
+          {authMode === "unavailable" && <p role="status">Đăng nhập chưa được cấu hình. Liên hệ quản trị hệ thống.</p>}
           {loading && <p role="status">Đang tải…</p>}
           {error && <p className="error" role="alert">{error}</p>}
-          {context && <div className="context"><span className="badge">{context.base_role}</span><code>{context.user_id}</code><span>Quyền: {context.actions.join(", ") || "Chỉ xem"}</span></div>}
+          {context && <div className="context"><span className="badge">{context.base_role}</span><span>Quyền: {context.actions.join(", ") || "Chỉ xem"}</span>{authMode === "university_oidc" && <button className="secondary" onClick={() => void signOut()}>Đăng xuất</button>}</div>}
         </section>
-        {!context ? <section className="panel"><p>Hãy kết nối bằng tài khoản thử nghiệm để xem dữ liệu.</p></section> : (
+        {!context ? <section className="panel"><p>{authMode === "university_oidc" ? "Đăng nhập bằng tài khoản Trường để xem dữ liệu được cấp quyền." : "Hãy kết nối bằng tài khoản thử nghiệm để xem dữ liệu."}</p></section> : (
           <Routes>
             <Route path="/" element={<div className="panel">Chọn <Link to="/topics">Đề tài</Link> để bắt đầu.</div>} />
             <Route path="/topics" element={<Topics userId={context.user_id} context={context} />} />

@@ -6,6 +6,83 @@
     "version": "0.3.0"
   },
   "paths": {
+    "/api/v1/auth/config": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Auth Config",
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Auth Config Api V1 Auth Config Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/callback": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Callback",
+        "operationId": "callback_api_v1_auth_callback_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "summary": "Live",
@@ -46,6 +123,14 @@
       "get": {
         "summary": "Context",
         "operationId": "context_api_v1_me_context_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "X-Dev-User-Id",
@@ -54,8 +139,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -93,6 +177,14 @@
       "get": {
         "summary": "Topics",
         "operationId": "topics_api_v1_topics_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "round_id",
@@ -130,8 +222,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -173,6 +264,14 @@
       "post": {
         "summary": "Register",
         "operationId": "register_api_v1_topic_registrations_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "X-Dev-User-Id",
@@ -181,8 +280,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -248,6 +346,14 @@
       "get": {
         "summary": "Registrations",
         "operationId": "registrations_api_v1_topic_registrations_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "X-Dev-User-Id",
@@ -256,8 +362,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -299,6 +404,14 @@
       "get": {
         "summary": "Registration",
         "operationId": "registration_api_v1_topic_registrations__registration_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -317,8 +430,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -356,6 +468,14 @@
       "post": {
         "summary": "Registration Member Response",
         "operationId": "registration_member_response_api_v1_topic_registrations__registration_id__member_response_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -374,8 +494,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -423,6 +542,14 @@
       "post": {
         "summary": "Registration Submit",
         "operationId": "registration_submit_api_v1_topic_registrations__registration_id__submit_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -441,8 +568,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -480,6 +606,14 @@
       "post": {
         "summary": "Registration Cancel",
         "operationId": "registration_cancel_api_v1_topic_registrations__registration_id__cancel_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -498,8 +632,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -537,6 +670,14 @@
       "post": {
         "summary": "Decide",
         "operationId": "decide_api_v1_topic_registrations__registration_id__lecturer_decision_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -564,8 +705,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -613,6 +753,14 @@
       "post": {
         "summary": "Finalize",
         "operationId": "finalize_api_v1_topic_registrations__registration_id__department_finalization_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -640,8 +788,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -679,6 +826,14 @@
       "post": {
         "summary": "Similar Topics",
         "operationId": "similar_topics_api_v1_ai_similar_topics_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "X-Dev-User-Id",
@@ -687,8 +842,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -740,6 +894,14 @@
       "post": {
         "summary": "Ai Chat",
         "operationId": "ai_chat_api_v1_ai_chat_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "X-Dev-User-Id",
@@ -748,8 +910,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -797,6 +958,14 @@
       "get": {
         "summary": "Eligible Students",
         "operationId": "eligible_students_api_v1_eligible_students_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "round_id",
@@ -815,8 +984,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -858,6 +1026,14 @@
       "get": {
         "summary": "Topic Detail",
         "operationId": "topic_detail_api_v1_topics__topic_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "topic_id",
@@ -876,8 +1052,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -915,6 +1090,14 @@
       "get": {
         "summary": "Thesis Detail",
         "operationId": "thesis_detail_api_v1_theses__thesis_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "thesis_id",
@@ -933,8 +1116,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -1657,6 +1839,19 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "kltn_session"
+      },
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "description": "Chỉ DEV/TEST",
+        "in": "header",
+        "name": "X-Dev-User-Id"
       }
     }
   }

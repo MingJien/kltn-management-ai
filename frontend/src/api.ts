@@ -47,16 +47,28 @@ export type SearchHit = {
   excerpt: string;
 };
 
-const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+let developmentAuthEnabled = false;
+
+export type AuthenticationMode = "development" | "university_oidc" | "unavailable";
+
+export function setDevelopmentAuthEnabled(enabled: boolean) {
+  developmentAuthEnabled = enabled;
+}
+
+export function universityLoginUrl() {
+  return `${baseUrl}/api/v1/auth/login`;
+}
 
 export async function request<T>(
   path: string, userId: string, init: RequestInit = {},
 ): Promise<T> {
   const response = await fetch(baseUrl + "/api/v1" + path, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-Dev-User-Id": userId,
+      ...(developmentAuthEnabled && userId ? { "X-Dev-User-Id": userId } : {}),
       ...(init.headers || {}),
     },
   });
@@ -64,6 +76,7 @@ export async function request<T>(
     const body = await response.json().catch(() => null);
     throw new Error(body?.detail || `HTTP ${response.status}`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 

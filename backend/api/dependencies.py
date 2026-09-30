@@ -5,11 +5,15 @@ from pathlib import Path
 from collections.abc import Iterator
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request, Security
+from fastapi.security import APIKeyCookie, APIKeyHeader
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.db.models.entities import UserAccount
+
+_session_cookie_auth = APIKeyCookie(name="kltn_session", auto_error=False)
+_dev_header_auth = APIKeyHeader(name="X-Dev-User-Id", description="Chỉ DEV/TEST", auto_error=False)
 
 def load_local_env() -> None:
     env_file = Path(__file__).resolve().parents[2] / ".env"
@@ -47,14 +51,34 @@ def get_session() -> Iterator[Session]:
 
 
 def current_user(
+    request: Request,
     session: Session = Depends(get_session),
-    dev_user_id: UUID | None = Header(default=None, alias="X-Dev-User-Id"),
+    dev_user_id: str | None = Header(default=None, alias="X-Dev-User-Id"),
+    _session_cookie: str | None = Security(_session_cookie_auth),
+    _dev_header: str | None = Security(_dev_header_auth),
 ) -> UserAccount:
-    if os.getenv("KLTN_ENV") not in {"development", "test"} or os.getenv("KLTN_DEV_AUTH") != "true":
-        raise HTTPException(503, "SSO is not configured; development identity is disabled")
-    if dev_user_id is None:
-        raise HTTPException(401, "Missing development identity")
-    user = session.scalar(select(UserAccount).where(UserAccount.id == dev_user_id, UserAccount.status == "ACTIVE"))
+    session_user_id = request.session.get("user_id") if "session" in request.scope else None
+    if session_user_id:
+        try:
+            user_id = UUID(session_user_id)
+        except (TypeError, ValueError):
+            request.session.clear()
+            raise HTTPException(401, "Invalid sign-in session")
+    elif os.getenv("KLTN_ENV") in {"development", "test"} and os.getenv("KLTN_DEV_AUTH") == "true":
+        if dev_user_id is None:
+            raise HTTPException(401, "Missing development identity")
+        try:
+            user_id = UUID(dev_user_id)
+        except (TypeError, ValueError):
+            raise HTTPException(401, "Invalid development identity")
+    else:
+        from backend.api.auth import oidc_is_configured
+        if not oidc_is_configured():
+            raise HTTPException(503, "University sign-in is not configured")
+        raise HTTPException(401, "Sign in with your University account")
+    user = session.scalar(select(UserAccount).where(UserAccount.id == user_id, UserAccount.status == "ACTIVE"))
     if user is None:
+        if session_user_id:
+            request.session.clear()
         raise HTTPException(401, "Unknown or inactive identity")
     return user
