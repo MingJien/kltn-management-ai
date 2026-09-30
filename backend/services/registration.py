@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.schemas import RegistrationCreate, RegistrationOut, LecturerDecision
+from backend.api.schemas import MemberResponse, RegistrationCreate, RegistrationMemberOut, RegistrationOut, LecturerDecision
 from backend.db.models import entities as m
 
 
@@ -35,10 +35,26 @@ def registration_out(session: Session, reg: m.TopicRegistration) -> Registration
             m.RegistrationMember.registration_id == reg.id,
         ).order_by(m.RegistrationMember.is_coordinator.desc())
     ).all()
+    profiles = {
+        student.id: student
+        for student in session.scalars(
+            select(m.StudentProfile).where(
+                m.StudentProfile.id.in_([item.student_id for item in members])
+            )
+        ).all()
+    } if members else {}
     thesis = session.scalar(select(m.Thesis).where(m.Thesis.registration_id == reg.id))
     return RegistrationOut(
         id=reg.id, topic_id=reg.topic_id, round_id=reg.round_id, state=reg.state, row_version=reg.row_version,
         member_student_ids=[item.student_id for item in members],
+        members=[RegistrationMemberOut(
+            student_id=item.student_id,
+            student_code=profiles[item.student_id].student_code,
+            display_name=profiles[item.student_id].display_name,
+            is_coordinator=item.is_coordinator,
+            active=item.active,
+            consent_status=item.consent_status,
+        ) for item in members],
         lecturer_decided_at=reg.lecturer_decided_at,
         thesis_id=thesis.id if thesis else None,
     )
@@ -85,7 +101,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
             fail(409, "A member already has an active registration in this round")
         reg = m.TopicRegistration(
             id=uuid4(), topic_id=topic.id, round_id=topic.round_id,
-            created_by=student.id, state="SUBMITTED", submitted_at=now,
+            created_by=student.id, state="DRAFT",
         )
         session.add(reg)
         session.flush()
@@ -101,6 +117,116 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
     except IntegrityError:
         session.rollback()
         fail(409, "Concurrent registration conflict")
+    except Exception:
+        session.rollback()
+        raise
+
+
+def respond_to_registration(session: Session, user: m.UserAccount, registration_id: UUID, data: MemberResponse) -> RegistrationOut:
+    if user.base_role != "STUDENT":
+        fail(403, "Only an invited student can respond to a group registration")
+    student = profile(session, user, "STUDENT")
+    try:
+        reg = _registration(session, registration_id, lock=True)
+        if reg.state != "DRAFT":
+            fail(409, "Member confirmation is closed after the draft is submitted")
+        member = session.scalar(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.student_id == student.id,
+            m.RegistrationMember.active.is_(True),
+        ).with_for_update())
+        if member is None:
+            fail(403, "Your account is not an active member of this draft")
+        if member.consent_status != "PENDING":
+            fail(409, "You have already responded; ask the group coordinator to cancel and recreate the draft if needed")
+        member.consent_status = data.consent_status
+        member.responded_by_user_id = user.id
+        member.responded_at = datetime.now(timezone.utc)
+        reg.row_version += 1
+        session.flush()
+        result = registration_out(session, reg)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+
+
+def submit_registration(session: Session, user: m.UserAccount, registration_id: UUID) -> RegistrationOut:
+    if user.base_role != "STUDENT":
+        fail(403, "Only the group coordinator can submit this registration")
+    student = profile(session, user, "STUDENT")
+    try:
+        reg = _registration(session, registration_id, lock=True)
+        if reg.state != "DRAFT":
+            fail(409, "Only a draft registration can be submitted")
+        coordinator = session.scalar(select(m.RegistrationMember.id).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.student_id == student.id,
+            m.RegistrationMember.is_coordinator.is_(True),
+            m.RegistrationMember.active.is_(True),
+        ))
+        if coordinator is None:
+            fail(403, "Only the student who created the group can submit it")
+        members = session.scalars(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.active.is_(True),
+        ).with_for_update()).all()
+        topic = session.scalar(select(m.Topic).where(m.Topic.id == reg.topic_id).with_for_update())
+        round_ = session.get(m.ThesisRound, reg.round_id)
+        now = datetime.now(timezone.utc)
+        if not (1 <= len(members) <= 3) or len(members) > topic.max_students:
+            fail(409, "The active group must contain 1 to 3 students and fit the topic capacity")
+        if any(member.consent_status != "ACCEPTED" for member in members):
+            fail(409, "Every active group member must confirm participation before submission")
+        if topic.state != "APPROVED" or round_ is None or round_.state != "OPEN" or not (round_.opens_at <= now <= round_.closes_at):
+            fail(409, "The topic or registration round is no longer open")
+        eligible_ids = set(session.scalars(select(m.EligibilitySnapshot.student_id).where(
+            m.EligibilitySnapshot.student_id.in_([member.student_id for member in members]),
+            m.EligibilitySnapshot.round_id == reg.round_id,
+            m.EligibilitySnapshot.state == "CONFIRMED",
+        )).all())
+        if eligible_ids != {member.student_id for member in members}:
+            fail(409, "Every group member must still have a confirmed eligibility snapshot")
+        reg.state = "SUBMITTED"
+        reg.submitted_at = now
+        reg.row_version += 1
+        session.flush()
+        result = registration_out(session, reg)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+
+
+def cancel_registration(session: Session, user: m.UserAccount, registration_id: UUID) -> RegistrationOut:
+    if user.base_role != "STUDENT":
+        fail(403, "Only the group coordinator can cancel this draft")
+    student = profile(session, user, "STUDENT")
+    try:
+        reg = _registration(session, registration_id, lock=True)
+        if reg.state != "DRAFT":
+            fail(409, "Only a draft can be cancelled; submitted registrations are locked")
+        coordinator = session.scalar(select(m.RegistrationMember.id).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.student_id == student.id,
+            m.RegistrationMember.is_coordinator.is_(True),
+            m.RegistrationMember.active.is_(True),
+        ))
+        if coordinator is None:
+            fail(403, "Only the student who created the group can cancel it")
+        reg.state = "CANCELLED"
+        reg.row_version += 1
+        for member in session.scalars(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.active.is_(True),
+        )).all():
+            member.active = False
+        session.flush()
+        result = registration_out(session, reg)
+        session.commit()
+        return result
     except Exception:
         session.rollback()
         raise
@@ -135,7 +261,9 @@ def get_registration(session: Session, user: m.UserAccount, registration_id: UUI
         ).limit(1)) is not None
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
-        allowed = topic.proposer_user_id == user.id or _is_department_head(session, lecturer.id, topic.department_id)
+        allowed = reg.state != "DRAFT" and (
+            topic.proposer_user_id == user.id or _is_department_head(session, lecturer.id, topic.department_id)
+        )
     if not allowed:
         fail(404, "Registration not found")
     return registration_out(session, reg)

@@ -352,6 +352,187 @@
         }
       }
     },
+    "/api/v1/topic-registrations/{registration_id}/member-response": {
+      "post": {
+        "summary": "Registration Member Response",
+        "operationId": "registration_member_response_api_v1_topic_registrations__registration_id__member_response_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberResponse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topic-registrations/{registration_id}/submit": {
+      "post": {
+        "summary": "Registration Submit",
+        "operationId": "registration_submit_api_v1_topic_registrations__registration_id__submit_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topic-registrations/{registration_id}/cancel": {
+      "post": {
+        "summary": "Registration Cancel",
+        "operationId": "registration_cancel_api_v1_topic_registrations__registration_id__cancel_post",
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/topic-registrations/{registration_id}/lecturer-decision": {
       "post": {
         "summary": "Decide",
@@ -1064,6 +1245,23 @@
         ],
         "title": "LecturerDecision"
       },
+      "MemberResponse": {
+        "properties": {
+          "consent_status": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "DECLINED"
+            ],
+            "title": "Consent Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_status"
+        ],
+        "title": "MemberResponse"
+      },
       "RegistrationCreate": {
         "properties": {
           "topic_id": {
@@ -1088,6 +1286,45 @@
           "member_student_ids"
         ],
         "title": "RegistrationCreate"
+      },
+      "RegistrationMemberOut": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "student_code": {
+            "type": "string",
+            "title": "Student Code"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "is_coordinator": {
+            "type": "boolean",
+            "title": "Is Coordinator"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "consent_status": {
+            "type": "string",
+            "title": "Consent Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "student_code",
+          "display_name",
+          "is_coordinator",
+          "active",
+          "consent_status"
+        ],
+        "title": "RegistrationMemberOut"
       },
       "RegistrationOut": {
         "properties": {
@@ -1122,6 +1359,13 @@
             "type": "array",
             "title": "Member Student Ids"
           },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationMemberOut"
+            },
+            "type": "array",
+            "title": "Members"
+          },
           "lecturer_decided_at": {
             "anyOf": [
               {
@@ -1154,7 +1398,8 @@
           "round_id",
           "state",
           "row_version",
-          "member_student_ids"
+          "member_student_ids",
+          "members"
         ],
         "title": "RegistrationOut"
       },

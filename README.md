@@ -17,10 +17,10 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 
 ## Trạng thái thực tế
 
-- Hai database local cùng ở PostgreSQL 17.11, revision `20260925_0007`, **63 bảng vật lý/618 cột** (`62 bảng mô hình/617 cột` cộng `alembic_version`). `kltn_ai` là database chính để theo dõi schema; `kltn_dev` là database phát triển để chạy prototype với dữ liệu giả. Bộ seed tạo 5 tài khoản, 3 sinh viên, 2 giảng viên, 1 đợt, 3 snapshot điều kiện và 1 đề tài; chưa tạo đăng ký nhóm hoặc Thesis. Migration 0007 lưu được phản hồi thành viên, nhưng runtime chưa bắt từng SV tự xác nhận.
+- Hai database local cùng ở PostgreSQL 17.11, revision `20260925_0007`, **63 bảng vật lý/618 cột** (`62 bảng mô hình/617 cột` cộng `alembic_version`). `kltn_ai` là database chính để theo dõi schema; `kltn_dev` là database phát triển để chạy prototype với dữ liệu giả. Bộ seed tạo 5 tài khoản, 3 sinh viên, 2 giảng viên, 1 đợt, 3 snapshot điều kiện và 1 đề tài. Mỗi đăng ký nhóm bắt đầu ở `DRAFT`; API kiểm tra từng thành viên tự xác nhận bằng tài khoản của mình, rồi mới cho nhóm trưởng gửi.
 - Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..42 PASS, gồm COMMENT_ONLY cho góp ý chéo và đầy đủ baseline Mẫu 6.
-- Prototype API chạy lát cắt SV gửi nhóm 1–3 cho đề tài GV đã duyệt → giảng viên đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm bị từ chối có thể đăng ký lại; đề tài đã chốt bị khóa. 8 pytest PASS, gồm kiểm luồng trên PostgreSQL và 5 tình huống similarity giả lập.
-- React có màn đề tài, đăng ký/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. Build/typecheck PASS. Đã chạy trình duyệt với schema PostgreSQL tạm và tài khoản giả lập: SV gửi nhóm 2 người → GV chấp nhận → TBM chốt → React hiển thị Thesis ACTIVE; schema tạm đã xóa. Ngày 30/09, giao diện cũng đã đọc đề tài từ `kltn_dev`, tìm được nguồn KLTN giả lập và trả citation tài liệu giả ở chế độ `RETRIEVAL_ONLY`; không gọi mô hình sinh câu trả lời.
+- Prototype API hỗ trợ lát cắt đề tài GV đã duyệt: SV tạo bản nháp nhóm 1–3 → từng SV tự xác nhận hoặc từ chối đúng một lần → nhóm trưởng gửi khi mọi người đồng ý → GV đề xuất chấp nhận/từ chối → TBM đúng bộ môn chốt để tạo Thesis/ThesisMember/AdvisorAssignment nguyên tử. Nhóm trưởng có thể hủy bản nháp để lập nhóm lại; từ `SUBMITTED` thành viên bị khóa. Bộ kiểm thử PostgreSQL xác nhận quyền, luồng chuyển trạng thái và rollback dữ liệu thử.
+- React có màn đề tài, đăng ký nhóm/xác nhận từng thành viên/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. Build/typecheck giao diện PASS; browser end-to-end cho luồng xác nhận mới vẫn cần kiểm. Ngày 30/09, phiên bản trước đã đọc đề tài từ `kltn_dev`, tìm nguồn KLTN giả lập và trả citation tài liệu giả ở chế độ `RETRIEVAL_ONLY`; không gọi mô hình sinh câu trả lời.
 - FastEmbed pretrained + Qdrant local truy xuất được corpus giả lập có source_type/provenance; RAG trả citation ở chế độ RETRIEVAL_ONLY. **Không có Gemini key, không có kết luận chất lượng AI trên 7 KLTN, không có ngưỡng 90% đã chốt.**
 - Mẫu 9 đã được thiết kế hai chữ ký Chủ tịch + Thư ký. Binary local là các biên bản đã điền dữ liệu thật, chưa phải mẫu trắng an toàn; **chưa PASS xuất đúng mẫu**. Baseline rubric dự án đã chốt theo Mẫu 6: 2/4/4, thưởng tối đa 1, tổng không quá 10; CSDL vẫn DRAFT vì runtime chấm thật chưa triển khai. Khác biệt nguồn với QĐ 2919 được lưu để truy vết. SSO thật, xuất biểu mẫu, similarity toàn văn và các use case còn lại là thiết kế/chưa chạy.
 - Docker daemon hiện không chạy; Qdrant **local mode** đã chạy. Qdrant service trong compose chưa được kiểm tra.
@@ -29,7 +29,7 @@ Repository này chứa sản phẩm phân tích và thiết kế NV4 cùng **pro
 
 | Phần việc | Trạng thái hiện tại | Việc cần có để gọi là đã chạy hoàn chỉnh |
 | --- | --- | --- |
-| Đăng ký nhóm và đề tài SV đề xuất | Prototype chỉ nhận Topic GV đã APPROVED và gửi nhóm ngay; migration 0007 mới lưu được phản hồi từng thành viên. | Từng SV tự xác nhận trong API/UI trước SUBMITTED; nhóm đề xuất và đăng ký trước, TBM xét đề tài sau, GVHD được phân công đồng ý rồi TBM chốt; test đủ hai nhánh. |
+| Đăng ký nhóm và đề tài SV đề xuất | Nhánh đề tài GV đã duyệt có luồng bản nháp, tự xác nhận từng thành viên và nhóm trưởng gửi; 9 test PostgreSQL, TypeScript và Vite build PASS. Chưa kiểm browser trực tiếp sau cập nhật; nhánh đề tài SV đề xuất chưa có runtime. | Kiểm tra trực quan luồng mới; xây nhánh SV đề xuất và TBM xét sau đăng ký, GVHD được phân công đồng ý rồi TBM chốt; kiểm thử hai nhánh. |
 | Điều kiện, chấm điểm, Mẫu 9 | Có mô hình; baseline Mẫu 6 đã chốt (2/4/4, thưởng ≤1, tổng ≤10), rubric DB đang DRAFT; hợp đồng hai chữ ký. | Xây quyền xác nhận, runtime chấm và khóa từ chữ ký đầu; xuất đúng Mẫu 9 trắng đã kiểm; gán version rubric/policy cho đợt thật. |
 | AI và kho tài liệu | Đã nạp/truy xuất corpus giả bằng FastEmbed + Qdrant local; similarity chỉ advisory. | Kiểm thử có phép trên tập tài liệu phù hợp, đánh giá sai số và quyền; chỉ bật chính sách ngưỡng nếu Khoa phê duyệt. |
 | Đăng nhập và vận hành | Định danh UUID chỉ chạy DEV/TEST; chưa có SSO hoặc triển khai production. | Tích hợp đăng nhập thật, kiểm thử phân quyền và luồng đầy đủ, cấu hình triển khai/khôi phục. |
@@ -79,7 +79,21 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Chạy API và giao diện ở hai terminal riêng. Tiến trình API tự chọn `kltn_dev`, bật UUID giả lập và dùng `tmp/qdrant-prototype` nếu chưa cấu hình Qdrant service. Trước lần thử AI đầu tiên, chạy bước 5 để tạo chỉ mục corpus giả. Mở `http://127.0.0.1:5173`, nhập UUID demo để xem đề tài và thử tra cứu AI. Swagger ở `http://127.0.0.1:8000/docs`. Prototype dùng header phát triển; production trả 503 cho header này cho tới khi tích hợp SSO.
+Chạy API và giao diện ở hai terminal riêng. Tiến trình API tự chọn `kltn_dev`, bật UUID giả lập và dùng `tmp/qdrant-prototype` nếu chưa cấu hình Qdrant service. Trước lần thử AI đầu tiên, chạy bước 5 để tạo chỉ mục corpus giả. Mở `http://127.0.0.1:5173`, nhập UUID demo để xem đề tài và thử tra cứu AI. Lấy UUID SV trong Query Tool đã kết nối `kltn_dev` bằng:
+
+```sql
+SELECT ua.id AS uuid_dev,
+       ua.base_role,
+       COALESCE(sp.student_code, lp.lecturer_code) AS ma_nguoi_dung,
+       COALESCE(sp.display_name, lp.display_name) AS ho_ten
+FROM user_account AS ua
+LEFT JOIN student_profile AS sp ON sp.user_id = ua.id
+LEFT JOIN lecturer_profile AS lp ON lp.user_id = ua.id
+WHERE ua.external_subject LIKE 'synthetic-demo-%'
+ORDER BY ua.base_role, ma_nguoi_dung;
+```
+
+UUID là khóa nội bộ tự sinh, không phải mật khẩu hay mã SV. Khi chạy thật, đăng nhập SSO của Trường sẽ xác định tài khoản rồi backend ánh xạ subject đăng nhập sang UUID nội bộ; người dùng không nhập UUID. Swagger ở `http://127.0.0.1:8000/docs`. Prototype dùng header phát triển; production trả 503 cho header này cho tới khi tích hợp SSO.
 
 **5. Thử AI không có Docker.** Đặt `QDRANT_LOCAL_PATH=tmp/qdrant-prototype` và bỏ/để trống `QDRANT_URL` trong `.env`, rồi chạy:
 

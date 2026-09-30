@@ -14,6 +14,14 @@ export type Topic = {
   state: string;
 };
 export type EligibleStudent = { id: string; display_name: string; student_code: string };
+export type RegistrationMember = {
+  student_id: string;
+  student_code: string;
+  display_name: string;
+  is_coordinator: boolean;
+  active: boolean;
+  consent_status: "PENDING" | "ACCEPTED" | "DECLINED";
+};
 export type Registration = {
   id: string;
   topic_id: string;
@@ -21,6 +29,7 @@ export type Registration = {
   state: string;
   row_version: number;
   member_student_ids: string[];
+  members: RegistrationMember[];
   lecturer_decided_at: string | null;
   thesis_id: string | null;
 };

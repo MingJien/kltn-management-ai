@@ -52,6 +52,14 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 
 Các giới hạn này được giữ trong README/thiết kế để người xem không nhầm thiết kế với phần đã chạy.
 
+## Kiểm chứng luồng xác nhận đăng ký nhóm — 30/09/2026
+
+- Luồng đề tài do giảng viên đề xuất: tạo đăng ký `DRAFT`; mọi thành viên tự xác nhận bằng tài khoản riêng; chỉ nhóm trưởng gửi khi 1–3 thành viên active đều `ACCEPTED` và còn snapshot đủ điều kiện; sau `SUBMITTED` không nhận sửa xác nhận. Thành viên chỉ phản hồi một lần. Nếu chọn nhầm nhóm hoặc có người từ chối, nhóm trưởng hủy `DRAFT` (giữ bản ghi làm lịch sử, giải phóng thành viên) rồi tạo bản mới.
+- API không nhận mã sinh viên/người xác nhận từ request xác nhận. Backend lấy StudentProfile và UserAccount từ danh tính hiện hành trong DEV/TEST, rồi lưu `consent_status`, `responded_by_user_id`, `responded_at`.
+- `pytest tests -q` trên `kltn_dev` (DATABASE_URL được đổi trong tiến trình kiểm thử; fixture tổng hợp và rollback): 9 passed; có 1 cảnh báo Starlette về tích hợp `httpx`/TestClient. Các ca mới gồm không gửi sớm, không xác nhận thay người khác, chỉ phản hồi một lần, khóa phản hồi sau submit, hủy bản nháp, giải phóng thành viên, và giảng viên không xem bản nháp.
+- `tsc --noEmit --incremental false -p tsconfig.json`: PASS. `vite build --configLoader runner --outDir ../tmp/frontend-build-consent-final`: PASS; bản build nằm trong `tmp/`, không đưa vào Git.
+- Không chạy seed hoặc ghi đăng ký vào `kltn_dev`/`kltn_ai`; mọi dữ liệu tích hợp do test tạo được rollback.
+
 ## Kiểm chứng bổ sung ngày 30/09/2026
 
 CSDL demo được xác minh là `kltn_dev` trên PostgreSQL 17.11, user `kltn_app`, port 5432. Tiến trình kiểm tra được cấu hình tạm để nhắm đúng database này; `.env` không bị sửa. `kltn_ai` và `kltn_dev` đều ở Alembic revision `20260925_0007`, mỗi database có 63 bảng vật lý/618 cột.
@@ -70,4 +78,4 @@ CSDL demo được xác minh là `kltn_dev` trên PostgreSQL 17.11, user `kltn_a
 | `topic_registration` sau kiểm tra GET | 0 row |
 | `git diff --check` | PASS |
 
-Bộ demo chỉ dùng dữ liệu tổng hợp. Endpoint prototype hiện trình diễn tra cứu đề tài và lát cắt đăng ký đề tài do giảng viên đề xuất; giao diện chưa thực hiện từng thành viên tự xác nhận, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9. AI chỉ truy xuất nguồn thử nghiệm; không tự kết luận đạo văn hoặc sinh câu trả lời.
+Trong lượt chạy trình duyệt ghi tại đây trước khi bổ sung tự xác nhận, UI mới kiểm tra đọc dữ liệu demo và tra cứu AI; trạng thái trình duyệt này không đại diện cho bản code sau cập nhật. Hiện API và giao diện có xác nhận từng thành viên (được test tự động bên trên), còn kiểm browser mới, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9 chưa hoàn tất. AI chỉ truy xuất nguồn thử nghiệm; không tự kết luận đạo văn hoặc sinh câu trả lời.

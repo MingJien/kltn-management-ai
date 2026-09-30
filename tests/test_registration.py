@@ -83,8 +83,18 @@ def test_registration_vertical_slice(scenario):
     made = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json=payload)
     assert made.status_code == 201, made.text
     reg = made.json()
-    assert reg["state"] == "SUBMITTED"
+    assert reg["state"] == "DRAFT"
     assert len(reg["member_student_ids"]) == 3
+    assert {member["consent_status"] for member in reg["members"]} == {"PENDING"}
+    assert client.get("/api/v1/topic-registrations", headers=hdr(users[3])).json() == []
+    assert client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[3])).status_code == 404
+    premature = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
+    assert premature.status_code == 409
+    wrong_member = client.post(
+        f"/api/v1/topic-registrations/{reg['id']}/member-response",
+        headers=hdr(users[3]), json={"consent_status": "ACCEPTED"},
+    )
+    assert wrong_member.status_code == 403
     again = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json=payload)
     assert again.status_code == 409
     outsider = client.post(
@@ -95,9 +105,39 @@ def test_registration_vertical_slice(scenario):
     assert outsider.status_code == 403
     lecturer_cannot_add = client.post("/api/v1/topic-registrations", headers=hdr(users[3]), json=payload)
     assert lecturer_cannot_add.status_code == 403
+    first_response = client.post(
+        f"/api/v1/topic-registrations/{reg['id']}/member-response",
+        headers=hdr(users[0]),
+        json={"consent_status": "ACCEPTED", "student_id": str(students[1].id)},
+    )
+    assert first_response.status_code == 200, first_response.text
+    first_member = next(member for member in first_response.json()["members"] if member["student_id"] == str(students[0].id))
+    assert first_member["consent_status"] == "ACCEPTED"
+    assert first_member["active"]
+    repeat_response = client.post(
+        f"/api/v1/topic-registrations/{reg['id']}/member-response",
+        headers=hdr(users[0]), json={"consent_status": "DECLINED"},
+    )
+    assert repeat_response.status_code == 409
+    for index in range(1, 3):
+        accepted_member = client.post(
+            f"/api/v1/topic-registrations/{reg['id']}/member-response",
+            headers=hdr(users[index]), json={"consent_status": "ACCEPTED"},
+        )
+        assert accepted_member.status_code == 200, accepted_member.text
+    non_coordinator_submit = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[1]))
+    assert non_coordinator_submit.status_code == 403
+    submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["state"] == "SUBMITTED"
+    late_response = client.post(
+        f"/api/v1/topic-registrations/{reg['id']}/member-response",
+        headers=hdr(users[0]), json={"consent_status": "DECLINED"},
+    )
+    assert late_response.status_code == 409
     accepted = client.post(
         f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
-        headers={**hdr(users[3]), "If-Match": str(reg["row_version"])},
+        headers={**hdr(users[3]), "If-Match": str(submitted.json()["row_version"])},
         json={"decision": "ACCEPT"},
     )
     assert accepted.status_code == 200, accepted.text
@@ -145,9 +185,13 @@ def test_rejection_releases_students_for_new_registration(scenario):
     })
     assert created.status_code == 201, created.text
     reg = created.json()
+    confirmed = client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[0]), json={"consent_status": "ACCEPTED"})
+    assert confirmed.status_code == 200
+    submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
+    assert submitted.status_code == 200
     rejected = client.post(
         f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
-        headers={**hdr(users[3]), "If-Match": str(reg["row_version"])},
+        headers={**hdr(users[3]), "If-Match": str(submitted.json()["row_version"])},
         json={"decision": "REJECT", "reason": "Synthetic rejection"},
     )
     assert rejected.status_code == 200, rejected.text
@@ -157,6 +201,28 @@ def test_rejection_releases_students_for_new_registration(scenario):
         "topic_id": str(topic.id), "member_student_ids": members,
     })
     assert second.status_code == 201, second.text
+
+
+def test_draft_decline_must_be_cancelled_before_reforming(scenario):
+    client, users, students, *_ = scenario
+    members = [str(student.id) for student in students[:2]]
+    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
+        "topic_id": str(scenario[4].id), "member_student_ids": members,
+    })
+    assert created.status_code == 201, created.text
+    reg = created.json()
+    declined = client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[1]), json={"consent_status": "DECLINED"})
+    assert declined.status_code == 200
+    denied_submit = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
+    assert denied_submit.status_code == 409
+    cancelled = client.post(f"/api/v1/topic-registrations/{reg['id']}/cancel", headers=hdr(users[0]))
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["state"] == "CANCELLED"
+    assert all(not member["active"] for member in cancelled.json()["members"])
+    retry = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
+        "topic_id": str(scenario[4].id), "member_student_ids": [str(students[0].id)],
+    })
+    assert retry.status_code == 201, retry.text
 
 
 def test_health_and_openapi(scenario):

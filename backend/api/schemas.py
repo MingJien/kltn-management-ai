@@ -21,6 +21,19 @@ class RegistrationCreate(BaseModel):
     member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
 
 
+class RegistrationMemberOut(BaseModel):
+    student_id: UUID
+    student_code: str
+    display_name: str
+    is_coordinator: bool
+    active: bool
+    consent_status: str
+
+
+class MemberResponse(BaseModel):
+    consent_status: Literal["ACCEPTED", "DECLINED"]
+
+
 class RegistrationOut(BaseModel):
     id: UUID
     topic_id: UUID
@@ -28,6 +41,7 @@ class RegistrationOut(BaseModel):
     state: str
     row_version: int
     member_student_ids: list[UUID]
+    members: list[RegistrationMemberOut]
     lecturer_decided_at: datetime | None = None
     thesis_id: UUID | None = None
 
