@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
-    ContextOut, ErrorOut, HealthOut, LecturerDecision,
+    ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
     RegistrationCreate, RegistrationOut, TopicOut, SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, ThesisOut,
 )
 from backend.db.models import entities as m
 from backend.services.registration import (
-    _is_department_head, create_registration, finalize_registration,
+    _is_department_head, cancel_registration, create_registration, finalize_registration,
     get_registration, lecturer_decision, profile, registration_out,
+    respond_to_registration, submit_registration,
 )
 
 app = FastAPI(
@@ -126,7 +127,10 @@ def registrations(
         head_departments = {dep for dep in departments if _is_department_head(session, lecturer.id, dep)}
         topic_ids = [t.id for t in topics]
         topic_ids += session.scalars(select(m.Topic.id).where(m.Topic.department_id.in_(head_departments))).all()
-        rows = session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id.in_(topic_ids))).all()
+        rows = session.scalars(select(m.TopicRegistration).where(
+            m.TopicRegistration.topic_id.in_(topic_ids),
+            m.TopicRegistration.state != "DRAFT",
+        )).all()
     else:
         rows = []
     return [registration_out(session, row) for row in rows]
@@ -139,6 +143,34 @@ def registration(
     session: Session = Depends(get_session),
 ) -> RegistrationOut:
     return get_registration(session, user, registration_id)
+
+
+@app.post("/api/v1/topic-registrations/{registration_id}/member-response", response_model=RegistrationOut)
+def registration_member_response(
+    registration_id: UUID,
+    payload: MemberResponse,
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return respond_to_registration(session, user, registration_id, payload)
+
+
+@app.post("/api/v1/topic-registrations/{registration_id}/submit", response_model=RegistrationOut)
+def registration_submit(
+    registration_id: UUID,
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return submit_registration(session, user, registration_id)
+
+
+@app.post("/api/v1/topic-registrations/{registration_id}/cancel", response_model=RegistrationOut)
+def registration_cancel(
+    registration_id: UUID,
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return cancel_registration(session, user, registration_id)
 
 
 @app.post("/api/v1/topic-registrations/{registration_id}/lecturer-decision", response_model=RegistrationOut)

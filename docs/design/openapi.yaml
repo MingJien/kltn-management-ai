@@ -3890,8 +3890,8 @@
           "TopicRegistration"
         ],
         "summary": "Từng sinh viên tự xác nhận hoặc từ chối tham gia nhóm",
-        "description": "Hợp đồng thiết kế; endpoint chưa có trong prototype. Danh tính người phản hồi lấy từ phiên đăng nhập, không nhận userId từ body. Chỉ phản hồi khi đăng ký còn DRAFT.",
-        "operationId": "respond_to_registration_invitation_design",
+        "description": "Prototype DEV/TEST: danh tính người phản hồi lấy từ tài khoản hiện hành, không nhận userId từ body. Chỉ phản hồi một lần khi đăng ký còn DRAFT.",
+        "operationId": "registration_member_response",
         "parameters": [
           {
             "name": "registrationId",
@@ -3910,14 +3910,14 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "decision"
+                  "consent_status"
                 ],
                 "properties": {
-                  "decision": {
+                  "consent_status": {
                     "type": "string",
                     "enum": [
-                      "ACCEPT",
-                      "DECLINE"
+                      "ACCEPTED",
+                      "DECLINED"
                     ]
                   }
                 }
@@ -3927,7 +3927,14 @@
         },
         "responses": {
           "200": {
-            "description": "Trạng thái phản hồi và thời điểm được lưu cho đúng RegistrationMember."
+            "description": "Trạng thái phản hồi và thời điểm được lưu cho đúng RegistrationMember.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
           },
           "403": {
             "description": "Tài khoản không phải thành viên được mời."
@@ -3936,12 +3943,41 @@
             "description": "Đăng ký đã gửi/khóa hoặc phản hồi không hợp lệ."
           }
         },
-        "x-runtime-status": "DESIGN_ONLY",
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
         "x-guards": [
-          "actor_user_id phải trùng StudentProfile.user_id của RegistrationMember",
+          "Chỉ thành viên có StudentProfile thuộc tài khoản hiện hành; body không nhận student_id/user_id",
+          "Chỉ phản hồi lần đầu khi consent_status=PENDING",
           "registration.state=DRAFT",
-          "mọi thành viên active ACCEPTED trước khi service chuyển SUBMITTED"
+          "mọi thành viên active ACCEPTED trước khi nhóm trưởng chuyển SUBMITTED"
         ]
+      }
+    },
+    "/topic-registrations/{registrationId}/submit": {
+      "post": {
+        "tags": ["TopicRegistration"],
+        "summary": "Nhóm trưởng gửi đăng ký sau khi mọi thành viên xác nhận",
+        "operationId": "registration_submit",
+        "parameters": [{"name": "registrationId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+        "responses": {
+          "200": {"description": "Đăng ký chuyển sang SUBMITTED.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegistrationOut"}}}},
+          "403": {"description": "Tài khoản hiện hành không phải nhóm trưởng."},
+          "409": {"description": "Còn thành viên chưa xác nhận, snapshot hết hạn hoặc đợt/đề tài đã đóng."}
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registrationId}/cancel": {
+      "post": {
+        "tags": ["TopicRegistration"],
+        "summary": "Nhóm trưởng hủy bản nháp đăng ký",
+        "operationId": "registration_cancel",
+        "parameters": [{"name": "registrationId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+        "responses": {
+          "200": {"description": "Bản nháp chuyển sang CANCELLED; thành viên được giải phóng.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegistrationOut"}}}},
+          "403": {"description": "Tài khoản hiện hành không phải nhóm trưởng."},
+          "409": {"description": "Chỉ có thể hủy bản DRAFT."}
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
     }
   },
@@ -4574,6 +4610,11 @@
             "type": "array",
             "title": "Member Student Ids"
           },
+          "members": {
+            "items": {"$ref": "#/components/schemas/RegistrationMemberOut"},
+            "type": "array",
+            "title": "Members"
+          },
           "lecturer_decided_at": {
             "anyOf": [
               {
@@ -4606,9 +4647,23 @@
           "round_id",
           "state",
           "row_version",
-          "member_student_ids"
+          "member_student_ids",
+          "members"
         ],
         "title": "RegistrationOut"
+      },
+      "RegistrationMemberOut": {
+        "properties": {
+          "student_id": {"type": "string", "format": "uuid"},
+          "student_code": {"type": "string"},
+          "display_name": {"type": "string"},
+          "is_coordinator": {"type": "boolean"},
+          "active": {"type": "boolean"},
+          "consent_status": {"type": "string"}
+        },
+        "type": "object",
+        "required": ["student_id", "student_code", "display_name", "is_coordinator", "active", "consent_status"],
+        "title": "RegistrationMemberOut"
       },
       "SearchResult": {
         "properties": {

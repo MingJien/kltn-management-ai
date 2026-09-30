@@ -63,8 +63,11 @@ Nguồn OpenAPI máy đọc được: `docs/prototype/openapi-runtime.json` sinh
 | GET /me/context | X-Dev-User-Id trong DEV/TEST | ContextOut: user_id, base_role, profile IDs, actions | Không bật ngoài DEV/TEST |
 | GET /topics, /topics/{id} | round_id/limit hoặc topic UUID | TopicOut | Chỉ APPROVED trong prototype |
 | GET /eligible-students | round_id UUID | EligibleStudentOut[] | SV cùng bộ môn có snapshot CONFIRMED |
-| POST /topic-registrations | RegistrationCreate: topic_id, member_student_ids[1..3] | RegistrationOut + row_version | SV tạo, có chính mình, capacity/round/eligibility/unique |
+| POST /topic-registrations | RegistrationCreate: topic_id, member_student_ids[1..3] | RegistrationOut + row_version | SV tạo bản nháp, có chính mình, capacity/round/eligibility/unique; thành viên bắt đầu PENDING |
 | GET /topic-registrations, /{id} | —/UUID | RegistrationOut[]/RegistrationOut | Thành viên, GV đề xuất hoặc TBM theo scope |
+| POST /{id}/member-response | consent_status: ACCEPTED/DECLINED; user ID không nhận từ body | RegistrationOut có trạng thái từng thành viên | Chỉ chính SV đang đăng nhập; một lần khi DRAFT; lưu actor/thời điểm |
+| POST /{id}/submit | — | RegistrationOut | Chỉ nhóm trưởng; mọi thành viên active đã ACCEPTED, còn đủ điều kiện và đợt còn mở; khóa nhóm |
+| POST /{id}/cancel | — | RegistrationOut | Chỉ nhóm trưởng, chỉ DRAFT; đánh CANCELLED và giải phóng thành viên |
 | POST /{id}/lecturer-decision | LecturerDecision ACCEPT/REJECT + If-Match | RegistrationOut | Chỉ GV đề xuất topic; không ghép thành viên |
 | POST /{id}/department-finalization | If-Match | RegistrationOut + thesis_id | TBM đúng bộ môn, transaction tạo Thesis/member/advisor |
 | GET /theses/{id} | UUID | ThesisOut | Thành viên/GVHD/TBM đúng scope |
@@ -75,7 +78,8 @@ Các lỗi validation của FastAPI dùng HTTP 422; lỗi quyền/state do servi
 
 ## Contract thiết kế bổ sung
 
-- `POST /topic-registrations/{registrationId}/member-response`: chỉ tài khoản SV có lời mời trong RegistrationMember của bản DRAFT tự gửi `ACCEPT` hoặc `DECLINE`; không nhận userId từ body. Service đối chiếu `StudentProfile.user_id`, lưu `consent_status`, `responded_by_user_id`, `responded_at` và audit. Chỉ khi mọi thành viên active đã ACCEPTED mới cho SUBMITTED. **DESIGN_ONLY**; endpoint prototype hiện chưa áp guard này.
+- `POST /topic-registrations/{registrationId}/member-response`: đã chạy trong prototype cho bản DRAFT. Không nhận user ID từ body; service tìm thành viên bằng StudentProfile của tài khoản DEV/TEST hiện hành, chỉ nhận phản hồi đầu tiên, lưu trạng thái/actor/thời điểm và không cho đổi sau SUBMITTED. Vì không có endpoint chỉnh thành viên, nhóm trưởng hủy bản nháp nếu có người từ chối hoặc chọn sai nhóm rồi tạo bản nháp mới.
+- `POST /topic-registrations/{registrationId}/submit` và `/cancel`: đã chạy. Chỉ nhóm trưởng gửi/hủy; gửi cần 1–3 thành viên active đã ACCEPTED, mỗi người còn snapshot đủ điều kiện và topic/round còn mở. Hủy chỉ dùng khi DRAFT, giữ hàng thành viên không active để tra lại lịch sử.
 - Đề tài do SV đề xuất: `POST /topics` tạo đề tài của SV cùng bản nháp đăng ký; sau các xác nhận, nhóm gửi đăng ký **trước** khi TBM xử lý `/topics/{topicId}/department-decision`. Khi TBM APPROVED, giảng viên được phân công mới nhận/từ chối; TBM finalize sau khi GV đồng ý. Guard `Topic.APPROVED` của `POST /topic-registrations` hiện chỉ là lát cắt prototype cho đề tài GV, cần tách nhánh trước runtime thật. **DESIGN_ONLY**.
 
 - `POST /council-minutes/{minuteId}/chair-confirmation` và `.../secretary-confirmation`: MinuteSignatureRequest có minuteVersionId; chỉ đúng role trong quyết định được ký; chữ ký đầu khóa sửa dù state còn PRINTED, đủ hai mới SIGNED. DESIGN_ONLY.
