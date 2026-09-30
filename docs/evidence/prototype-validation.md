@@ -79,3 +79,10 @@ CSDL demo được xác minh là `kltn_dev` trên PostgreSQL 17.11, user `kltn_a
 | `git diff --check` | PASS |
 
 Trong lượt chạy trình duyệt ghi tại đây trước khi bổ sung tự xác nhận, UI mới kiểm tra đọc dữ liệu demo và tra cứu AI; trạng thái trình duyệt này không đại diện cho bản code sau cập nhật. Hiện API và giao diện có xác nhận từng thành viên (được test tự động bên trên), còn kiểm browser mới, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9 chưa hoàn tất. AI chỉ truy xuất nguồn thử nghiệm; không tự kết luận đạo văn hoặc sinh câu trả lời.
+
+## Kiểm chứng khung đăng nhập OIDC — 30/09/2026
+
+- API có `/api/v1/auth/config`, `/login`, `/callback`, `/logout`. Callback nhận `sub` từ ID token đã được Authlib kiểm tra, chỉ ánh xạ tài khoản `ACTIVE` có sẵn qua `user_account.external_subject`; không tự tạo tài khoản hoặc lấy role từ IdP. Session chỉ giữ UUID nội bộ; không lưu access token.
+- `pytest tests -q` chạy trên PostgreSQL local `kltn_dev` (URL được chuyển đích trong tiến trình kiểm thử; test DB đều tạo dữ liệu tổng hợp trong transaction rồi rollback): **15 passed**, 2 cảnh báo thư viện (plugin pytest nạp lại `anyio` và Starlette TestClient/httpx). Bộ test auth xác nhận mode/config, ánh xạ session, từ chối account chưa liên kết, và UUID header bị bỏ qua ở production.
+- TypeScript `tsc --noEmit -p frontend/tsconfig.json`: PASS. Vite build với output ở `tmp/frontend-oidc-build-final`: PASS. OpenAPI runtime JSON: validator PASS và có đủ bốn endpoint auth. `git diff --check`: PASS.
+- **Chưa kiểm chứng đăng nhập với hệ thống Trường:** chưa có discovery URL/client secret/redirect URI được cấp, chưa liên kết account thật, và chưa biết hệ thống Trường có OIDC hay chỉ SAML/CAS. Cần kiểm thử end-to-end bằng HTTPS sau khi bộ phận CNTT cấp cấu hình; hiện chỉ xác nhận code bằng test giả lập.

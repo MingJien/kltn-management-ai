@@ -77,7 +77,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-WORK-001, UC-EVAL-002.
 - **Entity/data:** MemberWorkAssignment, Evaluation, FinalResult.
 - **Trạng thái:** `CONFIRMED`.
-- **Chưa rõ:** Trọng số trực tiếp theo mẫu 6(2,4,4,1+, nhưng không quá 10)
+- **Đã chốt baseline thiết kế:** Mẫu 6 Khoa theo nhóm tiêu chí 2/4/4; điểm thưởng tối đa 1,0 và tổng không quá 10. Đây là baseline của dự án, không hỏi lại như vấn đề còn mở.
 
 ## 7. Ai phê duyệt phân công GVHD
 
@@ -93,15 +93,15 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 ## 8. Nguồn và người quản lý chuyên môn giảng viên
 
-- **Câu hỏi:** Dữ liệu chuyên môn nào đủ tin cậy, ai quản lý/cập nhật?
-- **Trả lời thực tế:** “GVHD tự khai báo chuyên môn,TBM là người xác nhận.
-- **Kết luận chắc chắn:** Giảng viên tự khai. Câu trả lời gốc chỉ chắc phần GV tự khai; thiết kế hiện chọn TBM đúng Bộ môn kiểm chứng bằng minh chứng, trừ tự khai của TBM thì Trưởng khoa/người được giao kiểm.
+- **Câu hỏi:** GVHD tự khai báo chuyên môn trên hồ sơ; ai xác nhận?
+- **Trả lời thực tế:** “GVHD tự khai báo chuyên môn, TBM là người xác nhận.”
+- **Kết luận chắc chắn:** GVHD tự khai; TBM đúng Bộ môn xác nhận sau khi kiểm chứng bằng minh chứng. Nếu người tự khai là TBM, Trưởng khoa/người được giao kiểm để tránh tự xác nhận. Đã có trả lời và quyết định thiết kế; không cần hỏi lại câu này.
 - **Requirement:** REQ-EXP-001.
 - **Business Rule:** tự khai có nhãn SELF_DECLARED; VERIFIED cần minh chứng, actor/time, đúng scope và không tự xác nhận.
 - **Actor/quyền:** Giảng viên C/U hồ sơ mình; TBM đúng Bộ môn kiểm, Trưởng khoa/người được giao xử lý hồ sơ của TBM.
 - **Use Case:** UC-EXP-001.
 - **Entity/data:** LecturerExpertise, ExpertiseEvidence, VerificationStatus.
-- **Trạng thái:** `CONFIRMED_PROJECT_DESIGN`; câu trả lời GVHD gốc vẫn giữ nguyên.
+- **Trạng thái:** `CONFIRMED_PROJECT_DESIGN`.
 - **Ghi chú thiết kế:** Đã chọn TBM đúng Bộ môn, chống tự kiểm bằng Trưởng khoa/người được giao; đây là quyết định phần mềm
 
 ## 9. Quy trình xét duyệt đề cương
@@ -115,7 +115,8 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Use Case:** UC-PROP-001..004.
 - **Entity/data:** Proposal, ProposalVersion, ProposalReview, SignatureConfirmation.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION`.
-- **Chưa rõ:** Tên chính thức và số người bắt buộc của nhóm/Hội đồng góp ý đề cương. Thông tin làm rõ nêu cơ cấu Hội đồng bảo vệ gồm Chủ tịch, hai phản biện, một ủy viên, một thư ký; chưa áp cơ cấu bảo vệ cho bước góp ý đề cương khi nguồn chưa xác nhận.
+- **Đã biết:** Nhóm đăng ký có 1–3 sinh viên (REQ-REG-002); Hội đồng bảo vệ có 5 người theo cơ cấu đã ghi ở BR-COUNCIL-002. Không áp số người Hội đồng bảo vệ cho buổi góp ý đề cương vì đây là hai hoạt động khác nhau.
+- **Còn cần hỏi:** Buổi góp ý đề cương có phải Hội đồng chính thức không? Nếu có thì cần tối thiểu bao nhiêu người, gồm vai trò nào? Nếu là buổi góp ý theo phân công, ai phân công và tổng hợp ý kiến?
 
 ## 10. Theo dõi tiến độ và milestone
 
@@ -129,7 +130,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Entity/data:** ProgressMilestone, ProgressReport, ProgressReview.
 - **Trạng thái:** `CONFIRMED_PROJECT_DECISION` cho hai checkpoint; lịch cụ thể là dữ liệu cấu hình của từng đợt.
 - **Làm rõ trong thiết kế ngày 25/09:** GVHD quản lý tiến độ thường kỳ. Lần 1 là góp ý đề cương; lần 2 là báo cáo tiến độ nội bộ dự kiến tháng 12 khi dự án đạt khoảng 70%, giữa các GVHD để góp ý chéo. Đây không phải Hội đồng bảo vệ theo quyết định.
-- **Chưa rõ:** Ngày giờ chính xác và danh sách GVHD góp ý của từng đợt phải nhập từ kế hoạch/phân công được duyệt.
+- **Còn cần hỏi:** Buổi nội bộ khoảng 70% có lập Hội đồng riêng không, hay GVHD khác được phân công góp ý `COMMENT_ONLY`? Nếu có Hội đồng thì số người/vai trò nào và ai tổng hợp kết luận? Ngày giờ, người cụ thể lấy từ kế hoạch/phân công theo từng đợt.
 
 ## 11. Đổi đề tài, rút và gia hạn
 
@@ -226,7 +227,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 ## 18. Có được gửi retrieved chunks sang Gemini?
 
-- **Câu hỏi:** Có được gửi nội dung/đoạn truy xuất sang Gemini hay chỉ metadata/ẩn danh?
+- **Câu hỏi:** Chính sách Trường/Khoa cho phép gửi loại dữ liệu nào tới Gemini?
 - **Trả lời thực tế:**chatbot tra cứu/link và phạm vi full text.
 - **Kết luận chắc chắn:** Không giả đây là quy định Trường. Thiết kế đã chọn ở cấp thiết kế: authorization trước retrieval, chỉ gửi chunks cần thiết, giảm PII, key backend-only, log an toàn.
 - **Requirement:** REQ-AI-002.
@@ -234,9 +235,10 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 - **Actor/quyền:** Backend RAG; người dùng chỉ nhận nội dung được phép; Admin quản trị key kỹ thuật.
 - **Use Case:** UC-AI-001.
 - **Entity/data:** RetrievalRequest, RetrievedChunk, AiInvocationAudit, SearchIndexMetadata.
-- **Trạng thái:** `CONFIRMED_PROJECT_DECISION`; chưa có chính sách Trường về nhà cung cấp/retention; thiết kế hiện không tự suy ra quyền gửi dữ liệu hạn chế.
-- **Chưa rõ:** Văn bản tổ chức về nhà cung cấp/retention và danh mục tài liệu cấm gửi nếu có.
-- **Ghi chú thiết kế:** Chỉ gửi đoạn tài liệu đã được kiểm quyền và giảm PII, giữ citation/source/version và nhật ký truy xuất; cần Khoa xác nhận chính sách nhà cung cấp/retention trước khi gửi dữ liệu thuộc diện hạn chế.
+- **Trạng thái:** Baseline dự án đã chọn backend kiểm quyền trước retrieval và chỉ gửi đoạn cần thiết đã giảm PII; đây chưa phải chấp thuận của Trường cho dữ liệu thật.
+- **Còn cần hỏi:** Văn bản của Trường/Khoa về nhà cung cấp, nơi xử lý/lưu dữ liệu, thời gian lưu và danh mục tài liệu không được gửi; trước khi được duyệt chỉ dùng dữ liệu tổng hợp/giả lập.
+- **Giải nghĩa “đoạn truy xuất”:** vài câu/đoạn liên quan được backend tìm thấy trong đề cương, báo cáo hoặc tài liệu hướng dẫn để Gemini trả lời có trích dẫn. Ví dụ, hỏi “đề cương thiếu mục nào?” có thể gửi các đoạn liên quan của đề cương. Metadata chỉ là thông tin mô tả như mã tài liệu, loại, phiên bản, ngày; nó không chứa phần văn bản để AI đọc. Ẩn danh tên/mã SV vẫn không chắc làm đoạn nội dung hết nhận diện được.
+- **Ghi chú thiết kế:** Chỉ gửi đoạn tài liệu người dùng được phép xem, đã giảm PII; giữ citation/source/version và không log nguyên văn mặc định. Phải có chính sách Trường/Khoa trước khi gửi dữ liệu thật thuộc diện hạn chế.
 
 ## Làm rõ từ các quyết định thiết kế cập nhật đến ngày 28/09/2026
 
@@ -244,7 +246,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 | Liên quan câu | Quyết định thiết kế đã chốt | Trạng thái triển khai hoặc điều kiện còn lại |
 | --- | --- | --- |
-| 2, 5 | SV tự lập nhóm 1–3; mỗi thành viên tự xác nhận bằng tài khoản riêng trước khi gửi; không ghép/thêm người sau khi gửi. Với đề tài SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài sau. Với đề tài GV đã duyệt, GV đề xuất nhận/từ chối trước khi TBM chốt. | Migration 0007 lưu được phản hồi thành viên, nhưng API/UI chưa yêu cầu đủ xác nhận và chưa hỗ trợ nhánh SV đề xuất. Chưa dùng prototype hiện tại để đăng ký thật. |
+| 2, 5 | SV tự lập nhóm 1–3; mỗi thành viên tự xác nhận bằng tài khoản riêng trước khi gửi; không ghép/thêm người sau khi gửi. Với đề tài SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài sau. Với đề tài GV đã duyệt, GV đề xuất nhận/từ chối trước khi TBM chốt. | Luồng API/UI tự xác nhận đã có cho đề tài GV đã duyệt; nhánh SV đề xuất vẫn chưa có runtime và luồng mới cần kiểm browser trực tiếp. |
 | 2, 7, 8 | Khoa giao người `ELIGIBILITY_VERIFIER` theo đợt để đối chiếu nguồn Phòng Đào tạo rồi xác nhận snapshot; TBM đúng Bộ môn kiểm chứng chuyên môn GV bằng minh chứng, còn hồ sơ tự khai của TBM do Trưởng khoa/người được giao kiểm. Điều phối viên KLTN khác Thư ký Hội đồng. TBM đúng Bộ môn chốt phân công GVHD. | Người thật, lịch và scope phân quyền phải được Khoa phân công. API xác nhận snapshot, kiểm chứng chuyên môn và quản lý assignment đầy đủ chưa chạy. |
 | 10 | GVHD quản lý tiến độ; lần 1 góp ý đề cương, lần 2 dự kiến tháng 12 khoảng 70% để GVHD khác góp ý chéo `COMMENT_ONLY`. | Luồng báo cáo/duyệt tiến độ chưa chạy. Ngày/giờ và người tham gia mỗi đợt lấy từ kế hoạch/phân công được duyệt. |
 | 11, 14 | Thay đổi đề tài đi theo workflow; rút/gia hạn ghi kết quả thủ tục ngoài. Đợt hiện tại chỉ dùng Điều 7 QĐ2919 để xét bảo vệ, không thêm điều kiện riêng của Khoa. | Runtime thay đổi đề tài, snapshot điều kiện và người xác nhận thật chưa đầy đủ. Danh sách, thời điểm khóa và kết quả thủ tục ngoài lấy theo nguồn được duyệt. |

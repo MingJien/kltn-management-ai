@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from backend.api.auth import router as auth_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
@@ -24,13 +26,30 @@ app = FastAPI(
     version="0.3.0",
     description="NV4 prototype. Development identity is disabled outside development/test.",
 )
+_session_secret = os.getenv("AUTH_SESSION_SECRET")
+if _session_secret and len(_session_secret) >= 32:
+    from starlette.middleware.sessions import SessionMiddleware
+
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=_session_secret,
+        session_cookie="kltn_session",
+        same_site="lax",
+        https_only=os.getenv("KLTN_ENV") == "production",
+        max_age=8 * 60 * 60,
+    )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=False,
+    allow_origins=list(dict.fromkeys([
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/"),
+    ])),
+    allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match"],
 )
+app.include_router(auth_router)
 
 
 @app.get("/health/live", response_model=HealthOut)
