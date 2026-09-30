@@ -35,7 +35,11 @@ def scenario(monkeypatch):
     users = [m.UserAccount(id=uuid4(), external_subject="test-"+uuid4().hex, base_role="STUDENT" if i<3 else "LECTURER", status="ACTIVE") for i in range(6)]
     students = [m.StudentProfile(id=uuid4(), user_id=users[i].id, student_code="T-"+uuid4().hex[:10], department_id=department.id, display_name="Synthetic student") for i in range(3)]
     lecturers = [m.LecturerProfile(id=uuid4(), user_id=users[i+3].id, lecturer_code="T-"+uuid4().hex[:10], department_id=department.id, display_name="Synthetic lecturer") for i in range(3)]
-    position = m.OrganizationalPosition(id=uuid4(), code="DEPARTMENT_HEAD", name="Department head")
+    position = session.scalar(select(m.OrganizationalPosition).where(
+        m.OrganizationalPosition.code == "DEPARTMENT_HEAD"
+    ))
+    if position is None:
+        position = m.OrganizationalPosition(id=uuid4(), code="DEPARTMENT_HEAD", name="Department head")
     head_assignment = m.PositionAssignment(id=uuid4(), lecturer_id=lecturers[1].id, position_id=position.id,
                                            department_id=department.id, effective_from=now-timedelta(days=1), state="ACTIVE")
     topic = m.Topic(id=uuid4(), round_id=round_.id, department_id=department.id,

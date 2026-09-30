@@ -230,13 +230,22 @@ def main() -> int:
             ))
             passed.append("DB-10")
 
-            department_position_id, faculty_position_id = uid(), uid()
-            conn.execute(m.OrganizationalPosition.__table__.insert().values(
-                id=department_position_id, code="DEPARTMENT_HEAD", name="Truong bo mon gia lap"
-            ))
-            conn.execute(m.OrganizationalPosition.__table__.insert().values(
-                id=faculty_position_id, code="FACULTY_DEAN", name="Truong khoa gia lap"
-            ))
+            department_position_id = conn.execute(select(m.OrganizationalPosition.id).where(
+                m.OrganizationalPosition.code == "DEPARTMENT_HEAD"
+            )).scalar_one_or_none()
+            if department_position_id is None:
+                department_position_id = uid()
+                conn.execute(m.OrganizationalPosition.__table__.insert().values(
+                    id=department_position_id, code="DEPARTMENT_HEAD", name="Truong bo mon gia lap"
+                ))
+            faculty_position_id = conn.execute(select(m.OrganizationalPosition.id).where(
+                m.OrganizationalPosition.code == "FACULTY_DEAN"
+            )).scalar_one_or_none()
+            if faculty_position_id is None:
+                faculty_position_id = uid()
+                conn.execute(m.OrganizationalPosition.__table__.insert().values(
+                    id=faculty_position_id, code="FACULTY_DEAN", name="Truong khoa gia lap"
+                ))
             for position_id, scope in ((faculty_position_id, {"faculty_id": faculty_id}),
                                        (department_position_id, {"department_id": department_id})):
                 values = dict(id=uid(), lecturer_id=lecturer_ids[0], position_id=position_id,
