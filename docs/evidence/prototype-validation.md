@@ -63,7 +63,11 @@ CSDL demo được xác minh là `kltn_dev` trên PostgreSQL 17.11, user `kltn_a
 | `pytest tests -q --basetemp .\tmp\pytest-run-20260930-kltn-dev-01 -p no:cacheprovider` | PASS, 8 test; 1 cảnh báo tương thích `TestClient/httpx` của Starlette |
 | Bộ seed demo | PASS, 5 tài khoản, 3 hồ sơ SV, 2 GV, 1 đợt, 3 snapshot điều kiện, 1 đề tài giả; chưa tạo đăng ký nhóm hoặc Thesis |
 | API GET với UUID giả lập SV/GV/TBM | PASS, `/health/ready`, `/api/v1/me/context` và `/api/v1/topics` trả HTTP 200; SV thấy một đề tài và 0 đăng ký |
+| React trên `http://127.0.0.1:5173` với API ở `kltn_dev` | PASS, đăng nhập UUID SV giả và hiển thị đề tài `Đề tài quản lý KLTN giả lập` |
+| Tìm đề tài tương tự trên trang AI | PASS, truy xuất `SYN-TOPIC-001`, điểm xếp hạng 0.810; giao diện ghi rõ điểm không phải tỉ lệ đạo văn |
+| Tra cứu hướng dẫn giả lập trên trang AI | PASS, trả nguồn `SYN-GUIDE-001` ở chế độ `RETRIEVAL_ONLY`; không sinh câu trả lời |
+| Console trình duyệt | Không có warning/error trong lượt kiểm tra |
 | `topic_registration` sau kiểm tra GET | 0 row |
 | `git diff --check` | PASS |
 
-Bộ demo chỉ dùng dữ liệu tổng hợp. Endpoint prototype hiện trình diễn tra cứu đề tài và lát cắt đăng ký đề tài do giảng viên đề xuất; giao diện chưa thực hiện từng thành viên tự xác nhận, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9. Trình diễn trên giao diện sau seed vẫn cần kiểm tra thủ công trước khi báo cáo hoàn tất NV4.
+Bộ demo chỉ dùng dữ liệu tổng hợp. Endpoint prototype hiện trình diễn tra cứu đề tài và lát cắt đăng ký đề tài do giảng viên đề xuất; giao diện chưa thực hiện từng thành viên tự xác nhận, nhánh đề tài do SV đề xuất, tiến độ/tài liệu, chấm điểm thật hoặc xuất Mẫu 9. AI chỉ truy xuất nguồn thử nghiệm; không tự kết luận đạo văn hoặc sinh câu trả lời.
