@@ -1,4 +1,4 @@
-# Đối chiếu 18 câu hỏi GVHD
+# Vấn đề đối chiếu
 
 Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả lời là một đoạn liên tục, không đánh số theo câu hỏi
 
