@@ -20,6 +20,8 @@ def main() -> None:
     os.environ["DATABASE_URL"] = make_url(configured_url).set(
         database="kltn_dev"
     ).render_as_string(hide_password=False)
+    if not os.getenv("QDRANT_URL") and not os.getenv("QDRANT_LOCAL_PATH"):
+        os.environ["QDRANT_LOCAL_PATH"] = "tmp/qdrant-prototype"
     os.environ["KLTN_ENV"] = "development"
     os.environ["KLTN_DEV_AUTH"] = "true"
     uvicorn.run("backend.api.main:app", host="127.0.0.1", port=8000)
