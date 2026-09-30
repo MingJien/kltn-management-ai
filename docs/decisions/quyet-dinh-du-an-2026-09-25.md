@@ -36,7 +36,7 @@ KLTN cũ là nguồn thử nghiệm chính; niên luận, đồ án học phần
 
 ## 5. Chấm điểm và biên bản Hội đồng
 
-Baseline Mẫu 6 của Khoa gồm **Hình thức 2 điểm, Nội dung 4 điểm, Demo/trả lời 4 điểm**, 12 tiêu chí con và điểm thưởng tối đa 1. Điểm nhóm là tổng của tiêu chí con, không cộng hai lần; thưởng đã nằm trong tổng phiếu, nên tổng cuối mỗi phiếu không vượt **10**. CSDL nạp [rubric Mẫu 6 đầy đủ](../design/rubric-mau-6.md) theo nguồn/phiên bản ở trạng thái `DRAFT`. QĐ2919 Điều 10 khoản 4 nêu cơ cấu khác `1/6/1/2`; Khoa cần xác nhận biểu mẫu có hiệu lực trước khi kích hoạt chấm thật. Kết quả của các đợt dùng rubric cũ phải giữ đúng phiên bản đã chấm.
+Baseline rubric dự án dùng Mẫu 6 của Khoa: **Hình thức 2 điểm, Nội dung 4 điểm, Demo/trả lời 4 điểm**, đủ 12 tiêu chí con; điểm thưởng tối đa 1 và tổng mỗi phiếu không quá **10**. Điểm nhóm chỉ tổng hợp tiêu chí con, không cộng lặp; thưởng nằm trong tổng phiếu. Đây là lựa chọn đã chốt cho phân tích, thiết kế và baseline CSDL; khác biệt với cách diễn đạt trong QĐ2919 được giữ lại trong sổ nguồn để truy vết, không còn là câu hỏi mở của NV4. CSDL nạp [rubric Mẫu 6 đầy đủ](../design/rubric-mau-6.md) ở trạng thái `DRAFT` vì runtime chấm điểm và việc gán đúng version cho đợt thật chưa được xây dựng. Nếu sau này có biểu mẫu/chính sách mới, tạo version rubric mới và giữ nguyên lịch sử.
 
 Mẫu 9 là **Biên bản họp Hội đồng chấm KLTN/ĐATN**, do **Chủ tịch và Thư ký** của đúng Hội đồng ký; không gán TBM ký Mẫu 9. Sau khi in nhưng **trước chữ ký đầu tiên**, Thư ký đối chiếu thực tế và xác nhận bản giấy chưa ai ký. Nếu sai, chính người chấm sửa phiếu của mình với lý do; hệ thống ghi audit, tính lại kết quả, đánh dấu `MinuteVersion` cũ `VOID`, tạo bản mới có liên kết `replacement_for_id`, mã phiên bản và thời gian phát hành rồi in lại. Tệp/hash bản cũ được giữ. **Từ chữ ký đầu tiên trên giấy hoặc điện tử**, khóa điểm, nội dung và phiên bản, kể cả khi biên bản tổng vẫn đang ở `PRINTED`; đủ hai chữ ký mới chuyển `SIGNED`. Lần tải hoặc in bản sao sau ký chỉ dùng đúng nội dung bản đã ký và được ghi nhận, không tạo bản nội dung khác.
 
@@ -51,7 +51,7 @@ Luồng xuất biểu mẫu đi từ dữ liệu có kiểu → adapter theo bi�
 Các lựa chọn trên đã đủ để tiếp tục thiết kế và phát triển. Trước khi hệ thống xác nhận quyền, chấm điểm hoặc tự từ chối hồ sơ thật, cần:
 
 1. Khoa phân công người giữ quyền xác nhận chuyên môn và đủ điều kiện theo đúng bộ môn/đợt; nhập lịch đợt chính thức.
-2. Khoa xác nhận hiệu lực Mẫu 6 so với cơ cấu QĐ2919 và hướng dẫn trích dẫn áp dụng cho KLTN đại học; chỉ khi đó mới kích hoạt rubric/checker tương ứng.
+2. Khi triển khai chấm thật, cấu hình đúng version rubric cho đợt được phép chấm; baseline hiện tại của dự án là Mẫu 6 như đã chốt. Nếu có văn bản hoặc biểu mẫu mới, thêm version mới, không sửa rubric đã dùng. Checker trích dẫn không được tự từ chối bài khi chưa có chính sách áp dụng cho đợt.
 3. Hoàn thiện service xác nhận từng thành viên và nhánh đề tài do sinh viên đề xuất, có test về quyền và thứ tự duyệt, trước khi mở đăng ký thật.
 4. Có mẫu trắng Mẫu 9 được duyệt, map field và kiểm xuất đúng bố cục; lưu chứng cứ chữ ký giấy/điện tử để khóa nội dung từ chữ ký đầu tiên.
 5. Chỉ xem xét chặn tự động bằng similarity khi đã có chính sách và bộ kiểm thử được phê duyệt.

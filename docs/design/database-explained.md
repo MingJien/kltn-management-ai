@@ -218,7 +218,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 
 ### `rubric_criterion` — nhóm và tiêu chí con của mẫu chấm
 
-`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Migration 0006 nạp Mẫu 6 DRAFT với ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; xem [bảng rubric đầy đủ](rubric-mau-6.md); **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Cơ cấu QĐ2919 khác; Khoa phải xác nhận mẫu có hiệu lực trước khi chấm thật.
+`rubric_template_id`: mẫu cha; `parent_id`: nhóm cha nếu là tiêu chí con; `code`, `label`: mã/nội dung; `max_points`: điểm tối đa; `criterion_type`: `GROUP`, `NORMAL` hoặc `BONUS`; `order_no`: thứ tự hiển thị. Có `id`, `created_at`, `updated_at`. Migration 0006 nạp Mẫu 6 DRAFT với ba nhóm 2/4/4, 12 tiêu chí con và thưởng tối đa 1; xem [bảng rubric đầy đủ](rubric-mau-6.md); **điểm nhóm chỉ tổng hợp, không cộng thêm lần nữa**. Mẫu 6 là baseline đã chốt của dự án; CSDL giữ DRAFT vì runtime chấm và gán version cho đợt thật chưa triển khai. Khác biệt với QĐ2919 được lưu để truy vết.
 
 ### `rubric_assignment` — chọn mẫu chấm cho đợt hoặc buổi
 
@@ -291,7 +291,7 @@ Tài khoản nền tảng chỉ có `ADMIN`, `LECTURER`, `STUDENT`; chức vụ 
 | 13 | `council`, `defense_session`, `session_thesis` | Một Hội đồng nhiều buổi, một buổi nhiều KLTN. |
 | 14 | `defense_eligibility_check`, `advisor_review` | Điều kiện Trường có căn cứ; đợt hiện tại không thêm tiêu chí Khoa. |
 | 15 | `evaluation`, `council_minute`, `minute_version`, `audit_event` | Người chấm sửa phiếu mình sau in nếu giấy chưa ký; Thư ký VOID/in version mới; từ chữ ký đầu khóa. |
-| 16 | `rubric_template`, `rubric_criterion`, `evaluation_item`, `bonus_evidence` | Lưu đầy đủ Mẫu 6; Khoa phải xác nhận hiệu lực trước chấm thật. |
+| 16 | `rubric_template`, `rubric_criterion`, `evaluation_item`, `bonus_evidence` | Lưu baseline Mẫu 6 (2/4/4, thưởng ≤1, tổng ≤10); CSDL đang DRAFT vì runtime chấm và gán version cho đợt thật chưa có. |
 | 17 | `repository_item`, `search_index_metadata` | Metadata và bản công bố phục vụ tra cứu; AI chỉ trỏ tới nguồn được phép. |
 | 18 | `retrieval_audit`, `search_index_metadata` | Thiết kế giảm PII và kiểm quyền trước truy xuất; chỉ dùng dữ liệu được phép và giảm PII; gửi dữ liệu hạn chế cần chính sách nhà cung cấp/retention được xác nhận. |
 

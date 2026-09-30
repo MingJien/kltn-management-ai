@@ -29,10 +29,10 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 
 ## Kiểm chứng bổ sung migration 0006
 
-- Đối chiếu migration với `SRC-MAU-06`: cả 16 dòng mã, tên và điểm tối đa khớp biểu mẫu nguồn; 3 nhóm 2/4/4, 12 tiêu chí con, 1 thưởng ≤1. Dữ liệu nạp ở `DRAFT`, chưa có `RubricAssignment` thật.
+- Đối chiếu migration với `SRC-MAU-06`: cả 16 dòng mã, tên và điểm tối đa khớp biểu mẫu nguồn; 3 nhóm 2/4/4, 12 tiêu chí con, 1 thưởng ≤1. Dữ liệu nạp ở `DRAFT`, chưa có `RubricAssignment` thật. Tại thời điểm kiểm chứng ngày 25/09, quyết định chọn baseline Mẫu 6 cho dự án chưa được xác nhận.
 - Nâng `kltn_dev` từ 0005 → 0006: PASS. `alembic check`: không có drift. DB-01..41 PASS, gồm DB-41 kiểm rubric thật; dữ liệu thử được rollback.
 - `tools.validate_migrations_disposable`: PASS nâng từ đầu/check/DB validation/seed giả/hạ 0006/nâng lại/check. `tools.validate_sql_snapshot`: PASS trên schema trống, head 0006, 63 bảng và 16 dòng rubric Mẫu 6.
-- `pytest -q`: 8 passed; build React và OpenAPI/Draw.io không đổi do đây là migration dữ liệu. Chưa kiểm runtime chấm thật, và Khoa chưa xác nhận hiệu lực Mẫu 6 khi QĐ 2919 nêu cơ cấu khác.
+- `pytest -q`: 8 passed; build React và OpenAPI/Draw.io không đổi do đây là migration dữ liệu. Chưa kiểm runtime chấm thật; tại thời điểm kiểm chứng 25/09, baseline Mẫu 6 chưa được chốt trong dự án.
 
 ## Kiểm chứng bổ sung migration 0007
 
@@ -47,7 +47,7 @@ Ngày chạy: 25/09/2026. Môi trường local Windows; PostgreSQL 17.11, Python
 - DB-27..39 kiểm MANAGED_THESIS, imported THESIS/CAPSTONE_PROJECT/TERM_PROJECT/COURSE_PROJECT, REGULATION/FORM, cặp origin sai bị chặn, index metadata không cần DocumentVersion, SimilarityMatch trỏ RepositoryItem, hai row chữ ký Mẫu 9, source ID duy nhất và URL HTTPS. **Hai row chữ ký chỉ là khả năng dữ liệu; chưa chứng minh service chuyển SIGNED đúng role.**
 - Qdrant unit test dùng vector giả lập để kiểm filter quyền, source type, revoke/deindex/reindex và citation. Thêm 5 ca kiểm chức năng: sao chép, sửa nhẹ, diễn đạt lại, cùng chủ đề khác nội dung, không liên quan; mọi ca vẫn advisory, không tự chặn hoặc phán đạo văn. Vector giả không phải kết quả đánh giá AI. Model thật chỉ chạy smoke trên 2 nguồn **giả lập**. Chưa nhập 7 KLTN thật, chưa đo precision/recall, chưa chọn threshold, chưa kiểm similarity toàn văn với 5 tình huống controlled.
 - Docker daemon không chạy, nên Qdrant container chưa được thử; Qdrant local mode đã chạy. Gemini chưa có key, không có generation thật; FakeLLM chưa cần trong runtime.
-- Mẫu 9 local là các biên bản đã điền thông tin thật. Hiện chưa có mẫu trắng được duyệt và đánh dấu field; chưa có runtime exact export, test layout hay service hai chữ ký. Trạng thái BLOCKED_SOURCE_TEMPLATE. Mẫu 6 còn CONFLICT-011.
+- Mẫu 9 local là các biên bản đã điền thông tin thật. Hiện chưa có mẫu trắng được duyệt và đánh dấu field; chưa có runtime exact export, test layout hay service hai chữ ký. Trạng thái BLOCKED_SOURCE_TEMPLATE. Cập nhật quyết định thiết kế ngày 30/09: baseline Mẫu 6 của dự án là 2/4/4, thưởng tối đa 1, tổng không quá 10; khác biệt với QĐ2919 được lưu để truy vết, không còn là câu hỏi mở. Runtime chấm và gán rubric theo đợt vẫn chưa triển khai.
 - React đã chạy browser toàn luồng bằng dữ liệu giả trên schema tạm; chưa có SSO production. Kiểm thị giác pixel và browser console vẫn chưa PASS. API design rộng hơn runtime; các operation `DESIGN_ONLY` chưa được coi là PASS.
 
 Các giới hạn này được giữ trong README/thiết kế để người xem không nhầm thiết kế với phần đã chạy.
