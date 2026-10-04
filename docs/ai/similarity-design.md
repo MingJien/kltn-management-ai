@@ -6,7 +6,7 @@
 2. Nguồn có nhắc mốc 90% nhưng không định nghĩa metric/corpus/exclusion; bản hiện tại **không dùng mốc này để chặn**. Cấm map cosine 0,9 = 90%.
 3. Hybrid gồm lexical + semantic; semantic chỉ tìm candidate. Document percentage phải dựa trên coverage metric đã định nghĩa/đánh giá.
 4. Baseline sản phẩm là ADVISORY: GVHD xem bằng chứng, SV sửa/nộp version mới; không có auto-gate ở upload, final submission hay bảo vệ. Gate tương lai là yêu cầu mới cần Khoa duyệt policy và thử nghiệm độ chính xác.
-5. Gemini được phép ở cấp project decision: authorization trước retrieval, chunks cần thiết, giảm PII, key backend-only, log an toàn. Đây không phải quy định Trường.
+5. Theo góp ý GV 03/10, Gemini chưa được kết nối. Thiết kế tương lai chỉ gửi câu hỏi đã lọc và đoạn từ quy định chính thức hoặc tài liệu đã công bố; không gửi tên, MSSV, điểm, kỷ luật hay báo cáo chưa công bố của người khác. Trước khi có bộ lọc kiểm chứng được, không gọi provider.
 
 ## Từ vựng metric
 
@@ -52,7 +52,7 @@ flowchart TD
 - Bộ dữ liệu hiệu chỉnh có quyền sử dụng; precision/recall/F1/coverage error.
 - Version, effective range và migration khi model/index đổi.
 
-## RAG với Gemini
+## RAG với Gemini — thiết kế tương lai, chưa bật
 
 ~~~mermaid
 sequenceDiagram
@@ -64,8 +64,8 @@ sequenceDiagram
   U->>A: Câu hỏi
   A->>P: Resolve scope + repository item được phép
   A->>Q: Retrieval có payload filter
-  Q-->>A: Chunks tối thiểu + provenance
-  A->>A: Giảm PII, giới hạn context, xem text là dữ liệu không tin cậy
+  Q-->>A: Trích đoạn + provenance
+  A->>A: Chỉ quy định chính thức/tài liệu đã công bố; lọc PII trong câu hỏi và đoạn
   A->>G: System instruction + bounded context
   G-->>A: Bản nháp trả lời
   A-->>U: Câu trả lời + citation + link web
@@ -73,8 +73,8 @@ sequenceDiagram
 
 Guardrail bắt buộc:
 
-- Không gửi full document mặc định; không gửi chunks ngoài quyền.
-- Không đưa MSSV/tên/ngày sinh/điểm vào prompt nếu không cần thiết và không được phép.
+- Không gửi full document, tài liệu nội bộ chưa công bố hoặc chunk ngoài quyền, kể cả khi người hỏi được xem trong web.
+- Không gửi tên, MSSV, ngày sinh, điểm, kỷ luật/án tích hoặc báo cáo chưa công bố của người khác.
 - Không dùng Vite/client để giữ API key.
 - Retrieved instruction không thể thay system rule hoặc cấp tool quyền.
 - AI không có command duyệt topic, phân công, chấm, ký hoặc đổi state.

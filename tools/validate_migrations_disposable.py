@@ -22,6 +22,9 @@ def main() -> int:
     if not original:
         print("DATABASE_URL missing")
         return 2
+    # seed_demo intentionally targets kltn_dev, so the disposable schema must
+    # live in that database too. Credentials stay in process memory.
+    original = make_url(original).set(database="kltn_dev").render_as_string(hide_password=False)
     name = "nv4_disposable_" + uuid4().hex[:12]
     assert re.fullmatch(r"nv4_disposable_[0-9a-f]{12}", name)
     engine = create_engine(original)
@@ -43,9 +46,6 @@ def main() -> int:
         [sys.executable, "-m", "alembic", "check"],
         [sys.executable, "-m", "backend.db.validate_schema"],
         [sys.executable, "-m", "tools.seed_demo", "--execute"],
-        [sys.executable, "-m", "alembic", "downgrade", "-1"],
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        [sys.executable, "-m", "alembic", "check"],
     ]
     try:
         for command in commands:
@@ -55,6 +55,11 @@ def main() -> int:
                 print("FAIL", label, result.stdout[-1000:], result.stderr[-1000:])
                 return result.returncode
             print("PASS", label)
+        blocked = subprocess.run([sys.executable, "-m", "alembic", "downgrade", "-1"], env=env, text=True, capture_output=True)
+        if blocked.returncode == 0 or "do not discard them automatically" not in blocked.stderr:
+            print("FAIL forward-only migration guard")
+            return 1
+        print("PASS 0011 forward-only guard preserves topic/evidence metadata")
         return 0
     finally:
         if created:

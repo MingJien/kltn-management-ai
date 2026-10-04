@@ -4,7 +4,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | TRC-01 | REQ-AUTH-001..003 / UC-AUTH-001 | UserAccount, PositionAssignment | `GET /me` | SCR-01 | Base role hoặc Admin đơn lẻ không thực hiện action TBM/HĐ. | CONFIRMED/DERIVED |
 | TRC-02 | REQ-ROUND-001 / UC-ROUND-001 | AcademicYear, ThesisRound, RoundPolicy | `/academic-years`, `/thesis-rounds` | SCR-02 | MAIN/SUPPLEMENTARY chung mô hình; ngày mẫu không tự nhập. | CONFIRMED_PROJECT_DECISION |
-| TRC-03 | REQ-ELIG-001..002 / UC-ELIG-001 | EligibilitySnapshot/Exception | `/rounds/{id}/eligibility-snapshots` | SCR-03 | GPA 2,49 hoặc credit <70% bị chặn nếu không có ngoại lệ; snapshot có nguồn. | CONFIRMED |
+| TRC-03 | REQ-ELIG-001..002 / UC-ELIG-001 | EligibilitySnapshot/Exception | `/rounds/{id}/eligibility-snapshots` | SCR-03 | Người Khoa được giao đối chiếu GPA/tín chỉ với nguồn Phòng Đào tạo và xác nhận kết quả; API chỉ mở đăng ký cho snapshot CONFIRMED. Chưa có runtime tự tính điều kiện từ GPA/tín chỉ. | CONFIRMED |
 | TRC-04 | REQ-EXP-001 / UC-EXP-001 | LecturerExpertise/Evidence | `/lecturer-expertise` | SCR-04 | Hồ sơ tự khai có nhãn; TBM đúng Bộ môn kiểm chứng, tự khai của TBM do Trưởng khoa/người được giao kiểm. | CONFIRMED_PROJECT_DESIGN |
 | TRC-05 | REQ-TOPIC-001..003 / UC-TOPIC-001..003 | Topic, TitleVersion, TopicRequirement | `/topics`, `/topics/{id}/requirements` | SCR-04 | TBM chỉnh tên có history; preferred GPA không auto reject. | CONFIRMED |
 | TRC-06 | REQ-REG-001..006 / UC-REG-001/002 | TopicRegistration, RegistrationMember | `/topic-registrations` | SCR-05 | Một active registration/SV/round; 1–3 SV tự xác nhận trước gửi; không nguyện vọng 2; không ghép sau SUBMITTED. | CONFIRMED_PROJECT_DECISION |
@@ -33,7 +33,7 @@
 
 | Source → Requirement → Rule | Use case / quyền / state | Entity/column | API → màn hình | Test / trạng thái |
 | --- | --- | --- | --- | --- |
-| SRC-PROJECT-DEC-20260925 → REQ-REG-005..006 → BR-REG-005 | UC-REG-001/002; SV tự lập, từng member tự xác nhận; SUBMITTED khóa member | topic_registration, registration_member consent fields (0007); unique active student/round | POST /topic-registrations + member-response DESIGN_ONLY → SCR-05 | CSDL DB-42 PASS; prototype chưa có self-response và chỉ dùng Topic GV APPROVED |
+| SRC-PROJECT-DEC-20260925 → REQ-REG-005..006 → BR-REG-005 | UC-REG-001/002; SV tự lập, từng member tự xác nhận; SUBMITTED khóa member | topic_registration, registration_member consent fields (0007); unique active student/round | POST /topic-registrations + member-response + submit → SCR-05 | DB-42 PASS; kiểm thử API và browser xác nhận cá nhân, khóa sau gửi, luồng GV và SV đề xuất PASS |
 | SRC-PROJECT-DEC-20260925 → REQ-REG-003 → BR-REG-003 | UC-ASSIGN-001; GV đề xuất quyết định; TBM position đúng scope finalize | Thesis, ThesisMember, AdvisorAssignment, row_version | POST lecturer-decision, department-finalization → SCR-05 /registrations, /theses/:id | integration test PASS, một transaction |
 | SRC-PROJECT-DEC-20260925 → REQ-ROUND-002 → BR-ROUND-002 | UC-ROUND-001; KLTN_COORDINATOR theo round khác Secretary | ResourceAssignment.round_id/assignment_type; CouncilMember.role_code | context/round milestones thiết kế → SCR-02/08 | Design-only; ngày theo round |
 | SRC-MAU-09 + SRC-PROJECT-DEC-20260925 → REQ-MIN-001/REQ-EXPORT-001 → BR-MIN-002/BR-EXPORT-001 | UC-MIN-001/002; Secretary + Chair, PRINTED → SIGNED khi đủ hai | MinuteSignature, CouncilMinute, StoredFile | design-only signature/export → SCR-14 | DB-37 PASS cho 2 row; role service/export chưa PASS, BLOCKED_SOURCE_TEMPLATE |

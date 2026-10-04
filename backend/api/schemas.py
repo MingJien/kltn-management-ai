@@ -4,7 +4,36 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+class RequirementInput(BaseModel):
+    requirement_type: Literal["PREFERRED_GPA", "SKILL", "TECHNOLOGY", "KNOWLEDGE", "OTHER"]
+    value_text: str = Field(default="", max_length=1000)
+    preferred_gpa: float | None = Field(default=None, ge=0, le=4)
+
+    @model_validator(mode="after")
+    def valid_requirement(self):
+        self.value_text = self.value_text.strip()
+        if self.requirement_type == "PREFERRED_GPA":
+            if self.preferred_gpa is None:
+                raise ValueError("GPA requirement needs a value between 0 and 4")
+        elif not self.value_text or self.preferred_gpa is not None:
+            raise ValueError("Non-GPA requirements need text, without a GPA value")
+        return self
+
+
+class LecturerOut(BaseModel):
+    id: UUID
+    display_name: str
+    lecturer_code: str
+
+
+class TitleVersionOut(BaseModel):
+    version_no: int
+    title: str
+    change_reason: str | None
+    created_at: datetime
 
 
 class TopicOut(BaseModel):
@@ -14,11 +43,61 @@ class TopicOut(BaseModel):
     description: str | None
     max_students: int
     state: str
+    row_version: int
+    department_id: UUID
+    proposer_user_id: UUID
+    decision_reason: str | None = None
+    code: str
+    round_label: str
+    proposer_type: str
+    receiving_lecturer_id: UUID | None
+    receiving_lecturer_name: str | None
+    requirements: list[RequirementInput]
+    title_versions: list[TitleVersionOut]
+    available: bool
+
+
+class TopicCreate(BaseModel):
+    round_id: UUID
+    title: str = Field(min_length=5, max_length=500)
+    description: str | None = Field(default=None, max_length=5000)
+    max_students: int = Field(default=3, ge=1, le=3)
+    requirements: list[RequirementInput] = Field(default_factory=list, max_length=10)
+    receiving_lecturer_id: UUID | None = None
+
+
+class TopicUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=5, max_length=500)
+    description: str | None = Field(default=None, max_length=5000)
+    max_students: int | None = Field(default=None, ge=1, le=3)
+    requirements: list[RequirementInput] | None = Field(default=None, max_length=10)
+    receiving_lecturer_id: UUID | None = None
+
+
+class TopicDecision(BaseModel):
+    decision: Literal["APPROVE", "RETURN", "REJECT"]
+    reason: str | None = Field(default=None, max_length=2000)
+    revised_title: str | None = Field(default=None, min_length=5, max_length=500)
+    receiving_lecturer_id: UUID | None = None
+
+
+class OpenRoundOut(BaseModel):
+    id: UUID
+    code: str
+    closes_at: datetime
+    academic_year: str
+    label: str
 
 
 class RegistrationCreate(BaseModel):
     topic_id: UUID
     member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
+    confirm_creator: bool = False
+
+
+class StudentProposalCreate(TopicCreate):
+    member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
+    confirm_creator: bool = False
 
 
 class RegistrationMemberOut(BaseModel):
@@ -28,6 +107,7 @@ class RegistrationMemberOut(BaseModel):
     is_coordinator: bool
     active: bool
     consent_status: str
+    evidence_file_name: str | None = None
 
 
 class MemberResponse(BaseModel):
@@ -44,6 +124,14 @@ class RegistrationOut(BaseModel):
     members: list[RegistrationMemberOut]
     lecturer_decided_at: datetime | None = None
     thesis_id: UUID | None = None
+    topic_title: str
+    topic_proposer_user_id: UUID
+    topic_code: str
+    topic_state: str
+    proposer_type: str
+    receiving_lecturer_user_id: UUID | None
+    receiving_lecturer_name: str | None
+    lecturer_reason: str | None
 
 
 class LecturerDecision(BaseModel):
@@ -57,6 +145,11 @@ class ContextOut(BaseModel):
     student_id: UUID | None = None
     lecturer_id: UUID | None = None
     actions: list[str]
+    display_name: str
+    department_id: UUID | None = None
+    email: str | None = None
+    student_code: str | None = None
+    lecturer_code: str | None = None
 
 
 class ErrorOut(BaseModel):

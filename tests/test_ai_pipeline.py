@@ -76,6 +76,16 @@ def test_qdrant_scoped_retrieval_and_rag(tmp_path):
     assert rag["status"] == "RETRIEVAL_ONLY"
     assert rag["answer"] is None
     assert rag["citations"][0]["source_id"] == "guide-public"
+    class ForbiddenProvider:
+        def answer(self, question, evidence):
+            raise AssertionError("External provider must never receive content")
+
+    try:
+        retrieve_answer(index, "Nộp hồ sơ thế nào?", scope="INTERNAL", provider=ForbiddenProvider())
+    except RuntimeError as exc:
+        assert "disabled" in str(exc)
+    else:
+        raise AssertionError("External provider was not blocked")
     assert retrieve_answer(index, "?", scope="OTHER")["status"] == "NO_EVIDENCE"
     similarities = advisory_similarity(index, "Đăng ký nhóm", scope="PUBLIC")
     assert similarities["status"] == "ADVISORY"

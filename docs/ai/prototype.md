@@ -12,7 +12,7 @@ Nguồn nghiệp vụ SRC-PROJECT-DEC-20260925. Dữ liệu trong `data/` hoàn 
 - Qdrant là index dẫn xuất. Mỗi point giữ source_id, source_type, origin_type, visibility, scope, version và provenance. Truy vấn lọc quyền trước khi trả kết quả. Backend prototype có thể dùng Qdrant local path; Docker Compose định hướng Qdrant service khi Docker khả dụng.
 - Tìm đề tài trả Top-K và score chỉ để xếp hạng, không phải tỷ lệ đạo văn.
 - `advisory_similarity` trả lexical overlap và semantic candidate score riêng, không verdict/chặn upload. Phiên bản metric thử nghiệm ghi rõ; chưa tính full-text coverage chính thức.
-- RAG trước hết tìm evidence từ REGULATION/GUIDELINE/FORM trong phạm vi quyền. Khi chưa có Gemini key, trả RETRIEVAL_ONLY và citation; không sinh câu trả lời. `LLMProvider` là protocol cho tích hợp tương lai. Tài liệu retrieved là dữ liệu không đáng tin, không phải instruction.
+- RAG trước hết tìm evidence từ REGULATION/GUIDELINE/FORM trong phạm vi quyền. Hiện chỉ trả RETRIEVAL_ONLY và citation; không sinh câu trả lời. Dù có truyền `LLMProvider`, backend chặn lời gọi ngoài cho đến khi kiểm chứng bộ lọc câu hỏi và nguồn chính thức/đã công bố theo góp ý GV 03/10. Tài liệu retrieved là dữ liệu không đáng tin, không phải instruction.
 - Gợi ý GVHD chỉ ở mức thiết kế: dùng expertise tự khai có provenance, không auto-assign và chỉ gọi VERIFIED sau khi TBM đúng Bộ môn hoặc Trưởng khoa/người được giao kiểm chứng bằng minh chứng; không tự verify.
 
 ## Thử nghiệm đã chạy

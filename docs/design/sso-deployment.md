@@ -1,4 +1,8 @@
-# Đăng nhập bằng tài khoản Trường
+# Phương án SSO Trường (để mở rộng sau)
+
+**Quyết định hiện tại đã đổi sang [email/mật khẩu do hệ thống quản lý](local-auth.md)** để hoàn thành và kiểm thử độc lập theo hai lựa chọn GV đưa ra. Tài liệu này chỉ giữ phương án SSO dự phòng; mã callback cũ chưa kết nối Trường và không phải luồng đăng nhập chính.
+
+[Thông báo DThU về email sinh viên](https://cmsweb.dthu.edu.vn/Uploads/TapTin/202491316274.pdf) cho biết sinh viên có địa chỉ `@student.dthu.edu.vn` và đăng nhập hộp thư qua Gmail; [DOffice](https://do.dthu.edu.vn/) có tùy chọn SSO. Điều này **chưa chứng minh** Khoa được cấp OIDC client cho ứng dụng KLTN hoặc GV dùng cùng nhà cung cấp. IdP cụ thể do CNTT Trường xác nhận nếu sau này tích hợp. Không nhận mật khẩu Trường trong ứng dụng.
 
 ## Luồng hệ thống
 
@@ -9,6 +13,8 @@
 5. Mọi quyền và hồ sơ SV/GV vẫn lấy từ PostgreSQL. Không lấy role từ form, không nhận UUID do người dùng nhập, không tự tạo account nếu chưa được liên kết.
 
 `sub` là mã định danh do nhà cung cấp cấp. Quản trị phải liên kết `external_subject` của từng tài khoản KLTN tới đúng `sub` qua quy trình nội bộ được duyệt; không dùng email làm khóa thay thế vì email có thể đổi hoặc không duy nhất. Bản ghi thử nghiệm hiện có không tự được biến thành danh tính thật.
+
+Nếu kích hoạt SSO về sau, Khoa/Trường phải liên kết người dùng với hồ sơ SV/GV và quyền đã xác minh. Tài khoản Google cá nhân không đương nhiên được vào. Hệ thống phải đối chiếu `issuer` cùng `sub` nếu dùng nhiều IdP; không lấy email thay khóa định danh.
 
 ## Việc bộ phận CNTT của Trường cần cấp
 

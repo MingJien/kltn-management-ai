@@ -52,7 +52,7 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20260925_0007"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20261004_0011"
 
             # DB-41: the real Mẫu 6 baseline is present but cannot be used live
             # until the Faculty resolves its conflict with QĐ 2919.
@@ -96,6 +96,22 @@ def main() -> int:
                 conn.execute(m.UserAccount.__table__.insert().values(
                     id=user_id, external_subject=f"synthetic-{i}-{user_id}", base_role=role, status="ACTIVE"
                 ))
+            local_id = uid()
+            conn.execute(m.UserAccount.__table__.insert().values(
+                id=local_id, email="synthetic-user@example.invalid", password_hash="SYNTHETIC_HASH_NOT_FOR_LOGIN",
+                email_verified_at=now, base_role="STUDENT", status="ACTIVE"
+            ))
+            expect_integrity(conn, lambda: conn.execute(m.UserAccount.__table__.insert().values(
+                id=uid(), email="synthetic-user@example.invalid", password_hash="SYNTHETIC_OTHER_HASH",
+                base_role="STUDENT", status="ACTIVE"
+            )), "duplicate local email")
+            expect_integrity(conn, lambda: conn.execute(m.UserAccount.__table__.insert().values(
+                id=uid(), email="synthetic-unpaired@example.invalid", base_role="STUDENT", status="ACTIVE"
+            )), "email without password hash")
+            expect_integrity(conn, lambda: conn.execute(m.UserAccount.__table__.insert().values(
+                id=uid(), base_role="STUDENT", status="ACTIVE"
+            )), "account without an identity")
+            passed.append("DB-45")
             student_ids = [uid() for _ in range(4)]
             for i, student_id in enumerate(student_ids):
                 conn.execute(m.StudentProfile.__table__.insert().values(
@@ -130,16 +146,25 @@ def main() -> int:
                 conn.execute(m.EligibilitySnapshot.__table__.insert().values(
                     id=uid(), student_id=student_id, round_id=round_id, version=1,
                     passed_credit_ratio=Decimal("0.80"), gpa_4=Decimal("3.00"),
-                    discipline_status="CLEAR", criminal_case_status="CLEAR",
                     evidence_ref=f"SYN-EVIDENCE-{i}", captured_at=now,
                     confirmed_by=user_ids[4], confirmed_at=now, state="CONFIRMED"
                 ))
+            expect_integrity(conn, lambda: conn.execute(text(
+                "UPDATE eligibility_snapshot SET passed_credit_ratio=1.2 "
+                "WHERE student_id=:student_id AND round_id=:round_id"
+            ), {"student_id": student_ids[0], "round_id": round_id}), "credit ratio above 1")
+            passed.append("DB-43")
+            expect_integrity(conn, lambda: conn.execute(text(
+                "UPDATE eligibility_snapshot SET gpa_4=4.2 "
+                "WHERE student_id=:student_id AND round_id=:round_id"
+            ), {"student_id": student_ids[0], "round_id": round_id}), "GPA above 4")
+            passed.append("DB-44")
 
             topic_id = uid()
             conn.execute(m.Topic.__table__.insert().values(
                 id=topic_id, round_id=round_id, department_id=department_id,
                 proposer_user_id=user_ids[4], proposer_type="LECTURER",
-                current_title="De tai KLTN gia lap", max_students=3, state="APPROVED"
+                code="TEST-"+topic_id.hex, current_title="De tai KLTN gia lap", max_students=3, state="APPROVED"
             ))
             conn.execute(m.TopicRequirement.__table__.insert().values(
                 id=uid(), topic_id=topic_id, requirement_type="PREFERRED_GPA",
@@ -165,7 +190,7 @@ def main() -> int:
             conn.execute(m.Topic.__table__.insert().values(
                 id=topic2_id, round_id=round_id, department_id=department_id,
                 proposer_user_id=user_ids[5], proposer_type="LECTURER",
-                current_title="De tai gia lap thu hai", max_students=3, state="APPROVED"
+                code="TEST-"+uid().hex, current_title="De tai gia lap thu hai", max_students=3, state="APPROVED"
             ))
             conn.execute(m.TopicRegistration.__table__.insert().values(
                 id=registration2_id, round_id=round_id, topic_id=topic2_id,
@@ -602,7 +627,7 @@ def main() -> int:
             ), "delete referenced account")
             passed.append("DB-18")
 
-            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,43)}
+            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,46)}
             assert set(passed)==expected, sorted(expected-set(passed))
         except Exception as exc:
             print("FAIL "+type(exc).__name__+": "+str(exc))

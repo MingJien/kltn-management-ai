@@ -1,6 +1,6 @@
 # ERD logical + physical PostgreSQL
 
-> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20260925_0007. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
+> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20261004_0011. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
 
 Bộ [6 ERD theo cụm nghiệp vụ](erd-clusters/README.md) được tái sinh từ schema PostgreSQL `kltn_ai` đang chạy, có PNG/SVG và kiểm PK/FK đối chiếu SQLAlchemy. ERD trên trang này vẫn là mục tra tổng thể.
 
@@ -28,6 +28,9 @@ erDiagram
     uuid id PK
     int row_version
     varchar external_subject UK
+    varchar email UK
+    varchar password_hash
+    timestamptz email_verified_at
   }
   STUDENT_PROFILE {
     uuid user_id FK,UK
@@ -140,6 +143,8 @@ erDiagram
 ~~~mermaid
 erDiagram
   TOPIC {
+    varchar code UK
+    uuid receiving_lecturer_id FK
     uuid round_id FK
     uuid department_id FK
     uuid proposer_user_id FK
@@ -169,6 +174,7 @@ erDiagram
     int row_version
   }
   REGISTRATION_MEMBER {
+    uuid evidence_file_id FK
     uuid registration_id FK,UK
     uuid round_id FK,UK
     uuid student_id FK,UK
@@ -557,6 +563,7 @@ erDiagram
 | topic.decided_by | user_account.id | NULL | 0..N / 0..1 | fk_topic_decided_by_user_account |
 | topic.department_id | department.id | NOT NULL | 0..N / 1 | fk_topic_department_id_department |
 | topic.proposer_user_id | user_account.id | NOT NULL | 0..N / 1 | fk_topic_proposer_user_id_user_account |
+| topic.receiving_lecturer_id | lecturer_profile.id | NULL | 0..N / 0..1 | fk_topic_receiving_lecturer_id_lecturer_profile |
 | topic.round_id | thesis_round.id | NOT NULL | 0..N / 1 | fk_topic_round_id_thesis_round |
 | council_member.council_id | council.id | NOT NULL | 0..N / 1 | fk_council_member_council_id_council |
 | council_member.lecturer_id | lecturer_profile.id | NOT NULL | 0..N / 1 | fk_council_member_lecturer_id_lecturer_profile |
@@ -587,6 +594,7 @@ erDiagram
 | expertise_evidence.expertise_id | lecturer_expertise.id | NOT NULL | 0..N / 1 | fk_expertise_evidence_expertise_id_lecturer_expertise |
 | registration_member.registration_id | topic_registration.id | NOT NULL | 0..N / 1 | fk_registration_member_registration_id_round_id_topic_registration |
 | registration_member.round_id | topic_registration.round_id | NOT NULL | 0..N / 1 | fk_registration_member_registration_id_round_id_topic_registration |
+| registration_member.evidence_file_id | stored_file.id | NULL | 0..N / 0..1 | fk_registration_member_evidence_file_id_stored_file |
 | registration_member.student_id | student_profile.id | NOT NULL | 0..N / 1 | fk_registration_member_student_id_student_profile |
 | registration_member.responded_by_user_id | user_account.id | NULL | 0..N / 0..1 | fk_registration_member_responded_by_user_id_user_account |
 | rubric_assignment.round_id | thesis_round.id | NULL | 0..N / 0..1 | fk_rubric_assignment_round_id_thesis_round |
@@ -700,6 +708,7 @@ erDiagram
 | eligibility_snapshot | student_id, round_id, version | UNIQUE | uq_eligibility_snapshot_student_id_round_id_version |
 | eligibility_exception | snapshot_id | UNIQUE | uq_eligibility_exception_snapshot_id |
 | lecturer_expertise | lecturer_id, version | UNIQUE | uq_lecturer_expertise_lecturer_id_version |
+| topic | code | UNIQUE | uq_topic_code |
 | topic_title_version | topic_id, version_no | UNIQUE | uq_topic_title_version_topic_id_version_no |
 | topic_registration | id, round_id | UNIQUE | uq_topic_registration_id_round_id |
 | registration_member | registration_id, student_id | UNIQUE | uq_registration_member_registration_id_student_id |
@@ -759,6 +768,6 @@ erDiagram
 - `search_index_metadata.document_version_id` NULL được cho nguồn nhập/official, nhưng `repository_item_id` luôn NOT NULL.
 - `similarity_match.source_repository_item_id` là FK tùy chọn đến nguồn, song song với `source_document_version_id` của tài liệu vận hành.
 
-Dữ liệu thực tế theo PostgreSQL 17 local sau 0007: 62 entity/617 cột; thêm `alembic_version` là 63 bảng/618 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
+Dữ liệu thực tế theo PostgreSQL 17 local sau 0011: 62 entity/621 cột; thêm `alembic_version` là 63 bảng/622 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
 
 Migration 0004 thêm `repository_item.external_source_id` (UNIQUE) và `source_url` (HTTPS); giữ ID nguồn ổn định để đồng bộ PostgreSQL/Qdrant.

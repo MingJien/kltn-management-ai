@@ -4,9 +4,10 @@
 | --- | --- | --- | --- |
 | BR-AUTH-001 | Một người chỉ dùng một `UserAccount`; base role thuộc `ADMIN/LECTURER/STUDENT`. | CONFIRMED | REQ-AUTH-001 |
 | BR-AUTH-002 | Thẩm quyền nghiệp vụ = base role + position/assignment + resource + trạng thái; `ADMIN` không được bỏ qua phép kiểm tra này. | CONFIRMED_PROJECT_DECISION | REQ-AUTH-002..003 |
+| BR-AUTH-003 | Tài khoản email local phải xác minh quyền sở hữu email và được liên kết hồ sơ hợp lệ trước khi truy cập nghiệp vụ; mật khẩu chỉ lưu mã băm Argon2id. Quyền SV/GV/TBM/xác nhận điều kiện do hệ thống đối chiếu và cấp, không nhận từ form đăng ký. | CONFIRMED_PROJECT_DESIGN 03/10; runtime pending | REQ-AUTH-004 |
 | BR-ROUND-001 | `ThesisRound.type ∈ {MAIN, SUPPLEMENTARY}`; mỗi đợt thuộc đúng một `AcademicYear`. | CONFIRMED_PROJECT_DECISION | REQ-ROUND-001 |
 | BR-ELIG-001 | Đủ điều kiện chung khi tín chỉ đạt ≥70%, GPA ≥2,50/4 và không thuộc tình trạng kỷ luật/truy cứu bị cấm; ngoại lệ do thẩm quyền quy định. | CONFIRMED | SRC-QD-5964 |
-| BR-ELIG-002 | Snapshot lưu giá trị/nguồn, actor/time/lý do. Chỉ `ELIGIBILITY_VERIFIER` được Khoa giao đúng round mới xác nhận sau đối chiếu nguồn Phòng Đào tạo; không dùng tự khai để chốt. | CONFIRMED_PROJECT_DESIGN | REQ-ELIG-002 |
+| BR-ELIG-002 | Phòng Đào tạo cung cấp dữ liệu; người được Khoa giao `ELIGIBILITY_VERIFIER` đúng đợt đối chiếu và ghi kết quả đạt/không đạt, nguồn tham chiếu, người/lúc xác nhận và lý do ngắn. Có thể lưu tỷ lệ tín chỉ và GPA đã đối chiếu để giải thích ngưỡng học vụ; hai số này được phép NULL nếu Phòng Đào tạo chỉ cung cấp kết quả chính thức. Không lưu tình trạng kỷ luật hay án tích chi tiết; không dùng tự khai để chốt. | CONFIRMED_BY_ADVISOR_2026-10-03 | REQ-ELIG-002 |
 | BR-TOPIC-001 | Topic chỉ mở đăng ký sau khi TBM duyệt; TBM được chỉnh tên nhưng lịch sử tên phải lưu. | CONFIRMED | REQ-TOPIC-001..002 |
 | BR-TOPIC-002 | `preferredGpa` và yêu cầu GVHD là tiêu chí mong muốn; chỉ policy điều kiện chung mới được loại SV tự động. | CONFIRMED_PROJECT_DECISION | REQ-TOPIC-003 |
 | BR-REG-001 | Mỗi SV có tối đa một đăng ký hoạt động trong một đợt và đăng ký chỉ có một topic; không có danh sách nguyện vọng xếp hạng. | CONFIRMED | REQ-REG-001 |
@@ -25,7 +26,7 @@
 | BR-SIM-002 | Semantic chỉ phát hiện ứng viên; document percentage phải là coverage metric có định nghĩa, corpus, exclusion, version và kết quả đánh giá. | CONFIRMED_PROJECT_DECISION | REQ-SIM-002..003 |
 | BR-SIM-003 | Kết quả tương đồng ở bản hiện tại là advisory, không tự loại hoặc chặn nộp/bảo vệ. Gate tương lai đòi policy Khoa được duyệt và đánh giá metric/corpus/ngưỡng. | CONFIRMED_PROJECT_DESIGN | REQ-SIM-003 |
 | BR-REPO-001 | Search/index chỉ chứa tài liệu người dùng được phép xem; revoke visibility phải loại hoặc cập nhật index. | DERIVED | REQ-REPO-001, REQ-AI-002 |
-| BR-AI-001 | Authorization diễn ra trước retrieval; Gemini chỉ nhận chunks tối thiểu đã lọc PII; key chỉ ở backend; log không chứa nguyên văn nhạy cảm. | CONFIRMED_PROJECT_DECISION | REQ-AI-002 |
+| BR-AI-001 | Chưa kết nối Gemini. Khi triển khai, chỉ gửi câu hỏi đã lọc và đoạn từ quy định chính thức hoặc tài liệu đã công bố; không gửi tên, MSSV, điểm, kỷ luật hay báo cáo chưa công bố của người khác. Backend phải kiểm nguồn/visibility và lọc trước khi gọi; key chỉ ở backend. | CONFIRMED_BY_ADVISOR_2026-10-03 / RUNTIME_PENDING | REQ-AI-002 |
 | BR-AI-002 | Chatbot trả câu trả lời, trích dẫn và link web; download do web endpoint có authorization thực hiện. | CONFIRMED | REQ-AI-001 |
 | BR-COUNCIL-001 | Chỉ import/update CouncilMember từ quyết định; không tự sinh hoặc tự chọn Chair. | CONFIRMED | REQ-COUNCIL-001 |
 | BR-COUNCIL-002 | Hội đồng 5 thành viên: Chair, Secretary, 2 Reviewer, Member; không mở phiên nếu vắng >2/5 hoặc vắng Chair/Secretary. | CONFIRMED | SRC-QD-2919 |
@@ -44,7 +45,7 @@
 | BR-AUTH-001 | UC-AUTH-001 | UserAccount; unique identity |
 | BR-AUTH-002 | Mọi UC có mutation | OrganizationalPosition, PositionAssignment, ResourceAssignment, AdvisorAssignment, CouncilMember |
 | BR-ROUND-001 | UC-ROUND-001 | AcademicYear 1–N ThesisRound; round_type CHECK |
-| BR-ELIG-001 | UC-ELIG-001, UC-REG-001 | EligibilitySnapshot; ratio/GPA CHECK; policy version |
+| BR-ELIG-001 | UC-ELIG-001, UC-REG-001 | EligibilitySnapshot giữ tỷ lệ tín chỉ/GPA khi có nguồn, kết quả theo đợt và người xác nhận; không lưu chi tiết kỷ luật/án tích |
 | BR-ELIG-002 | UC-ELIG-001 | EligibilitySnapshot, ResourceAssignment, confirmation actor/time |
 | BR-TOPIC-001 | UC-TOPIC-001..003 | Topic, TopicTitleVersion, status/version |
 | BR-TOPIC-002 | UC-TOPIC-001..003, UC-REG-001 | TopicRequirement.enforcement=DESIRED |
