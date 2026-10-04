@@ -56,8 +56,15 @@ class UserAccount(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __table_args__ = (
         CheckConstraint("base_role IN ('ADMIN','LECTURER','STUDENT')", name="base_role"),
         CheckConstraint("status IN ('ACTIVE','LOCKED','DISABLED')", name="status"),
+        CheckConstraint("external_subject IS NOT NULL OR email IS NOT NULL", name="identity_present"),
+        CheckConstraint("(email IS NULL AND password_hash IS NULL) OR (email IS NOT NULL AND password_hash IS NOT NULL)", name="local_credentials_pair"),
+        CheckConstraint("email IS NULL OR email = lower(email)", name="email_normalized"),
+        Index("uq_user_account_email_lower", text("lower(email)"), unique=True, postgresql_where=text("email IS NOT NULL")),
     )
-    external_subject: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    external_subject: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     base_role: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
 
@@ -199,10 +206,9 @@ class EligibilitySnapshot(UuidPrimaryKeyMixin, TimestampMixin, Base):
     student_id: Mapped[uuid.UUID] = fk("student_profile.id")
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    passed_credit_ratio: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
-    gpa_4: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False)
-    discipline_status: Mapped[str] = mapped_column(String(40), nullable=False)
-    criminal_case_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    # May be unknown when only the Faculty's signed eligibility result is imported.
+    passed_credit_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4))
+    gpa_4: Mapped[Optional[Decimal]] = mapped_column(Numeric(3, 2))
     evidence_ref: Mapped[str] = mapped_column(String(500), nullable=False)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     confirmed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
@@ -252,6 +258,8 @@ class Topic(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
         CheckConstraint("max_students BETWEEN 1 AND 3", name="max_students"),
     )
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    receiving_lecturer_id: Mapped[Optional[uuid.UUID]] = fk("lecturer_profile.id", nullable=True)
     department_id: Mapped[uuid.UUID] = fk("department.id")
     proposer_user_id: Mapped[uuid.UUID] = fk("user_account.id")
     proposer_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -345,6 +353,7 @@ class RegistrationMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
     registration_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     round_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     student_id: Mapped[uuid.UUID] = fk("student_profile.id")
+    evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
     is_coordinator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     consent_status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING", server_default="PENDING")

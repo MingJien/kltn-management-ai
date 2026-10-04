@@ -59,6 +59,9 @@ def current_user(
 ) -> UserAccount:
     session_user_id = request.session.get("user_id") if "session" in request.scope else None
     if session_user_id:
+        from backend.api.auth import _same_app_origin
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not _same_app_origin(request):
+            raise HTTPException(403, "Request origin is not allowed")
         try:
             user_id = UUID(session_user_id)
         except (TypeError, ValueError):
@@ -72,13 +75,14 @@ def current_user(
         except (TypeError, ValueError):
             raise HTTPException(401, "Invalid development identity")
     else:
-        from backend.api.auth import oidc_is_configured
-        if not oidc_is_configured():
-            raise HTTPException(503, "University sign-in is not configured")
-        raise HTTPException(401, "Sign in with your University account")
+        raise HTTPException(401, "Sign in required")
     user = session.scalar(select(UserAccount).where(UserAccount.id == user_id, UserAccount.status == "ACTIVE"))
     if user is None:
         if session_user_id:
             request.session.clear()
         raise HTTPException(401, "Unknown or inactive identity")
+    credential_version = request.session.get("credential_version") if session_user_id else None
+    if credential_version is not None and credential_version != user.row_version:
+        request.session.clear()
+        raise HTTPException(401, "Sign-in session has expired")
     return user

@@ -9,7 +9,7 @@
 | Dữ liệu giao dịch | PostgreSQL | Nguồn chính cho state, quyền, điểm, biên bản, audit. |
 | File | Storage abstraction sau backend | Bytes tách CSDL; provider triển khai chưa chốt. |
 | Tìm kiếm vector | Qdrant | Chỉ mục dẫn xuất có filter quyền. |
-| AI | Gemini qua backend | `CONFIRMED_PROJECT_DECISION`; chỉ retrieved chunks cần thiết. |
+| AI | Gemini qua backend | Chưa kết nối; tương lai chỉ nguồn chính thức/đã công bố và câu hỏi đã lọc theo góp ý GV 03/10. |
 | Contract | REST JSON + OpenAPI 3.1 | Trace về use case; async cho similarity/index/export. |
 
 ## Module
@@ -38,7 +38,7 @@ flowchart LR
   API --> JOB["Worker/Outbox"]
   JOB --> QD[(Qdrant)]
   API --> QD
-  API --> GM["Gemini API"]
+  API -.->|chỉ khi bộ lọc nguồn/câu hỏi đạt kiểm thử| GM["Gemini API: chưa bật"]
   AUTH --> PG
 ~~~
 
@@ -64,12 +64,12 @@ flowchart TD
   CV --> DB["Check/Match + provenance trong PostgreSQL"]
   EX -->|repository eligible| IX["Qdrant + payload filter"]
   Q["Câu hỏi đã xác thực"] --> AZ["Authorization trước retrieval"]
-  AZ --> IX --> MIN["Chunks tối thiểu + giảm PII"]
-  MIN --> GM --> ANS["Trả lời + citation + link web"]
+  AZ --> IX --> MIN["Chỉ nguồn chính thức/đã công bố + lọc câu hỏi"]
+  MIN -.->|tương lai, nguồn đã công bố| GM --> ANS["Trả lời + citation + link web"]
 ~~~
 
 - Business threshold và metric tách biệt; semantic score không là phần trăm tài liệu.
-- Key Gemini chỉ ở backend/secret store; không vào Vite, log hoặc Git.
+- Gemini hiện chưa được gọi; backend chặn provider. Khi triển khai, chỉ dùng câu hỏi đã lọc và quy định/tài liệu đã công bố. Key chỉ ở backend/secret store; không vào Vite, log hoặc Git.
 - Prompt injection trong tài liệu được xem là dữ liệu không tin cậy; AI không có tool đổi nghiệp vụ.
 - Log chỉ giữ request/correlation/retrieved IDs/outcome cần thiết, không giữ chunks/body mặc định.
 
@@ -95,4 +95,4 @@ flowchart TD
 
 ## Runtime prototype từ 25/09/2026
 
-Cấu trúc giữ modular monolith: `backend/api` nhận HTTP/validate DTO; `backend/services` thực thi use case và transaction; `backend/db` giữ mô hình và migration; `backend/ai` xử lý nguồn, embedding, truy xuất; `frontend` là React shell. PostgreSQL giữ nghiệp vụ và metadata corpus, Qdrant local/service giữ index có thể rebuild. Đăng nhập OIDC đã có luồng cấu hình sẵn: callback kiểm tra ID token, lấy `sub` ổn định của nhà cung cấp và chỉ ánh xạ sang `UserAccount.external_subject` đã được quản trị liên kết trước; không tự tạo tài khoản hoặc lấy base role từ claim. UUID header vẫn chỉ được chấp nhận khi `KLTN_ENV=development|test` và `KLTN_DEV_AUTH=true`. Tích hợp chưa được coi là kết nối Trường thật cho tới khi bộ phận CNTT cung cấp OIDC discovery/client và đăng ký redirect URI; xem [hướng dẫn triển khai đăng nhập Trường](sso-deployment.md). Xuất biểu mẫu đi qua template adapter/version như [thiết kế riêng](xuat-bieu-mau.md); hiện không có runtime export exact Mẫu 9.
+Cấu trúc giữ modular monolith: `backend/api` nhận HTTP/validate DTO; `backend/services` thực thi use case và transaction; `backend/db` giữ mô hình và migration; `backend/ai` xử lý nguồn, embedding, truy xuất; `frontend` là React shell. PostgreSQL giữ nghiệp vụ và metadata corpus, Qdrant local/service giữ index có thể rebuild. Theo [quyết định đăng nhập 03/10](local-auth.md), hệ thống sẽ tự quản lý đăng ký/đăng nhập email và mật khẩu băm Argon2id; quyền SV/GV/TBM chỉ gắn sau khi đối chiếu hồ sơ. CSDL đã có cột/ràng buộc cho tài khoản local ở migration 0010, **runtime đăng nhập email/mật khẩu và cookie phiên đã chạy trên tài khoản giả**. Callback OIDC cũ chỉ là khả năng mở rộng và chưa kết nối Trường; xem [phương án SSO dự phòng](sso-deployment.md). UUID header vẫn chỉ được chấp nhận khi `KLTN_ENV=development|test` và `KLTN_DEV_AUTH=true`. Xuất biểu mẫu đi qua template adapter/version như [thiết kế riêng](xuat-bieu-mau.md); hiện không có runtime export exact Mẫu 9.

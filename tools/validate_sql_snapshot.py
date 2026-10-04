@@ -32,7 +32,7 @@ def main() -> int:
             with connection.cursor() as cursor:
                 cursor.execute(script, prepare=False)
                 cursor.execute("SELECT version_num FROM alembic_version")
-                assert cursor.fetchone()[0] == "20260925_0007"
+                assert cursor.fetchone()[0] == "20261004_0011"
                 cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema=%s", (name,))
                 assert cursor.fetchone()[0] == 63
                 cursor.execute("SELECT id, state FROM rubric_template WHERE code='MAU-06-HOIDONG' AND version_no=1")
@@ -42,7 +42,11 @@ def main() -> int:
                 assert cursor.fetchone()[0] == 16
                 cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=%s AND table_name='registration_member' AND column_name IN ('consent_status','responded_by_user_id','responded_at')", (name,))
                 assert len(cursor.fetchall()) == 3
-        print("PASS init SQL on empty disposable schema: 63 tables, head 20260925_0007")
+                cursor.execute("SELECT column_name, is_nullable FROM information_schema.columns WHERE table_schema=%s AND table_name='eligibility_snapshot' AND column_name IN ('passed_credit_ratio','gpa_4','discipline_status','criminal_case_status')", (name,))
+                assert dict(cursor.fetchall()) == {"passed_credit_ratio": "YES", "gpa_4": "YES"}
+                cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=%s AND table_name='user_account' AND column_name IN ('email','password_hash','email_verified_at')", (name,))
+                assert len(cursor.fetchall()) == 3
+        print("PASS baseline SQL on empty disposable schema: 63 tables, head 20261004_0011")
         return 0
     finally:
         with engine.begin() as conn:

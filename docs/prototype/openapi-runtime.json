@@ -48,6 +48,38 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Local Login",
+        "operationId": "local_login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/auth/callback": {
@@ -79,6 +111,142 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/v1/topic-registrations/{registration_id}/evidence": {
+      "post": {
+        "summary": "Registration Evidence Upload",
+        "operationId": "registration_evidence_upload_api_v1_topic_registrations__registration_id__evidence_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topic-registrations/{registration_id}/members/{student_id}/evidence": {
+      "get": {
+        "summary": "Registration Evidence Download",
+        "operationId": "registration_evidence_download_api_v1_topic_registrations__registration_id__members__student_id__evidence_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -173,6 +341,64 @@
         }
       }
     },
+    "/api/v1/rounds/open": {
+      "get": {
+        "summary": "Rounds Open",
+        "operationId": "rounds_open_api_v1_rounds_open_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpenRoundOut"
+                  },
+                  "title": "Response Rounds Open Api V1 Rounds Open Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/topics": {
       "get": {
         "summary": "Topics",
@@ -243,6 +469,491 @@
                     "$ref": "#/components/schemas/TopicOut"
                   },
                   "title": "Response Topics Api V1 Topics Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Topic Create",
+        "operationId": "topic_create_api_v1_topics_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lecturers": {
+      "get": {
+        "summary": "Lecturers",
+        "operationId": "lecturers_api_v1_lecturers_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LecturerOut"
+                  },
+                  "title": "Response Lecturers Api V1 Lecturers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/student-proposals": {
+      "post": {
+        "summary": "Student Proposal",
+        "operationId": "student_proposal_api_v1_student_proposals_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentProposalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topics/{topic_id}": {
+      "patch": {
+        "summary": "Topic Update",
+        "operationId": "topic_update_api_v1_topics__topic_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Topic Detail",
+        "operationId": "topic_detail_api_v1_topics__topic_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topics/{topic_id}/submit": {
+      "post": {
+        "summary": "Topic Submit",
+        "operationId": "topic_submit_api_v1_topics__topic_id__submit_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/topics/{topic_id}/department-decision": {
+      "post": {
+        "summary": "Topic Department Decision",
+        "operationId": "topic_department_decision_api_v1_topics__topic_id__department_decision_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
                 }
               }
             }
@@ -1022,70 +1733,6 @@
         }
       }
     },
-    "/api/v1/topics/{topic_id}": {
-      "get": {
-        "summary": "Topic Detail",
-        "operationId": "topic_detail_api_v1_topics__topic_id__get",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "topic_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Topic Id"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TopicOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/theses/{thesis_id}": {
       "get": {
         "summary": "Thesis Detail",
@@ -1325,13 +1972,63 @@
             },
             "type": "array",
             "title": "Actions"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "student_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Code"
+          },
+          "lecturer_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Code"
           }
         },
         "type": "object",
         "required": [
           "user_id",
           "base_role",
-          "actions"
+          "actions",
+          "display_name"
         ],
         "title": "ContextOut"
       },
@@ -1427,6 +2124,52 @@
         ],
         "title": "LecturerDecision"
       },
+      "LecturerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "lecturer_code": {
+            "type": "string",
+            "title": "Lecturer Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "lecturer_code"
+        ],
+        "title": "LecturerOut"
+      },
+      "LocalLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LocalLogin"
+      },
       "MemberResponse": {
         "properties": {
           "consent_status": {
@@ -1444,6 +2187,41 @@
         ],
         "title": "MemberResponse"
       },
+      "OpenRoundOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closes At"
+          },
+          "academic_year": {
+            "type": "string",
+            "title": "Academic Year"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "closes_at",
+          "academic_year",
+          "label"
+        ],
+        "title": "OpenRoundOut"
+      },
       "RegistrationCreate": {
         "properties": {
           "topic_id": {
@@ -1460,6 +2238,11 @@
             "maxItems": 3,
             "minItems": 1,
             "title": "Member Student Ids"
+          },
+          "confirm_creator": {
+            "type": "boolean",
+            "title": "Confirm Creator",
+            "default": false
           }
         },
         "type": "object",
@@ -1495,6 +2278,17 @@
           "consent_status": {
             "type": "string",
             "title": "Consent Status"
+          },
+          "evidence_file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence File Name"
           }
         },
         "type": "object",
@@ -1571,6 +2365,61 @@
               }
             ],
             "title": "Thesis Id"
+          },
+          "topic_title": {
+            "type": "string",
+            "title": "Topic Title"
+          },
+          "topic_proposer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Proposer User Id"
+          },
+          "topic_code": {
+            "type": "string",
+            "title": "Topic Code"
+          },
+          "topic_state": {
+            "type": "string",
+            "title": "Topic State"
+          },
+          "proposer_type": {
+            "type": "string",
+            "title": "Proposer Type"
+          },
+          "receiving_lecturer_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer User Id"
+          },
+          "receiving_lecturer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Name"
+          },
+          "lecturer_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Reason"
           }
         },
         "type": "object",
@@ -1581,9 +2430,56 @@
           "state",
           "row_version",
           "member_student_ids",
-          "members"
+          "members",
+          "topic_title",
+          "topic_proposer_user_id",
+          "topic_code",
+          "topic_state",
+          "proposer_type",
+          "receiving_lecturer_user_id",
+          "receiving_lecturer_name",
+          "lecturer_reason"
         ],
         "title": "RegistrationOut"
+      },
+      "RequirementInput": {
+        "properties": {
+          "requirement_type": {
+            "type": "string",
+            "enum": [
+              "PREFERRED_GPA",
+              "SKILL",
+              "TECHNOLOGY",
+              "KNOWLEDGE",
+              "OTHER"
+            ],
+            "title": "Requirement Type"
+          },
+          "value_text": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Value Text",
+            "default": ""
+          },
+          "preferred_gpa": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Gpa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement_type"
+        ],
+        "title": "RequirementInput"
       },
       "SearchResult": {
         "properties": {
@@ -1714,6 +2610,82 @@
         ],
         "title": "SimilarTopicRequest"
       },
+      "StudentProposalCreate": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Students",
+            "default": 3
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          },
+          "member_student_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Member Student Ids"
+          },
+          "confirm_creator": {
+            "type": "boolean",
+            "title": "Confirm Creator",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "title",
+          "member_student_ids"
+        ],
+        "title": "StudentProposalCreate"
+      },
       "ThesisOut": {
         "properties": {
           "id": {
@@ -1753,6 +2725,157 @@
         ],
         "title": "ThesisOut"
       },
+      "TitleVersionOut": {
+        "properties": {
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_no",
+          "title",
+          "change_reason",
+          "created_at"
+        ],
+        "title": "TitleVersionOut"
+      },
+      "TopicCreate": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Students",
+            "default": 3
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "title"
+        ],
+        "title": "TopicCreate"
+      },
+      "TopicDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "RETURN",
+              "REJECT"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revised_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised Title"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "TopicDecision"
+      },
       "TopicOut": {
         "properties": {
           "id": {
@@ -1787,6 +2910,84 @@
           "state": {
             "type": "string",
             "title": "State"
+          },
+          "row_version": {
+            "type": "integer",
+            "title": "Row Version"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "proposer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Proposer User Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "round_label": {
+            "type": "string",
+            "title": "Round Label"
+          },
+          "proposer_type": {
+            "type": "string",
+            "title": "Proposer Type"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          },
+          "receiving_lecturer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Name"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "title": "Requirements"
+          },
+          "title_versions": {
+            "items": {
+              "$ref": "#/components/schemas/TitleVersionOut"
+            },
+            "type": "array",
+            "title": "Title Versions"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
           }
         },
         "type": "object",
@@ -1796,9 +2997,91 @@
           "title",
           "description",
           "max_students",
-          "state"
+          "state",
+          "row_version",
+          "department_id",
+          "proposer_user_id",
+          "code",
+          "round_label",
+          "proposer_type",
+          "receiving_lecturer_id",
+          "receiving_lecturer_name",
+          "requirements",
+          "title_versions",
+          "available"
         ],
         "title": "TopicOut"
+      },
+      "TopicUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Students"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequirementInput"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "title": "TopicUpdate"
       },
       "ValidationError": {
         "properties": {

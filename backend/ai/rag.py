@@ -10,6 +10,10 @@ class LLMProvider(Protocol):
 
 
 def retrieve_answer(index: CorpusIndex, question: str, *, scope: str, provider: LLMProvider | None = None) -> dict:
+    if provider is not None:
+        # The advisor-approved external-data boundary is not implemented yet.
+        # Never hand retrieved internal excerpts to an arbitrary provider.
+        raise RuntimeError("Gemini is disabled until the published-source and question filters are implemented")
     hits = index.search(question, scope=scope, source_types={"REGULATION", "GUIDELINE", "FORM"}, representation="EVIDENCE")
     citations = [
         {key: value for key, value in asdict(hit).items() if key != "score"}
@@ -17,8 +21,4 @@ def retrieve_answer(index: CorpusIndex, question: str, *, scope: str, provider: 
     ]
     if not hits:
         return {"status": "NO_EVIDENCE", "answer": None, "citations": []}
-    if provider is None:
-        return {"status": "RETRIEVAL_ONLY", "answer": None, "citations": citations}
-    # Retrieved document text is evidence, never an instruction to the provider.
-    answer = provider.answer(question, citations)
-    return {"status": "ANSWERED", "answer": answer, "citations": citations}
+    return {"status": "RETRIEVAL_ONLY", "answer": None, "citations": citations}

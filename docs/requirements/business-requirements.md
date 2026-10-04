@@ -13,6 +13,7 @@
 | REQ-AUTH-001 | Mỗi người dùng dùng một tài khoản; base role chỉ gồm `ADMIN`, `LECTURER`, `STUDENT`. | CONFIRMED | SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 |
 | REQ-AUTH-002 | GVHD, GVPB, TBM, Trưởng khoa, Chủ tịch, Thư ký và thành viên Hội đồng là position/assignment/resource role theo phạm vi, không có tài khoản/mật khẩu riêng. | CONFIRMED | SRC-GVHD-NV4-001, SRC-PROJECT-MASTER-001 |
 | REQ-AUTH-003 | `ADMIN` là vai trò kỹ thuật nền tảng, không mặc nhiên được duyệt/chốt nghiệp vụ. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-MASTER-001 |
+| REQ-AUTH-004 | Chọn đăng ký/đăng nhập email và mật khẩu do ứng dụng KLTN quản lý; CSDL chỉ lưu mã băm. Xác minh email và đối chiếu danh sách SV/GV trước khi cấp quyền nghiệp vụ; người dùng không tự chọn chức vụ. | CONFIRMED_PROJECT_DESIGN 03/10; runtime pending | Góp ý GV 30/09–07/10 và quyết định 03/10 |
 
 ## Năm học, đợt và điều kiện
 
@@ -20,7 +21,7 @@
 | --- | --- | --- | --- |
 | REQ-ROUND-001 | Một `AcademicYear` có nhiều `ThesisRound`; đợt chính và bổ sung dùng chung mô hình, khác mã/type/thời gian/trạng thái. | CONFIRMED_PROJECT_DECISION | SRC-GVHD-NV4-001, SRC-QD-2919, SRC-PROJECT-MASTER-001 |
 | REQ-ELIG-001 | Lập danh sách/khảo sát SV đủ điều kiện theo đợt. Điều kiện chung hiện hành: không bị xử lý theo Điều 2, có ít nhất 70% tín chỉ đạt và GPA từ 2,50/4; Khoa có thể bổ sung tiêu chí. | CONFIRMED | SRC-QD-5964, SRC-GVHD-NV4-001 |
-| REQ-ELIG-002 | SV tự khai cùng nguồn/thời điểm; cán bộ Khoa được giao `ELIGIBILITY_VERIFIER` theo đợt đối chiếu dữ liệu Phòng Đào tạo rồi xác nhận hoặc từ chối snapshot. Khoa phải phân công người thực tế; Admin/TBM không mặc nhiên xác nhận. | CONFIRMED_PROJECT_DESIGN | SRC-QD-2919, SRC-QD-5964, SRC-PROJECT-DEC-20260925 |
+| REQ-ELIG-002 | Phòng Đào tạo cấp dữ liệu; Khoa giao người `ELIGIBILITY_VERIFIER` theo đợt để đối chiếu và xác nhận đạt/không đạt. CSDL ứng dụng giữ kết quả, nguồn tham chiếu, người/thời gian, lý do ngắn và có thể giữ tỷ lệ tín chỉ/GPA để đối chiếu ngưỡng; không giữ chi tiết kỷ luật/án tích. Admin/TBM không mặc nhiên xác nhận. | CONFIRMED_BY_ADVISOR_2026-10-03 | SRC-QD-2919, SRC-QD-5964, SRC-PROJECT-DEC-20260925 |
 
 ## Đề tài, chuyên môn và đăng ký
 
@@ -60,7 +61,7 @@
 | REQ-SIM-003 | Upload bản hợp lệ luôn được tiếp nhận; kiểm tra tương đồng sau upload chỉ trả bằng chứng tham khảo, GVHD đọc và SV có thể nộp bản mới. Bản hiện tại không có ngưỡng tự chặn nộp/bảo vệ; gate tương lai là thay đổi policy có nguồn, version và kiểm thử. | CONFIRMED_PROJECT_DESIGN | SRC-PROJECT-DEC-20260925 |
 | REQ-REPO-001 | Theo nguồn hiện tại, kho cho xem và tải; quyền vẫn phải qua authorization và visibility của tài liệu. KLTN được quản lý theo Bộ môn/chuyên ngành. | CONFIRMED / DERIVED | SRC-GVHD-NV4-001, SRC-QD-2919 |
 | REQ-AI-001 | Chatbot tra cứu, trả kết quả kèm link; file được xem/tải trên web, chatbot không phát tệp trực tiếp. | CONFIRMED | SRC-GVHD-NV4-001 |
-| REQ-AI-002 | Cho phép Gemini trên dữ liệu nội bộ theo project decision: authorization trước retrieval, chỉ gửi retrieved chunks cần thiết, giảm PII, key backend-only, log an toàn. Đây không phải quy định Trường. | CONFIRMED_PROJECT_DECISION | SRC-PROJECT-MASTER-001 |
+| REQ-AI-002 | Gemini chưa kết nối. Bản thiết kế chỉ cho phép câu hỏi đã lọc và đoạn từ quy định chính thức/tài liệu đã công bố; không gửi dữ liệu cá nhân hoặc báo cáo chưa công bố của người khác. Backend phải chặn nguồn không hợp lệ trước lời gọi ngoài. | CONFIRMED_BY_ADVISOR_2026-10-03 / RUNTIME_PENDING | SRC-PROJECT-MASTER-001 |
 
 ## Hội đồng, bảo vệ, chấm điểm và biên bản
 
@@ -87,8 +88,8 @@ Phần mô tả ở các mục trên là nội dung normative. Bảng này bổ 
 | REQ-AUTH-002 | Người có position/assignment | Position, assignment, scope, hiệu lực | Ngữ cảnh quyền theo tài nguyên | Không tạo password riêng cho GVHD/HĐ |
 | REQ-AUTH-003 | Admin, actor nghiệp vụ | Action + resource context | Admin bị từ chối nếu thiếu thẩm quyền nghiệp vụ | Backend enforce |
 | REQ-ROUND-001 | TBM/Trưởng khoa theo scope | Năm học, loại đợt, lịch, policy | Round MAIN/SUPPLEMENTARY có version | Deadline cấu hình |
-| REQ-ELIG-001 | SV, đơn vị xác nhận | GPA, tín chỉ, tình trạng, nguồn | Snapshot đủ/không đủ điều kiện | QĐ5964 |
-| REQ-ELIG-002 | SV, ELIGIBILITY_VERIFIER | Snapshot, evidence, assignment | Xác nhận/từ chối có actor/time | Người Khoa được giao theo round |
+| REQ-ELIG-001 | Phòng Đào tạo, người Khoa được giao | Dữ liệu nguồn Phòng Đào tạo | Snapshot kết quả đủ/không đủ và hai chỉ số học vụ nếu có | QĐ5964 |
+| REQ-ELIG-002 | ELIGIBILITY_VERIFIER theo đợt | Snapshot, tham chiếu nguồn, assignment | Xác nhận/từ chối có actor/time | Người Khoa được giao theo round |
 | REQ-TOPIC-001 | Giảng viên, TBM | Đề xuất, chuyên môn, title | Topic được duyệt/trả lại/từ chối | Lưu title history |
 | REQ-TOPIC-002 | SV, TBM, GVHD được phân công | Đề tài SV, nhóm đã tự xác nhận | Đăng ký gửi trước; TBM xét đề tài sau; GVHD đồng ý trước khi chốt | Không yêu cầu Topic.APPROVED trước đăng ký nhánh SV |
 | REQ-TOPIC-003 | GVHD/TBM | GPA/kỹ năng/công nghệ/kiến thức mong muốn | TopicRequirement có enforcement DESIRED | Không là eligibility hard rule |
@@ -113,7 +114,7 @@ Phần mô tả ở các mục trên là nội dung normative. Bảng này bổ 
 | REQ-SIM-003 | GVHD/TBM theo policy | Check result + policy hiệu lực | Advisory hoặc gate cấu hình | Baseline advisory, không auto-gate |
 | REQ-REPO-001 | Người dùng được phép | Bản công bố, visibility, metadata | RepositoryItem xem/tải được | Bản nháp/PII không công bố |
 | REQ-AI-001 | Người dùng | Câu hỏi/phạm vi | Answer + citation/link | Không triển khai vòng DB |
-| REQ-AI-002 | Backend về sau | Authorized chunks, PII policy | Invocation audit an toàn | Quyết định dự án, không phải quy định Trường |
+| REQ-AI-002 | Backend về sau | Câu hỏi đã lọc, nguồn chính thức/đã công bố | Invocation audit an toàn | Quyết định dự án, không phải quy định Trường |
 | REQ-COUNCIL-001 | Actor nhập quyết định | Decision ref, 5 members/roles | Council đúng quyết định | Không auto Chair |
 | REQ-COUNCIL-002 | Thư ký/Chủ tịch theo action | Hội đồng, lịch, danh sách Thesis | Nhiều DefenseSession và SessionThesis | Phạm vi Bộ môn/chuyên ngành |
 | REQ-COUNCIL-003 | Thư ký/Chủ tịch | Attendance 5 thành viên | READY hoặc POSTPONED; scorer set hợp lệ | QĐ2919 quorum |

@@ -4,6 +4,11 @@ export type Context = {
   student_id: string | null;
   lecturer_id: string | null;
   actions: string[];
+  display_name: string;
+  department_id: string | null;
+  email: string | null;
+  student_code: string | null;
+  lecturer_code: string | null;
 };
 export type Topic = {
   id: string;
@@ -12,7 +17,22 @@ export type Topic = {
   description: string | null;
   max_students: number;
   state: string;
+  row_version: number;
+  department_id: string;
+  proposer_user_id: string;
+  decision_reason: string | null;
+  code: string;
+  round_label: string;
+  proposer_type: string;
+  receiving_lecturer_id: string | null;
+  receiving_lecturer_name: string | null;
+  requirements: Requirement[];
+  title_versions: {version_no: number; title: string; change_reason: string | null; created_at: string}[];
+  available: boolean;
 };
+export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
+export type Lecturer = {id: string; display_name: string; lecturer_code: string};
+export type OpenRound = { id: string; code: string; closes_at: string; academic_year: string; label: string };
 export type EligibleStudent = { id: string; display_name: string; student_code: string };
 export type RegistrationMember = {
   student_id: string;
@@ -21,6 +41,7 @@ export type RegistrationMember = {
   is_coordinator: boolean;
   active: boolean;
   consent_status: "PENDING" | "ACCEPTED" | "DECLINED";
+  evidence_file_name: string | null;
 };
 export type Registration = {
   id: string;
@@ -32,6 +53,14 @@ export type Registration = {
   members: RegistrationMember[];
   lecturer_decided_at: string | null;
   thesis_id: string | null;
+  topic_title: string;
+  topic_proposer_user_id: string;
+  topic_code: string;
+  topic_state: string;
+  proposer_type: string;
+  receiving_lecturer_user_id: string | null;
+  receiving_lecturer_name: string | null;
+  lecturer_reason: string | null;
 };
 export type SearchHit = {
   source_id: string;
@@ -47,10 +76,24 @@ export type SearchHit = {
   excerpt: string;
 };
 
-const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Keep local API and UI on the same hostname (localhost or 127.0.0.1).
+// A session cookie issued for one hostname is not sent to the other.
+const baseUrl = import.meta.env.VITE_API_URL
+  || `${window.location.protocol}//${window.location.hostname}:8000`;
 let developmentAuthEnabled = false;
 
-export type AuthenticationMode = "development" | "university_oidc" | "unavailable";
+export function evidenceUrl(registrationId: string, studentId: string) {
+  return `${baseUrl}/api/v1/topic-registrations/${registrationId}/members/${studentId}/evidence`;
+}
+
+export function uploadEvidence(registrationId: string, userId: string, file: File): Promise<Registration> {
+  return request<Registration>(`/topic-registrations/${registrationId}/evidence`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name)},
+  });
+}
+
+export type AuthenticationMode = "development" | "university_oidc" | "local_email" | "unavailable";
 
 export function setDevelopmentAuthEnabled(enabled: boolean) {
   developmentAuthEnabled = enabled;
@@ -58,6 +101,16 @@ export function setDevelopmentAuthEnabled(enabled: boolean) {
 
 export function universityLoginUrl() {
   return `${baseUrl}/api/v1/auth/login`;
+}
+
+export async function emailLogin(email: string, password: string): Promise<void> {
+  await request<void>("/auth/login", "", {
+    method: "POST", body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await request<void>("/auth/logout", "", { method: "POST" });
 }
 
 export async function request<T>(

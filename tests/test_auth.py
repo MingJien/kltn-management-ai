@@ -37,7 +37,7 @@ def test_auth_mode_requires_complete_oidc_and_session_config(monkeypatch):
     assert authentication_mode() == "unavailable"
 
     monkeypatch.setenv("KLTN_ENV", "test")
-    assert authentication_mode() == "development"
+    assert authentication_mode() == "local_email"
 
     monkeypatch.setenv("OIDC_DISCOVERY_URL", "https://identity.example/.well-known/openid-configuration")
     monkeypatch.setenv("OIDC_CLIENT_ID", "test-client")
