@@ -58,7 +58,7 @@ File contract máy đọc: `openapi.yaml`.
 
 ## Hợp đồng prototype đang chạy
 
-Nguồn OpenAPI máy đọc được: `docs/prototype/openapi-runtime.json` sinh từ FastAPI. Trong `docs/design/openapi.yaml`, operation có `x-runtime-status=IMPLEMENTED_PROTOTYPE` là endpoint thật; các operation còn lại là contract thiết kế, chưa được triển khai và một số payload/result còn generic cần khóa trước các giai đoạn sau.
+Nguồn OpenAPI máy đọc được của API đang chạy là `/openapi.json` hoặc `/docs` do FastAPI sinh. Trong `docs/design/openapi.yaml`, operation có `x-runtime-status=IMPLEMENTED_PROTOTYPE` là endpoint thật; các operation còn lại là contract thiết kế, chưa được triển khai và một số payload/result còn generic cần khóa trước các giai đoạn sau.
 
 | Endpoint | Input có kiểu | Output có kiểu | Guard chính |
 | --- | --- | --- | --- |
@@ -95,7 +95,7 @@ Các lỗi validation của FastAPI dùng HTTP 422; lỗi quyền/state do servi
 
 ## Hợp đồng runtime đề tài và đăng ký (0011)
 
-Nguồn API chạy thật là [OpenAPI runtime](../prototype/openapi-runtime.json); bản đặc tả toàn miền còn chứa endpoint cho giai đoạn sau.
+Nguồn API chạy thật là `/openapi.json` của FastAPI; bản đặc tả toàn miền còn chứa endpoint cho giai đoạn sau.
 
 | API | Quyền và xử lý |
 | --- | --- |

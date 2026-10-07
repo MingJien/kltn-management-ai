@@ -19,7 +19,7 @@
 
 **Lưu ý 04/10:** `topic_title_version` và `audit_event` đã được thêm vào **file SQL lõi** vì luồng đề tài trên `kltn_dev` dùng chúng. `kltn_ai`/`kltn_dev` vốn đã có hai bảng này; migration 0011 thêm mã đề tài, GV tiếp nhận và liên kết minh chứng của thành viên. File lõi 32 bảng vẫn là bản trình bày/dựng database mới, chưa có migration lõi riêng hoặc xác nhận runtime có thể chuyển thẳng sang `kltn_core`.
 
-Các bảng Mẫu 6, hội đồng bảo vệ, biên bản, tương đồng và chatbot vẫn nằm trong [schema đầy đủ 62 bảng](../kltn-schema-consolidated.sql) để mở rộng theo giai đoạn. `signature_confirmation` và những bảng biểu mẫu chuyên biệt cũng còn ở bản đầy đủ; không xóa lịch sử/mô hình đó chỉ để đạt một con số. [Phạm vi và trạng thái](../../docs/design/database-scope-review.md) phân biệt rõ phần đã có schema với phần đã có runtime.
+Các bảng Mẫu 6, hội đồng bảo vệ, biên bản, tương đồng và chatbot vẫn nằm trong [schema đầy đủ 62 bảng](../kltn-schema-consolidated.sql) để mở rộng theo giai đoạn. `signature_confirmation` và những bảng biểu mẫu chuyên biệt cũng còn ở bản đầy đủ; không xóa lịch sử/mô hình đó chỉ để đạt một con số.
 
 ## Trạng thái và cách dựng database riêng
 

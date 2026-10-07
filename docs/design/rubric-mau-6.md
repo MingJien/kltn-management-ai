@@ -25,4 +25,4 @@ Ba dòng `GROUP` có điểm tối đa 2 + 4 + 4, nhưng chỉ là tổng của 
 
 Phiên bản 1 này giữ nguyên để đối chiếu lịch sử. Nếu Khoa ban hành biểu mẫu khác, tạo `RubricTemplate` phiên bản mới và chỉ gắn cho đợt/phiên tương ứng; không sửa nội dung phiếu đã chấm.
 
-Nguồn: [đăng ký nguồn](../references/source-register.md) `SRC-MAU-06`; [xung đột nguồn](../references/source-conflicts.md) `CONFLICT-011`; [quy tắc nghiệp vụ](../requirements/business-rules.md) `BR-EVAL-003`.
+Nguồn: [đăng ký nguồn](../references/source-register.md) `SRC-MAU-06`; [quy tắc nghiệp vụ](../requirements/business-rules.md) `BR-EVAL-003`.

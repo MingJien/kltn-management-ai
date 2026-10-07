@@ -10,7 +10,7 @@
 - `ARCHIVED_NON_CANONICAL`: snapshot lịch sử, không phải nguồn nghiệp vụ chính.
 - `DUPLICATE_BYTE_IDENTICAL_REMOVED`: bản trùng byte đã được ghi nhận và loại khỏi raw canonical.
 
-Thứ tự xử lý khi có xung đột: P1 = góp ý/chỉ đạo GVHD mới nhất; P2 = quyết định, quy định, kế hoạch, đề cương và biểu mẫu chính thức của Trường/Khoa (văn bản sửa đổi mới hơn có hiệu lực trong phạm vi được sửa); P3 = quyết định thiết kế đã chốt của đề tài, chỉ trong phạm vi thiết kế dự án; P4 = tài liệu chính thức của công nghệ; P5 = nguồn học thuật; P6 = kiến thức chung. Snapshot lịch sử mang nhãn `ARCHIVE`, không tham gia ưu tiên nghiệp vụ. Nếu các nguồn mâu thuẫn mà chưa có căn cứ phân xử, ghi vào `source-conflicts.md`, không tự hợp nhất.
+Thứ tự xử lý khi có xung đột: P1 = góp ý/chỉ đạo GVHD mới nhất; P2 = quyết định, quy định, kế hoạch, đề cương và biểu mẫu chính thức của Trường/Khoa (văn bản sửa đổi mới hơn có hiệu lực trong phạm vi được sửa); P3 = quyết định thiết kế đã chốt của đề tài, chỉ trong phạm vi thiết kế dự án; P4 = tài liệu chính thức của công nghệ; P5 = nguồn học thuật; P6 = kiến thức chung. Snapshot lịch sử mang nhãn `ARCHIVE`, không tham gia ưu tiên nghiệp vụ. Nếu chưa có căn cứ phân xử, không tự hợp nhất và chờ nguồn có thẩm quyền.
 
 Các bản trích và tài liệu gốc ở cột Bản xử lý nội bộ chỉ dùng để đối chiếu trên máy, không thuộc bộ source công bố. Bản nộp trên GitHub gồm kết quả phân tích, thiết kế và mã nguồn; có thể đối chiếu chúng theo ID nguồn trong bảng dưới.
 
