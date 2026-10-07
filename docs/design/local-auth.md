@@ -1,6 +1,6 @@
 # Quyết định đăng nhập của hệ thống KLTN
 
-Theo hai phương án GV đưa ra ngày 03/10/2026, giai đoạn triển khai của đồ án **chọn đăng ký/đăng nhập bằng email và mật khẩu do ứng dụng KLTN quản lý**. Ứng dụng, tài khoản và phân quyền vẫn thuộc sản phẩm do nhóm xây dựng; không cần chờ quyền tích hợp Google/Microsoft/SSO của Trường. Phương án SSO cũ giữ ở [tài liệu dự phòng](sso-deployment.md), chưa phải đăng nhập thật.
+Giai đoạn triển khai của đồ án **chọn đăng nhập bằng email và mật khẩu do ứng dụng KLTN quản lý**. Ứng dụng, tài khoản và phân quyền vẫn thuộc sản phẩm do nhóm xây dựng; không cần chờ quyền tích hợp Google/Microsoft/SSO của Trường. Tích hợp SSO có thể được xem xét khi Trường cấp cơ chế và quyền tích hợp phù hợp.
 
 ## Dữ liệu tài khoản
 
