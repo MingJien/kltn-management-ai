@@ -1,4 +1,4 @@
-# Hệ thống quản lý khóa luận tốt nghiệp tích hợp AI
+# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
 Source của hệ thống quản lý khóa luận tốt nghiệp, gồm PostgreSQL, FastAPI và React. AI hiện ở mức thử nghiệm truy xuất tài liệu và tìm đề tài tương tự trên dữ liệu giả; không tự chấm đạo văn hoặc quyết định kết quả học tập.
 
