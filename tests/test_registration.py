@@ -123,13 +123,10 @@ def test_topic_to_lecturer_acceptance(scenario):
     assert [item.title for item in versions] == [
         "Synthetic new topic", "Synthetic revised topic", "Synthetic approved topic",
     ]
-    reg = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
-        json={"topic_id": topic["id"], "member_student_ids": [str(students[0].id), str(students[1].id)]})
+    reg = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={"topic_id": topic["id"]})
     assert reg.status_code == 201, reg.text
-    for user in users[:2]:
-        answer = client.post(f"/api/v1/topic-registrations/{reg.json()['id']}/member-response",
-            headers=hdr(user), json={"consent_status": "ACCEPTED"})
-        assert answer.status_code == 200, answer.text
+    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]), json={"topic_id": topic["id"]})
+    assert joined.status_code == 201 and joined.json()["id"] == reg.json()["id"]
     sent = client.post(f"/api/v1/topic-registrations/{reg.json()['id']}/submit", headers=hdr(users[0]))
     assert sent.status_code == 200, sent.text
     accepted = client.post(f"/api/v1/topic-registrations/{reg.json()['id']}/lecturer-decision",
@@ -157,103 +154,58 @@ def test_email_login_and_session_access(scenario, monkeypatch):
         "email": user.email, "password": "correct-demo-password",
     })
     assert signed_in.status_code == 204, signed_in.text
-    assert client.get("/api/v1/me/context").json()["user_id"] == str(user.id)
-    assert client.post("/api/v1/auth/logout").status_code == 204
+    context = client.get("/api/v1/me/context").json()
+    assert context["user_id"] == str(user.id)
+    token = context["csrf_token"]
+    assert token
+    trusted_origin = {"Origin": "http://localhost:5173"}
+    assert client.post("/api/v1/topic-registrations", json={"topic_id": str(scenario[4].id)},
+        headers=trusted_origin).status_code == 403
+    assert client.post("/api/v1/topic-registrations", json={"topic_id": str(scenario[4].id)},
+        headers={**trusted_origin, "X-CSRF-Token": "wrong"}).status_code == 403
+    created = client.post("/api/v1/topic-registrations", json={"topic_id": str(scenario[4].id)},
+        headers={**trusted_origin, "X-CSRF-Token": token})
+    assert created.status_code == 201, created.text
+    assert client.post("/api/v1/auth/logout", headers=trusted_origin).status_code == 403
+    assert client.post("/api/v1/auth/logout",
+        headers={**trusted_origin, "X-CSRF-Token": token}).status_code == 204
     assert client.get("/api/v1/me/context").status_code == 401
 
 
 def test_registration_vertical_slice(scenario):
     client, users, students, lecturers, topic, session = scenario
-    payload = {"topic_id": str(topic.id), "member_student_ids": [str(s.id) for s in students]}
-    made = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json=payload)
-    assert made.status_code == 201, made.text
-    reg = made.json()
-    assert reg["state"] == "DRAFT"
-    assert len(reg["member_student_ids"]) == 3
-    assert {member["consent_status"] for member in reg["members"]} == {"PENDING"}
+    reg = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={"topic_id":str(topic.id)}).json()
+    assert reg["state"] == "DRAFT" and reg["members"][0]["consent_status"] == "ACCEPTED"
     assert client.get("/api/v1/topic-registrations", headers=hdr(users[3])).json() == []
     assert client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[3])).status_code == 404
-    premature = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
-    assert premature.status_code == 409
-    wrong_member = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/member-response",
-        headers=hdr(users[3]), json={"consent_status": "ACCEPTED"},
-    )
-    assert wrong_member.status_code == 403
-    again = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json=payload)
-    assert again.status_code == 409
-    outsider = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
-        headers={**hdr(users[5]), "If-Match": str(reg["row_version"])},
-        json={"decision": "ACCEPT"},
-    )
+    for user in users[1:3]:
+        joined = client.post("/api/v1/topic-registrations", headers=hdr(user), json={"topic_id":str(topic.id)})
+        assert joined.status_code == 201 and joined.json()["id"] == reg["id"]
+    group = client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[0])).json()
+    assert len(group["members"]) == 3 and all(m["consent_status"] == "ACCEPTED" for m in group["members"])
+    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[1])).status_code == 403
+    assert client.post("/api/v1/topic-registrations", headers=hdr(users[3]), json={"topic_id":str(topic.id)}).status_code == 403
+    submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0])).json()
+    outsider = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[5]),"If-Match":str(submitted["row_version"])},json={"decision":"ACCEPT"})
     assert outsider.status_code == 403
-    lecturer_cannot_add = client.post("/api/v1/topic-registrations", headers=hdr(users[3]), json=payload)
-    assert lecturer_cannot_add.status_code == 403
-    first_response = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/member-response",
-        headers=hdr(users[0]),
-        json={"consent_status": "ACCEPTED", "student_id": str(students[1].id)},
-    )
-    assert first_response.status_code == 200, first_response.text
-    first_member = next(member for member in first_response.json()["members"] if member["student_id"] == str(students[0].id))
-    assert first_member["consent_status"] == "ACCEPTED"
-    assert first_member["active"]
-    repeat_response = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/member-response",
-        headers=hdr(users[0]), json={"consent_status": "DECLINED"},
-    )
-    assert repeat_response.status_code == 409
-    for index in range(1, 3):
-        accepted_member = client.post(
-            f"/api/v1/topic-registrations/{reg['id']}/member-response",
-            headers=hdr(users[index]), json={"consent_status": "ACCEPTED"},
-        )
-        assert accepted_member.status_code == 200, accepted_member.text
-    non_coordinator_submit = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[1]))
-    assert non_coordinator_submit.status_code == 403
-    submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
-    assert submitted.status_code == 200, submitted.text
-    assert submitted.json()["state"] == "SUBMITTED"
-    late_response = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/member-response",
-        headers=hdr(users[0]), json={"consent_status": "DECLINED"},
-    )
-    assert late_response.status_code == 409
-    accepted = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
-        headers={**hdr(users[3]), "If-Match": str(submitted.json()["row_version"])},
-        json={"decision": "ACCEPT"},
-    )
+    accepted = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),"If-Match":str(submitted["row_version"])},json={"decision":"ACCEPT"})
     assert accepted.status_code == 200, accepted.text
-    wrong_head = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
-        headers={**hdr(users[5]), "If-Match": str(accepted.json()["row_version"])},
-    )
-    assert wrong_head.status_code == 403
-    finalized = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
-        headers={**hdr(users[4]), "If-Match": str(accepted.json()["row_version"])},
-    )
+    wrong = client.post(f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
+        headers={**hdr(users[5]),"If-Match":str(accepted.json()["row_version"])})
+    assert wrong.status_code == 403
+    finalized = client.post(f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
+        headers={**hdr(users[4]),"If-Match":str(accepted.json()["row_version"])})
     assert finalized.status_code == 200, finalized.text
-    assert finalized.json()["state"] == "FINALIZED"
     thesis_id = finalized.json()["thesis_id"]
-    assert thesis_id is not None
-    thesis = session.scalar(select(m.Thesis).where(m.Thesis.registration_id == reg["id"]))
-    assert str(thesis.id) == thesis_id
-    assert len(session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis.id)).all()) == 3
-    advisor = session.scalar(select(m.AdvisorAssignment).where(m.AdvisorAssignment.thesis_id == thesis.id))
+    assert finalized.json()["state"] == "FINALIZED" and thesis_id
+    assert len(session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis_id)).all()) == 3
+    advisor = session.scalar(select(m.AdvisorAssignment).where(m.AdvisorAssignment.thesis_id == thesis_id))
     assert advisor.lecturer_id == lecturers[0].id
-    hidden = client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[2]))
-    assert hidden.status_code == 200
-    unrelated = client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[5]))
-    assert unrelated.status_code == 404
-    repeat = client.post(
-        f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
-        headers={**hdr(users[4]), "If-Match": str(accepted.json()["row_version"])},
-    )
-    assert repeat.status_code == 200
-    assert repeat.json()["thesis_id"] == thesis_id
+    repeat = client.post(f"/api/v1/topic-registrations/{reg['id']}/department-finalization",
+        headers={**hdr(users[4]),"If-Match":str(accepted.json()["row_version"])})
+    assert repeat.status_code == 200 and repeat.json()["thesis_id"] == thesis_id
 
 
 def test_dev_identity_fail_closed(scenario, monkeypatch):
@@ -270,8 +222,6 @@ def test_rejection_releases_students_for_new_registration(scenario):
     })
     assert created.status_code == 201, created.text
     reg = created.json()
-    confirmed = client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[0]), json={"consent_status": "ACCEPTED"})
-    assert confirmed.status_code == 200
     submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
     assert submitted.status_code == 200
     rejected = client.post(
@@ -288,26 +238,25 @@ def test_rejection_releases_students_for_new_registration(scenario):
     assert second.status_code == 201, second.text
 
 
-def test_draft_decline_must_be_cancelled_before_reforming(scenario):
-    client, users, students, *_ = scenario
-    members = [str(student.id) for student in students[:2]]
-    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
-        "topic_id": str(scenario[4].id), "member_student_ids": members,
-    })
-    assert created.status_code == 201, created.text
-    reg = created.json()
-    declined = client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[1]), json={"consent_status": "DECLINED"})
-    assert declined.status_code == 200
-    denied_submit = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0]))
-    assert denied_submit.status_code == 409
-    cancelled = client.post(f"/api/v1/topic-registrations/{reg['id']}/cancel", headers=hdr(users[0]))
-    assert cancelled.status_code == 200, cancelled.text
-    assert cancelled.json()["state"] == "CANCELLED"
-    assert all(not member["active"] for member in cancelled.json()["members"])
-    retry = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
-        "topic_id": str(scenario[4].id), "member_student_ids": [str(students[0].id)],
-    })
-    assert retry.status_code == 201, retry.text
+def test_no_invitations_or_registration_on_another_students_behalf(scenario):
+    client, users, students, _, topic, session = scenario
+    before = session.scalar(select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id))
+    assert before is None
+    invalid = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),json={
+        "topic_id":str(topic.id),"member_student_ids":[str(students[1].id)]})
+    assert invalid.status_code == 422
+    invalid = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),json={
+        "topic_id":str(topic.id),"member_student_ids":[str(s.id) for s in students[:2]]})
+    assert invalid.status_code == 422
+    assert session.scalar(select(m.RegistrationMember.id).where(m.RegistrationMember.student_id == students[1].id)) is None
+    made = client.post("/api/v1/topic-registrations", headers=hdr(users[1]),json={"topic_id":str(topic.id)})
+    assert made.status_code == 201
+    reg = made.json()
+    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response",
+        headers=hdr(users[1]),json={"consent_status":"DECLINED"}).status_code == 422
+    cancelled = client.post(f"/api/v1/topic-registrations/{reg['id']}/cancel", headers=hdr(users[1]))
+    assert cancelled.status_code == 200 and all(not m["active"] for m in cancelled.json()["members"])
+    assert client.post("/api/v1/topic-registrations", headers=hdr(users[1]),json={"topic_id":str(topic.id)}).status_code == 201
 
 
 def test_health_and_openapi(scenario):
@@ -321,29 +270,33 @@ def test_health_and_openapi(scenario):
 
 def test_student_proposal_review_and_receiving_lecturer(scenario):
     client, users, students, lecturers, topic, session = scenario
-    made = client.post("/api/v1/student-proposals", headers=hdr(users[0]), json={
-        "round_id": str(topic.round_id), "title": "Student suggested application", "max_students": 2,
-        "member_student_ids": [str(s.id) for s in students[:2]], "receiving_lecturer_id": str(lecturers[0].id), "confirm_creator": True,
-    })
+    made = client.post("/api/v1/student-proposals", headers=hdr(users[0]),json={
+        "round_id":str(topic.round_id),"title":"Student suggested application","max_students":2,
+        "receiving_lecturer_id":str(lecturers[0].id)})
     assert made.status_code == 201, made.text
     reg = made.json()
-    assert reg["members"][0]["consent_status"] == "ACCEPTED"
-    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0])).status_code == 409
-    client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[1]), json={"consent_status":"ACCEPTED"})
+    assert len(reg["members"]) == 1 and reg["members"][0]["consent_status"] == "ACCEPTED"
+    assert client.post("/api/v1/topic-registrations",headers=hdr(users[1]),json={"topic_id":reg["topic_id"]}).status_code in (403,409)
     sent = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0])).json()
     assert sent["topic_state"] == "SUBMITTED"
-    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision", headers={**hdr(users[3]),"If-Match":str(sent['row_version'])}, json={"decision":"ACCEPT"}).status_code == 409
+    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),"If-Match":str(sent["row_version"])},json={"decision":"ACCEPT"}).status_code == 409
     proposed = client.get(f"/api/v1/topics/{reg['topic_id']}", headers=hdr(users[4])).json()
-    assert client.get(f"/api/v1/topics/{reg['topic_id']}", headers=hdr(users[2])).status_code == 404
-    approved = client.post(f"/api/v1/topics/{reg['topic_id']}/department-decision", headers={**hdr(users[4]),"If-Match":str(proposed['row_version'])},
-        json={"decision":"APPROVE", "revised_title":"Student topic approved by department", "receiving_lecturer_id":str(lecturers[2].id)})
+    assert client.get(f"/api/v1/topics/{reg['topic_id']}",headers=hdr(users[2])).status_code == 404
+    approved = client.post(f"/api/v1/topics/{reg['topic_id']}/department-decision",
+        headers={**hdr(users[4]),"If-Match":str(proposed["row_version"])},
+        json={"decision":"APPROVE","revised_title":"Student topic approved by department","receiving_lecturer_id":str(lecturers[2].id)})
     assert approved.status_code == 200, approved.text
-    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision", headers={**hdr(users[3]),"If-Match":str(sent['row_version'])}, json={"decision":"ACCEPT"}).status_code == 403
-    received = client.get(f"/api/v1/topic-registrations/{reg['id']}", headers=hdr(users[5])).json()
-    assert received['receiving_lecturer_user_id'] == str(users[5].id)
-    rejected = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision", headers={**hdr(users[5]),"If-Match":str(received['row_version'])}, json={"decision":"REJECT","reason":"Outside current capacity"})
+    joined = client.post("/api/v1/topic-registrations",headers=hdr(users[1]),json={"topic_id":reg["topic_id"]})
+    assert joined.status_code == 201 and joined.json()["id"] == reg["id"]
+    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),"If-Match":str(joined.json()["row_version"])},json={"decision":"ACCEPT"}).status_code == 403
+    received = client.get(f"/api/v1/topic-registrations/{reg['id']}",headers=hdr(users[5])).json()
+    assert received["receiving_lecturer_user_id"] == str(users[5].id)
+    rejected = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[5]),"If-Match":str(received["row_version"])},json={"decision":"REJECT","reason":"Outside current capacity"})
     assert rejected.status_code == 200, rejected.text
-    assert all(not member['active'] for member in rejected.json()['members'])
+    assert all(not m["active"] for m in rejected.json()["members"])
 
 
 def test_student_proposal_return_edit_resubmit(scenario):
@@ -388,7 +341,8 @@ def test_requirements_capacity_and_year_codes(scenario):
 def test_private_member_evidence_and_submission_lock(scenario, monkeypatch, tmp_path):
     client, users, students, _, topic, session=scenario
     monkeypatch.setenv('KLTN_EVIDENCE_DIR',str(tmp_path))
-    reg=client.post('/api/v1/topic-registrations',headers=hdr(users[0]),json={"topic_id":str(topic.id),"member_student_ids":[str(s.id) for s in students[:2]],"confirm_creator":True}).json()
+    reg=client.post('/api/v1/topic-registrations',headers=hdr(users[0]),json={"topic_id":str(topic.id)}).json()
+    assert client.post('/api/v1/topic-registrations',headers=hdr(users[1]),json={"topic_id":str(topic.id)}).status_code == 201
     url=f"/api/v1/topic-registrations/{reg['id']}/evidence"
     payload=b'%PDF-1.7\nSynthetic demonstration, no PII\n%%EOF'
     upload=client.post(url,headers={**hdr(users[0]),"X-File-Name":"proof.pdf","Content-Type":"application/octet-stream"},content=payload)
@@ -400,7 +354,6 @@ def test_private_member_evidence_and_submission_lock(scenario, monkeypatch, tmp_
     assert client.get(download,headers=hdr(users[2])).status_code == 404
     assert client.get(download,headers=hdr(users[3])).status_code == 404
     assert client.get(download,headers=hdr(users[1])).content == payload
-    client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response",headers=hdr(users[1]),json={"consent_status":"ACCEPTED"})
     client.post(f"/api/v1/topic-registrations/{reg['id']}/submit",headers=hdr(users[0]))
     assert client.get(download,headers=hdr(users[3])).content == payload
     assert client.get(download,headers=hdr(users[5])).status_code == 404
@@ -440,3 +393,151 @@ def test_round_number_display_and_student_proposal_atomicity(scenario):
         "max_students":1,"member_student_ids":[str(s.id) for s in students[:2]],"receiving_lecturer_id":str(lecturers[0].id)})
     assert rejected.status_code == 422
     assert session.scalar(select(m.Topic.id).where(m.Topic.current_title=='Must not leave an orphan proposal')) is None
+
+
+def test_capacity_closes_before_lecturer_acceptance(scenario):
+    client, users, _, _, topic, session = scenario
+    topic.max_students = 2
+    session.commit()
+    first = client.post('/api/v1/topic-registrations', headers=hdr(users[0]), json={'topic_id':str(topic.id)}).json()
+    assert first['expected_member_count'] == 2
+    detail = client.get(f'/api/v1/topics/{topic.id}', headers=hdr(users[1])).json()
+    assert detail['remaining_slots'] == 1 and detail['available']
+    second = client.post('/api/v1/topic-registrations', headers=hdr(users[1]), json={'topic_id':str(topic.id)})
+    assert second.status_code == 201 and second.json()['id'] == first['id']
+    detail = client.get(f'/api/v1/topics/{topic.id}', headers=hdr(users[2])).json()
+    assert detail['remaining_slots'] == 0 and not detail['available']
+    assert client.post('/api/v1/topic-registrations', headers=hdr(users[2]), json={'topic_id':str(topic.id)}).status_code == 409
+    assert len(session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id == topic.id)).all()) == 1
+
+
+def test_partial_group_acceptance_and_later_join_requires_new_decision(scenario):
+    client, users, _, _, topic, session = scenario
+    topic.max_students = 2
+    session.commit()
+    reg = client.post('/api/v1/topic-registrations', headers=hdr(users[0]), json={'topic_id':str(topic.id)}).json()
+    sent = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0])).json()
+    accepted = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),'If-Match':str(sent['row_version'])}, json={'decision':'ACCEPT'})
+    assert accepted.status_code == 200 and len(accepted.json()['members']) == 1
+    joined = client.post('/api/v1/topic-registrations', headers=hdr(users[1]), json={'topic_id':str(topic.id)})
+    assert joined.status_code == 201, joined.text
+    updated = joined.json()
+    assert updated['id'] == reg['id'] and updated['state'] == 'SUBMITTED'
+    assert updated['lecturer_decided_at'] is None
+    assert next(m for m in updated['members'] if not m['is_coordinator'])['can_upload_evidence']
+    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),'If-Match':str(accepted.json()['row_version'])}, json={'decision':'ACCEPT'}).status_code == 409
+    again = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+        headers={**hdr(users[3]),'If-Match':str(updated['row_version'])}, json={'decision':'ACCEPT'})
+    assert again.status_code == 200
+    events = session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_id == reg['id'],m.AuditEvent.action == 'REGISTRATION_MEMBER_JOINED')).all()
+    assert len(events) == 1 and 'LECTURER_ACCEPTED' in events[0].reason
+
+
+def test_late_join_is_blocked_after_deadline(scenario):
+    client, users, _, _, topic, session = scenario
+    client.post('/api/v1/topic-registrations', headers=hdr(users[0]), json={'topic_id':str(topic.id)})
+    round_ = session.get(m.ThesisRound, topic.round_id)
+    round_.closes_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    session.commit()
+    assert client.post('/api/v1/topic-registrations', headers=hdr(users[1]), json={'topic_id':str(topic.id)}).status_code == 409
+    assert not client.get(f'/api/v1/topics/{topic.id}',headers=hdr(users[1])).json()['available']
+
+
+@pytest.mark.parametrize('stage', ['submit','accept'])
+def test_inactive_member_cannot_be_submitted_or_accepted(scenario, stage):
+    client, users, _, _, topic, session = scenario
+    reg = client.post('/api/v1/topic-registrations', headers=hdr(users[0]), json={'topic_id':str(topic.id)}).json()
+    client.post('/api/v1/topic-registrations', headers=hdr(users[1]), json={'topic_id':str(topic.id)})
+    if stage == 'accept':
+        reg = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit",headers=hdr(users[0])).json()
+    users[1].status = 'LOCKED'
+    session.commit()
+    if stage == 'submit':
+        result = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit",headers=hdr(users[0]))
+    else:
+        result = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
+            headers={**hdr(users[3]),'If-Match':str(reg['row_version'])},json={'decision':'ACCEPT'})
+    assert result.status_code == 409, result.text
+
+
+def test_wrong_profile_role_has_no_actions(scenario):
+    client, users, _, _, topic, session = scenario
+    users[0].base_role = 'LECTURER'
+    session.commit()
+    assert client.get('/api/v1/me/context',headers=hdr(users[0])).json()['actions'] == []
+    assert client.post('/api/v1/topic-registrations',headers=hdr(users[0]),json={'topic_id':str(topic.id)}).status_code == 403
+
+
+def test_topic_list_pagination_and_bounded_query_count(scenario):
+    from sqlalchemy import event
+    client, users, _, _, topic, session = scenario
+    for index in range(25):
+        session.add(m.Topic(id=uuid4(),round_id=topic.round_id,department_id=topic.department_id,
+            proposer_user_id=users[3].id,proposer_type='LECTURER',code='PAGED-'+uuid4().hex,
+            current_title=f'Pagination topic {index:02d}',max_students=2,state='APPROVED'))
+    session.commit()
+    queries = []
+    def track(*args): queries.append(args[2])
+    event.listen(session.bind, 'before_cursor_execute',track)
+    try:
+        first = client.get('/api/v1/topics?limit=20&search=Pagination',headers=hdr(users[0])).json()
+    finally:
+        event.remove(session.bind,'before_cursor_execute',track)
+    second = client.get('/api/v1/topics?limit=20&offset=20&search=Pagination',headers=hdr(users[0])).json()
+    assert len(first) == 20 and len(second) == 5
+    assert not {t['id'] for t in first} & {t['id'] for t in second}
+    assert len([q for q in queries if q.lstrip().startswith('SELECT')]) <= 14
+    assert client.get('/api/v1/topics?search=%25',headers=hdr(users[0])).json() == []
+
+
+def test_student_proposal_rolls_back_if_student_already_registered(scenario):
+    client,users,_,lecturers,topic,session = scenario
+    client.post('/api/v1/topic-registrations',headers=hdr(users[0]),json={'topic_id':str(topic.id)})
+    result = client.post('/api/v1/student-proposals',headers=hdr(users[0]),json={
+        'round_id':str(topic.round_id),'title':'Orphan topic must not survive',
+        'max_students':1,'receiving_lecturer_id':str(lecturers[0].id)})
+    assert result.status_code == 409
+    assert session.scalar(select(m.Topic.id).where(m.Topic.current_title == 'Orphan topic must not survive')) is None
+
+
+
+@pytest.mark.parametrize('stage', ['create', 'edit'])
+def test_student_cannot_forge_lecturer_requirements(scenario, stage):
+    client, users, _, lecturers, topic, session = scenario
+    payload = {'round_id':str(topic.round_id),'title':'Personal proposed topic',
+               'max_students':2,'receiving_lecturer_id':str(lecturers[0].id)}
+    requirement = {'requirement_type':'PREFERRED_GPA','value_text':'GPA preferred by lecturer','preferred_gpa':3.0}
+    if stage == 'create':
+        result = client.post('/api/v1/student-proposals',headers=hdr(users[0]),
+                             json={**payload,'requirements':[requirement]})
+    else:
+        created = client.post('/api/v1/student-proposals',headers=hdr(users[0]),json=payload).json()
+        result = client.patch(f"/api/v1/topics/{created['topic_id']}",
+            headers={**hdr(users[0]),'If-Match':'1'},json={'requirements':[requirement]})
+    assert result.status_code == 422
+    assert 'not student-editable' in result.json()['detail']
+    assert not session.scalars(select(m.TopicRequirement).join(m.Topic).where(m.Topic.proposer_user_id == users[0].id)).all()
+
+
+def test_lecturer_cannot_submit_topic_after_round_closes(scenario):
+    client, users, _, _, topic, session = scenario
+    created = client.post('/api/v1/topics',headers=hdr(users[3]),
+        json={'round_id':str(topic.round_id),'title':'Topic prepared before deadline','max_students':2}).json()
+    session.get(m.ThesisRound,topic.round_id).closes_at = datetime.now(timezone.utc)-timedelta(seconds=1)
+    session.commit()
+    result = client.post(f"/api/v1/topics/{created['id']}/submit",
+        headers={**hdr(users[3]),'If-Match':str(created['row_version'])})
+    assert result.status_code == 409
+    assert session.get(m.Topic,created['id']).state == 'DRAFT'
+
+
+def test_private_api_cache_and_legacy_student_directory(scenario):
+    client, users, students, _, topic, _ = scenario
+    response = client.get('/api/v1/topics',headers=hdr(users[0]))
+    assert response.headers['cache-control'] == 'private, no-store'
+    assert response.headers['x-content-type-options'] == 'nosniff'
+    legacy = client.get(f'/api/v1/eligible-students?round_id={topic.round_id}',headers=hdr(users[0]))
+    assert [row['id'] for row in legacy.json()] == [str(students[0].id)]
+    assert client.get('/api/v1/me/eligibility?round_id='+str(topic.round_id),headers=hdr(users[0])).json()['eligible']

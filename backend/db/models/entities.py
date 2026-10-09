@@ -305,6 +305,7 @@ class TopicRegistration(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     __tablename__ = "topic_registration"
     __table_args__ = (
         UniqueConstraint("id", "round_id"),
+        CheckConstraint("expected_member_count BETWEEN 1 AND 3", name="expected_member_count"),
         CheckConstraint(
             "state IN ('DRAFT','SUBMITTED','LECTURER_ACCEPTED','LECTURER_REJECTED','RETURNED','FINALIZED','CANCELLED')",
             name="state",
@@ -313,6 +314,7 @@ class TopicRegistration(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
     topic_id: Mapped[uuid.UUID] = fk("topic.id")
     created_by: Mapped[uuid.UUID] = fk("student_profile.id")
+    expected_member_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     lecturer_decided_by: Mapped[Optional[uuid.UUID]] = fk("lecturer_profile.id", nullable=True)

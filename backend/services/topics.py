@@ -58,36 +58,65 @@ def _title_version(session: Session, topic: m.Topic, actor: UUID, title: str,
 
 
 def topic_out(session: Session, topic: m.Topic) -> TopicOut:
-    reason = None
-    if topic.state in {"RETURNED", "REJECTED"}:
-        reason = session.scalar(select(m.AuditEvent.reason).where(
-            m.AuditEvent.resource_type == "topic", m.AuditEvent.resource_id == topic.id,
-            m.AuditEvent.action.in_(["TOPIC_RETURNED", "TOPIC_REJECTED"]),
-        ).order_by(m.AuditEvent.occurred_at.desc()).limit(1))
-    lecturer = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else None
-    requirements = session.scalars(select(m.TopicRequirement).where(m.TopicRequirement.topic_id == topic.id)
-                                   .order_by(m.TopicRequirement.created_at, m.TopicRequirement.id)).all()
-    versions = session.scalars(select(m.TopicTitleVersion).where(m.TopicTitleVersion.topic_id == topic.id)
-                               .order_by(m.TopicTitleVersion.version_no)).all()
-    occupied = session.scalar(select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id,
-        m.TopicRegistration.state.in_(["LECTURER_ACCEPTED", "FINALIZED"])).limit(1))
-    round_ = session.get(m.ThesisRound, topic.round_id)
+    return topics_out(session, [topic])[0]
+
+
+def topics_out(session: Session, topics: list[m.Topic]) -> list[TopicOut]:
+    """Batch related reads so list size does not multiply database round trips."""
+    if not topics:
+        return []
+    ids = [t.id for t in topics]
+    requirements = session.scalars(select(m.TopicRequirement).where(m.TopicRequirement.topic_id.in_(ids))
+        .order_by(m.TopicRequirement.created_at, m.TopicRequirement.id)).all()
+    versions = session.scalars(select(m.TopicTitleVersion).where(m.TopicTitleVersion.topic_id.in_(ids))
+        .order_by(m.TopicTitleVersion.version_no)).all()
+    lecturers = {l.id: l for l in session.scalars(select(m.LecturerProfile).where(
+        m.LecturerProfile.id.in_([t.receiving_lecturer_id for t in topics if t.receiving_lecturer_id]))).all()}
+    rounds = {r.id: r for r in session.scalars(select(m.ThesisRound).where(
+        m.ThesisRound.id.in_({t.round_id for t in topics}))).all()}
+    years = {y.id: y for y in session.scalars(select(m.AcademicYear).where(
+        m.AcademicYear.id.in_({r.academic_year_id for r in rounds.values()}))).all()}
+    year_rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.academic_year_id.in_(years))
+        .order_by(m.ThesisRound.opens_at, m.ThesisRound.code, m.ThesisRound.id)).all()
+    registrations = session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id.in_(ids),
+        m.TopicRegistration.state.in_(["DRAFT", "RETURNED", "SUBMITTED", "LECTURER_ACCEPTED", "FINALIZED"]))).all()
+    counts = dict(session.execute(select(m.RegistrationMember.registration_id, func.count()).where(
+        m.RegistrationMember.registration_id.in_([r.id for r in registrations]), m.RegistrationMember.active.is_(True))
+        .group_by(m.RegistrationMember.registration_id)).all())
+    reasons: dict[UUID, str | None] = {}
+    for event in session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_type == "topic",
+        m.AuditEvent.resource_id.in_([t.id for t in topics if t.state in {"RETURNED", "REJECTED"}]),
+        m.AuditEvent.action.in_(["TOPIC_RETURNED", "TOPIC_REJECTED"]))
+        .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id)).all():
+        reasons.setdefault(event.resource_id, event.reason)
     now = datetime.now(timezone.utc)
-    return TopicOut(
-        id=topic.id, round_id=topic.round_id, department_id=topic.department_id,
-        proposer_user_id=topic.proposer_user_id, title=topic.current_title,
-        description=topic.description, max_students=topic.max_students,
-        state=topic.state, row_version=topic.row_version, decision_reason=reason,
-        code=topic.code, round_label=round_out(session, round_).label, proposer_type=topic.proposer_type,
-        receiving_lecturer_id=topic.receiving_lecturer_id,
-        receiving_lecturer_name=lecturer.display_name if lecturer else None,
-        requirements=[RequirementInput(requirement_type=r.requirement_type, value_text=r.value_text or "",
-            preferred_gpa=float(r.preferred_gpa) if r.preferred_gpa is not None else None) for r in requirements],
-        title_versions=[TitleVersionOut(version_no=v.version_no, title=v.title,
-            change_reason=v.change_reason, created_at=v.created_at) for v in versions],
-        available=topic.state == "APPROVED" and not occupied and round_.state == "OPEN"
-            and round_.opens_at <= now <= round_.closes_at,
-    )
+    result = []
+    for topic in topics:
+        round_ = rounds[topic.round_id]
+        year = years[round_.academic_year_id]
+        same_year = [r.id for r in year_rounds if r.academic_year_id == year.id]
+        label = f"Năm học {year.starts_on.year}-{year.ends_on.year}"
+        if len(same_year) > 1:
+            label += f" (đợt {same_year.index(round_.id) + 1})"
+        regs = [r for r in registrations if r.topic_id == topic.id]
+        state = "LEGACY_REVIEW" if len(regs) > 1 else regs[0].state if regs else None
+        count = sum(counts.get(r.id, 0) for r in regs)
+        remaining = max(0, topic.max_students - count)
+        available = topic.state == "APPROVED" and state not in {"FINALIZED", "LEGACY_REVIEW"} and remaining > 0
+        available = available and round_.state == "OPEN" and round_.opens_at <= now <= round_.closes_at
+        lecturer = lecturers.get(topic.receiving_lecturer_id)
+        result.append(TopicOut(id=topic.id, round_id=topic.round_id, department_id=topic.department_id,
+            proposer_user_id=topic.proposer_user_id, title=topic.current_title, description=topic.description,
+            max_students=topic.max_students, state=topic.state, row_version=topic.row_version,
+            decision_reason=reasons.get(topic.id), code=topic.code, round_label=label, proposer_type=topic.proposer_type,
+            receiving_lecturer_id=topic.receiving_lecturer_id, receiving_lecturer_name=lecturer.display_name if lecturer else None,
+            requirements=[RequirementInput(requirement_type=r.requirement_type, value_text=r.value_text or "",
+                preferred_gpa=float(r.preferred_gpa) if r.preferred_gpa is not None else None)
+                for r in requirements if r.topic_id == topic.id],
+            title_versions=[TitleVersionOut(version_no=v.version_no, title=v.title, change_reason=v.change_reason,
+                created_at=v.created_at) for v in versions if v.topic_id == topic.id],
+            registered_member_count=count, remaining_slots=remaining, registration_state=state, available=available))
+    return result
 
 
 def open_rounds(session: Session) -> list[m.ThesisRound]:
@@ -110,12 +139,13 @@ def round_out(session: Session, round_: m.ThesisRound) -> OpenRoundOut:
 
 
 def visible_topics(session: Session, user: m.UserAccount,
-                   round_id: UUID | None, limit: int) -> list[TopicOut]:
+                   round_id: UUID | None, limit: int, offset: int = 0,
+                   search: str | None = None, view: str = "all") -> list[TopicOut]:
     if user.base_role == "STUDENT":
         viewer = profile(session, user, "STUDENT")
         group_topics = select(m.TopicRegistration.topic_id).join(m.RegistrationMember,
             m.RegistrationMember.registration_id == m.TopicRegistration.id).where(m.RegistrationMember.student_id == viewer.id)
-        allowed = or_(and_(m.Topic.state == "APPROVED", m.Topic.proposer_type == "LECTURER"),
+        allowed = or_(m.Topic.state == "APPROVED",
                       m.Topic.proposer_user_id == user.id, m.Topic.id.in_(group_topics))
     elif user.base_role == "LECTURER":
         viewer = profile(session, user, "LECTURER")
@@ -127,10 +157,21 @@ def visible_topics(session: Session, user: m.UserAccount,
     else:
         return []
     query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
+    if user.base_role == "STUDENT" and view == "all":
+        query = query.where(m.Topic.state == "APPROVED")
     if round_id is not None:
         query = query.where(m.Topic.round_id == round_id)
-    rows = session.scalars(query.order_by(m.Topic.created_at.desc(), m.Topic.id).limit(limit)).all()
-    return [topic_out(session, row) for row in rows]
+    if search:
+        term = "%" + search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        receivers = select(m.LecturerProfile.id).where(m.LecturerProfile.display_name.ilike(term, escape="\\"))
+        query = query.where(or_(m.Topic.code.ilike(term, escape="\\"),
+            m.Topic.current_title.ilike(term, escape="\\"), m.Topic.receiving_lecturer_id.in_(receivers)))
+    if view == "pending":
+        query = query.where(m.Topic.state == "SUBMITTED")
+    elif view == "mine":
+        query = query.where(m.Topic.proposer_user_id == user.id)
+    rows = session.scalars(query.order_by(m.Topic.created_at.desc(), m.Topic.id).offset(offset).limit(limit)).all()
+    return topics_out(session, rows)
 
 
 def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> TopicOut:
@@ -139,7 +180,7 @@ def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> 
         _fail(404, "Topic not found")
     if user.base_role == "STUDENT":
         viewer = profile(session, user, "STUDENT")
-        allowed = (row.state == "APPROVED" and row.proposer_type == "LECTURER") or row.proposer_user_id == user.id or session.scalar(
+        allowed = row.state == "APPROVED" or row.proposer_user_id == user.id or session.scalar(
             select(m.RegistrationMember.id).join(m.TopicRegistration,
                 m.TopicRegistration.id == m.RegistrationMember.registration_id).where(
                 m.TopicRegistration.topic_id == row.id, m.RegistrationMember.student_id == viewer.id).limit(1)) is not None
@@ -171,7 +212,7 @@ def _own_editable_topic(session: Session, user: m.UserAccount,
 def receiving_lecturer(session: Session, lecturer_id: UUID | None, department_id: UUID) -> m.LecturerProfile:
     lecturer = session.get(m.LecturerProfile, lecturer_id) if lecturer_id else None
     account = session.get(m.UserAccount, lecturer.user_id) if lecturer else None
-    if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE":
+    if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE" or account.base_role != "LECTURER":
         _fail(422, "Choose an active lecturer in the same department")
     return lecturer
 
@@ -197,6 +238,8 @@ def create_topic(session: Session, user: m.UserAccount, data: TopicCreate, *, st
     if user.base_role != "LECTURER" and not (student_proposal and user.base_role == "STUDENT"):
         _fail(403, "Only lecturers propose topics")
     lecturer = profile(session, user, user.base_role)
+    if student_proposal and data.requirements:
+        _fail(422, "Students describe their proposal; lecturer requirements are not student-editable")
     round_ = session.get(m.ThesisRound, data.round_id)
     now = datetime.now(timezone.utc)
     if not round_ or round_.state != "OPEN" or not round_.opens_at <= now <= round_.closes_at:
@@ -254,6 +297,8 @@ def update_topic(session: Session, user: m.UserAccount, topic_id: UUID,
                 _fail(422, "Student proposal membership is fixed in its registration")
             topic.max_students = data.max_students
         if data.requirements is not None:
+            if user.base_role != "LECTURER":
+                _fail(422, "Students describe their proposal; lecturer requirements are not student-editable")
             save_requirements(session, topic, data.requirements)
         if "receiving_lecturer_id" in data.model_fields_set:
             if topic.proposer_type != "STUDENT":
@@ -276,6 +321,10 @@ def submit_topic(session: Session, user: m.UserAccount, topic_id: UUID,
         topic = _own_editable_topic(session, user, topic_id)
         if topic.proposer_type == "STUDENT":
             _fail(409, "Submit the student registration after all members confirm")
+        round_ = session.get(m.ThesisRound, topic.round_id)
+        now = datetime.now(timezone.utc)
+        if not round_ or round_.state != "OPEN" or not round_.opens_at <= now <= round_.closes_at:
+            _fail(409, "The selected round is not open")
         row_version(expected_version, topic.row_version)
         before = _fingerprint(topic, session)
         topic.state = "SUBMITTED"

@@ -19,7 +19,9 @@ ROOT = Path(__file__).resolve().parents[2]
 def load_env() -> None:
     path = ROOT / ".env"
     if not path.exists():
-        raise RuntimeError("Missing local .env")
+        if os.getenv("DATABASE_URL"):
+            return
+        raise RuntimeError("Missing local .env or DATABASE_URL")
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if line and not line.startswith("#") and "=" in line:
@@ -52,7 +54,7 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20261004_0011"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20261004_0012"
 
             # DB-41: the real Mẫu 6 baseline is present but cannot be used live
             # until the Faculty resolves its conflict with QĐ 2919.
@@ -185,6 +187,12 @@ def main() -> int:
                     student_id=student_id, is_coordinator=(i==0), active=True
                 ))
             passed.append("DB-04")
+            for invalid_count in (0, 4):
+                expect_integrity(conn, lambda: conn.execute(m.TopicRegistration.__table__.insert().values(
+                    id=uid(), round_id=round_id, topic_id=topic_id,
+                    created_by=student_ids[0], expected_member_count=invalid_count,
+                    state="DRAFT")), "planned group capacity outside 1..3")
+            passed.append("DB-46")
 
             topic2_id, registration2_id = uid(), uid()
             conn.execute(m.Topic.__table__.insert().values(
@@ -627,7 +635,7 @@ def main() -> int:
             ), "delete referenced account")
             passed.append("DB-18")
 
-            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,46)}
+            expected={f"DB-{i:02d}" for i in range(1,20)} | {f"DB-{i:02d}" for i in range(21,47)}
             assert set(passed)==expected, sorted(expected-set(passed))
         except Exception as exc:
             print("FAIL "+type(exc).__name__+": "+str(exc))

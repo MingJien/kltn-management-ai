@@ -1,5 +1,5 @@
 -- KLTN: CSDL loi theo gop y GV, uu tien tai khoan, dot, dieu kien, de tai, dang ky, khoa luan, GVHD, de cuong, tien do, tai lieu.
--- Nguon: PostgreSQL kltn_ai, Alembic 20261004_0011; doi chieu metadata truoc khi xuat.
+-- Nguon: PostgreSQL kltn_ai, Alembic 20261004_0012; doi chieu metadata truoc khi xuat.
 -- Chi chay MOT LAN tren database PostgreSQL MOI, TRONG (de xuat ten: kltn_core).
 -- Khong chay tren kltn_ai/kltn_dev. Khong chua du lieu sinh vien, de tai hay mat khau.
 -- Ban 62 bang o kltn_ai duoc giu lam tham chieu cho cac giai doan sau.
@@ -318,6 +318,7 @@ CREATE TABLE topic_registration (
 	round_id UUID NOT NULL,
 	topic_id UUID NOT NULL,
 	created_by UUID NOT NULL,
+	expected_member_count INTEGER DEFAULT '1' NOT NULL,
 	state VARCHAR(30) DEFAULT 'DRAFT' NOT NULL,
 	submitted_at TIMESTAMP WITH TIME ZONE,
 	lecturer_decided_by UUID,
@@ -331,6 +332,7 @@ CREATE TABLE topic_registration (
 	row_version INTEGER DEFAULT '1' NOT NULL,
 	CONSTRAINT pk_topic_registration PRIMARY KEY (id),
 	CONSTRAINT uq_topic_registration_id_round_id UNIQUE (id, round_id),
+	CONSTRAINT ck_topic_registration_expected_member_count CHECK (expected_member_count BETWEEN 1 AND 3),
 	CONSTRAINT ck_topic_registration_state CHECK (state IN ('DRAFT','SUBMITTED','LECTURER_ACCEPTED','LECTURER_REJECTED','RETURNED','FINALIZED','CANCELLED')),
 	CONSTRAINT fk_topic_registration_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_registration_topic_id_topic FOREIGN KEY(topic_id) REFERENCES topic (id) ON DELETE RESTRICT,

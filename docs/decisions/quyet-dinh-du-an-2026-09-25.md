@@ -56,4 +56,4 @@ Các lựa chọn trên đã đủ để tiếp tục thiết kế và phát tri
 4. Có mẫu trắng Mẫu 9 được duyệt, map field và kiểm xuất đúng bố cục; lưu chứng cứ chữ ký giấy/điện tử để khóa nội dung từ chữ ký đầu tiên.
 5. Chỉ xem xét chặn tự động bằng similarity khi đã có chính sách và bộ kiểm thử được phê duyệt.
 
-**Trạng thái phần mềm đã chạy và việc cần hoàn thiện cho bản nộp cuối** được theo dõi tại [README](../../README.md) và [minh chứng prototype](../evidence/prototype-validation.md). Tài liệu quyết định này không dùng kết quả thiết kế để tuyên bố các chức năng chưa xây xong đã hoạt động.
+Tài liệu quyết định này ghi lại lựa chọn thiết kế và điều kiện cần trước vận hành thật; không dùng quyết định thiết kế để tuyên bố các chức năng chưa xây xong đã hoạt động.

@@ -3,7 +3,7 @@
   "info": {
     "title": "API hệ thống quản lý KLTN",
     "version": "0.3.0-nv4-design",
-    "description": "Thiết kế toàn domain; các operation có x-runtime-status=IMPLEMENTED_PROTOTYPE chạy trong FastAPI. Operation còn lại là thiết kế, chưa gọi runtime PASS."
+    "description": "Thiết kế tổng thể; operation IMPLEMENTED_PROTOTYPE đồng bộ từ FastAPI ngày 04/10/2026, cập nhật xác thực ngày 10/10/2026. Với cookie phiên, thao tác ghi cần Origin được phép và header X-CSRF-Token lấy từ /me/context; riêng đăng nhập chỉ kiểm Origin. Các operation khác là thiết kế hoặc cần cấu hình. Luồng đề tài/đăng ký dùng schema 20261004_0012; chưa kết nối SSO Trường hoặc Gemini."
   },
   "servers": [
     {
@@ -526,190 +526,6 @@
         ]
       }
     },
-    "/topics": {
-      "get": {
-        "summary": "Topics",
-        "operationId": "topics_api_v1_topics_get",
-        "parameters": [
-          {
-            "name": "round_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Round Id"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TopicOut"
-                  },
-                  "title": "Response Topics Api V1 Topics Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      },
-      "post": {
-        "tags": [
-          "Đề tài"
-        ],
-        "operationId": "createTopic",
-        "summary": "Tạo đề tài do giảng viên hoặc sinh viên đề xuất",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
-        "x-design-note": "Đề tài do SV đề xuất được tạo cùng bản nháp đăng ký nhóm; TBM xét sau khi nhóm gửi, không yêu cầu Topic.APPROVED trước đăng ký."
-      }
-    },
-    "/topics/{topicId}": {
-      "patch": {
-        "tags": [
-          "Đề tài"
-        ],
-        "operationId": "updateTopicDraft",
-        "summary": "Sửa bản nháp đề tài",
-        "responses": {
-          "200": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "topicId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
     "/topics/{topicId}/requirements": {
       "put": {
         "tags": [
@@ -757,309 +573,6 @@
         "parameters": [
           {
             "name": "topicId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
-    "/topics/{topicId}/department-decision": {
-      "post": {
-        "tags": [
-          "Đề tài"
-        ],
-        "operationId": "decideTopic",
-        "summary": "TBM duyệt, trả sửa hoặc từ chối đề tài",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "topicId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "x-design-note": "Với Topic do SV đề xuất, TBM xử lý sau khi registration của nhóm đã SUBMITTED; sau APPROVED phải có GVHD được phân công đồng ý trước finalization."
-      }
-    },
-    "/topic-registrations": {
-      "post": {
-        "summary": "Register",
-        "operationId": "register_api_v1_topic_registrations_post",
-        "parameters": [
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrationCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationOut"
-                }
-              }
-            }
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Forbidden"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed.",
-        "x-design-note": "Prototype hiện chỉ nhận Topic.APPROVED do GV đề xuất và gửi nhóm ngay. Thiết kế cuối yêu cầu từng thành viên tự ACCEPTED trước SUBMITTED; với Topic do SV đề xuất, đăng ký trước rồi TBM xét đề tài."
-      },
-      "get": {
-        "summary": "Registrations",
-        "operationId": "registrations_api_v1_topic_registrations_get",
-        "parameters": [
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/RegistrationOut"
-                  },
-                  "title": "Response Registrations Api V1 Topic Registrations Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/topic-registrations/{registrationId}/lecturer-decision": {
-      "post": {
-        "tags": [
-          "Đăng ký"
-        ],
-        "operationId": "decideRegistrationAsLecturer",
-        "summary": "GVHD đồng ý hoặc từ chối đăng ký",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "registrationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
-    "/topic-registrations/{registrationId}/department-finalization": {
-      "post": {
-        "tags": [
-          "Đăng ký"
-        ],
-        "operationId": "finalizeRegistration",
-        "summary": "TBM chốt đề tài và phân công GVHD",
-        "responses": {
-          "201": {
-            "description": "Thành công",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ObjectResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationError"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommandPayload"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "registrationId",
             "in": "path",
             "required": true,
             "schema": {
@@ -3022,65 +2535,6 @@
         ]
       }
     },
-    "/ai/chat": {
-      "post": {
-        "summary": "Ai Chat",
-        "operationId": "ai_chat_api_v1_ai_chat_post",
-        "parameters": [
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
     "/reports/eligibility": {
       "get": {
         "tags": [
@@ -3225,158 +2679,18 @@
         }
       }
     },
-    "/health/live": {
-      "get": {
-        "summary": "Live",
-        "operationId": "live_health_live_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthOut"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/health/ready": {
-      "get": {
-        "summary": "Ready",
-        "operationId": "ready_health_ready_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthOut"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/me/context": {
-      "get": {
-        "summary": "Context",
-        "operationId": "context_api_v1_me_context_get",
-        "parameters": [
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ContextOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/topic-registrations/{registration_id}": {
-      "get": {
-        "summary": "Registration",
-        "operationId": "registration_api_v1_topic_registrations__registration_id__get",
-        "parameters": [
-          {
-            "name": "registration_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Registration Id"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
     "/topic-registrations/{registration_id}/lecturer-decision": {
       "post": {
         "summary": "Decide",
         "operationId": "decide_api_v1_topic_registrations__registration_id__lecturer_decision_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -3404,8 +2718,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -3447,14 +2760,21 @@
             }
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
     },
     "/topic-registrations/{registration_id}/department-finalization": {
       "post": {
         "summary": "Finalize",
         "operationId": "finalize_api_v1_topic_registrations__registration_id__department_finalization_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "registration_id",
@@ -3482,8 +2802,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -3515,134 +2834,7 @@
             }
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/ai/similar-topics": {
-      "post": {
-        "summary": "Similar Topics",
-        "operationId": "similar_topics_api_v1_ai_similar_topics_post",
-        "parameters": [
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SimilarTopicRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SearchResult"
-                  },
-                  "title": "Response Similar Topics Api V1 Ai Similar Topics Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/eligible-students": {
-      "get": {
-        "summary": "Eligible Students",
-        "operationId": "eligible_students_api_v1_eligible_students_get",
-        "parameters": [
-          {
-            "name": "round_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Round Id"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EligibleStudentOut"
-                  },
-                  "title": "Response Eligible Students Api V1 Eligible Students Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
     },
     "/council-minutes/{minuteId}/secretary-confirmation": {
@@ -3767,9 +2959,99 @@
       }
     },
     "/topics/{topic_id}": {
+      "patch": {
+        "summary": "Topic Update",
+        "operationId": "topic_update_api_v1_topics__topic_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
       "get": {
         "summary": "Topic Detail",
         "operationId": "topic_detail_api_v1_topics__topic_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "topic_id",
@@ -3788,8 +3070,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -3821,14 +3102,1602 @@
             }
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/auth/config": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Auth Config",
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Auth Config Api V1 Auth Config Get"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "CONFIGURATION_REQUIRED"
+      }
+    },
+    "/auth/login": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Local Login",
+        "operationId": "local_login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Callback",
+        "operationId": "callback_api_v1_auth_callback_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "x-runtime-status": "CONFIGURATION_REQUIRED"
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}/evidence": {
+      "post": {
+        "summary": "Registration Evidence Upload",
+        "operationId": "registration_evidence_upload_api_v1_topic_registrations__registration_id__evidence_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}/members/{student_id}/evidence": {
+      "get": {
+        "summary": "Registration Evidence Download",
+        "operationId": "registration_evidence_download_api_v1_topic_registrations__registration_id__members__student_id__evidence_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Live",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Ready",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/me/context": {
+      "get": {
+        "summary": "Context",
+        "operationId": "context_api_v1_me_context_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/open": {
+      "get": {
+        "summary": "Rounds Open",
+        "operationId": "rounds_open_api_v1_rounds_open_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpenRoundOut"
+                  },
+                  "title": "Response Rounds Open Api V1 Rounds Open Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topics": {
+      "get": {
+        "summary": "Topics",
+        "operationId": "topics_api_v1_topics_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(all|mine|pending)$",
+              "default": "all",
+              "title": "View"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TopicOut"
+                  },
+                  "title": "Response Topics Api V1 Topics Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "post": {
+        "summary": "Topic Create",
+        "operationId": "topic_create_api_v1_topics_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/lecturers": {
+      "get": {
+        "summary": "Lecturers",
+        "operationId": "lecturers_api_v1_lecturers_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LecturerOut"
+                  },
+                  "title": "Response Lecturers Api V1 Lecturers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/student-proposals": {
+      "post": {
+        "summary": "Student Proposal",
+        "operationId": "student_proposal_api_v1_student_proposals_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentProposalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topics/{topic_id}/submit": {
+      "post": {
+        "summary": "Topic Submit",
+        "operationId": "topic_submit_api_v1_topics__topic_id__submit_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topics/{topic_id}/department-decision": {
+      "post": {
+        "summary": "Topic Department Decision",
+        "operationId": "topic_department_decision_api_v1_topics__topic_id__department_decision_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations": {
+      "post": {
+        "summary": "Register",
+        "operationId": "register_api_v1_topic_registrations_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "get": {
+        "summary": "Registrations",
+        "operationId": "registrations_api_v1_topic_registrations_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegistrationOut"
+                  },
+                  "title": "Response Registrations Api V1 Topic Registrations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}": {
+      "get": {
+        "summary": "Registration",
+        "operationId": "registration_api_v1_topic_registrations__registration_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}/member-response": {
+      "post": {
+        "summary": "Registration Member Response",
+        "operationId": "registration_member_response_api_v1_topic_registrations__registration_id__member_response_post",
+        "deprecated": true,
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberResponse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}/submit": {
+      "post": {
+        "summary": "Registration Submit",
+        "operationId": "registration_submit_api_v1_topic_registrations__registration_id__submit_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/topic-registrations/{registration_id}/cancel": {
+      "post": {
+        "summary": "Registration Cancel",
+        "operationId": "registration_cancel_api_v1_topic_registrations__registration_id__cancel_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Registration Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/ai/similar-topics": {
+      "post": {
+        "summary": "Similar Topics",
+        "operationId": "similar_topics_api_v1_ai_similar_topics_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarTopicRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResult"
+                  },
+                  "title": "Response Similar Topics Api V1 Ai Similar Topics Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/ai/chat": {
+      "post": {
+        "summary": "Ai Chat",
+        "operationId": "ai_chat_api_v1_ai_chat_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/me/eligibility": {
+      "get": {
+        "summary": "My Eligibility",
+        "operationId": "my_eligibility_api_v1_me_eligibility_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEligibilityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/eligible-students": {
+      "get": {
+        "summary": "Eligible Students",
+        "operationId": "eligible_students_api_v1_eligible_students_get",
+        "deprecated": true,
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleStudentOut"
+                  },
+                  "title": "Response Eligible Students Api V1 Eligible Students Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
     },
     "/theses/{thesis_id}": {
       "get": {
         "summary": "Thesis Detail",
         "operationId": "thesis_detail_api_v1_theses__thesis_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "parameters": [
           {
             "name": "thesis_id",
@@ -3847,8 +4716,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -3879,103 +4747,6 @@
               }
             }
           }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-auth-note": "X-Dev-User-Id only development/test; production fails closed."
-      }
-    },
-    "/topic-registrations/{registrationId}/member-response": {
-      "post": {
-        "tags": [
-          "TopicRegistration"
-        ],
-        "summary": "Từng sinh viên tự xác nhận hoặc từ chối tham gia nhóm",
-        "description": "Prototype DEV/TEST: danh tính người phản hồi lấy từ tài khoản hiện hành, không nhận userId từ body. Chỉ phản hồi một lần khi đăng ký còn DRAFT.",
-        "operationId": "registration_member_response",
-        "parameters": [
-          {
-            "name": "registrationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "consent_status"
-                ],
-                "properties": {
-                  "consent_status": {
-                    "type": "string",
-                    "enum": [
-                      "ACCEPTED",
-                      "DECLINED"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Trạng thái phản hồi và thời điểm được lưu cho đúng RegistrationMember.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationOut"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Tài khoản không phải thành viên được mời."
-          },
-          "409": {
-            "description": "Đăng ký đã gửi/khóa hoặc phản hồi không hợp lệ."
-          }
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
-        "x-guards": [
-          "Chỉ thành viên có StudentProfile thuộc tài khoản hiện hành; body không nhận student_id/user_id",
-          "Chỉ phản hồi lần đầu khi consent_status=PENDING",
-          "registration.state=DRAFT",
-          "mọi thành viên active ACCEPTED trước khi nhóm trưởng chuyển SUBMITTED"
-        ]
-      }
-    },
-    "/topic-registrations/{registrationId}/submit": {
-      "post": {
-        "tags": ["TopicRegistration"],
-        "summary": "Nhóm trưởng gửi đăng ký sau khi mọi thành viên xác nhận",
-        "operationId": "registration_submit",
-        "parameters": [{"name": "registrationId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
-        "responses": {
-          "200": {"description": "Đăng ký chuyển sang SUBMITTED.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegistrationOut"}}}},
-          "403": {"description": "Tài khoản hiện hành không phải nhóm trưởng."},
-          "409": {"description": "Còn thành viên chưa xác nhận, snapshot hết hạn hoặc đợt/đề tài đã đóng."}
-        },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
-      }
-    },
-    "/topic-registrations/{registrationId}/cancel": {
-      "post": {
-        "tags": ["TopicRegistration"],
-        "summary": "Nhóm trưởng hủy bản nháp đăng ký",
-        "operationId": "registration_cancel",
-        "parameters": [{"name": "registrationId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
-        "responses": {
-          "200": {"description": "Bản nháp chuyển sang CANCELLED; thành viên được giải phóng.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegistrationOut"}}}},
-          "403": {"description": "Tài khoản hiện hành không phải nhóm trưởng."},
-          "409": {"description": "Chỉ có thể hủy bản DRAFT."}
         },
         "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
@@ -4450,13 +5221,75 @@
             },
             "type": "array",
             "title": "Actions"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "student_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Code"
+          },
+          "lecturer_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Code"
+          },
+          "csrf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Csrf Token",
+            "description": "Gửi trong X-CSRF-Token khi thao tác ghi bằng cookie phiên; không dùng với dev header."
           }
         },
         "type": "object",
         "required": [
           "user_id",
           "base_role",
-          "actions"
+          "actions",
+          "display_name"
         ],
         "title": "ContextOut"
       },
@@ -4560,20 +5393,44 @@
             "title": "Topic Id"
           },
           "member_student_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "maxItems": 3,
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 1,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Member Student Ids"
+          },
+          "confirm_creator": {
+            "type": "boolean",
+            "title": "Confirm Creator",
+            "default": true
+          },
+          "expected_member_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Member Count"
           }
         },
         "type": "object",
         "required": [
-          "topic_id",
-          "member_student_ids"
+          "topic_id"
         ],
         "title": "RegistrationCreate"
       },
@@ -4602,6 +5459,22 @@
             "type": "integer",
             "title": "Row Version"
           },
+          "expected_member_count": {
+            "type": "integer",
+            "title": "Expected Member Count"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
           "member_student_ids": {
             "items": {
               "type": "string",
@@ -4611,7 +5484,9 @@
             "title": "Member Student Ids"
           },
           "members": {
-            "items": {"$ref": "#/components/schemas/RegistrationMemberOut"},
+            "items": {
+              "$ref": "#/components/schemas/RegistrationMemberOut"
+            },
             "type": "array",
             "title": "Members"
           },
@@ -4638,6 +5513,61 @@
               }
             ],
             "title": "Thesis Id"
+          },
+          "topic_title": {
+            "type": "string",
+            "title": "Topic Title"
+          },
+          "topic_proposer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Proposer User Id"
+          },
+          "topic_code": {
+            "type": "string",
+            "title": "Topic Code"
+          },
+          "topic_state": {
+            "type": "string",
+            "title": "Topic State"
+          },
+          "proposer_type": {
+            "type": "string",
+            "title": "Proposer Type"
+          },
+          "receiving_lecturer_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer User Id"
+          },
+          "receiving_lecturer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Name"
+          },
+          "lecturer_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lecturer Reason"
           }
         },
         "type": "object",
@@ -4647,22 +5577,73 @@
           "round_id",
           "state",
           "row_version",
+          "expected_member_count",
           "member_student_ids",
-          "members"
+          "members",
+          "topic_title",
+          "topic_proposer_user_id",
+          "topic_code",
+          "topic_state",
+          "proposer_type",
+          "receiving_lecturer_user_id",
+          "receiving_lecturer_name",
+          "lecturer_reason"
         ],
         "title": "RegistrationOut"
       },
       "RegistrationMemberOut": {
         "properties": {
-          "student_id": {"type": "string", "format": "uuid"},
-          "student_code": {"type": "string"},
-          "display_name": {"type": "string"},
-          "is_coordinator": {"type": "boolean"},
-          "active": {"type": "boolean"},
-          "consent_status": {"type": "string"}
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "student_code": {
+            "type": "string",
+            "title": "Student Code"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "is_coordinator": {
+            "type": "boolean",
+            "title": "Is Coordinator"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "consent_status": {
+            "type": "string",
+            "title": "Consent Status"
+          },
+          "evidence_file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence File Name"
+          },
+          "can_upload_evidence": {
+            "type": "boolean",
+            "title": "Can Upload Evidence",
+            "default": false
+          }
         },
         "type": "object",
-        "required": ["student_id", "student_code", "display_name", "is_coordinator", "active", "consent_status"],
+        "required": [
+          "student_id",
+          "student_code",
+          "display_name",
+          "is_coordinator",
+          "active",
+          "consent_status"
+        ],
         "title": "RegistrationMemberOut"
       },
       "SearchResult": {
@@ -4828,6 +5809,105 @@
           "state": {
             "type": "string",
             "title": "State"
+          },
+          "row_version": {
+            "type": "integer",
+            "title": "Row Version"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "proposer_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Proposer User Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "round_label": {
+            "type": "string",
+            "title": "Round Label"
+          },
+          "proposer_type": {
+            "type": "string",
+            "title": "Proposer Type"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          },
+          "receiving_lecturer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Name"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "title": "Requirements"
+          },
+          "title_versions": {
+            "items": {
+              "$ref": "#/components/schemas/TitleVersionOut"
+            },
+            "type": "array",
+            "title": "Title Versions"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "registered_member_count": {
+            "type": "integer",
+            "title": "Registered Member Count",
+            "default": 0
+          },
+          "remaining_slots": {
+            "type": "integer",
+            "title": "Remaining Slots",
+            "default": 0
+          },
+          "registration_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration State"
           }
         },
         "type": "object",
@@ -4837,7 +5917,18 @@
           "title",
           "description",
           "max_students",
-          "state"
+          "state",
+          "row_version",
+          "department_id",
+          "proposer_user_id",
+          "code",
+          "round_label",
+          "proposer_type",
+          "receiving_lecturer_id",
+          "receiving_lecturer_name",
+          "requirements",
+          "title_versions",
+          "available"
         ],
         "title": "TopicOut"
       },
@@ -5166,6 +6257,475 @@
           "advisor_lecturer_id"
         ],
         "title": "ThesisOut"
+      },
+      "LecturerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "lecturer_code": {
+            "type": "string",
+            "title": "Lecturer Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "lecturer_code"
+        ],
+        "title": "LecturerOut"
+      },
+      "LocalLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LocalLogin"
+      },
+      "MemberResponse": {
+        "properties": {
+          "consent_status": {
+            "type": "string",
+            "const": "ACCEPTED",
+            "title": "Consent Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent_status"
+        ],
+        "title": "MemberResponse"
+      },
+      "MyEligibilityOut": {
+        "properties": {
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          },
+          "has_active_registration": {
+            "type": "boolean",
+            "title": "Has Active Registration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "eligible",
+          "has_active_registration"
+        ],
+        "title": "MyEligibilityOut"
+      },
+      "OpenRoundOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closes At"
+          },
+          "academic_year": {
+            "type": "string",
+            "title": "Academic Year"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "closes_at",
+          "academic_year",
+          "label"
+        ],
+        "title": "OpenRoundOut"
+      },
+      "RequirementInput": {
+        "properties": {
+          "requirement_type": {
+            "type": "string",
+            "enum": [
+              "PREFERRED_GPA",
+              "SKILL",
+              "TECHNOLOGY",
+              "KNOWLEDGE",
+              "OTHER"
+            ],
+            "title": "Requirement Type"
+          },
+          "value_text": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Value Text",
+            "default": ""
+          },
+          "preferred_gpa": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Gpa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement_type"
+        ],
+        "title": "RequirementInput"
+      },
+      "StudentProposalCreate": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Students",
+            "default": 3
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          },
+          "member_student_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 1,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Student Ids"
+          },
+          "confirm_creator": {
+            "type": "boolean",
+            "title": "Confirm Creator",
+            "default": true
+          },
+          "expected_member_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Member Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "title"
+        ],
+        "title": "StudentProposalCreate"
+      },
+      "TitleVersionOut": {
+        "properties": {
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_no",
+          "title",
+          "change_reason",
+          "created_at"
+        ],
+        "title": "TitleVersionOut"
+      },
+      "TopicCreate": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Students",
+            "default": 3
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementInput"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "title"
+        ],
+        "title": "TopicCreate"
+      },
+      "TopicDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "RETURN",
+              "REJECT"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "revised_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised Title"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "TopicDecision"
+      },
+      "TopicUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_students": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Students"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequirementInput"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "receiving_lecturer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Lecturer Id"
+          }
+        },
+        "type": "object",
+        "title": "TopicUpdate"
       }
     }
   }

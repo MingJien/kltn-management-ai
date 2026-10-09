@@ -59,9 +59,11 @@ def current_user(
 ) -> UserAccount:
     session_user_id = request.session.get("user_id") if "session" in request.scope else None
     if session_user_id:
-        from backend.api.auth import _same_app_origin
-        if request.method not in {"GET", "HEAD", "OPTIONS"} and not _same_app_origin(request):
-            raise HTTPException(403, "Request origin is not allowed")
+        from backend.api.auth import _same_app_origin, require_csrf
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            if not _same_app_origin(request):
+                raise HTTPException(403, "Request origin is not allowed")
+            require_csrf(request)
         try:
             user_id = UUID(session_user_id)
         except (TypeError, ValueError):
@@ -81,8 +83,10 @@ def current_user(
         if session_user_id:
             request.session.clear()
         raise HTTPException(401, "Unknown or inactive identity")
-    credential_version = request.session.get("credential_version") if session_user_id else None
-    if credential_version is not None and credential_version != user.row_version:
+    if session_user_id and request.session.get("credential_version") != user.row_version:
+        request.session.clear()
+        raise HTTPException(401, "Sign-in session has expired")
+    if session_user_id and not isinstance(request.session.get("csrf_token"), str):
         request.session.clear()
         raise HTTPException(401, "Sign-in session has expired")
     return user

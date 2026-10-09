@@ -1,59 +1,79 @@
-import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
-import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled } from "./api";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { ApiError, errorMessage } from "./errors";
+import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
 import WorkspacePage from "./pages/WorkspacePage";
 import TopicsPage from "./pages/TopicsPage";
 import RegistrationsPage from "./pages/RegistrationsPage";
 import ThesisViewPage from "./pages/ThesisViewPage";
-import AIPage from "./pages/AIPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
-import { LogIn } from "lucide-react";
+const AIPage = lazy(() => import("./pages/AIPage"));
+import { Eye, EyeOff, LogIn } from "lucide-react";
 
 function App() {
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [context, setContext] = useState<Context | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  useEffect(() => {
+    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/ai":"Tra cứu thử nghiệm"};
+    document.title = `${context ? labels[location.pathname] || "Khóa luận" : "Đăng nhập"} · KLTN`;
+  }, [location.pathname, context]);
 
   const restore = useCallback(async () => {
     setError("");
     setLoading(true);
     try {
       const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
       setContext(result);
     } catch (cause) {
+      setSessionCsrfToken(null);
       setContext(null);
-      if (/Sign in required|Missing development identity|401/.test(String(cause))) setError("");
-      else setError(String(cause));
+      if (cause instanceof ApiError && cause.status === 401) setError("");
+      else setError(errorMessage(cause));
     } finally {
       setLoading(false);
+      setRestoring(false);
     }
   }, []);
 
   useEffect(() => {
     setDevelopmentAuthEnabled(false);
     void restore();
-  }, []); // initial session restore only
+    const expired = () => {setSessionCsrfToken(null); setContext(null); setPassword(""); setError("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");};
+    window.addEventListener("kltn:session-expired", expired);
+    return () => window.removeEventListener("kltn:session-expired", expired);
+  }, [restore]);
 
   async function signIn() {
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
       await emailLogin(email, password);
       setPassword("");
-      setContext(await request<Context>("/me/context", ""));
+      const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
+      setContext(result);
     } catch (cause) {
-      setError(String(cause));
+      setPassword("");
+      setError(errorMessage(cause));
     } finally {
       setLoading(false);
     }
   }
 
   async function signOut() {
-    try { await logout(); } finally { setContext(null); }
+    try { await logout(); setSessionCsrfToken(null); setContext(null); setPassword(""); }
+    catch (cause) { setError(errorMessage(cause)); }
   }
+
+  if (restoring) return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
 
   // Not connected — show login card
   if (!context) {
@@ -92,7 +112,7 @@ function App() {
                 className="text-body-sm text-muted"
                 style={{ marginBottom: "var(--space-5)" }}
               >
-                Dùng tài khoản đã được cấp. Bản thử nghiệm dùng email giả lập trong kltn_dev.
+                Dùng tài khoản KLTN đã được cấp quyền.
               </p>
 
               <form
@@ -110,18 +130,26 @@ function App() {
                     id="login-email"
                     className="input"
                     type="email"
+                    required
                     autoComplete="username"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="sv1@demo.test"
+                    placeholder="Nhập email đăng nhập"
                     autoFocus
                   />
                 </div>
                 <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
                   <label htmlFor="login-password">Mật khẩu</label>
-                  <input id="login-password" className="input" type="password"
-                    autoComplete="current-password" value={password}
-                    onChange={(event) => setPassword(event.target.value)} />
+                  <div className="login-password-field">
+                    <input id="login-password" className="input" type={showPassword ? "text" : "password"} required
+                      autoComplete="current-password" value={password}
+                      onChange={(event) => setPassword(event.target.value)} />
+                    <button type="button" className="login-password-toggle"
+                      aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
+                      {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                    </button>
+                  </div>
                 </div>
                 <button
                   className="btn btn-primary"
@@ -145,60 +173,49 @@ function App() {
             </div>
           </div>
 
-          <p
+          {import.meta.env.DEV ? <p
             className="text-caption text-muted"
             style={{ textAlign: "center", marginTop: "var(--space-4)" }}
           >
-            Giao diện thử nghiệm · Chỉ dùng tài khoản giả lập trong môi trường phát triển.
-          </p>
+            Bản thử nghiệm · Chỉ dùng tài khoản giả lập trong môi trường phát triển.
+          </p> : null}
         </div>
       </div>
     );
   }
 
   // Connected — show app shell with routes
+  const workflowAccess = context.base_role === "STUDENT" || context.base_role === "LECTURER";
   return (
     <AppShell context={context} onLogout={() => void signOut()}>
-      <Routes>
+      {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
+      <Suspense fallback={<p role="status">Đang tải trang…</p>}><Routes>
         <Route
           path="/"
           element={<WorkspacePage context={context} />}
         />
         <Route
           path="/topics"
-          element={
+          element={workflowAccess ?
             <TopicsPage userId={context.user_id} context={context} />
-          }
+            : <Navigate to="/" replace />}
         />
         <Route
           path="/registrations"
-          element={
+          element={workflowAccess ?
             <RegistrationsPage userId={context.user_id} context={context} />
-          }
+            : <Navigate to="/" replace />}
         />
         <Route
           path="/ai"
-          element={<AIPage userId={context.user_id} />}
+          element={workflowAccess ? <AIPage userId={context.user_id} /> : <Navigate to="/" replace />}
         />
         <Route
           path="/theses/:thesisId"
-          element={<ThesisViewPage userId={context.user_id} />}
+          element={workflowAccess ? <ThesisViewPage userId={context.user_id} /> : <Navigate to="/" replace />}
         />
-
-        {/* Placeholder routes — Phase 2+ */}
-        <Route path="/rounds" element={<PlaceholderPage title="Đợt & Năm học" description="Quản lý đợt KLTN và policy theo năm học" />} />
-        <Route path="/eligibility" element={<PlaceholderPage title="Điều kiện SV" description="Snapshot tín chỉ/GPA và xác nhận theo đợt" />} />
-        <Route path="/proposals" element={<PlaceholderPage title="Đề cương" description="Timeline version/review đề cương" />} />
-        <Route path="/progress" element={<PlaceholderPage title="Tiến độ" description="Milestone, report/review, thay đổi" />} />
-        <Route path="/documents" element={<PlaceholderPage title="Tài liệu" description="Upload tài liệu, version history, kiểm tra tương đồng" />} />
-        <Route path="/councils" element={<PlaceholderPage title="Hội đồng & Phiên" description="Hội đồng bảo vệ và phiên chấm" />} />
-        <Route path="/reviews" element={<PlaceholderPage title="Nhận xét" description="Nhận xét GVHD/GVPB theo Mẫu 7/8" />} />
-        <Route path="/scoring" element={<PlaceholderPage title="Chấm điểm" description="Rubric theo Mẫu 6, điểm cá nhân" />} />
-        <Route path="/minutes" element={<PlaceholderPage title="Biên bản" description="Biên bản bảo vệ Mẫu 9" />} />
-        <Route path="/archive" element={<PlaceholderPage title="Kho & Báo cáo" description="Tìm kiếm và tra cứu tài liệu kho" />} />
-        <Route path="/similarity" element={<PlaceholderPage title="Tìm tương đồng" description="Tìm đề tài tương đồng trong kho" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes></Suspense>
     </AppShell>
   );
 }

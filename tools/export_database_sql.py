@@ -98,8 +98,8 @@ def main() -> None:
             raise RuntimeError("Kết nối sai database")
         revision = connection.execute(text("select version_num from alembic_version")).scalar_one()
     engine.dispose()
-    if revision != "20261004_0011":
-        raise RuntimeError(f"Cần nâng kltn_ai đến 20261004_0011 trước khi xuất; hiện {revision}")
+    if revision != "20261004_0012":
+        raise RuntimeError(f"Cần nâng kltn_ai đến 20261004_0012 trước khi xuất; hiện {revision}")
 
     env = os.environ.copy()
     env.update(PGHOST=url.host or "localhost", PGPORT=str(url.port or 5432),

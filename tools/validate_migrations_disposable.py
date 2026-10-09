@@ -56,10 +56,10 @@ def main() -> int:
                 return result.returncode
             print("PASS", label)
         blocked = subprocess.run([sys.executable, "-m", "alembic", "downgrade", "-1"], env=env, text=True, capture_output=True)
-        if blocked.returncode == 0 or "do not discard them automatically" not in blocked.stderr:
+        if blocked.returncode == 0 or "do not discard it automatically" not in blocked.stderr:
             print("FAIL forward-only migration guard")
             return 1
-        print("PASS 0011 forward-only guard preserves topic/evidence metadata")
+        print("PASS 0012 forward-only guard preserves planned group capacity")
         return 0
     finally:
         if created:

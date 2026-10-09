@@ -1,3 +1,5 @@
+import { ApiError, apiMessage } from "./errors";
+
 export type Context = {
   user_id: string;
   base_role: string;
@@ -9,6 +11,7 @@ export type Context = {
   email: string | null;
   student_code: string | null;
   lecturer_code: string | null;
+  csrf_token: string | null;
 };
 export type Topic = {
   id: string;
@@ -29,6 +32,9 @@ export type Topic = {
   requirements: Requirement[];
   title_versions: {version_no: number; title: string; change_reason: string | null; created_at: string}[];
   available: boolean;
+  registered_member_count: number;
+  remaining_slots: number;
+  registration_state: string | null;
 };
 export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
 export type Lecturer = {id: string; display_name: string; lecturer_code: string};
@@ -42,6 +48,7 @@ export type RegistrationMember = {
   active: boolean;
   consent_status: "PENDING" | "ACCEPTED" | "DECLINED";
   evidence_file_name: string | null;
+  can_upload_evidence: boolean;
 };
 export type Registration = {
   id: string;
@@ -49,6 +56,8 @@ export type Registration = {
   round_id: string;
   state: string;
   row_version: number;
+  expected_member_count: number;
+  submitted_at: string | null;
   member_student_ids: string[];
   members: RegistrationMember[];
   lecturer_decided_at: string | null;
@@ -81,6 +90,7 @@ export type SearchHit = {
 const baseUrl = import.meta.env.VITE_API_URL
   || `${window.location.protocol}//${window.location.hostname}:8000`;
 let developmentAuthEnabled = false;
+let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {
   return `${baseUrl}/api/v1/topic-registrations/${registrationId}/members/${studentId}/evidence`;
@@ -97,6 +107,10 @@ export type AuthenticationMode = "development" | "university_oidc" | "local_emai
 
 export function setDevelopmentAuthEnabled(enabled: boolean) {
   developmentAuthEnabled = enabled;
+}
+
+export function setSessionCsrfToken(token: string | null) {
+  sessionCsrfToken = token;
 }
 
 export function universityLoginUrl() {
@@ -116,18 +130,31 @@ export async function logout(): Promise<void> {
 export async function request<T>(
   path: string, userId: string, init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(baseUrl + "/api/v1" + path, {
+  let response: Response;
+  const method = (init.method || "GET").toUpperCase();
+  const abort = new AbortController();
+  const timer = window.setTimeout(() => abort.abort(), path.startsWith("/ai/") ? 90000 : 30000);
+  try { response = await fetch(baseUrl + "/api/v1" + path, {
     ...init,
     credentials: "include",
+    signal: init.signal || abort.signal,
     headers: {
       "Content-Type": "application/json",
       ...(developmentAuthEnabled && userId ? { "X-Dev-User-Id": userId } : {}),
+      ...(sessionCsrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)
+        ? { "X-CSRF-Token": sessionCsrfToken } : {}),
       ...(init.headers || {}),
     },
-  });
+  }); } catch {
+    throw new Error("Không kết nối được máy chủ hoặc yêu cầu quá lâu. Kiểm tra kết nối rồi thử lại.");
+  } finally {window.clearTimeout(timer);}
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
+    if (response.status === 401 && path !== "/auth/login" && path !== "/me/context") {
+      sessionCsrfToken = null;
+      window.dispatchEvent(new Event("kltn:session-expired"));
+    }
+    throw new ApiError(response.status, apiMessage(response.status, body?.detail));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

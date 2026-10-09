@@ -1,17 +1,17 @@
-# Hệ thống quản lý khóa luận tốt nghiệp tích hợp AI
+# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
 Source của hệ thống quản lý khóa luận tốt nghiệp, gồm PostgreSQL, FastAPI và React. AI hiện ở mức thử nghiệm truy xuất tài liệu và tìm đề tài tương tự trên dữ liệu giả; không tự chấm đạo văn hoặc quyết định kết quả học tập.
 
 ## Chức năng đã có
 
-- Đăng nhập email/mật khẩu thử nghiệm và kiểm tra quyền theo vai trò.
+- Đăng nhập bằng email/mật khẩu của tài khoản đã được cấp, duy trì phiên bằng cookie và kiểm tra quyền tại API theo vai trò, bộ môn và quan hệ với đề tài.
 - Giảng viên tạo, sửa và gửi đề tài.
 - Trưởng bộ môn duyệt, trả về để sửa hoặc từ chối đề tài thuộc bộ môn.
-- Sinh viên đăng ký đề tài cá nhân hoặc theo nhóm.
-- Giảng viên tiếp nhận hoặc từ chối đăng ký.
+- Sinh viên tự đề xuất đề tài hoặc đăng ký đề tài đã duyệt, tham gia nhóm trong chỉ tiêu và thời hạn đăng ký.
+- Giảng viên tiếp nhận hoặc từ chối đăng ký, kèm lý do khi từ chối.
 - Thử nghiệm tìm đề tài tương tự và tra cứu nguồn trên corpus giả.
 
-Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biên bản và tích hợp Gemini tiếp tục được phát triển ở các giai đoạn sau.
+Tài khoản hiện dùng dữ liệu giả để kiểm thử; chưa có quy trình cấp tài khoản thật, xác minh email hoặc khôi phục mật khẩu. Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biên bản và tích hợp Gemini tiếp tục được phát triển ở các giai đoạn sau.
 
 ## Cấu trúc
 
@@ -20,7 +20,7 @@ Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biê
 | `backend/` | API FastAPI, nghiệp vụ, mô hình SQLAlchemy và Alembic migrations. |
 | `frontend/` | Giao diện React. |
 | `database/` | Schema PostgreSQL để dựng database mới và schema lõi để xem thiết kế. |
-| `docs/` | Yêu cầu, thiết kế, ERD, API và minh chứng kiểm thử. |
+| `docs/` | Yêu cầu, thiết kế, ERD và đặc tả API. |
 | `tests/` | Kiểm thử backend. |
 | `tools/` | Script seed dữ liệu giả, sinh ERD và kiểm tra CSDL. |
 
@@ -54,6 +54,7 @@ Mở `http://localhost:5173`. Dữ liệu và tài khoản demo chỉ tạo trê
 .\.venv\Scripts\python.exe -m backend.db.validate_schema
 .\.venv\Scripts\python.exe -m pytest tests -q
 npm run build --prefix frontend
+.\.venv\Scripts\python.exe -m tools.run_e2e
 ```
 
 ## Tài liệu chính
@@ -63,7 +64,7 @@ npm run build --prefix frontend
 - [Schema lõi PostgreSQL](database/core/kltn-core-schema.sql)
 - [Schema đầy đủ PostgreSQL](database/kltn-schema-consolidated.sql)
 - [Đặc tả API](docs/design/openapi.yaml)
-- [Minh chứng prototype](docs/evidence/prototype-validation.md)
+- [Luồng đề tài và đăng ký](docs/design/registration-workflow.md)
 - [Thiết kế thử nghiệm AI](docs/ai/prototype.md)
 
 ## Phạm vi dữ liệu

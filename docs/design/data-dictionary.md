@@ -1,6 +1,6 @@
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ từ SQLAlchemy metadata và các migration 20260920_0001 → 20261004_0011. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
+> Canonical field dictionary đồng bộ từ SQLAlchemy metadata và các migration 20260920_0001 → 20261004_0012. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
 
 ## Quy ước
 
@@ -329,6 +329,7 @@
 | round_id | UUID | NOT NULL | — | — | thesis_round.id | uq_topic_registration_id_round_id | — | Tham chiếu thesis_round.id. | NON_PII | Physical metadata 20260920_0001 |
 | topic_id | UUID | NOT NULL | — | — | topic.id | — | — | Tham chiếu topic.id. | NON_PII | Physical metadata 20260920_0001 |
 | created_by | UUID | NOT NULL | — | — | student_profile.id | — | — | Tham chiếu student_profile.id. | PII | Physical metadata 20260920_0001 |
+| expected_member_count | INTEGER | NOT NULL | 1 | — | — | — | ck_topic_registration_expected_member_count | Quy mô dự kiến 1–3, service lấy mức tối đa của đề tài; không bắt buộc đủ trước gửi. Số thực tế đếm RegistrationMember active. | NON_PII | Migration 20261004_0012 |
 | state | VARCHAR(30) | NOT NULL | DRAFT | — | — | — | ck_topic_registration_state | Trạng thái lifecycle của aggregate/entity. | NON_PII | Physical metadata 20260920_0001 |
 | submitted_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm submit. | NON_PII | Physical metadata 20260920_0001 |
 | lecturer_decided_by | UUID | NULL | — | — | lecturer_profile.id | — | — | Tham chiếu lecturer_profile.id. | PII | Physical metadata 20260920_0001 |
@@ -353,8 +354,8 @@
 | student_id | UUID | NOT NULL | — | — | student_profile.id | uq_registration_member_registration_id_student_id, uq_registration_member_student_round_active | — | Tham chiếu student_profile.id. | PII | Physical metadata 20260920_0001 |
 | is_coordinator | BOOLEAN | NOT NULL | false | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
 | active | BOOLEAN | NOT NULL | true | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
-| consent_status | VARCHAR(20) | NOT NULL | PENDING | — | — | — | ck_registration_member_consent_consistency | PENDING trước phản hồi; ACCEPTED/DECLINED sau khi chính SV trả lời. Service phải đối chiếu đúng tài khoản với student_id. | PII | Migration 0007 |
-| responded_by_user_id | UUID | NULL | — | — | user_account.id | — | ck_registration_member_consent_consistency | Tài khoản đã tự phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
+| consent_status | VARCHAR(20) | NOT NULL | PENDING | — | — | — | ck_registration_member_consent_consistency | Runtime mới ghi ACCEPTED khi chính SV tự tham gia; PENDING/DECLINED giữ tương thích lịch sử. Không tạo lời mời; service đối chiếu tài khoản với student_id. | PII | Migration 0007; luồng 04/10 |
+| responded_by_user_id | UUID | NULL | — | — | user_account.id | — | ck_registration_member_consent_consistency | Chính tài khoản SV tự tham gia/xác nhận; không cho người khác gửi thay. | PII | Migration 0007 |
 | responded_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | ck_registration_member_consent_consistency | Thời điểm phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
 | evidence_file_id | UUID | NULL | — | — | stored_file.id | — | — | Metadata minh chứng của chính thành viên; chỉ nhóm/GV tiếp nhận/TBM được tải. | PII | Physical metadata 20261004_0011 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
@@ -1138,6 +1139,6 @@
 ## Kiểm soát đồng bộ
 
 - Tổng số bảng: 62.
-- Tổng số field: 618 (sau migration 20261004_0011).
+- Tổng số field: 622 (sau migration 20261004_0012), chưa tính cột của alembic_version.
 - Migration và model là nguồn physical; thay đổi schema phải cập nhật migration mới và tái sinh tài liệu.
 - Không có field plagiarism verdict; threshold similarity không hard-code 90%.

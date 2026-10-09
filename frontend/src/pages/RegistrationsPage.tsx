@@ -1,272 +1,144 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ClipboardList } from "lucide-react";
 import type { Context, Registration } from "../api";
 import { evidenceUrl, request, uploadEvidence } from "../api";
+import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import Dialog from "../components/ui/Dialog";
 import PageHeader from "../components/layout/PageHeader";
-import { ClipboardList, ExternalLink } from "lucide-react";
 
-interface RegistrationsPageProps {
-  userId: string;
-  context: Context;
-}
-
-export default function RegistrationsPage({ userId, context }: RegistrationsPageProps) {
+const PAGE_SIZE = 24;
+export default function RegistrationsPage({userId, context}: {userId: string; context: Context}) {
   const [rows, setRows] = useState<Registration[]>([]);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-
-  async function upload(row: Registration, file?: File) {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {setMessage("Minh chứng tối đa 5 MB."); return;}
-    setBusy(true);
-    try {await uploadEvidence(row.id, userId, file); setMessage("Đã lưu minh chứng riêng của bạn."); reload();}
-    catch (e) {setMessage(String(e));} finally {setBusy(false);}
-  }
-
-  // Reject dialog state
+  const [page, setPage] = useState(0);
   const [rejectTarget, setRejectTarget] = useState<Registration | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-
-  const reload = useCallback(() => {
-    setLoading(true);
-    request<Registration[]>("/topic-registrations", userId)
-      .then(setRows)
-      .catch((error) => setMessage(String(error)))
-      .finally(() => setLoading(false));
-  }, [userId]);
-
+  const [cancelTarget, setCancelTarget] = useState<Registration | null>(null);
+  const reload = useCallback(async () => {
+    setRows(await request<Registration[]>("/topic-registrations?limit=" + PAGE_SIZE + "&offset=" + page * PAGE_SIZE, userId));
+  }, [userId,page]);
   useEffect(() => {
-    reload();
-  }, [reload]);
+    let alive = true;
+    setLoading(true);
+    request<Registration[]>("/topic-registrations?limit=" + PAGE_SIZE + "&offset=" + page * PAGE_SIZE, userId)
+      .then((data) => {if (alive) setRows(data);})
+      .catch((cause) => {if (alive) setError(errorMessage(cause));})
+      .finally(() => {if (alive) setLoading(false);});
+    return () => {alive = false;};
+  }, [userId,page]);
 
-  async function act(row: Registration, action: "accept" | "reject" | "finalize", reason?: string) {
-    setMessage("");
-    const path =
-      action === "finalize" ? "department-finalization" : "lecturer-decision";
-    try {
-      await request<Registration>(
-        `/topic-registrations/${row.id}/${path}`,
-        userId,
-        {
-          method: "POST",
-          headers: { "If-Match": String(row.row_version) },
-          body:
-            action === "finalize"
-              ? undefined
-              : JSON.stringify({
-                  decision: action === "accept" ? "ACCEPT" : "REJECT",
-                  reason: action === "reject" ? reason : undefined,
-                }),
-        }
-      );
-      setMessage("Đã cập nhật. Trạng thái được đọc lại từ server.");
-      reload();
-    } catch (error) {
-      setMessage(String(error));
-    }
+  async function operate(work: () => Promise<unknown>, success: string): Promise<boolean> {
+    if (busy) return false;
+    setBusy(true); setMessage(""); setError("");
+    try {await work(); await reload(); setMessage(success); return true;}
+    catch (cause) {setError(errorMessage(cause)); await reload().catch(() => undefined); return false;}
+    finally {setBusy(false);}
   }
-
-  async function groupAction(row: Registration, action: "confirm" | "decline" | "submit" | "cancel") {
-    setMessage("");
-    const path = action === "confirm" || action === "decline" ? "member-response" : action;
-    try {
-      await request<Registration>(`/topic-registrations/${row.id}/${path}`, userId, {
-        method: "POST",
-        body: action === "confirm" || action === "decline"
-          ? JSON.stringify({ consent_status: action === "confirm" ? "ACCEPTED" : "DECLINED" })
-          : undefined,
-      });
-      setMessage("Đã cập nhật. Trạng thái được đọc lại từ server.");
-      reload();
-    } catch (error) { setMessage(String(error)); }
+  async function upload(row: Registration, file?: File) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {setError("Minh chứng tối đa 5 MB."); return;}
+    await operate(() => uploadEvidence(row.id,userId,file), "Đã lưu minh chứng của bạn.");
   }
-
-  function handleRejectConfirm() {
-    if (!rejectTarget) return;
-    void act(rejectTarget, "reject", rejectReason);
-    setRejectTarget(null);
-    setRejectReason("");
+  async function groupAction(row: Registration, action: "confirm" | "submit" | "cancel") {
+    return operate(() => request<Registration>("/topic-registrations/" + row.id + "/" + (action === "confirm" ? "member-response" : action),userId,{
+      method:"POST",body:action === "confirm" ? JSON.stringify({consent_status:"ACCEPTED"}) : undefined,
+    }), action === "cancel" ? "Đã hủy bản nháp. Thành viên có thể đăng ký đề tài khác."
+      : action === "submit" ? "Đã gửi đăng ký. Vui lòng theo dõi kết quả xét duyệt." : "Đã xác nhận đăng ký cũ của bạn.");
   }
-
-  return (
-    <>
-      <PageHeader
-        title="Đăng ký và Khóa luận"
-        description="Xác nhận thành viên, bổ sung minh chứng và theo dõi kết quả tiếp nhận."
-      />
-
-      {loading ? (
-        <div className="stack">
-          {[1, 2, 3].map((i) => (
-            <div className="card" key={i}>
-              <div className="card-body">
-                <div className="skeleton skeleton-line" style={{ width: "40%" }} />
-                <div className="skeleton skeleton-line" style={{ width: "70%" }} />
-                <div className="skeleton skeleton-line" style={{ width: "55%" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="card">
-          <div className="empty-state">
-            <ClipboardList />
-            <h3>Chưa có đăng ký</h3>
-            <p>Chưa có đăng ký trong phạm vi của bạn.</p>
+  async function decide(row: Registration, decision: "ACCEPT" | "REJECT", reason?: string) {
+    return operate(() => request<Registration>("/topic-registrations/" + row.id + "/lecturer-decision",userId,{
+      method:"POST",headers:{"If-Match":String(row.row_version)},body:JSON.stringify({decision,reason}),
+    }),decision === "ACCEPT" ? "Đã chấp nhận nhóm đăng ký." : "Đã từ chối và lưu lý do. SV có thể đăng ký lại.");
+  }
+  return <>
+    <PageHeader title="Đăng ký đề tài" description={context.base_role === "STUDENT"
+      ? "Bổ sung minh chứng, gửi đăng ký và theo dõi kết quả xét duyệt." : "Xem hồ sơ đã gửi và quyết định tiếp nhận trong phạm vi được giao."} />
+    <div className="flex gap-2" style={{marginBottom:"var(--space-4)"}}>
+      <button className="btn btn-secondary" disabled={busy || loading}
+        onClick={() => void reload().catch((cause) => setError(errorMessage(cause)))}>Làm mới</button>
+      {context.base_role === "STUDENT" ? <Link className="btn btn-primary" to="/topics">Chọn đề tài</Link> : null}
+    </div>
+    {message ? <p className="alert alert-info" role="status">{message}</p> : null}
+    {error && !rejectTarget && !cancelTarget ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    {loading ? <p role="status">Đang tải đăng ký…</p> : !rows.length ?
+      <div className="card empty-state"><ClipboardList aria-hidden="true" /><h2>Chưa có đăng ký</h2><p>Chưa có đăng ký trong phạm vi của bạn.</p></div> :
+      <div className="stack">{rows.map((row) => {
+        const me = row.members.find((member) => member.student_id === context.student_id && member.active);
+        const activeCount = row.members.filter((member) => member.active).length;
+        const draft = ["DRAFT","RETURNED"].includes(row.state);
+        return <article className="card" key={row.id}><div className="card-body stack">
+          <div className="flex justify-between items-center gap-2"><h2 className="topic-card-title">{row.topic_title}</h2><ThesisStatusBadge state={row.state} /></div>
+          <dl className="registration-summary">
+            <dt>Mã đề tài</dt><dd>{row.topic_code}</dd>
+            <dt>GV tiếp nhận</dt><dd>{row.receiving_lecturer_name || "Chờ bộ môn chọn"}</dd>
+            <dt>Thành viên</dt><dd>{activeCount}/{row.expected_member_count} SV</dd>
+            {row.submitted_at ? <><dt>Đã gửi</dt><dd>{new Date(row.submitted_at).toLocaleString("vi-VN")}</dd></> : null}
+            {row.lecturer_decided_at ? <><dt>GV xét</dt><dd>{new Date(row.lecturer_decided_at).toLocaleString("vi-VN")}</dd></> : null}
+          </dl>
+          <div><h3>Thành viên đăng ký</h3><ul className="requirement-list">{row.members.map((member) =>
+            <li key={member.student_id}>{member.display_name} ({member.student_code})
+              {member.is_coordinator ? " · đại diện" : ""}{!member.active ? " · đã kết thúc đăng ký" : ""}
+              {member.active && member.consent_status !== "ACCEPTED" ? <ThesisStatusBadge state={member.consent_status} /> : null}
+              {member.evidence_file_name ? <div><a href={evidenceUrl(row.id,member.student_id)}>Tải minh chứng: {member.evidence_file_name}</a></div> : null}
+            </li>)}</ul></div>
+          {row.lecturer_reason ? <p className="alert alert-warning">Lý do của GV: {row.lecturer_reason}</p> : null}
+          {row.proposer_type === "STUDENT" && row.state === "SUBMITTED" && row.topic_state !== "APPROVED" ?
+            <p className="alert alert-info">Đề xuất đang chờ bộ môn duyệt tên và xác nhận GV tiếp nhận.</p> : null}
+          {me && activeCount < row.expected_member_count && row.topic_state === "APPROVED" && row.state !== "FINALIZED" ?
+            <p className="text-caption">Các SV khác có thể tự tham gia từ danh sách đề tài khi còn hạn đăng ký. Nếu thêm thành viên, nhóm sẽ chờ GV xét lại.</p> : null}
+          {me?.can_upload_evidence && context.base_role === "STUDENT" ? <label className="evidence-upload">
+            Minh chứng của tôi (tùy chọn) — PDF, PNG, JPEG, tối đa 5 MB
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy}
+              onChange={(event) => {void upload(row,event.target.files?.[0]); event.target.value = "";}} />
+            <span className="text-caption">{draft ? "Tệp mới thay minh chứng đang gắn. Sau gửi hồ sơ, minh chứng được khóa."
+              : "Bạn vừa tham gia nhóm đã gửi: có thể bổ sung minh chứng lần đầu trước khi GV xét."}</span>
+          </label> : null}
+          <div className="flex gap-2">
+            {draft && me ? <>
+              {me.consent_status === "PENDING" ? <button className="btn btn-secondary" disabled={busy}
+                onClick={() => void groupAction(row,"confirm")}>Xác nhận đăng ký cũ của tôi</button> : null}
+              {me.is_coordinator ? <>
+                <button className="btn btn-primary" disabled={busy || !row.members.filter((member) => member.active).every((member) => member.consent_status === "ACCEPTED")}
+                  onClick={() => void groupAction(row,"submit")}>{row.proposer_type === "STUDENT" ? "Gửi đề xuất cho bộ môn" : "Gửi đăng ký cho GV"}</button>
+                <button className="btn btn-secondary" disabled={busy} onClick={() => {setCancelTarget(row); setError("");}}>Hủy bản nháp</button>
+              </> : <p className="text-caption">Đại diện sẽ gửi đăng ký sau khi nhóm kiểm tra thông tin.</p>}
+            </> : null}
+            {row.state === "SUBMITTED" && row.topic_state === "APPROVED" && row.receiving_lecturer_user_id === context.user_id ? <>
+              <button className="btn btn-primary" disabled={busy} onClick={() => void decide(row,"ACCEPT")}>Chấp nhận</button>
+              <button className="btn btn-destructive" disabled={busy} onClick={() => {setRejectTarget(row); setRejectReason(""); setError("");}}>Từ chối</button>
+            </> : null}
+            {row.thesis_id ? <Link className="btn btn-secondary" to={"/theses/" + row.thesis_id}>Xem khóa luận đã chốt</Link> : null}
           </div>
-        </div>
-      ) : (
-        <div className="stack">
-          {rows.map((row) => (
-            <article className="card" key={row.id}>
-              <div className="card-body">
-                <div className="flex justify-between items-center" style={{ marginBottom: "var(--space-3)" }}>
-                  <h3>{row.topic_title}</h3>
-                  <ThesisStatusBadge state={row.state} />
-                </div>
-
-                <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-2) var(--space-4)", marginBottom: "var(--space-4)" }}>
-                  <dt className="text-caption" style={{ color: "var(--neutral-500)" }}>Đề tài</dt>
-                  <dd className="text-body-sm">{row.topic_code} · {row.topic_title}</dd>
-                  <dt className="text-caption">GV tiếp nhận</dt><dd>{row.receiving_lecturer_name || "Chờ bộ môn chọn"}</dd>
-
-                  <dt className="text-caption" style={{ color: "var(--neutral-500)" }}>Thành viên</dt>
-                  <dd className="text-body-sm">{row.member_student_ids.length} sinh viên</dd>
-
-                  {row.thesis_id && (
-                    <>
-                      <dt className="text-caption" style={{ color: "var(--neutral-500)" }}>Khóa luận</dt>
-                      <dd>
-                        <Link
-                          to={`/theses/${row.thesis_id}`}
-                          className="flex items-center gap-1 text-body-sm"
-                        >
-                          {row.thesis_id.slice(0, 8)}…
-                          <ExternalLink size={12} />
-                        </Link>
-                      </dd>
-                    </>
-                  )}
-                </dl>
-
-                <div style={{ marginBottom: "var(--space-4)" }}>
-                  <strong>Thành viên và xác nhận</strong>
-                  <ul className="requirement-list">{row.members.map((member) =>
-                    <li key={member.student_id}>{member.display_name} ({member.student_code}) — <ThesisStatusBadge state={member.consent_status}/>
-                      {member.is_coordinator ? " · đại diện" : ""}{!member.active ? " · đã kết thúc đăng ký" : ""}
-                      {member.evidence_file_name ? <div><a href={evidenceUrl(row.id, member.student_id)} className="btn btn-link">Tải minh chứng: {member.evidence_file_name}</a></div> : null}
-                    </li>
-                  )}</ul>
-                </div>
-                {row.lecturer_reason ? <p className="alert alert-warning">Lý do của GV: {row.lecturer_reason}</p> : null}
-                {row.proposer_type === "STUDENT" && row.state === "SUBMITTED" && row.topic_state !== "APPROVED" ? <p className="alert alert-info">Đề xuất đã gửi, chờ bộ môn duyệt tên và xác nhận GV tiếp nhận.</p> : null}
-                {context.base_role === "STUDENT" && ["DRAFT", "RETURNED"].includes(row.state) && row.members.some((m) => m.active && m.student_id === context.student_id) ?
-                  <label className="evidence-upload">Minh chứng của tôi (tùy chọn) — PDF, PNG, JPEG, tối đa 5 MB<input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy}
-                    onChange={(e) => {void upload(row,e.target.files?.[0]); e.target.value = "";}}/><span className="text-caption">Chỉ gửi thông tin cần để GV xem xét. Tệp mới thay tệp đang gắn; sau gửi đăng ký không thể thay.</span></label> : null}
-
-                <div className="flex gap-3">
-                  {["DRAFT", "RETURNED"].includes(row.state) && context.base_role === "STUDENT" && (() => {
-                    const me = row.members.find((member) => member.student_id === context.student_id && member.active);
-                    if (!me) return null;
-                    return <>
-                      {me.consent_status === "PENDING" && <>
-                        <button className="btn btn-primary btn-sm" onClick={() => void groupAction(row, "confirm")}>Tôi xác nhận tham gia</button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => void groupAction(row, "decline")}>Từ chối tham gia</button>
-                      </>}
-                      {me.is_coordinator && <>
-                        <button className="btn btn-primary btn-sm"
-                          disabled={!row.members.filter((member) => member.active).every((member) => member.consent_status === "ACCEPTED")}
-                          onClick={() => void groupAction(row, "submit")}>{row.proposer_type === "STUDENT" ? "Gửi đề xuất cho bộ môn" : "Gửi đăng ký cho GV"}</button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => void groupAction(row, "cancel")}>Hủy bản nháp</button>
-                      </>}
-                    </>;
-                  })()}
-                  {row.state === "SUBMITTED" &&
-                    row.topic_state === "APPROVED" && row.receiving_lecturer_user_id === context.user_id && (
-                      <>
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => void act(row, "accept")}
-                        >
-                          Chấp nhận
-                        </button>
-                        <button
-                          className="btn btn-destructive btn-sm"
-                          onClick={() => {
-                            setRejectTarget(row);
-                            setRejectReason("");
-                          }}
-                        >
-                          Từ chối
-                        </button>
-                      </>
-                    )}
-                  {row.state === "LECTURER_ACCEPTED" &&
-                    context.actions.includes("registration:department_finalize") && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => void act(row, "finalize")}
-                      >
-                        TBM chốt đăng ký
-                      </button>
-                    )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {/* Feedback message */}
-      {message && (
-        <div
-          className="alert alert-info"
-          role="status"
-          style={{ marginTop: "var(--space-4)" }}
-        >
-          {message}
-        </div>
-      )}
-
-      {/* Reject dialog — replaces window.prompt() */}
-      <Dialog
-        open={rejectTarget !== null}
-        onClose={() => { setRejectTarget(null); setRejectReason(""); }}
-        title="Từ chối đăng ký"
-        size="sm"
-        footer={
-          <>
-            <button
-              className="btn btn-secondary"
-              onClick={() => { setRejectTarget(null); setRejectReason(""); }}
-            >
-              Hủy
-            </button>
-            <button
-              className="btn btn-destructive"
-              onClick={handleRejectConfirm}
-              disabled={rejectReason.trim().length === 0}
-            >
-              Xác nhận từ chối
-            </button>
-          </>
-        }
-      >
-        <div className="input-group">
-          <label htmlFor="reject-reason">Lý do từ chối *</label>
-          <textarea
-            id="reject-reason"
-            className="input"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Nhập lý do từ chối đăng ký..."
-            rows={3}
-          />
-        </div>
-      </Dialog>
-    </>
-  );
+        </div></article>;
+      })}</div>}
+    <nav className="pagination" aria-label="Phân trang đăng ký">
+      <button className="btn btn-secondary" disabled={!page || loading || busy} onClick={() => setPage(page - 1)}>Trang trước</button>
+      <span>Trang {page + 1}</span>
+      <button className="btn btn-secondary" disabled={rows.length < PAGE_SIZE || loading || busy} onClick={() => setPage(page + 1)}>Trang sau</button>
+    </nav>
+    <Dialog open={!!rejectTarget} busy={busy} onClose={() => setRejectTarget(null)} title="Từ chối đăng ký" footer={<>
+      <button className="btn btn-secondary" disabled={busy} onClick={() => setRejectTarget(null)}>Quay lại</button>
+      <button className="btn btn-destructive" disabled={busy || !rejectReason.trim()} onClick={() => {
+        if (rejectTarget) void decide(rejectTarget,"REJECT",rejectReason.trim()).then((ok) => {if (ok) setRejectTarget(null);});
+      }}>{busy ? "Đang lưu…" : "Xác nhận từ chối"}</button>
+    </>}>
+      <p>{rejectTarget?.topic_title}</p>
+      <label>Lý do từ chối<textarea className="input" rows={3} maxLength={2000} required value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /></label>
+      {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    </Dialog>
+    <Dialog open={!!cancelTarget} busy={busy} onClose={() => setCancelTarget(null)} title="Hủy bản nháp đăng ký" footer={<>
+      <button className="btn btn-secondary" disabled={busy} onClick={() => setCancelTarget(null)}>Giữ đăng ký</button>
+      <button className="btn btn-destructive" disabled={busy} onClick={() => {
+        if (cancelTarget) void groupAction(cancelTarget,"cancel").then((ok) => {if (ok) setCancelTarget(null);});
+      }}>Xác nhận hủy</button>
+    </>}>
+      <p>Hủy bản nháp của đề tài “{cancelTarget?.topic_title}” sẽ kết thúc đăng ký của tất cả thành viên trong nhóm. Hồ sơ cũ vẫn được lưu.</p>
+      {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    </Dialog>
+  </>;
 }
