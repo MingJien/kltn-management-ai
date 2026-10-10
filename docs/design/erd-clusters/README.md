@@ -1,20 +1,6 @@
 # ERD theo cụm nghiệp vụ
 
-Nguồn tạo: **PostgreSQL public (live, read-only)**. Database: **`kltn_ai`**, schema **`public`**; PostgreSQL **17.11**; Alembic **`20261010_0013`**. Ngày sinh: **2026-10-10 21:02 SE Asia Standard Time**.
-
-Các ảnh được sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu. Bảng xám là context; một bảng ở nhiều ảnh vẫn chỉ là một bảng vật lý.
-
-## Chạy lại bằng một lệnh
-
-Tại thư mục gốc `D:\KLTN` (có `.env` local cho kết nối), chạy:
-
-```powershell
-python tools/generate_erd_clusters.py
-```
-
-Cài môi trường lần đầu: `py -m venv .venv`, rồi `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"`. Sau đó mỗi lần tái sinh chỉ cần lệnh trên.
-
-Nếu `python` hệ thống thiếu thư viện, script tự chuyển sang `.venv\Scripts\python.exe`. Khi PostgreSQL không kết nối được, lệnh mặc định báo lỗi; chỉ dùng `--metadata-fallback` nếu muốn sinh ảnh từ SQLAlchemy metadata và ghi rõ nguồn thay thế.
+Sáu ERD dưới đây trình bày các cụm bảng và quan hệ khóa ngoại của hệ thống KLTN. Một bảng có thể xuất hiện ở nhiều cụm để giải thích nghiệp vụ, nhưng vẫn là một bảng vật lý duy nhất.
 
 ## Sáu ảnh
 

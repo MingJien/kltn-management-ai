@@ -70,7 +70,7 @@ npm run build --prefix frontend
 - [Yêu cầu, quy trình và phân quyền](docs/requirements/)
 - [ERD và từ điển dữ liệu](docs/design/erd.md)
 - [Schema lõi PostgreSQL](database/core/kltn-core-schema.sql)
-- [Schema đầy đủ PostgreSQL](database/kltn-schema-consolidated.sql)
+- [Schema CSDL lõi 32 bảng](database/core/kltn-core-schema.sql)
 - [Đặc tả API](docs/design/openapi.yaml)
 - [Luồng đề tài và đăng ký](docs/design/registration-workflow.md)
 - [Thiết kế thử nghiệm AI](docs/ai/prototype.md)

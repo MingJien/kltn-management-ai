@@ -27,7 +27,7 @@
 
 - `RoundPolicy`, storage abstraction, outbox/reindex, optimistic concurrency và AuditEvent là `PROPOSED` kỹ thuật để thực thi requirement; không phải quy định Trường.
 - Không có entity/API/screen cho auto Chair, plagiarism verdict, Admin business override, online approval rút/gia hạn hoặc sửa hậu ký.
-- Các câu hỏi nghiệp vụ trong phạm vi thiết kế đã được chốt trong [quyết định thiết kế](../decisions/quyet-dinh-du-an-2026-09-25.md). Trước khi vận hành hồ sơ thật, cần cấu hình người được giao xác nhận theo từng đợt và version policy/rubric áp dụng; baseline rubric của dự án đã chọn Mẫu 6.
+- Các câu hỏi nghiệp vụ trong phạm vi thiết kế đã được phản ánh trong yêu cầu và quy tắc hiện hành. Trước khi vận hành hồ sơ thật, cần cấu hình người được giao xác nhận theo từng đợt và version policy/rubric áp dụng; baseline rubric của dự án đã chọn Mẫu 6.
 
 ## Truy vết bổ sung từ quyết định 25/09/2026
 

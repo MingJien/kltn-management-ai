@@ -242,7 +242,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 ## Làm rõ từ các quyết định thiết kế cập nhật đến ngày 28/09/2026
 
-Đây là **làm rõ trong quyết định thiết kế**, lưu tại `docs/decisions/quyet-dinh-du-an-2026-09-25.md`.
+Đây là các lựa chọn thiết kế đã được phản ánh trong yêu cầu, CSDL và API hiện hành.
 
 | Liên quan câu | Quyết định thiết kế đã chốt | Trạng thái triển khai hoặc điều kiện còn lại |
 | --- | --- | --- |

@@ -17,7 +17,7 @@ Tài liệu này trả lời câu hỏi “đổi nghiệp vụ thì bảng/cộ
 
 ## Kết luận kỹ thuật
 
-- SQL khởi tạo [kltn-db-baseline.sql](../../database/kltn-db-baseline.sql) dựng **database mới, trống** ở Alembic head `20261004_0011`; không chạy lại trên database đã có bảng. Bản [lõi 32 bảng](../../database/core/kltn-core-schema.sql) dành cho database riêng để trình bày/phát triển phạm vi ưu tiên, không dùng migration 62 bảng trên đó.
-- Database đã có bảng được nâng cấp bằng [Alembic migrations](../../backend/migrations/versions/). Mỗi thay đổi **cấu trúc chính thức** cần revision mới để không chạy lại lệnh cũ; một tệp `kltn-ai-updates.sql` chỉ là sổ thao tác pgAdmin cá nhân, Git bỏ qua.
+- Bản nộp CSDL là [schema lõi 32 bảng](../../database/core/kltn-core-schema.sql), dùng để trình bày phạm vi ưu tiên hiện tại. Không chạy lại file này trên database ứng dụng đang có bảng.
+- Database ứng dụng được nâng cấp bằng [Alembic migrations](../../backend/migrations/versions/). Mỗi thay đổi **cấu trúc chính thức** cần revision mới để không chạy lại lệnh cũ.
 - Các quyết định vừa chốt có cấu trúc lưu trữ; migration 0005 bổ sung CHECK `COMMENT_ONLY` cho góp ý chéo. Quyền và chuyển trạng thái vẫn thuộc service chưa triển khai.
-- Có thể nộp bộ **phân tích và thiết kế hiện tại kèm các giới hạn ghi rõ**, nhưng không được gọi toàn hệ thống/API/UI/AI, biểu mẫu và toàn bộ runtime là hoàn tất 100%. Xem [quyết định thiết kế](../decisions/quyet-dinh-du-an-2026-09-25.md).
+- Có thể nộp bộ **phân tích và thiết kế hiện tại kèm các giới hạn ghi rõ**, nhưng không được gọi toàn hệ thống/API/UI/AI, biểu mẫu và toàn bộ runtime là hoàn tất 100%.
