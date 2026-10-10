@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Bot, ClipboardList, FileText, LayoutDashboard } from "lucide-react";
+import { Bot, ClipboardList, FileText, LayoutDashboard, UserRound, UsersRound, ShieldCheck } from "lucide-react";
 import type { Context } from "../../api";
 export function roleLabel(context: Context) {
   return context.actions.includes("topic:department_decide") ? "Trưởng bộ môn"
@@ -40,6 +40,21 @@ export default function Sidebar({context, isOpen, onClose}: {
                 onClick={onClose}><Bot aria-hidden="true" /><span>Tra cứu tài liệu</span></NavLink>
             </div>
           </> : null}
+          {context.actions.includes("account:manage") ? <div className="sidebar__group">
+            <div className="sidebar__group-label">QUẢN TRỊ</div>
+            <NavLink to="/administration" className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản và phân công</span></NavLink>
+          </div> : null}
+          {context.actions.some(a=>a.startsWith("eligibility:")) ? <div className="sidebar__group">
+            <div className="sidebar__group-label">ĐIỀU KIỆN THEO ĐỢT</div>
+            <NavLink to="/roster" className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><ShieldCheck aria-hidden="true" /><span>Danh sách sinh viên</span></NavLink>
+          </div> : null}
+          <div className="sidebar__group">
+            <div className="sidebar__group-label">TÀI KHOẢN</div>
+            <NavLink to="/account" className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><UserRound aria-hidden="true" /><span>Thông tin của tôi</span></NavLink>
+          </div>
         </nav>
         <div className="sidebar__footer"><div className="sidebar__user">
           <div className="sidebar__avatar" aria-hidden="true">{context.display_name.charAt(0).toUpperCase()}</div>

@@ -54,7 +54,7 @@ def main() -> int:
         try:
             tables = set(inspect(conn).get_table_names())
             assert len(tables) == 63 and "alembic_version" in tables
-            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20261004_0012"
+            assert conn.execute(text("select version_num from alembic_version")).scalar_one() == "20261010_0013"
 
             # DB-41: the real Mẫu 6 baseline is present but cannot be used live
             # until the Faculty resolves its conflict with QĐ 2919.

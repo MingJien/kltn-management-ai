@@ -32,7 +32,7 @@ def main() -> int:
             with connection.cursor() as cursor:
                 cursor.execute(script, prepare=False)
                 cursor.execute("SELECT version_num FROM alembic_version")
-                assert cursor.fetchone()[0] == "20261004_0012"
+                assert cursor.fetchone()[0] == "20261010_0013"
                 cursor.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema=%s", (name,))
                 assert cursor.fetchone()[0] == 63
                 cursor.execute("SELECT id, state FROM rubric_template WHERE code='MAU-06-HOIDONG' AND version_no=1")
@@ -46,7 +46,7 @@ def main() -> int:
                 assert dict(cursor.fetchall()) == {"passed_credit_ratio": "YES", "gpa_4": "YES"}
                 cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=%s AND table_name='user_account' AND column_name IN ('email','password_hash','email_verified_at')", (name,))
                 assert len(cursor.fetchall()) == 3
-        print("PASS baseline SQL on empty disposable schema: 63 tables, head 20261004_0012")
+        print("PASS baseline SQL on empty disposable schema: 63 tables, head 20261010_0013")
         return 0
     finally:
         with engine.begin() as conn:

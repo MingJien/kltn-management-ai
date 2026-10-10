@@ -89,6 +89,12 @@ def main() -> int:
         with Session(private_engine) as session, session.begin():
             assert session.scalar(text('select current_schema()')) == schema
             now = datetime.now(timezone.utc)
+            admin_password = secrets.token_urlsafe(20)
+            admin = m.UserAccount(id=uuid4(), email='admin@e2e.test',
+                password_hash=hash_password(admin_password), email_verified_at=now,
+                base_role='ADMIN', status='ACTIVE')
+            session.add(admin)
+            accounts['admin'] = {'email':admin.email, 'password':admin_password}
             for key in ('proposalPeer','race1','race2','race3'):
                 password = secrets.token_urlsafe(20)
                 email = key.lower() + '@e2e.test'

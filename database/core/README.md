@@ -1,6 +1,6 @@
 # CSDL lõi theo góp ý GV ngày 03/10/2026
 
-[kltn-core-schema.sql](kltn-core-schema.sql) là file SQL riêng để trình bày và dựng **database mới `kltn_core`**. Bản này có **32 bảng nghiệp vụ**: 25 bảng nền theo các nhóm GV nêu, bốn bảng giữ FK/góp ý và hai bảng giữ lịch sử tên đề tài/nhật ký quyết định của luồng đã triển khai. Mốc GV nêu là “khoảng 25”, không phải danh sách 25 bảng bắt buộc. Nguồn là SQLAlchemy metadata đã đối chiếu với PostgreSQL `kltn_ai` tại Alembic `20261004_0011` (cột/kiểu/null, PK/FK/UNIQUE/CHECK/index). Mỗi bảng có đúng một `CREATE TABLE` với toàn bộ cột và ràng buộc của nó, **không có `ALTER TABLE` thêm cột ở cuối file**. File không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
+[kltn-core-schema.sql](kltn-core-schema.sql) là file SQL riêng để trình bày và dựng **database mới `kltn_core`**. Bản này có **32 bảng nghiệp vụ**: 25 bảng nền theo các nhóm GV nêu, bốn bảng giữ FK/góp ý và hai bảng giữ lịch sử tên đề tài/nhật ký quyết định của luồng đã triển khai. Mốc GV nêu là “khoảng 25”, không phải danh sách 25 bảng bắt buộc. Nguồn là SQLAlchemy metadata đã đối chiếu với PostgreSQL `kltn_ai` tại Alembic `20261010_0013` (cột/kiểu/null, PK/FK/UNIQUE/CHECK/index). Mỗi bảng có đúng một `CREATE TABLE` với toàn bộ cột và ràng buộc của nó, **không có `ALTER TABLE` thêm cột ở cuối file**. File không chứa dữ liệu nghiệp vụ hoặc mật khẩu.
 
 ## Danh sách bảng và lý do giữ
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Người dùng, đơn vị, chức vụ (7) | `faculty`, `department`, `user_account`, `student_profile`, `lecturer_profile`, `organizational_position`, `position_assignment` | SV/GV thuộc đúng bộ môn; TBM chỉ có quyền khi được phân công chức vụ còn hiệu lực. `user_account` có email, mã băm mật khẩu, trạng thái và UUID. |
 | Dấu vết quyết định (1) | `audit_event` | Ghi người thực hiện, hành động, đối tượng và thời gian để giải trình việc duyệt/từ chối. |
-| Năm học, đợt, điều kiện (4) | `academic_year`, `thesis_round`, `round_policy`, `eligibility_snapshot` | Chính sách/ngày theo đợt; snapshot đủ điều kiện có nguồn, người xác nhận, tín chỉ/GPA tùy nguồn. Không lưu chi tiết án tích/kỷ luật. |
+| Năm học, đợt, điều kiện (4) | `academic_year`, `thesis_round`, `round_policy`, `eligibility_snapshot` | Chính sách/ngày theo đợt; snapshot đủ điều kiện có nguồn và người xác nhận. Cột tín chỉ/GPA cũ để trống khi nhập danh sách mới; không lưu chi tiết án tích/kỷ luật. |
 | Đề tài, đăng ký, khóa luận, GVHD (8) | `topic`, `topic_title_version`, `topic_requirement`, `topic_registration`, `registration_member`, `thesis`, `thesis_member`, `advisor_assignment` | GV tạo → TBM duyệt → từng SV tự đồng ý → nhóm gửi → GV chấp nhận; tên cũ của đề tài được giữ theo phiên bản. Chốt nhóm/GVHD là bước triển khai sau. |
 | Quyền theo đợt và FK nền (2) | `resource_assignment`, `council` | `resource_assignment` gán `ELIGIBILITY_VERIFIER` theo đợt. `council` chỉ để giữ FK thật của bảng assignment đa phạm vi; **không coi buổi góp ý đề cương/tiến độ là hội đồng bảo vệ**. |
 | Tệp, đề cương và góp ý (5) | `stored_file`, `proposal`, `proposal_version`, `reviewer_assignment`, `proposal_review` | Lưu bản nộp theo phiên bản và GV được giao góp ý. GV góp ý chéo phải khác GVHD; backend kiểm ở use case vì cần đối chiếu nhiều bảng. |

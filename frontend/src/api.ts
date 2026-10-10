@@ -10,8 +10,11 @@ export type Context = {
   department_id: string | null;
   email: string | null;
   student_code: string | null;
+  class_name: string | null;
+  major_code: string | null;
   lecturer_code: string | null;
   csrf_token: string | null;
+  can_change_password: boolean;
 };
 export type Topic = {
   id: string;
@@ -133,7 +136,7 @@ export async function request<T>(
   let response: Response;
   const method = (init.method || "GET").toUpperCase();
   const abort = new AbortController();
-  const timer = window.setTimeout(() => abort.abort(), path.startsWith("/ai/") ? 90000 : 30000);
+  const timer = window.setTimeout(() => abort.abort(), path.startsWith("/ai/") || path.includes("/roster") ? 90000 : 30000);
   try { response = await fetch(baseUrl + "/api/v1" + path, {
     ...init,
     credentials: "include",

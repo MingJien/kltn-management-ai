@@ -92,8 +92,8 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261004_0012":
-            parser.error("Upgrade the configured development DB to 20261004_0012 first")
+        if version != "20261010_0013":
+            parser.error("Upgrade the configured development DB to 20261010_0013 first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")
@@ -145,13 +145,9 @@ def main() -> None:
         for i, student in enumerate(students, 1):
             snapshot = ensure(session, m.EligibilitySnapshot, f"eligibility-{i}",
                    student_id=student.id, round_id=round_.id, version=1,
-                   passed_credit_ratio=0.8, gpa_4=3.0,
                    evidence_ref="SYNTHETIC_DEMO",
                    captured_at=now, confirmed_by=lecturer_users[1].id,
                    confirmed_at=now, state="CONFIRMED")
-            if snapshot.evidence_ref == "SYNTHETIC_DEMO":
-                snapshot.passed_credit_ratio = 0.8
-                snapshot.gpa_4 = 3.0
         ensure(session, m.Topic, "topic", round_id=round_.id, department_id=department.id,
                code=allocate_topic_code(session, round_), receiving_lecturer_id=lecturers[0].id,
                proposer_user_id=lecturer_users[0].id, proposer_type="LECTURER",

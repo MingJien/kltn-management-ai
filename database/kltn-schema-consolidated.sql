@@ -1,5 +1,5 @@
 -- KLTN PostgreSQL public schema; pg_dump --schema-only from kltn_ai.
--- Alembic 20261004_0012; 62 bảng nghiệp vụ + alembic_version. Không chứa dữ liệu.
+-- Alembic 20261010_0013; 62 bảng nghiệp vụ + alembic_version. Không chứa dữ liệu.
 -- Mỗi bảng có đủ cột hiện hành trong một CREATE TABLE; khóa FK/PK ở phần ALTER TABLE.
 -- Chỉ dùng để xem/nộp thiết kế; không chạy trên database đang có bảng.
 
@@ -792,7 +792,9 @@ CREATE TABLE student_profile (
     display_name character varying(255) NOT NULL,
     id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    class_name character varying(100),
+    major_code character varying(32)
 );
 
 CREATE TABLE thesis (

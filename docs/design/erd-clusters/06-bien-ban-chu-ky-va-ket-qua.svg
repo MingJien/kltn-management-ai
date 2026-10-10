@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="3890" height="2061" viewBox="0 0 3890 2061">
 <rect width="3890" height="2061" fill="#F7F9FC"/>
 <text x="130" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="700" fill="#14243A">06  Biên bản, chữ ký và kết quả</text>
-<text x="130" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="400" fill="#52667E">kltn_ai  •  PostgreSQL 17.11  •  Alembic 20261004_0011  •  10 bảng  •  10 FK</text>
+<text x="130" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="400" fill="#52667E">kltn_ai  •  PostgreSQL 17.11  •  Alembic 20261010_0013  •  10 bảng  •  10 FK</text>
 <text x="130" y="184" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#52667E">Bảng xanh: nghiệp vụ chính    •    Bảng xám: ngữ cảnh    •    Các đường nối lấy từ khóa ngoại thật</text>
 <polyline points="508,672 508,717 1022,717 1022,453 1080,453" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="532,672 532,724 1965,724 1965,453 2030,453" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -295,5 +295,5 @@
 <text x="3362" y="704" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
 <rect x="2919" y="1054" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
 <text x="2930" y="1076" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
-<text x="130" y="2020" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">Nguồn: PostgreSQL public (live, read-only)  •  2026-10-04 21:39 SE Asia Standard Time  •  1 = bảng cha, N = nhiều bản ghi con; ≤1 = FK duy nhất</text>
+<text x="130" y="2020" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">Nguồn: PostgreSQL public (live, read-only)  •  2026-10-10 21:02 SE Asia Standard Time  •  1 = bảng cha, N = nhiều bản ghi con; ≤1 = FK duy nhất</text>
 </svg>

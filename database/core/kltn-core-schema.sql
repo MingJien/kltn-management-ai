@@ -1,5 +1,5 @@
 -- KLTN: CSDL loi theo gop y GV, uu tien tai khoan, dot, dieu kien, de tai, dang ky, khoa luan, GVHD, de cuong, tien do, tai lieu.
--- Nguon: PostgreSQL kltn_ai, Alembic 20261004_0012; doi chieu metadata truoc khi xuat.
+-- Nguon: PostgreSQL kltn_ai, Alembic 20261010_0013; doi chieu metadata truoc khi xuat.
 -- Chi chay MOT LAN tren database PostgreSQL MOI, TRONG (de xuat ten: kltn_core).
 -- Khong chay tren kltn_ai/kltn_dev. Khong chua du lieu sinh vien, de tai hay mat khau.
 -- Ban 62 bang o kltn_ai duoc giu lam tham chieu cho cac giai doan sau.
@@ -87,6 +87,8 @@ CREATE TABLE student_profile (
 	student_code VARCHAR(32) NOT NULL,
 	department_id UUID NOT NULL,
 	display_name VARCHAR(255) NOT NULL,
+	class_name VARCHAR(100),
+	major_code VARCHAR(32),
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,

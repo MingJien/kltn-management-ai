@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorMessage } from "./errors";
 import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
@@ -7,11 +7,16 @@ import WorkspacePage from "./pages/WorkspacePage";
 import TopicsPage from "./pages/TopicsPage";
 import RegistrationsPage from "./pages/RegistrationsPage";
 import ThesisViewPage from "./pages/ThesisViewPage";
+import AccountAccessPage from "./pages/AccountAccessPage";
+import AccountPage from "./pages/AccountPage";
+import AdministrationPage from "./pages/AdministrationPage";
+import RosterPage from "./pages/RosterPage";
 const AIPage = lazy(() => import("./pages/AIPage"));
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -74,6 +79,9 @@ function App() {
   }
 
   if (restoring) return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
+
+  if (!context && ["/account/activation-request", "/account/forgot-password",
+    "/account/activate", "/account/reset-password"].includes(location.pathname)) return <AccountAccessPage />;
 
   // Not connected — show login card
   if (!context) {
@@ -161,6 +169,11 @@ function App() {
                 </button>
               </form>
 
+              <div className="account-entry__links">
+                <Link to="/account/activation-request">Kích hoạt tài khoản</Link>
+                <Link to="/account/forgot-password">Quên mật khẩu?</Link>
+              </div>
+
               {error && (
                 <div
                   className="alert alert-danger"
@@ -194,6 +207,13 @@ function App() {
           path="/"
           element={<WorkspacePage context={context} />}
         />
+        <Route path="/account" element={<AccountPage context={context} onPasswordChanged={() => {
+          setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
+        }} />} />
+        <Route path="/administration" element={context.actions.includes("account:manage") ?
+          <AdministrationPage context={context} /> : <Navigate to="/" replace />} />
+        <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
+          <RosterPage context={context} /> : <Navigate to="/" replace />} />
         <Route
           path="/topics"
           element={workflowAccess ?

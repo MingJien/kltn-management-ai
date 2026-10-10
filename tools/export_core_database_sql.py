@@ -21,7 +21,7 @@ from backend.db.validate_schema import load_env
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "database" / "core" / "kltn-core-schema.sql"
 SOURCE_DATABASE = "kltn_ai"
-SOURCE_REVISION = "20261004_0012"
+SOURCE_REVISION = "20261010_0013"
 
 # Dependency order also follows the first delivered business flow.
 TABLES = (

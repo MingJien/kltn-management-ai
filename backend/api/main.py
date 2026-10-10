@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -10,6 +11,9 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
 from backend.api.auth import allowed_frontend_origins, router as auth_router
+from backend.api.account import router as account_router
+from backend.api.roster import router as roster_router, assignment_router
+from backend.api.account_admin import router as account_admin_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
@@ -49,9 +53,13 @@ app.add_middleware(
     allow_origins=allowed_frontend_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-CSRF-Token"],
+    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-Preview-SHA256", "X-CSRF-Token"],
 )
 app.include_router(auth_router)
+app.include_router(account_router)
+app.include_router(roster_router)
+app.include_router(assignment_router)
+app.include_router(account_admin_router)
 
 
 @app.middleware("http")
@@ -105,6 +113,21 @@ def context(
     actions: list[str] = []
     if student and user.base_role == "STUDENT":
         actions.append("registration:create")
+    if user.base_role == "ADMIN":
+        actions.append("account:manage")
+    now = datetime.now(timezone.utc)
+    assignment_types = session.scalars(select(m.ResourceAssignment.assignment_type).where(
+        m.ResourceAssignment.user_id == user.id,
+        m.ResourceAssignment.round_id.is_not(None),
+        m.ResourceAssignment.state == "ACTIVE",
+        m.ResourceAssignment.effective_from <= now,
+        or_(m.ResourceAssignment.effective_to.is_(None), m.ResourceAssignment.effective_to > now),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
+    )).all()
+    if "ELIGIBILITY_IMPORTER" in assignment_types:
+        actions.append("eligibility:import")
+    if "ELIGIBILITY_VERIFIER" in assignment_types:
+        actions.append("eligibility:confirm")
     if lecturer and user.base_role == "LECTURER":
         actions.extend(["topic:create", "topic:submit"])
         if session.scalar(select(m.Topic.id).where(
@@ -122,8 +145,11 @@ def context(
         department_id=(student.department_id if student else lecturer.department_id if lecturer else None),
         email=user.email,
         student_code=student.student_code if student else None,
+        class_name=student.class_name if student else None,
+        major_code=student.major_code if student else None,
         lecturer_code=lecturer.lecturer_code if lecturer else None,
         csrf_token=csrf_token,
+        can_change_password=bool(user.email_verified_at and user.password_hash and user.password_hash.startswith("$argon2")),
     )
 
 

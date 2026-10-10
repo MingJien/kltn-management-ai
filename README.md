@@ -4,14 +4,15 @@ Source của hệ thống quản lý khóa luận tốt nghiệp, gồm PostgreS
 
 ## Chức năng đã có
 
-- Đăng nhập bằng email/mật khẩu của tài khoản đã được cấp, duy trì phiên bằng cookie và kiểm tra quyền tại API theo vai trò, bộ môn và quan hệ với đề tài.
+- Đăng nhập bằng email/mật khẩu, kích hoạt qua email, đổi/đặt lại mật khẩu, khóa tài khoản; phiên cookie và quyền được kiểm tra tại API.
+- Người được giao quyền nhập danh sách sinh viên đã được Khoa chấp thuận bằng CSV/XLSX; người xác nhận theo đợt đối chiếu và chốt kết quả. Chỉ sinh viên chủ động kích hoạt tài khoản mới đăng nhập.
 - Giảng viên tạo, sửa và gửi đề tài.
 - Trưởng bộ môn duyệt, trả về để sửa hoặc từ chối đề tài thuộc bộ môn.
 - Sinh viên tự đề xuất đề tài hoặc đăng ký đề tài đã duyệt, tham gia nhóm trong chỉ tiêu và thời hạn đăng ký.
-- Giảng viên tiếp nhận hoặc từ chối đăng ký, kèm lý do khi từ chối.
+- Giảng viên tiếp nhận hoặc từ chối đăng ký, kèm lý do khi từ chối. Sinh viên bị từ chối được chọn đề tài khác trong cùng đợt nếu thời hạn đăng ký còn mở và vẫn đáp ứng điều kiện.
 - Thử nghiệm tìm đề tài tương tự và tra cứu nguồn trên corpus giả.
 
-Tài khoản hiện dùng dữ liệu giả để kiểm thử; chưa có quy trình cấp tài khoản thật, xác minh email hoặc khôi phục mật khẩu. Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biên bản và tích hợp Gemini tiếp tục được phát triển ở các giai đoạn sau.
+Luồng tài khoản đã có mã nguồn và kiểm thử với dữ liệu giả. Gửi email thật cần cấu hình SMTP và HTTPS khi triển khai. Không kết nối Phòng Đào tạo; Khoa cung cấp danh sách và phân công người xác nhận. Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biên bản và tích hợp Gemini tiếp tục được phát triển ở các giai đoạn sau.
 
 ## Cấu trúc
 
@@ -47,6 +48,13 @@ npm run dev --prefix frontend
 ```
 
 Mở `http://localhost:5173`. Dữ liệu và tài khoản demo chỉ tạo trên máy, không nằm trong repository.
+
+## Tài khoản và danh sách theo đợt
+
+- Tài khoản ADMIN đầu tiên được mời bằng `python -m tools.bootstrap_admin --execute` sau khi đặt `KLTN_BOOTSTRAP_ADMIN_EMAIL` và `AUTH_SESSION_SECRET` trong `.env`. Cấu hình SMTP để gửi email thật; trong development/test, liên kết được ghi vào hộp thư thử ở `tmp/mail-outbox/`. Công cụ không tạo hoặc gửi mật khẩu.
+- ADMIN mời giảng viên và ghi phân công `ELIGIBILITY_IMPORTER`/`ELIGIBILITY_VERIFIER` theo đợt cùng căn cứ từ Khoa. ADMIN không tự có quyền xác nhận điều kiện; chỉ quyền được gán rõ ràng mới mở chức năng này.
+- Tệp CSV UTF-8 hoặc XLSX nhập sinh viên có đúng các cột `student_code,display_name,email,department_code,class_name,major_code`. Tối đa 1.000 dòng/2 MB, không có điểm hoặc dữ liệu kỷ luật. Người nhập xem trước rồi mới ghi; người xác nhận duyệt kết quả và lưu căn cứ. Có thể nhập bổ sung, thu hồi hoặc đính chính với dấu vết audit.
+- Sinh viên có kết quả xác nhận dùng MSSV và email trong danh sách để yêu cầu liên kết kích hoạt; giảng viên dùng mã GV và email đã được mời. Liên kết có hạn dùng và chỉ dùng một lần. Trong development/test nếu chưa cấu hình SMTP, email thử được ghi tại `tmp/mail-outbox/` (Git bỏ qua). Production cần SMTP STARTTLS và HTTPS.
 
 ## Kiểm thử
 

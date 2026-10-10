@@ -6,6 +6,20 @@
 /* ════════════════════════════════════
    BUTTONS
    ════════════════════════════════════ */
+.account-entry {min-height:100dvh; display:grid; place-items:center; padding:var(--space-4); background:var(--neutral-50);}
+.account-entry__card {width:100%; max-width:460px;}
+.account-entry__links {display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-3); margin-top:var(--space-4);}
+.account-entry__links a {color:var(--primary-700);}
+.account-actions {display:flex; flex-wrap:wrap; gap:var(--space-3);}
+.account-search {display:flex; gap:var(--space-3); max-width:500px;}
+.account-search .input {flex:1; min-width:0;}
+.account-list {display:grid; gap:var(--space-2);}
+.account-list__row {display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border-color); border-radius:var(--radius-md);}
+.account-list__row span {overflow-wrap:anywhere;}
+.table-scroll {overflow-x:auto; max-height:480px;}
+.account-table {width:100%; border-collapse:collapse; font:var(--text-body-sm);}
+.account-table th,.account-table td {padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border-color); text-align:left;}
+.account-table th {position:sticky; top:0; background:#fff;}
 .btn {
   display: inline-flex;
   align-items: center;

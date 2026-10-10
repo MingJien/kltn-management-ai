@@ -158,8 +158,11 @@ class ContextOut(BaseModel):
     department_id: UUID | None = None
     email: str | None = None
     student_code: str | None = None
+    class_name: str | None = None
+    major_code: str | None = None
     lecturer_code: str | None = None
     csrf_token: str | None = None
+    can_change_password: bool = False
 
 
 class ErrorOut(BaseModel):

@@ -1,5 +1,5 @@
 -- KLTN PostgreSQL baseline dùng một lần trên database mới, trống.
--- Alembic 20261004_0012; không chạy lại trên kltn_ai/kltn_dev đã có bảng.
+-- Alembic 20261010_0013; không chạy lại trên kltn_ai/kltn_dev đã có bảng.
 -- Tạo bảng/khóa rồi nạp duy nhất marker Alembic và rubric Mẫu 6 DRAFT.
 
 BEGIN;
@@ -793,7 +793,9 @@ CREATE TABLE student_profile (
     display_name character varying(255) NOT NULL,
     id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    class_name character varying(100),
+    major_code character varying(32)
 );
 
 CREATE TABLE thesis (
@@ -1745,7 +1747,7 @@ ALTER TABLE ONLY topic_title_version
 ALTER TABLE ONLY topic_title_version
     ADD CONSTRAINT fk_topic_title_version_topic_id_topic FOREIGN KEY (topic_id) REFERENCES topic(id) ON DELETE RESTRICT;
 
-INSERT INTO alembic_version (version_num) VALUES ('20261004_0012');
+INSERT INTO alembic_version (version_num) VALUES ('20261010_0013');
 
 -- Dữ liệu kỹ thuật Mẫu 6 DRAFT, cùng mã ổn định với migration 0006.
 INSERT INTO rubric_template (id, code, name, version_no, source_ref, state) VALUES ('1a4b7ef6-4f53-5627-8d1b-a54f9c0c1b1f', 'MAU-06-HOIDONG', 'Mẫu 6 - Phiếu đánh giá Hội đồng', 1, 'SRC-MAU-06', 'DRAFT');

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "API hệ thống quản lý KLTN",
-    "version": "0.3.0-nv4-design",
-    "description": "Thiết kế tổng thể; operation IMPLEMENTED_PROTOTYPE đồng bộ từ FastAPI ngày 04/10/2026, cập nhật xác thực ngày 10/10/2026. Với cookie phiên, thao tác ghi cần Origin được phép và header X-CSRF-Token lấy từ /me/context; riêng đăng nhập chỉ kiểm Origin. Các operation khác là thiết kế hoặc cần cấu hình. Luồng đề tài/đăng ký dùng schema 20261004_0012; chưa kết nối SSO Trường hoặc Gemini."
+    "version": "0.4.0-nv5-design",
+    "description": "Thiết kế tổng thể; operation IMPLEMENTED_PROTOTYPE được đồng bộ từ FastAPI ngày 10/10/2026. Luồng đề tài/đăng ký và tài khoản dùng PostgreSQL revision 20261010_0013. Đăng nhập local, kích hoạt qua email và import danh sách theo đợt đã có mã nguồn; gửi email thật cần SMTP/HTTPS. Các operation khác còn là thiết kế. Chưa kết nối SSO Trường hoặc Gemini."
   },
   "servers": [
     {
@@ -3128,7 +3128,8 @@
             }
           }
         },
-        "x-runtime-status": "CONFIGURATION_REQUIRED"
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
       }
     },
     "/auth/login": {
@@ -3148,7 +3149,8 @@
             }
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
       },
       "post": {
         "tags": [
@@ -3181,7 +3183,8 @@
             }
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
       }
     },
     "/auth/callback": {
@@ -3201,7 +3204,8 @@
             }
           }
         },
-        "x-runtime-status": "CONFIGURATION_REQUIRED"
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
       }
     },
     "/auth/logout": {
@@ -3216,7 +3220,8 @@
             "description": "Successful Response"
           }
         },
-        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
       }
     },
     "/topic-registrations/{registration_id}/evidence": {
@@ -4750,6 +4755,1337 @@
         },
         "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
+    },
+    "/account/activation-request": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Activation Request",
+        "operationId": "activation_request_api_v1_account_activation_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Activation Request Api V1 Account Activation Request Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
+      }
+    },
+    "/account/activate": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Activate",
+        "operationId": "activate_api_v1_account_activate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
+      }
+    },
+    "/account/password-reset-request": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Password Reset Request",
+        "operationId": "password_reset_request_api_v1_account_password_reset_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Password Reset Request Api V1 Account Password Reset Request Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
+      }
+    },
+    "/account/password-reset": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Password Reset",
+        "operationId": "password_reset_api_v1_account_password_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE",
+        "security": []
+      }
+    },
+    "/account/password-change": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Password Change",
+        "operationId": "password_change_api_v1_account_password_change_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/{round_id}/roster/preview": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Preview",
+        "operationId": "preview_api_v1_rounds__round_id__roster_preview_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-File-Name"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Preview Api V1 Rounds  Round Id  Roster Preview Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/{round_id}/roster": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Import File",
+        "operationId": "import_file_api_v1_rounds__round_id__roster_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "reference",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 500,
+              "title": "Reference"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-File-Name"
+            }
+          },
+          {
+            "name": "X-Preview-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Preview-Sha256"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Import File Api V1 Rounds  Round Id  Roster Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "get": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "List Roster",
+        "operationId": "list_roster_api_v1_rounds__round_id__roster_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Roster Api V1 Rounds  Round Id  Roster Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/{round_id}/roster/confirm": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Confirm Roster",
+        "operationId": "confirm_roster_api_v1_rounds__round_id__roster_confirm_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRows"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Confirm Roster Api V1 Rounds  Round Id  Roster Confirm Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/{round_id}/roster/revoke": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Revoke Eligibility",
+        "operationId": "revoke_eligibility_api_v1_rounds__round_id__roster_revoke_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeStudent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Revoke Eligibility Api V1 Rounds  Round Id  Roster Revoke Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/rounds/{round_id}/roster/{student_id}": {
+      "patch": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Correct Student",
+        "operationId": "correct_student_api_v1_rounds__round_id__roster__student_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectStudent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Correct Student Api V1 Rounds  Round Id  Roster  Student Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/me/round-assignments": {
+      "get": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "My Round Assignments",
+        "operationId": "my_round_assignments_api_v1_me_round_assignments_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response My Round Assignments Api V1 Me Round Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/departments": {
+      "get": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Departments",
+        "operationId": "departments_api_v1_admin_departments_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Departments Api V1 Admin Departments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/rounds": {
+      "get": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Rounds",
+        "operationId": "rounds_api_v1_admin_rounds_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Rounds Api V1 Admin Rounds Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Users",
+        "operationId": "users_api_v1_admin_users_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Search"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Users Api V1 Admin Users Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/lecturers": {
+      "post": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Invite Lecturer",
+        "operationId": "invite_lecturer_api_v1_admin_lecturers_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LecturerInvite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Invite Lecturer Api V1 Admin Lecturers Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/round-assignments": {
+      "post": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Grant Round Assignment",
+        "operationId": "grant_round_assignment_api_v1_admin_round_assignments_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundAssignment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Grant Round Assignment Api V1 Admin Round Assignments Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "get": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Round Assignments",
+        "operationId": "round_assignments_api_v1_admin_round_assignments_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Round Assignments Api V1 Admin Round Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/round-assignments/{assignment_id}/revoke": {
+      "post": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Revoke Assignment",
+        "operationId": "revoke_assignment_api_v1_admin_round_assignments__assignment_id__revoke_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Assignment Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentRevoke"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/users/{user_id}/lock": {
+      "post": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Lock Account",
+        "operationId": "lock_account_api_v1_admin_users__user_id__lock_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountStatus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
     }
   },
   "components": {
@@ -4758,6 +6094,17 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
+      },
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "kltn_session"
+      },
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "description": "Chỉ DEV/TEST",
+        "in": "header",
+        "name": "X-Dev-User-Id"
       }
     },
     "responses": {
@@ -5260,6 +6607,28 @@
             ],
             "title": "Student Code"
           },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "major_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Major Code"
+          },
           "lecturer_code": {
             "anyOf": [
               {
@@ -5280,8 +6649,12 @@
                 "type": "null"
               }
             ],
-            "title": "Csrf Token",
-            "description": "Gửi trong X-CSRF-Token khi thao tác ghi bằng cookie phiên; không dùng với dev header."
+            "title": "Csrf Token"
+          },
+          "can_change_password": {
+            "type": "boolean",
+            "title": "Can Change Password",
+            "default": false
           }
         },
         "type": "object",
@@ -6726,6 +8099,294 @@
         },
         "type": "object",
         "title": "TopicUpdate"
+      },
+      "AccountStatus": {
+        "properties": {
+          "locked": {
+            "type": "boolean",
+            "title": "Locked"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locked",
+          "reason"
+        ],
+        "title": "AccountStatus"
+      },
+      "ActivationRequest": {
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Identifier"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "identifier",
+          "email"
+        ],
+        "title": "ActivationRequest"
+      },
+      "AssignmentRevoke": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "AssignmentRevoke"
+      },
+      "ConfirmRows": {
+        "properties": {
+          "snapshot_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Snapshot Ids"
+          },
+          "basis_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Basis Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_ids",
+          "basis_ref"
+        ],
+        "title": "ConfirmRows"
+      },
+      "CorrectStudent": {
+        "properties": {
+          "student_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Student Code"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "class_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Class Name"
+          },
+          "major_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Major Code"
+          },
+          "basis_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Basis Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_code",
+          "display_name",
+          "email",
+          "class_name",
+          "major_code",
+          "basis_ref"
+        ],
+        "title": "CorrectStudent"
+      },
+      "EmailRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "EmailRequest"
+      },
+      "LecturerInvite": {
+        "properties": {
+          "lecturer_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Lecturer Code"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lecturer_code",
+          "display_name",
+          "email",
+          "department_id"
+        ],
+        "title": "LecturerInvite"
+      },
+      "LinkPassword": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 12,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "LinkPassword"
+      },
+      "PasswordChange": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 12,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordChange"
+      },
+      "RevokeStudent": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 5,
+            "title": "Reason"
+          },
+          "basis_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Basis Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "reason",
+          "basis_ref"
+        ],
+        "title": "RevokeStudent"
+      },
+      "RoundAssignment": {
+        "properties": {
+          "round_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Round Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "assignment_type": {
+            "type": "string",
+            "pattern": "^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER)$",
+            "title": "Assignment Type"
+          },
+          "basis_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Basis Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "round_id",
+          "user_id",
+          "assignment_type",
+          "basis_ref"
+        ],
+        "title": "RoundAssignment"
       }
     }
   }

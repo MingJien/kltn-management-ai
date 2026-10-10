@@ -1,6 +1,6 @@
 # ERD theo cụm nghiệp vụ
 
-Nguồn tạo: **PostgreSQL public (live, read-only)**. Database: **`kltn_ai`**, schema **`public`**; PostgreSQL **17.11**; Alembic **`20261004_0011`**. Ngày sinh: **2026-10-04 21:39 SE Asia Standard Time**.
+Nguồn tạo: **PostgreSQL public (live, read-only)**. Database: **`kltn_ai`**, schema **`public`**; PostgreSQL **17.11**; Alembic **`20261010_0013`**. Ngày sinh: **2026-10-10 21:02 SE Asia Standard Time**.
 
 Các ảnh được sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu. Bảng xám là context; một bảng ở nhiều ảnh vẫn chỉ là một bảng vật lý.
 

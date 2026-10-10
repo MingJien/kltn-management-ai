@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import create_engine, text
@@ -41,11 +42,13 @@ def main() -> int:
     env["KLTN_ENV"] = "test"
     env["KLTN_DEV_AUTH"] = "true"
     env["PYTHONIOENCODING"] = "utf-8"
+    demo_credentials = Path(__file__).resolve().parents[1] / "database" / "tai-khoan-demo.local.csv"
+    created_credentials = not demo_credentials.exists()
     commands = [
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         [sys.executable, "-m", "alembic", "check"],
         [sys.executable, "-m", "backend.db.validate_schema"],
-        [sys.executable, "-m", "tools.seed_demo", "--execute"],
+        [sys.executable, "-m", "tools.seed_demo", "--execute", "--create-credentials"],
     ]
     try:
         for command in commands:
@@ -56,12 +59,14 @@ def main() -> int:
                 return result.returncode
             print("PASS", label)
         blocked = subprocess.run([sys.executable, "-m", "alembic", "downgrade", "-1"], env=env, text=True, capture_output=True)
-        if blocked.returncode == 0 or "do not discard it automatically" not in blocked.stderr:
+        if blocked.returncode == 0 or "do not discard" not in blocked.stderr:
             print("FAIL forward-only migration guard")
             return 1
-        print("PASS 0012 forward-only guard preserves planned group capacity")
+        print("PASS 0013 forward-only guard preserves imported class and major")
         return 0
     finally:
+        if created_credentials and demo_credentials.is_file():
+            demo_credentials.unlink()
         if created:
             # A random schema created in this run cannot contain pre-existing user data.
             with engine.begin() as conn:
