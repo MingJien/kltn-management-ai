@@ -19,6 +19,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
   const [rejectTarget, setRejectTarget] = useState<Registration | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [cancelTarget, setCancelTarget] = useState<Registration | null>(null);
+  const [finalizeTarget, setFinalizeTarget] = useState<Registration | null>(null);
   const reload = useCallback(async () => {
     setRows(await request<Registration[]>("/topic-registrations?limit=" + PAGE_SIZE + "&offset=" + page * PAGE_SIZE, userId));
   }, [userId,page]);
@@ -55,6 +56,11 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
       method:"POST",headers:{"If-Match":String(row.row_version)},body:JSON.stringify({decision,reason}),
     }),decision === "ACCEPT" ? "Đã chấp nhận nhóm đăng ký." : "Đã từ chối và lưu lý do. SV có thể đăng ký lại.");
   }
+  async function finalize(row: Registration) {
+    return operate(() => request<Registration>("/topic-registrations/" + row.id + "/department-finalization", userId, {
+      method: "POST", headers: {"If-Match": String(row.row_version)},
+    }), "Đã chốt đăng ký và phân công GVHD chính.");
+  }
   return <>
     <PageHeader title="Đăng ký đề tài" description={context.base_role === "STUDENT"
       ? "Bổ sung minh chứng, gửi đăng ký và theo dõi kết quả xét duyệt." : "Xem hồ sơ đã gửi và quyết định tiếp nhận trong phạm vi được giao."} />
@@ -64,7 +70,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
       {context.base_role === "STUDENT" ? <Link className="btn btn-primary" to="/topics">Chọn đề tài</Link> : null}
     </div>
     {message ? <p className="alert alert-info" role="status">{message}</p> : null}
-    {error && !rejectTarget && !cancelTarget ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    {error && !rejectTarget && !cancelTarget && !finalizeTarget ? <p className="alert alert-danger" role="alert">{error}</p> : null}
     {loading ? <p role="status">Đang tải đăng ký…</p> : !rows.length ?
       <div className="card empty-state"><ClipboardList aria-hidden="true" /><h2>Chưa có đăng ký</h2><p>Chưa có đăng ký trong phạm vi của bạn.</p></div> :
       <div className="stack">{rows.map((row) => {
@@ -89,6 +95,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
           {row.lecturer_reason ? <p className="alert alert-warning">Lý do của GV: {row.lecturer_reason}</p> : null}
           {row.proposer_type === "STUDENT" && row.state === "SUBMITTED" && row.topic_state !== "APPROVED" ?
             <p className="alert alert-info">Đề xuất đang chờ bộ môn duyệt tên và xác nhận GV tiếp nhận.</p> : null}
+          {row.state === "LECTURER_ACCEPTED" ? <p className="alert alert-info">GV đã đồng ý tiếp nhận. Hồ sơ chờ Trưởng bộ môn chốt và xác nhận GVHD chính.</p> : null}
           {me && activeCount < row.expected_member_count && row.topic_state === "APPROVED" && row.state !== "FINALIZED" ?
             <p className="text-caption">Các SV khác có thể tự tham gia từ danh sách đề tài khi còn hạn đăng ký. Nếu thêm thành viên, nhóm sẽ chờ GV xét lại.</p> : null}
           {me?.can_upload_evidence && context.base_role === "STUDENT" ? <label className="evidence-upload">
@@ -112,6 +119,9 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
               <button className="btn btn-primary" disabled={busy} onClick={() => void decide(row,"ACCEPT")}>Chấp nhận</button>
               <button className="btn btn-destructive" disabled={busy} onClick={() => {setRejectTarget(row); setRejectReason(""); setError("");}}>Từ chối</button>
             </> : null}
+            {row.state === "LECTURER_ACCEPTED" && context.actions.includes("registration:department_finalize") ?
+              <button className="btn btn-primary" disabled={busy} onClick={() => {setFinalizeTarget(row); setError("");}}>
+                Chốt đăng ký và GVHD</button> : null}
             {row.thesis_id ? <Link className="btn btn-secondary" to={"/theses/" + row.thesis_id}>Xem khóa luận đã chốt</Link> : null}
           </div>
         </div></article>;
@@ -138,6 +148,17 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
       }}>Xác nhận hủy</button>
     </>}>
       <p>Hủy bản nháp của đề tài “{cancelTarget?.topic_title}” sẽ kết thúc đăng ký của tất cả thành viên trong nhóm. Hồ sơ cũ vẫn được lưu.</p>
+      {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    </Dialog>
+    <Dialog open={!!finalizeTarget} busy={busy} onClose={() => setFinalizeTarget(null)} title="Chốt đăng ký và phân công GVHD" footer={<>
+      <button className="btn btn-secondary" disabled={busy} onClick={() => setFinalizeTarget(null)}>Quay lại</button>
+      <button className="btn btn-primary" disabled={busy} onClick={() => {
+        if (finalizeTarget) void finalize(finalizeTarget).then(ok => {if (ok) setFinalizeTarget(null);});
+      }}>Xác nhận chốt</button>
+    </>}>
+      <p>Đề tài: <strong>{finalizeTarget?.topic_title}</strong></p>
+      <p>GVHD chính: <strong>{finalizeTarget?.receiving_lecturer_name}</strong> (GV đã chấp nhận nhóm).</p>
+      <p className="text-caption">Hệ thống sẽ kiểm tra lại điều kiện của từng SV. Sau khi chốt, nhóm không thể bổ sung thành viên qua đăng ký này.</p>
       {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
     </Dialog>
   </>;

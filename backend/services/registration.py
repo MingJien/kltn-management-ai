@@ -490,12 +490,16 @@ def finalize_registration(
         proposer = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == topic.proposer_user_id))
         if proposer is None:
             fail(409, "Proposing lecturer profile is unavailable")
+        lecturer_account = session.get(m.UserAccount, proposer.user_id)
+        if proposer.department_id != topic.department_id or lecturer_account is None or lecturer_account.status != "ACTIVE":
+            fail(409, "Receiving lecturer is no longer active in this department")
         members = session.scalars(select(m.RegistrationMember).where(
             m.RegistrationMember.registration_id == reg.id,
             m.RegistrationMember.active.is_(True),
         )).all()
-        if not (1 <= len(members) <= topic.max_students <= 3):
-            fail(409, "Group membership is invalid")
+        if not valid_group(session, topic, members):
+            fail(409, "Group membership or eligibility has changed; review before finalization")
+        before = _registration_hash(session, reg)
         now = datetime.now(timezone.utc)
         thesis = m.Thesis(
             id=uuid4(), round_id=reg.round_id, topic_id=topic.id, registration_id=reg.id,
@@ -518,6 +522,7 @@ def finalize_registration(
         reg.department_finalized_at = now
         reg.row_version += 1
         session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_FINALIZED", before)
         result = registration_out(session, reg)
         session.commit()
         return result

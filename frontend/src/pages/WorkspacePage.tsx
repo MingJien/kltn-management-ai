@@ -30,8 +30,10 @@ export default function WorkspacePage({context}: {context: Context}) {
   if (!workflowAccess) return <>
     <PageHeader title="Tổng quan" description={"Xin chào " + context.display_name + " · " + roleLabel(context)} />
     <section className="card"><div className="card-body stack">
-      <h2>Chưa có công việc được giao trên giao diện này</h2>
-      <p>Chức năng hiện tại dành cho sinh viên, giảng viên và Trưởng bộ môn trong quy trình đề tài, đăng ký.</p>
+      <h2>Quản trị đợt và tài khoản</h2>
+      <p>Tạo đợt đăng ký, cấp tài khoản giảng viên và phân công người nhập hoặc xác nhận danh sách sinh viên.</p>
+      <div className="flex gap-2"><Link className="btn btn-primary" to="/rounds">Quản lý đợt KLTN</Link>
+        <Link className="btn btn-secondary" to="/administration">Tài khoản và phân công</Link></div>
     </div></section>
   </>;
   return <>

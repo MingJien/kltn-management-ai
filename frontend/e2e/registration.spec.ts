@@ -102,6 +102,13 @@ test("GV tạo → TBM duyệt/sửa tên → SV tự đăng ký → GV nhận; 
     await sv1.page.reload();
     await expect(sv1.page.getByRole("heading",{name:"Đăng ký đề tài",exact:true})).toBeVisible();
     expect((await write(sv1.page,"/topics",{data:{round_id:topic.round_id,title:"SV không được tạo đề tài GV"}})).status()).toBe(403);
+    await tbm.page.goto("http://127.0.0.1:5174/registrations");
+    await card(tbm.page,approved).getByRole("button",{name:"Chốt đăng ký và GVHD"}).click();
+    dialog = tbm.page.getByRole("dialog");
+    await expect(dialog).toContainText("GVHD chính");
+    await dialog.getByRole("button",{name:"Xác nhận chốt"}).click();
+    await expect(card(tbm.page,approved).getByText("Đã chốt",{exact:true})).toBeVisible();
+    await expect(card(tbm.page,approved).getByRole("link",{name:"Xem khóa luận đã chốt"})).toBeVisible();
   } finally {await close(actors);}
 });
 

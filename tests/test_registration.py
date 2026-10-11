@@ -136,6 +136,69 @@ def test_topic_to_lecturer_acceptance(scenario):
     assert accepted.json()["state"] == "LECTURER_ACCEPTED"
 
 
+def test_admin_can_create_and_control_round_without_new_schema(scenario):
+    client, users, *_ = scenario
+    users[5].base_role = "ADMIN"
+    payload = {
+        "academic_year_code": "2400-2401", "year_starts_on": "2400-09-01",
+        "year_ends_on": "2401-08-31", "code": "TEST-ROUND",
+        "round_type": "MAIN", "opens_at": "2400-09-20T08:00:00+07:00",
+        "closes_at": "2400-10-20T17:00:00+07:00", "basis_ref": "SYNTHETIC PLAN",
+    }
+    assert client.post("/api/v1/admin/rounds", headers=hdr(users[3]), json=payload).status_code == 403
+    created = client.post("/api/v1/admin/rounds", headers=hdr(users[5]), json=payload)
+    assert created.status_code == 201, created.text
+    round_id = created.json()["id"]
+    assert created.json()["state"] == "DRAFT"
+    assert client.post("/api/v1/admin/rounds", headers=hdr(users[5]), json=payload).status_code == 409
+    edited = client.patch(f"/api/v1/admin/rounds/{round_id}/schedule",
+        headers={**hdr(users[5]), "If-Match": "1"},
+        json={"code": "TEST-ROUND-REVISED", "round_type": "MAIN",
+              "opens_at": payload["opens_at"], "closes_at": "2400-10-25T17:00:00+07:00",
+              "reason": "SYNTHETIC CORRECTION"})
+    assert edited.status_code == 200, edited.text
+    opened = client.patch(f"/api/v1/admin/rounds/{round_id}",
+        headers={**hdr(users[5]), "If-Match": str(edited.json()["row_version"])},
+        json={"state": "OPEN", "reason": "SYNTHETIC PLAN"})
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["state"] == "OPEN"
+    assert client.patch(f"/api/v1/admin/rounds/{round_id}/schedule",
+        headers={**hdr(users[5]), "If-Match": str(opened.json()["row_version"])},
+        json={"code": "NOT-ALLOWED", "round_type": "MAIN",
+              "opens_at": payload["opens_at"], "closes_at": payload["closes_at"],
+              "reason": "SYNTHETIC CORRECTION"}).status_code == 409
+    assert client.patch(f"/api/v1/admin/rounds/{round_id}",
+        headers={**hdr(users[5]), "If-Match": "1"},
+        json={"state": "CLOSED", "reason": "SYNTHETIC CLOSE"}).status_code == 409
+    closed = client.patch(f"/api/v1/admin/rounds/{round_id}",
+        headers={**hdr(users[5]), "If-Match": str(opened.json()["row_version"])},
+        json={"state": "CLOSED", "reason": "SYNTHETIC CLOSE"})
+    assert closed.status_code == 200 and closed.json()["state"] == "CLOSED"
+
+
+def test_department_cannot_finalize_after_eligibility_is_revoked(scenario):
+    client, users, students, _, topic, session = scenario
+    registered = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
+        json={"topic_id": str(topic.id)})
+    assert registered.status_code == 201, registered.text
+    submitted = client.post(f"/api/v1/topic-registrations/{registered.json()['id']}/submit",
+        headers=hdr(users[0]))
+    assert submitted.status_code == 200, submitted.text
+    accepted = client.post(f"/api/v1/topic-registrations/{registered.json()['id']}/lecturer-decision",
+        headers={**hdr(users[3]), "If-Match": str(submitted.json()["row_version"])},
+        json={"decision": "ACCEPT"})
+    assert accepted.status_code == 200, accepted.text
+    session.add(m.EligibilitySnapshot(id=uuid4(), student_id=students[0].id,
+        round_id=topic.round_id, version=2, captured_at=datetime.now(timezone.utc),
+        confirmed_by=users[4].id, confirmed_at=datetime.now(timezone.utc),
+        evidence_ref="SYNTHETIC REVOKE", state="REJECTED"))
+    session.flush()
+    blocked = client.post(f"/api/v1/topic-registrations/{registered.json()['id']}/department-finalization",
+        headers={**hdr(users[4]), "If-Match": str(accepted.json()["row_version"])})
+    assert blocked.status_code == 409
+    assert session.scalar(select(m.Thesis.id).where(m.Thesis.registration_id == registered.json()["id"])) is None
+
+
 def test_email_login_and_session_access(scenario, monkeypatch):
     from backend.services.passwords import hash_password
 

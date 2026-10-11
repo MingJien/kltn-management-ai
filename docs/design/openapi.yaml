@@ -3,7 +3,7 @@
   "info": {
     "title": "API hệ thống quản lý KLTN",
     "version": "0.4.0-nv5-design",
-    "description": "Thiết kế tổng thể; operation IMPLEMENTED_PROTOTYPE được đồng bộ từ FastAPI ngày 10/10/2026. Luồng đề tài/đăng ký và tài khoản dùng PostgreSQL revision 20261010_0013. Đăng nhập local, kích hoạt qua email và import danh sách theo đợt đã có mã nguồn; gửi email thật cần SMTP/HTTPS. Các operation khác còn là thiết kế. Chưa kết nối SSO Trường hoặc Gemini."
+    "description": "Thiết kế tổng thể; operation IMPLEMENTED_PROTOTYPE được đồng bộ từ FastAPI đến ngày 11/10/2026. Luồng đề tài/đăng ký, tài khoản và quản lý đợt dùng PostgreSQL revision 20261010_0013. Đăng nhập local, kích hoạt qua email và import danh sách theo đợt đã có mã nguồn; gửi email thật cần SMTP/HTTPS. Các operation khác còn là thiết kế. Chưa kết nối SSO Trường hoặc Gemini."
   },
   "servers": [
     {
@@ -5669,6 +5669,74 @@
           }
         },
         "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      },
+      "post": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Create Round",
+        "operationId": "create_round_api_v1_admin_rounds_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Round Api V1 Admin Rounds Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
       }
     },
     "/admin/users": {
@@ -6072,6 +6140,184 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/rounds/{round_id}": {
+      "patch": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Change Round State",
+        "operationId": "change_round_state_api_v1_admin_rounds__round_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundStateChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Change Round State Api V1 Admin Rounds  Round Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-runtime-status": "IMPLEMENTED_PROTOTYPE"
+      }
+    },
+    "/admin/rounds/{round_id}/schedule": {
+      "patch": {
+        "tags": [
+          "account administration"
+        ],
+        "summary": "Update Round Schedule",
+        "operationId": "update_round_schedule_api_v1_admin_rounds__round_id__schedule_patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundScheduleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Round Schedule Api V1 Admin Rounds  Round Id  Schedule Patch"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -8387,6 +8633,134 @@
           "basis_ref"
         ],
         "title": "RoundAssignment"
+      },
+      "RoundCreate": {
+        "properties": {
+          "academic_year_code": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{4}$",
+            "title": "Academic Year Code"
+          },
+          "year_starts_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Year Starts On"
+          },
+          "year_ends_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Year Ends On"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "round_type": {
+            "type": "string",
+            "enum": [
+              "MAIN",
+              "SUPPLEMENTARY"
+            ],
+            "title": "Round Type",
+            "default": "MAIN"
+          },
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closes At"
+          },
+          "basis_ref": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Basis Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "academic_year_code",
+          "year_starts_on",
+          "year_ends_on",
+          "code",
+          "opens_at",
+          "closes_at",
+          "basis_ref"
+        ],
+        "title": "RoundCreate"
+      },
+      "RoundStateChange": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "CLOSED"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "reason"
+        ],
+        "title": "RoundStateChange"
+      },
+      "RoundScheduleUpdate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "round_type": {
+            "type": "string",
+            "enum": [
+              "MAIN",
+              "SUPPLEMENTARY"
+            ],
+            "title": "Round Type"
+          },
+          "opens_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opens At"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closes At"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "round_type",
+          "opens_at",
+          "closes_at",
+          "reason"
+        ],
+        "title": "RoundScheduleUpdate"
       }
     }
   }

@@ -67,7 +67,7 @@ export default function AdministrationPage({context}: {context:Context}) {
           <form className="stack" onSubmit={e=>{e.preventDefault();void run(()=>request("/admin/round-assignments",context.user_id,
             {method:"POST",body:JSON.stringify({round_id:roundId,user_id:userId,assignment_type:kind,basis_ref:basis})}),"Đã lưu phân công.");}}>
             <label className="input-group">Đợt<select className="input" required value={roundId} onChange={e=>setRoundId(e.target.value)}>
-              <option value="">Chọn đợt</option>{rounds.map(r=><option key={r.id} value={r.id}>{r.code} · {r.state}</option>)}</select></label>
+              <option value="">Chọn đợt</option>{rounds.filter(r=>r.state==="DRAFT"||r.state==="OPEN").map(r=><option key={r.id} value={r.id}>{r.code} · {r.state}</option>)}</select></label>
             <label className="input-group">Người được giao<select className="input" required value={userId} onChange={e=>setUserId(e.target.value)}>
               <option value="">Chọn tài khoản đang hoạt động</option>{accounts.filter(a=>a.status==="ACTIVE" && a.base_role!=="STUDENT").map(a=><option key={a.id} value={a.id}>{a.email}</option>)}</select></label>
             <label className="input-group">Nhiệm vụ<select className="input" value={kind} onChange={e=>setKind(e.target.value)}>

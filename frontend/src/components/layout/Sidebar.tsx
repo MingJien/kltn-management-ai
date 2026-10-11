@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Bot, ClipboardList, FileText, LayoutDashboard, UserRound, UsersRound, ShieldCheck } from "lucide-react";
+import { Bot, CalendarDays, ClipboardList, FileText, LayoutDashboard, UserRound, UsersRound, ShieldCheck } from "lucide-react";
 import type { Context } from "../../api";
 export function roleLabel(context: Context) {
   return context.actions.includes("topic:department_decide") ? "Trưởng bộ môn"
@@ -44,6 +44,8 @@ export default function Sidebar({context, isOpen, onClose}: {
             <div className="sidebar__group-label">QUẢN TRỊ</div>
             <NavLink to="/administration" className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản và phân công</span></NavLink>
+            <NavLink to="/rounds" className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink>
           </div> : null}
           {context.actions.some(a=>a.startsWith("eligibility:")) ? <div className="sidebar__group">
             <div className="sidebar__group-label">ĐIỀU KIỆN THEO ĐỢT</div>

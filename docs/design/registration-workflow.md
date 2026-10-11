@@ -1,6 +1,6 @@
 # Luồng đề tài và đăng ký đang triển khai
 
-Quy tắc được xác nhận ngày 04/10/2026. Luồng hiện tại dùng đăng nhập email/mật khẩu và cookie phiên: **GV tạo → bộ môn duyệt → SV tự đăng ký → GV tiếp nhận chấp nhận/từ chối**. Xem [đặc tả API](openapi.yaml); khi chạy backend, OpenAPI runtime ở `/openapi.json` và giao diện thử API ở `/docs`.
+Quy tắc được xác nhận ngày 04/10/2026. Luồng hiện tại dùng đăng nhập email/mật khẩu và cookie phiên: **GV tạo → bộ môn duyệt → SV tự đăng ký → GV tiếp nhận chấp nhận/từ chối → TBM chốt**. Xem [đặc tả API](openapi.yaml); khi chạy backend, OpenAPI runtime ở `/openapi.json` và giao diện thử API ở `/docs`.
 
 ## Đề tài có sẵn
 
@@ -10,6 +10,7 @@ Quy tắc được xác nhận ngày 04/10/2026. Luồng hiện tại dùng đă
 4. Đại diện có thể gửi khi nhóm có một người; số SV tối đa không phải số tối thiểu bắt buộc. Từng người phải còn đủ điều kiện theo snapshot mới nhất, tài khoản hoạt động và cùng bộ môn. Một SV chỉ có một đăng ký hoạt động trong một đợt.
 5. GV tiếp nhận xem hồ sơ/minh chứng rồi nhận hoặc từ chối có lý do. Từ chối kết thúc đăng ký, giải phóng thành viên; hồ sơ cũ vẫn được lưu.
 6. Khi còn chỉ tiêu **và còn thời gian đăng ký**, SV khác vẫn được bổ sung, kể cả nhóm đã gửi hoặc được nhận. Nhóm có thành viên mới trở về `SUBMITTED`, tăng `row_version`, xóa quyết định hiện hành và chờ GV xét lại. Dấu vết quyết định trước nằm trong `audit_event`; không mặc nhiên nhận người mới theo quyết định cũ. `FINALIZED` không bổ sung tại đây.
+7. Sau khi GV chấp nhận, TBM xác nhận chốt trên giao diện. GV đã tiếp nhận được ghi làm GVHD chính. Trước khi chốt, API kiểm lại tài khoản và kết quả đủ điều kiện hiện hành của từng SV; nếu thay đổi thì trả `409` để Khoa rà soát, không tạo khóa luận.
 
 Đủ số SV thì đóng nhận thêm **ngay khi đăng ký**, không chờ GV chấp nhận. Quá hạn cũng đóng. Các yêu cầu GPA/kỹ năng riêng là thông tin để GV xét mức phù hợp, không tự thay điều kiện đăng ký chính thức của đợt.
 
@@ -32,8 +33,8 @@ Mỗi SV tự tải PDF/PNG/JPEG tối đa 5 MB, kiểm đuôi và chữ ký đ�
 
 ## Giao diện và kiểm chứng
 
-Menu chỉ hiển thị Tổng quan, Đề tài, Đăng ký và Tra cứu thử nghiệm. Tổng quan đọc dữ liệu thật trong phạm vi tài khoản; đề tài có tìm kiếm/phân trang, chi tiết/duyệt trong hộp thoại, lỗi tiếng Việt và khóa nút khi đang xử lý. Có hỗ trợ bàn phím, màn hình nhỏ, tiêu đề trang, `lang=vi`; ứng dụng có đăng nhập đặt `noindex,nofollow`, không quảng bá hồ sơ SV lên công cụ tìm kiếm.
+Menu hiển thị chức năng theo vai trò: Tổng quan, Đề tài, Đăng ký, Tra cứu thử nghiệm, quản trị tài khoản, danh sách đủ điều kiện và quản lý đợt KLTN. ADMIN tạo đợt nháp rồi mở/đóng kèm căn cứ; quyền xác nhận đủ điều kiện vẫn phải được gán riêng theo đợt. Tổng quan đọc dữ liệu trong phạm vi tài khoản; đề tài có tìm kiếm/phân trang, chi tiết/duyệt trong hộp thoại, lỗi tiếng Việt và khóa nút khi đang xử lý. Có hỗ trợ bàn phím, màn hình nhỏ, tiêu đề trang, `lang=vi`; ứng dụng có đăng nhập đặt `noindex,nofollow`, không quảng bá hồ sơ SV lên công cụ tìm kiếm.
 
 Chạy kiểm xuyên suốt: `python -m tools.run_e2e`. Script dựng schema tên ngẫu nhiên riêng trong `kltn_dev`, tạo tài khoản/dữ liệu giả, chạy API ở 8001 và Vite ở 5174, rồi xóa đúng schema do lượt kiểm tạo. Không dùng dữ liệu demo `public` và không dừng server của người dùng. Mã kiểm: [Playwright](../../frontend/e2e/registration.spec.ts); kết quả hiện trực tiếp trong terminal.
 
-Chốt thành khóa luận/phân công GVHD, quản trị cấp tài khoản dùng thật, tiến độ và tài liệu chưa được gọi là hoàn thành bởi luồng này. API chốt từ prototype trước vẫn được giữ nhưng chưa mở nút trong giao diện của mốc hiện tại.
+Quản lý thay đổi GVHD sau khi chốt, tiến độ và tài liệu thuộc các giai đoạn tiếp theo. Gửi email thật vẫn cần SMTP/HTTPS và danh sách thật do Khoa cấp khi vận hành.

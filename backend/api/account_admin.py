@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -43,6 +44,49 @@ class AssignmentRevoke(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
 
 
+class RoundCreate(BaseModel):
+    academic_year_code: str = Field(pattern=r"^\d{4}-\d{4}$")
+    year_starts_on: date
+    year_ends_on: date
+    code: str = Field(min_length=1, max_length=32)
+    round_type: Literal["MAIN", "SUPPLEMENTARY"] = "MAIN"
+    opens_at: datetime
+    closes_at: datetime
+    basis_ref: str = Field(min_length=3, max_length=500)
+
+    @model_validator(mode="after")
+    def valid_schedule(self):
+        first, last = map(int, self.academic_year_code.split("-"))
+        if last != first + 1 or self.year_starts_on.year != first or self.year_ends_on.year != last:
+            raise ValueError("Academic year code must match its start and end dates")
+        if self.year_ends_on <= self.year_starts_on:
+            raise ValueError("Academic year end must follow its start")
+        if not self.opens_at.tzinfo or not self.closes_at.tzinfo or self.closes_at <= self.opens_at:
+            raise ValueError("Registration dates need time zones and a valid order")
+        if self.opens_at.date() < self.year_starts_on or self.closes_at.date() > self.year_ends_on:
+            raise ValueError("Registration dates must fall within the academic year")
+        return self
+
+
+class RoundStateChange(BaseModel):
+    state: Literal["OPEN", "CLOSED"]
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class RoundScheduleUpdate(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+    round_type: Literal["MAIN", "SUPPLEMENTARY"]
+    opens_at: datetime
+    closes_at: datetime
+    reason: str = Field(min_length=3, max_length=500)
+
+    @model_validator(mode="after")
+    def valid_window(self):
+        if not self.opens_at.tzinfo or not self.closes_at.tzinfo or self.closes_at <= self.opens_at:
+            raise ValueError("Registration dates need time zones and a valid order")
+        return self
+
+
 def _admin(user: m.UserAccount) -> None:
     if user.base_role != "ADMIN":
         raise HTTPException(403, "Account administration requires ADMIN")
@@ -61,9 +105,133 @@ def departments(user: m.UserAccount = Depends(current_user),
 def rounds(user: m.UserAccount = Depends(current_user),
            session: Session = Depends(get_session)) -> list[dict]:
     _admin(user)
-    return [{"id": str(row.id), "code": row.code, "state": row.state}
-            for row in session.scalars(select(m.ThesisRound).where(
-                m.ThesisRound.state.in_(["DRAFT", "OPEN"])).order_by(m.ThesisRound.opens_at.desc())).all()]
+    rows = session.scalars(select(m.ThesisRound).order_by(m.ThesisRound.opens_at.desc())).all()
+    years = {year.id: year for year in session.scalars(select(m.AcademicYear).where(
+        m.AcademicYear.id.in_([row.academic_year_id for row in rows]))).all()}
+    return [{"id": str(row.id), "code": row.code, "state": row.state,
+             "round_type": row.round_type, "academic_year_code": years[row.academic_year_id].code,
+             "year_starts_on": years[row.academic_year_id].starts_on,
+             "year_ends_on": years[row.academic_year_id].ends_on,
+             "opens_at": row.opens_at, "closes_at": row.closes_at,
+             "row_version": row.row_version} for row in rows]
+
+
+@router.post("/rounds", status_code=201)
+def create_round(payload: RoundCreate, user: m.UserAccount = Depends(current_user),
+                 session: Session = Depends(get_session)) -> dict:
+    _admin(user)
+    code = payload.code.strip()
+    basis = payload.basis_ref.strip()
+    if not code or not basis:
+        raise HTTPException(422, "Round code and schedule reference are required")
+    year = session.scalar(select(m.AcademicYear).where(
+        m.AcademicYear.code == payload.academic_year_code).with_for_update())
+    if year:
+        if (year.starts_on, year.ends_on) != (payload.year_starts_on, payload.year_ends_on):
+            raise HTTPException(409, "Academic year dates differ from the existing year")
+        if year.state == "CLOSED":
+            raise HTTPException(409, "Academic year is closed")
+    else:
+        year = m.AcademicYear(id=uuid4(), code=payload.academic_year_code,
+            starts_on=payload.year_starts_on, ends_on=payload.year_ends_on, state="DRAFT")
+        session.add(year)
+        try:
+            session.flush()
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(409, "Academic year was created concurrently") from exc
+    if session.scalar(select(m.ThesisRound.id).where(
+        m.ThesisRound.academic_year_id == year.id, m.ThesisRound.code == code)):
+        raise HTTPException(409, "Round code already exists in this academic year")
+    round_ = m.ThesisRound(id=uuid4(), academic_year_id=year.id, code=code,
+        round_type=payload.round_type, opens_at=payload.opens_at,
+        closes_at=payload.closes_at, state="DRAFT")
+    session.add(round_)
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_CREATED",
+        resource_type="thesis_round", resource_id=round_.id,
+        reason=basis, occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(409, "Academic year or round was created concurrently") from exc
+    return {"id": str(round_.id), "state": round_.state}
+
+
+@router.patch("/rounds/{round_id}/schedule")
+def update_round_schedule(round_id: UUID, payload: RoundScheduleUpdate,
+                          if_match: int = Header(alias="If-Match"),
+                          user: m.UserAccount = Depends(current_user),
+                          session: Session = Depends(get_session)) -> dict:
+    _admin(user)
+    round_ = session.scalar(select(m.ThesisRound).where(
+        m.ThesisRound.id == round_id).with_for_update())
+    if not round_:
+        raise HTTPException(404, "Round not found")
+    if round_.state != "DRAFT":
+        raise HTTPException(409, "Only a draft round can be edited")
+    if round_.row_version != if_match:
+        raise HTTPException(409, "Round has changed; reload it")
+    year = session.get(m.AcademicYear, round_.academic_year_id)
+    if payload.opens_at.date() < year.starts_on or payload.closes_at.date() > year.ends_on:
+        raise HTTPException(422, "Registration dates must fall within the academic year")
+    code, reason = payload.code.strip(), payload.reason.strip()
+    if not code or not reason:
+        raise HTTPException(422, "Round code and change reason are required")
+    if session.scalar(select(m.ThesisRound.id).where(
+        m.ThesisRound.academic_year_id == year.id,
+        m.ThesisRound.code == code, m.ThesisRound.id != round_.id)):
+        raise HTTPException(409, "Round code already exists in this academic year")
+    round_.code = code
+    round_.round_type = payload.round_type
+    round_.opens_at = payload.opens_at
+    round_.closes_at = payload.closes_at
+    round_.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_SCHEDULE_UPDATED",
+        resource_type="thesis_round", resource_id=round_.id,
+        reason=reason, occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(409, "Round code was changed concurrently") from exc
+    return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
+
+
+@router.patch("/rounds/{round_id}")
+def change_round_state(round_id: UUID, payload: RoundStateChange,
+                       if_match: int = Header(alias="If-Match"),
+                       user: m.UserAccount = Depends(current_user),
+                       session: Session = Depends(get_session)) -> dict:
+    _admin(user)
+    round_ = session.scalar(select(m.ThesisRound).where(
+        m.ThesisRound.id == round_id).with_for_update())
+    if not round_:
+        raise HTTPException(404, "Round not found")
+    if round_.row_version != if_match:
+        raise HTTPException(409, "Round has changed; reload it")
+    if (round_.state, payload.state) not in {("DRAFT", "OPEN"), ("OPEN", "CLOSED")}:
+        raise HTTPException(409, "Only draft rounds can open and only open rounds can close")
+    if not payload.reason.strip():
+        raise HTTPException(422, "A reason or schedule reference is required")
+    if payload.state == "OPEN":
+        if round_.closes_at <= datetime.now(timezone.utc):
+            raise HTTPException(409, "Registration deadline has passed")
+        year = session.scalar(select(m.AcademicYear).where(
+            m.AcademicYear.id == round_.academic_year_id).with_for_update())
+        if year.state == "CLOSED":
+            raise HTTPException(409, "Academic year is closed")
+        year.state = "ACTIVE"
+        year.row_version += 1
+    round_.state = payload.state
+    round_.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id,
+        action="ROUND_OPENED" if payload.state == "OPEN" else "ROUND_CLOSED",
+        resource_type="thesis_round", resource_id=round_.id,
+        reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
+        correlation_id=uuid4()))
+    session.commit()
+    return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
 
 
 @router.get("/users")

@@ -11,6 +11,7 @@ import AccountAccessPage from "./pages/AccountAccessPage";
 import AccountPage from "./pages/AccountPage";
 import AdministrationPage from "./pages/AdministrationPage";
 import RosterPage from "./pages/RosterPage";
+import RoundsPage from "./pages/RoundsPage";
 const AIPage = lazy(() => import("./pages/AIPage"));
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
@@ -212,6 +213,8 @@ function App() {
         }} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} /> : <Navigate to="/" replace />} />
+        <Route path="/rounds" element={context.actions.includes("account:manage") ?
+          <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
           <RosterPage context={context} /> : <Navigate to="/" replace />} />
         <Route
