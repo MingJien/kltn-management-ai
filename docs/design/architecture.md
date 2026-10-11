@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | identity_access | account, profile, position, assignment authorization | Duyệt topic/điểm/biên bản |
 | rounds_eligibility | year, round, policy, eligibility | Tự tạo ngoại lệ |
-| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | SV tự lập nhóm trước gửi; không thêm người sau SUBMITTED |
+| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | Không thêm người thay SV; không bổ sung sau TBM chốt |
 | proposal_progress | proposal/version/review/signature, milestone/report/change/outcome | Duyệt rút/gia hạn online |
 | documents_similarity | file/document/version, policy/check/match | Kết luận đạo văn |
 | councils_evaluation | council/session/attendance/reviews/rubric/evaluation/result/minute | Tự chọn Chair; sửa từ chữ ký đầu |

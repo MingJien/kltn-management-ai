@@ -8,14 +8,14 @@
 | BR-ROUND-001 | `ThesisRound.type ∈ {MAIN, SUPPLEMENTARY}`; mỗi đợt thuộc đúng một `AcademicYear`. | CONFIRMED_PROJECT_DECISION | REQ-ROUND-001 |
 | BR-ELIG-001 | Đủ điều kiện chung khi tín chỉ đạt ≥70%, GPA ≥2,50/4 và không thuộc tình trạng kỷ luật/truy cứu bị cấm; ngoại lệ do thẩm quyền quy định. | CONFIRMED | SRC-QD-5964 |
 | BR-ELIG-002 | Phòng Đào tạo cung cấp dữ liệu; người được Khoa giao `ELIGIBILITY_VERIFIER` đúng đợt đối chiếu và ghi kết quả đạt/không đạt, nguồn tham chiếu, người/lúc xác nhận và lý do ngắn. Có thể lưu tỷ lệ tín chỉ và GPA đã đối chiếu để giải thích ngưỡng học vụ; hai số này được phép NULL nếu Phòng Đào tạo chỉ cung cấp kết quả chính thức. Không lưu tình trạng kỷ luật hay án tích chi tiết; không dùng tự khai để chốt. | CONFIRMED_BY_ADVISOR_2026-10-03 | REQ-ELIG-002 |
-| BR-TOPIC-001 | Topic chỉ mở đăng ký sau khi TBM duyệt; TBM được chỉnh tên nhưng lịch sử tên phải lưu. | CONFIRMED | REQ-TOPIC-001..002 |
+| BR-TOPIC-001 | Đề tài GV tạo chỉ mở đăng ký sau TBM duyệt. Đề tài SV đề xuất được đăng ký cá nhân trước, TBM xét sau; chỉnh tên phải lưu lịch sử. | CONFIRMED | REQ-TOPIC-001..002 |
 | BR-TOPIC-002 | `preferredGpa` và yêu cầu GVHD là tiêu chí mong muốn; chỉ policy điều kiện chung mới được loại SV tự động. | CONFIRMED_PROJECT_DECISION | REQ-TOPIC-003 |
 | BR-REG-001 | Mỗi SV có tối đa một đăng ký hoạt động trong một đợt và đăng ký chỉ có một topic; không có danh sách nguyện vọng xếp hạng. | CONFIRMED | REQ-REG-001 |
 | BR-REG-002 | Thesis có 1–3 thành viên; tối đa một coordinator và coordinator không có quyền nghiệp vụ cao hơn thành viên. | CONFIRMED | REQ-REG-002 |
 | BR-REG-003 | GVHD accept/reject; TBM mới là bên finalize topic và advisor assignment. | CONFIRMED_PROJECT_DECISION | REQ-REG-003 |
 | BR-REG-004 | Mỗi thành viên phải có work allocation; GVHD duyệt trước khi dùng làm bằng chứng đánh giá cá nhân. | CONFIRMED | REQ-REG-004 |
-| BR-REG-005 | SV tự lập nhóm; từng thành viên active phải tự ACCEPTED trước SUBMITTED. Membership bất biến từ SUBMITTED; SV, GV và Admin không thêm/ghép/đổi người hậu gửi. | CONFIRMED_PROJECT_DECISION | REQ-REG-005 |
-| BR-REG-006 | Với đề tài SV đề xuất, nhóm đăng ký trước khi TBM xét đề tài; sau đó TBM duyệt/return/reject, GVHD được phân công đồng ý và TBM mới finalize. Không dùng guard Topic.APPROVED trước đăng ký cho nhánh này. | CONFIRMED_PROJECT_DESIGN / RUNTIME_PENDING | REQ-TOPIC-002, REQ-REG-003, REQ-REG-006 |
+| BR-REG-005 | Mỗi SV tự tham gia; tối đa chỉ tiêu 1–3 và trước hạn đăng ký. Bổ sung sau khi gửi/được GV nhận làm đăng ký quay về `SUBMITTED`, GV xét lại; không bổ sung sau `FINALIZED`. | CONFIRMED_PROJECT_DECISION / IMPLEMENTED | REQ-REG-005 |
+| BR-REG-006 | Đề tài SV tự đề xuất được đăng ký cá nhân trước, TBM xét sau; GV tiếp nhận được TBM chọn/đổi rồi quyết định, TBM chốt. Không yêu cầu Topic.APPROVED trước đăng ký ở nhánh này. | CONFIRMED_PROJECT_DESIGN / IMPLEMENTED | REQ-TOPIC-002, REQ-REG-003, REQ-REG-006 |
 | BR-PROP-001 | ProposalVersion bất biến; nhận xét trỏ đúng version; không ghi đè file đã nộp. | DERIVED | REQ-PROP-001 |
 | BR-PROP-002 | Thứ tự chốt: GVHD xác nhận → TBM chốt nội dung → Trưởng khoa ký/xác nhận văn bản. | CONFIRMED_PROJECT_DECISION | REQ-PROP-002..003 |
 | BR-PROG-001 | GVHD quản lý và xác nhận tiến độ Thesis được phân công. Mốc góp ý đề cương và mốc nội bộ khoảng 70% trong tháng 12 được lưu theo round/version; ngày cụ thể lấy từ kế hoạch được duyệt. | CONFIRMED_PROJECT_DECISION | REQ-PROG-001..002 |

@@ -41,7 +41,7 @@
 | INV-03 | `EligibilitySnapshot` giữ nguồn, thời điểm, người xác nhận; không sửa sau chốt. | Append-only/version. |
 | INV-04 | `preferredGpa` không tự chặn đăng ký; hard gate chỉ từ RoundPolicy/REQ-ELIG. | Domain service tách preference/policy. |
 | INV-05 | Mỗi SV, kể cả thành viên nhóm không phải người tạo, chỉ thuộc tối đa một registration hoạt động/round; một registration chỉ một topic. | `registration_member.round_id` phải khớp registration; partial unique `(student_id, round_id)` với state hoạt động + transaction. |
-| INV-06 | Mỗi topic/round chỉ hình thành tối đa một Thesis; Thesis có 1–3 member, tối đa một coordinator; tổng thành viên được accept/finalize không vượt capacity tối đa 3; không thêm/đổi thành viên sau SUBMITTED theo quyết định hiện tại. | Unique `(round_id, topic_id)` trên Thesis + khóa topic khi finalize + count guard. |
+| INV-06 | Mỗi topic/round chỉ hình thành tối đa một Thesis; Thesis có 1–3 member, tối đa một coordinator. SV được tự bổ sung trước hạn khi còn chỗ; sau GV nhận phải xét lại; không bổ sung sau FINALIZED. | Unique `(round_id, topic_id)` trên Thesis + khóa topic khi finalize + count guard. |
 | INV-07 | Mỗi ThesisMember có ít nhất một MemberWorkAssignment version trước đánh giá cá nhân. | Readiness guard. |
 | INV-08 | Proposal/Document version đã submit bất biến; review/check trỏ đúng version. | Content hash + append-only version. |
 | INV-09 | SimilarityCheck ghi policy/model/index/corpus snapshot; cosine không là phần trăm tài liệu. | Required provenance fields. |

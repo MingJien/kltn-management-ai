@@ -35,7 +35,7 @@
 | DBD-16 | Minute có aggregate + version + signature riêng | MinuteVersion giữ từng tệp và liên kết bản thay thế; Chủ tịch và Thư ký cùng ký Mẫu 9. Bản in sai được VOID và tạo version/tệp/mã thời gian mới trước chữ ký đầu, có Thư ký đối chiếu và audit. Từ chữ ký đầu điểm/nội dung bất biến. | CONFIRMED_PROJECT_DECISION |
 | DBD-17 | SearchIndexMetadata/ RetrievalAudit chỉ là metadata dẫn xuất | Qdrant/RAG đã có prototype trên dữ liệu giả; schema chỉ lưu metadata dẫn xuất, không lưu vector/raw prompt/secret. PostgreSQL vẫn là source of truth. | PROPOSED |
 | DBD-18 | Alembic migration initial chứa DDL explicit được sinh từ metadata đã review | Các migration bất biến và review được; `alembic check` sau apply phải không có drift. Không gọi `create_all` động trong migration. | PROPOSED |
-| DBD-19 | SQLAlchemy 2.x + Alembic + psycopg trong `D:\KLTN\.venv` | Đủ cho schema/migration và prototype FastAPI. Python bundled runtime 3.12 được dùng vì Python 3.9 hệ thống lỗi venv launcher do path profile có khoảng trắng. | PROPOSED |
+| DBD-19 | SQLAlchemy 2.x + Alembic + psycopg | Quản lý mô hình PostgreSQL và migration; cấu hình môi trường nằm ngoài source. | PROPOSED |
 | DBD-20 | Không seed dữ liệu thật; validation dùng mã/tên synthetic rõ ràng | Ngăn PII vào Git/log; seed reference chỉ thêm khi thực sự cần. | DERIVED |
 | DBD-21 | Lưu `consent_status`, `responded_by_user_id`, `responded_at` trên mỗi RegistrationMember | Không coi việc nhóm trưởng nhập tên là sự đồng ý của bạn khác. Migration 0007 giữ dữ liệu cũ PENDING; CHECK yêu cầu actor/time khi phản hồi. Service đối chiếu actor với StudentProfile và chỉ submit khi mọi thành viên active ACCEPTED. | CONFIRMED_PROJECT_DESIGN; service pending |
 | DBD-23 | Điều kiện đăng ký giữ tỷ lệ tín chỉ/GPA có nguồn, kết quả và người xác nhận; không giữ chi tiết kỷ luật/án tích | Hai chỉ số học vụ cần giải thích ngưỡng QĐ5964, nhưng có thể NULL nếu Phòng Đào tạo chỉ cấp kết quả. Migration 0008 đã áp dụng, 0009 khôi phục hai chỉ số; dữ liệu cũ không thể suy đoán để phục hồi. | CONFIRMED_PROJECT_DESIGN 03/10 |
@@ -52,12 +52,12 @@
 | Bản in và chữ ký | Bản PRINTED chưa ký có thể VOID/in version mới sau Thư ký đối chiếu; từ chữ ký đầu Minute/Evaluation khóa nội dung. |
 | Mẫu 9 | Chủ tịch + Thư ký ký theo CouncilMember; không gán TBM. |
 | Xác nhận điều kiện | `ELIGIBILITY_VERIFIER` được Khoa giao theo round sau đối chiếu nguồn Phòng Đào tạo; không hard-code Admin/TBM. |
-| Đồng thuận nhóm và đề tài SV | RegistrationMember lưu phản hồi từng SV; Topic.proposer_type=STUDENT cùng TopicRegistration cho phép nhóm đăng ký trước, TBM xét Topic sau; service/API theo nhánh chưa triển khai. |
+| Thành viên nhóm và đề tài SV | Mỗi SV tự tham gia, RegistrationMember ghi tài khoản/thời điểm; đề tài SV được đăng ký cá nhân trước khi TBM xét. API/UI đã có trên dữ liệu giả. |
 | Góp ý chéo | Migration 0005 cho `COMMENT_ONLY`; service phải chỉ cho GVHD chính đổi trạng thái tiến độ, GVHD khác được giao chỉ góp ý. |
 
 ## Ranh giới migration
 
-Migration `0001` tạo nền, `0002` khóa chữ ký đề cương đúng version, `0003` tách nguồn corpus, `0004` lưu định danh nguồn ngoài và `0005` cho góp ý chéo `COMMENT_ONLY`, `0006` nạp 16 dòng rubric Mẫu 6 trạng thái DRAFT, `0007` lưu phản hồi từng thành viên trước khi gửi đăng ký. `0008` bỏ bốn cột điều kiện; `0009` khôi phục tỷ lệ tín chỉ/GPA tùy chọn sau khi làm rõ logic, vẫn bỏ chi tiết kỷ luật/án tích; `0010` chuẩn bị tài khoản email/mã băm local. `0011` thêm mã đề tài theo năm, GV tiếp nhận và minh chứng từng thành viên. Head hiện tại là `20261004_0011` với 63 bảng, đã được đối chiếu bằng SQL snapshot trên schema thử nghiệm. Migration đã áp dụng là lịch sử bất biến; thay đổi vật lý trong tương lai phải có revision mới. Các quyết định ngày 25/09 về mốc và điều kiện bảo vệ đã có bảng/cột biểu diễn. Xác nhận tham gia nhóm được bổ sung ở 0007; service tự xác nhận và nhánh đề tài SV đề xuất đã kiểm tự động/browser trên dữ liệu giả; chưa vận hành thật. Mẫu 6 đã được nạp bằng migration dữ liệu 0006 để mọi database mới/cũ có cùng rubric baseline, nhưng chưa tự kích hoạt chấm.
+Alembic giữ lịch sử thay đổi từ `0001` đến head `20261010_0013`. `0012` thêm quy mô nhóm dự kiến; `0013` thêm lớp/ngành từ danh sách SV được Khoa duyệt. Schema hiện có 62 bảng nghiệp vụ và bảng `alembic_version`; bản SQL lõi 32 bảng dùng trình bày, không chạy lại trên CSDL đang dùng. Mẫu 6 đã được nạp ở trạng thái DRAFT, chưa dùng chấm thật. Thay đổi tiếp theo phải tạo migration mới.
 
 | ID | Quyết định bổ sung | Hệ quả | Trạng thái |
 | --- | --- | --- | --- |

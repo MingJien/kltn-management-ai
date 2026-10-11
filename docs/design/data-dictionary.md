@@ -1,6 +1,6 @@
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ từ SQLAlchemy metadata và các migration 20260920_0001 → 20261004_0012. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
+> Từ điển cột đối chiếu SQLAlchemy metadata/Alembic đến `20261010_0013`. Mọi bảng nghiệp vụ dùng UUID PK; FK nghiệp vụ mặc định ON DELETE RESTRICT. Không chứa dữ liệu sinh viên thật.
 
 ## Quy ước
 
@@ -49,8 +49,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | external_subject | VARCHAR(255) | NULL | — | — | — | uq_user_account_external_subject | ck_user_account_identity_present | Định danh DEV/SSO tùy chọn; tài khoản email local để NULL. | PII | Migration 0010 |
 | email | VARCHAR(255) | NULL | — | — | — | uq_user_account_email_lower | ck_user_account_identity_present, ck_user_account_local_credentials_pair, ck_user_account_email_normalized | Email đăng nhập local, lưu chữ thường; NULL ở tài khoản cũ. | PII | Migration 0010 |
-| password_hash | VARCHAR(255) | NULL | — | — | — | — | ck_user_account_local_credentials_pair | Mã băm mật khẩu, không phải mật khẩu gốc; dự kiến Argon2id. | SECRET | Migration 0010 |
-| email_verified_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm xác minh email; chưa có luồng gửi mã/xác minh. | PII | Migration 0010 |
+| password_hash | VARCHAR(255) | NULL | — | — | — | — | ck_user_account_local_credentials_pair | Mã băm mật khẩu Argon2id, không lưu mật khẩu gốc. | SECRET | Migration 0010 |
+| email_verified_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm xác minh qua liên kết email. | PII | Migration 0010 |
 | base_role | VARCHAR(20) | NOT NULL | — | — | — | — | ck_user_account_base_role | Thuộc tính nghiệp vụ của user_account. | PII | Physical metadata 20260920_0001 |
 | status | VARCHAR(20) | NOT NULL | ACTIVE | — | — | — | ck_user_account_status | Trạng thái lifecycle. | NON_PII | Physical metadata 20260920_0001 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | NON_PII | Physical metadata 20260920_0001 |
@@ -69,6 +69,8 @@
 | student_code | VARCHAR(32) | NOT NULL | — | — | — | uq_student_profile_student_code | — | Thuộc tính nghiệp vụ của student_profile. | PII | Physical metadata 20260920_0001 |
 | department_id | UUID | NOT NULL | — | — | department.id | — | — | Tham chiếu department.id. | PII | Physical metadata 20260920_0001 |
 | display_name | VARCHAR(255) | NOT NULL | — | — | — | — | — | Thuộc tính nghiệp vụ của student_profile. | PII | Physical metadata 20260920_0001 |
+| class_name | VARCHAR(100) | NULL | — | — | — | — | — | Lớp từ danh sách SV do Khoa cung cấp. | PII | Migration 20261010_0013 |
+| major_code | VARCHAR(32) | NULL | — | — | — | — | — | Mã ngành từ danh sách SV do Khoa cung cấp. | PII | Migration 20261010_0013 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
 | created_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm tạo record. | PII | Physical metadata 20260920_0001 |
 | updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm cập nhật gần nhất. | PII | Physical metadata 20260920_0001 |

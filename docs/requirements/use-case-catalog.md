@@ -63,8 +63,8 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 
 - **Primary Actor / Supporting Actor:** SV / TBM; GVHD tiềm năng chỉ xem khi được phân công.
 - **Precondition / Trigger:** SV thuộc round và đủ điều kiện / không chọn topic có sẵn.
-- **Input:** title, mô tả, phạm vi Bộ môn/đợt; chưa lưu GVHD đề xuất khi chưa có rule xác định.
-- **Main Flow:** SV lập đề tài cùng bản nháp đăng ký nhóm; từng thành viên tự xác nhận; nhóm gửi đăng ký trước, sau đó TBM mới xét đề tài tại UC-TOPIC-003. Người được phân công làm GVHD đồng ý trước khi chốt.
+- **Input:** tên, mô tả, bộ môn/đợt và GV tiếp nhận mong muốn.
+- **Main Flow:** SV đề xuất đề tài kèm đăng ký cá nhân; gửi trước khi TBM xét tại UC-TOPIC-003. TBM xác nhận/chọn lại GV phù hợp; GV tiếp nhận đồng ý trước khi TBM chốt.
 - **Alternative/Exception:** thiếu thông tin thì TBM trả sửa; không tự tạo AdvisorAssignment.
 - **Output / Postcondition:** Topic và TopicRegistration cùng được gửi; chưa tạo Thesis.
 - **Rule / Permission / Data:** BR-TOPIC-001, BR-REG-005..006; SV tạo, TBM đúng scope review; Topic.
@@ -75,7 +75,7 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 - **Primary Actor / Supporting Actor:** TBM / proposer.
 - **Precondition / Trigger:** Topic `SUBMITTED` / có đề tài chờ xử lý.
 - **Input:** decision, title chuẩn hóa, reason.
-- **Main Flow:** kiểm scope/khả thi/trùng → tạo TopicTitleVersion nếu chỉnh → approve. Với đề tài do GV đề xuất, sau đó mở đăng ký; với đề tài do SV đề xuất, nhóm đã đăng ký trước và tiếp tục bước phân công GVHD.
+- **Main Flow:** kiểm scope/khả thi/trùng → tạo TopicTitleVersion nếu chỉnh → approve. Đề tài GV mở đăng ký sau duyệt; đề tài SV đã đăng ký cá nhân trước, sau duyệt có thể nhận SV khác khi còn hạn/chỗ.
 - **Alternative/Exception:** return/reject có lý do; title cũ không bị ghi đè.
 - **Output / Postcondition:** `SUBMITTED → APPROVED/RETURNED/REJECTED`.
 - **Rule / Permission / Data:** BR-TOPIC-001..002; chỉ TBM đúng scope approve/chỉnh; Topic, TopicTitleVersion.
@@ -85,23 +85,23 @@ Mỗi Use Case dưới đây là đơn vị triển khai/kiểm thử riêng. `P
 
 - **Primary Actor / Supporting Actor:** SV / hệ thống.
 - **Precondition / Trigger:** Eligibility confirmed, round mở; topic GV đã APPROVED hoặc topic SV đang gửi cùng nhóm / SV đăng ký.
-- **Input:** topicId hoặc đề xuất topic SV, danh sách 1–3 studentId, coordinator; từng thành viên tự xác nhận.
-- **Main Flow:** kiểm từng member chưa có active registration/round → tạo DRAFT registration/member → từng thành viên đăng nhập ACCEPTED → kiểm capacity/eligibility → SUBMITTED. Topic do SV đề xuất được TBM xét sau bước này.
+- **Input:** topicId hoặc đề xuất topic SV; mỗi SV chỉ đăng ký cho chính mình.
+- **Main Flow:** kiểm tài khoản/điều kiện/chỉ tiêu → SV đầu tiên tạo DRAFT và tự ghi nhận tham gia → đại diện gửi, có thể chỉ một người. SV khác tự tham gia trước hạn khi đề tài còn chỗ; bổ sung sau GV nhận buộc GV xét lại. Topic do SV đề xuất được TBM xét sau khi SV gửi.
 - **Alternative/Exception:** nguyện vọng thứ hai, member trùng, >3, topic đóng hoặc không đủ điều kiện thì `409/422`.
 - **Output / Postcondition:** TopicRegistration `SUBMITTED`; chưa tạo Thesis.
 - **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005..006; từng thành viên phải tự xác nhận; TopicRegistration/RegistrationMember.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-MAU-01A/01B / `CONFIRMED_PROJECT_DECISION`; danh sách khóa sau SUBMITTED.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919, SRC-MAU-01A/01B / `CONFIRMED_PROJECT_DECISION`; không thêm sau TBM chốt.
 
 ### UC-REG-002 — Xử lý đăng ký nhóm
 
 - **Primary Actor / Supporting Actor:** SV/coordinator / các thành viên, hệ thống.
 - **Precondition / Trigger:** Round mở, eligibility CONFIRMED / SV tự lập nhóm.
-- **Input:** topicId hoặc đề tài SV đề xuất, member list 1–3; người tạo là coordinator.
-- **Main Flow:** kiểm 1–3 member cùng department và chưa có active registration → tạo lời mời PENDING → từng SV tự ACCEPTED bằng tài khoản của mình → gửi một registration chung; danh sách khóa khi SUBMITTED.
-- **Alternative/Exception:** thành viên từ chối hoặc còn PENDING, đã đăng ký nơi khác hoặc không đủ điều kiện thì không submit; trước khi gửi có thể sửa bản nháp và giải phóng lời mời bị từ chối. Không có lecturer add/merge.
+- **Input:** topicId; mỗi người tự bấm tham gia. Đề tài SV đề xuất bắt đầu bằng đăng ký cá nhân.
+- **Main Flow:** SV đầu tạo nhóm; đại diện gửi khi có ít nhất một thành viên. SV khác cùng bộ môn tự tham gia khi còn hạn/chỗ, kể cả sau gửi hoặc GV nhận; trường hợp sau GV nhận quay về `SUBMITTED` để GV xét lại.
+- **Alternative/Exception:** hết hạn/chỉ tiêu, không đủ điều kiện hoặc đã có đăng ký khác thì từ chối tham gia. Không có lời mời hay thao tác GV thêm người.
 - **Output / Postcondition:** membership snapshot gắn registration; `DRAFT → SUBMITTED`.
 - **Rule / Permission / Data:** BR-REG-001..002, BR-REG-005..006; SV không có quyền nghiệp vụ cao hơn vì coordinator; RegistrationMember.
-- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / giới hạn `CONFIRMED_PROJECT_DECISION`; không có thao tác thêm người sau gửi.
+- **Source / Status:** SRC-GVHD-NV4-001, SRC-QD-2919 / giới hạn `CONFIRMED_PROJECT_DECISION`; không thêm sau TBM chốt.
 
 ### UC-ASSIGN-001 — GVHD nhận/từ chối và TBM phân công
 

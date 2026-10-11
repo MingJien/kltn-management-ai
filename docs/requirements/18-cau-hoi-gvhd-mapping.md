@@ -56,15 +56,15 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 ## 5. Đăng ký nhóm và ghép thêm SV
 
 - **Câu hỏi:** Nhóm đăng ký ngay từ đầu hay có thể ghép thêm sau?
-- **Trả lời thực tế:** Một đề tài tối đa 3 SV, SV tự đăng ký, có nhóm trưởng nhưng không là chủ nhiệm; Không ghép thêm SV sau khi đăng ký; SV tự ghép nhóm trước khi gửi và giảng viên không tự thêm người.( Mô hình/endpoint không cho sửa membership hậu SUBMITTED.)
+- **Trả lời ban đầu:** Một đề tài tối đa 3 SV, SV tự đăng ký, nhóm trưởng không là chủ nhiệm; GV không tự ghép thêm SV. Cách SV bổ sung trước hạn đã được cập nhật theo quyết định triển khai ở cuối tài liệu.
 - **Requirement:** REQ-REG-002, REQ-REG-005.
 - **Business Rule:** BR-REG-002, BR-REG-005.
 - **Actor/quyền:** SV lập nhóm; GVHD/TBM xem/duyệt theo workflow; không ai có lệnh ghép tự do ở safe default.
 - **Use Case:** UC-REG-002.
 - **Entity/data:** Thesis, ThesisMember, TopicRegistration.
 - **Trạng thái:** `CONFIRMED` cho giới hạn/nhóm trưởng; `CONFIRMED_PROJECT_DECISION` cho khóa thành viên từ khi gửi.
-- **Làm rõ thêm:** Mỗi thành viên phải tự xác nhận bằng tài khoản của mình trước khi gửi. Nếu nhóm do SV đề xuất đề tài, nhóm đăng ký trước; TBM xét nội dung đề tài sau.
-- **Trạng thái triển khai:** Migration 0007 lưu phản hồi và người/thời điểm xác nhận; prototype API/UI chưa buộc từng SV xác nhận và chưa hỗ trợ nhánh đề tài SV đề xuất. (Đây là phần code còn thiếu, không phải quyết định nghiệp vụ còn mở.)
+- **Làm rõ thêm:** Mỗi SV tự tham gia bằng tài khoản mình, có thể bổ sung trước hạn khi còn chỗ; đề tài SV đề xuất bắt đầu bằng đăng ký cá nhân và được TBM xét sau.
+- **Trạng thái triển khai:** Mỗi SV tự tham gia bằng tài khoản của mình; đề tài SV đề xuất bắt đầu bằng đăng ký cá nhân. API/UI hai nhánh và kiểm thử dữ liệu giả đã có; không tạo lời mời.
 
 ## 6. Điểm riêng hay chung cho nhóm
 
@@ -246,7 +246,7 @@ Nguồn trả lời: `SRC-GVHD-NV4-001`, bản Drive mới nhất. Phần trả 
 
 | Liên quan câu | Quyết định thiết kế đã chốt | Trạng thái triển khai hoặc điều kiện còn lại |
 | --- | --- | --- |
-| 2, 5 | SV tự lập nhóm 1–3; mỗi thành viên tự xác nhận bằng tài khoản riêng trước khi gửi; không ghép/thêm người sau khi gửi. Với đề tài SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài sau. Với đề tài GV đã duyệt, GV đề xuất nhận/từ chối trước khi TBM chốt. | Luồng API/UI tự xác nhận đã có cho đề tài GV đã duyệt; nhánh SV đề xuất vẫn chưa có runtime và luồng mới cần kiểm browser trực tiếp. |
+| 2, 5 | Mỗi SV tự tham gia nhóm 1–3; được bổ sung trước hạn khi còn chỗ, GV xét lại nếu đã nhận nhóm. Đề tài SV đề xuất đăng ký cá nhân trước, TBM xét sau; đề tài GV đã duyệt thì GV nhận/từ chối trước khi TBM chốt. | API/UI hai nhánh đã có và kiểm thử trên dữ liệu giả; không bổ sung sau TBM chốt. |
 | 2, 7, 8 | Khoa giao người `ELIGIBILITY_VERIFIER` theo đợt để đối chiếu nguồn Phòng Đào tạo rồi xác nhận snapshot; TBM đúng Bộ môn kiểm chứng chuyên môn GV bằng minh chứng, còn hồ sơ tự khai của TBM do Trưởng khoa/người được giao kiểm. Điều phối viên KLTN khác Thư ký Hội đồng. TBM đúng Bộ môn chốt phân công GVHD. | Người thật, lịch và scope phân quyền phải được Khoa phân công. API xác nhận snapshot, kiểm chứng chuyên môn và quản lý assignment đầy đủ chưa chạy. |
 | 10 | GVHD quản lý tiến độ; lần 1 góp ý đề cương, lần 2 dự kiến tháng 12 khoảng 70% để GVHD khác góp ý chéo `COMMENT_ONLY`. | Luồng báo cáo/duyệt tiến độ chưa chạy. Ngày/giờ và người tham gia mỗi đợt lấy từ kế hoạch/phân công được duyệt. |
 | 11, 14 | Thay đổi đề tài đi theo workflow; rút/gia hạn ghi kết quả thủ tục ngoài. Đợt hiện tại chỉ dùng Điều 7 QĐ2919 để xét bảo vệ, không thêm điều kiện riêng của Khoa. | Runtime thay đổi đề tài, snapshot điều kiện và người xác nhận thật chưa đầy đủ. Danh sách, thời điểm khóa và kết quả thủ tục ngoài lấy theo nguồn được duyệt. |
