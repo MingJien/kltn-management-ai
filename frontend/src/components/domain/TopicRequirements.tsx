@@ -2,12 +2,16 @@ import type { Requirement } from "../../api";
 const labels: Record<Requirement["requirement_type"], string> = {
   PREFERRED_GPA: "GPA mong muốn", SKILL: "Kỹ năng", TECHNOLOGY: "Công nghệ", KNOWLEDGE: "Kiến thức", OTHER: "Yêu cầu khác",
 };
-export function RequirementList({ items }: { items: Requirement[] }) {
-  return items.length ? <ul className="requirement-list">{items.map((item, i) => <li key={i}>
-    <strong>{labels[item.requirement_type]}: </strong>
-    {item.requirement_type === "PREFERRED_GPA" ? `từ ${item.preferred_gpa?.toFixed(2)}/4` : item.value_text}
-    {item.requirement_type === "PREFERRED_GPA" && item.value_text ? ` — ${item.value_text}` : ""}
-  </li>)}</ul> : <p className="text-body-sm">Không có yêu cầu bổ sung.</p>;
+export function RequirementList({ items, preview = false }: { items: Requirement[]; preview?: boolean }) {
+  const visible = preview ? items.slice(0, 2) : items;
+  return items.length ? <ul className={preview ? "requirement-preview" : "requirement-list requirement-list--detailed"}>
+    {visible.map((item, i) => <li key={i}>
+      <strong>{labels[item.requirement_type]}</strong>
+      <span>{item.requirement_type === "PREFERRED_GPA" ? `Từ ${item.preferred_gpa?.toFixed(2)}/4` : item.value_text}
+        {item.requirement_type === "PREFERRED_GPA" && item.value_text ? ` — ${item.value_text}` : ""}</span>
+    </li>)}
+    {preview && items.length > visible.length ? <li className="requirement-preview__more">+{items.length - visible.length} yêu cầu khác</li> : null}
+  </ul> : <p className="text-body-sm text-muted">Không có yêu cầu bổ sung.</p>;
 }
 export function RequirementEditor({ items, onChange }: {items: Requirement[]; onChange: (items: Requirement[]) => void}) {
   function change(index: number, fields: Partial<Requirement>) {

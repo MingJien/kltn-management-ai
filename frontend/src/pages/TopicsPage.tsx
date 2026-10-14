@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FileText, Plus, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { CalendarDays, FileText, Plus, UserRound, Users } from "lucide-react";
 import type { Context, Lecturer, OpenRound, Registration, Topic } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
@@ -12,10 +12,21 @@ import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
 
 const PAGE_SIZE = 24;
+function roundDisplay(label: string) {
+  const match = /^Năm học\s+(.+?)(?:\s+\((đợt\s+\d+)\))?$/i.exec(label);
+  return {year: match?.[1] || label, period: match?.[2] || ""};
+}
+
+function LecturerLink({id, name}: {id: string | null; name: string | null}) {
+  return id && name ? <Link className="lecturer-link" to={`/lecturers/${id}`} state={{name}}>{name}</Link>
+    : <span className="text-muted">Chờ bộ môn chọn</span>;
+}
+
 export default function TopicsPage({userId, context}: {userId: string; context: Context}) {
   const navigate = useNavigate();
   const [topics, setTopics] = useState<Topic[]>([]);
   const [rounds, setRounds] = useState<OpenRound[]>([]);
+  const [roundsLoaded, setRoundsLoaded] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [selected, setSelected] = useState<Topic | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -50,7 +61,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   useEffect(() => {
     let alive = true;
     Promise.all([request<OpenRound[]>("/rounds/open", userId), request<Lecturer[]>("/lecturers", userId)])
-      .then(([r,l]) => {if (alive) {setRounds(r); setLecturers(l);}})
+      .then(([r,l]) => {if (alive) {setRounds(r); setLecturers(l); setRoundsLoaded(true);}})
       .catch((cause) => {if (alive) setMessage(errorMessage(cause));});
     return () => {alive = false;};
   }, [userId]);
@@ -93,7 +104,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
           <Plus size={16} aria-hidden="true" />{student ? "Tự đề xuất đề tài" : "Tạo đề tài"}
         </button> : null}
     </div>
-    {!rounds.length ? <p className="text-caption">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
+    {roundsLoaded && !rounds.length ? <p className="text-caption">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
     <div className="tabs" aria-label="Lọc đề tài">
       {[...(head ? [["pending","Chờ duyệt"]] : []), ["all",student ? "Đề tài có sẵn" : "Tất cả đề tài"],
         ["mine",student ? "Đề xuất của tôi" : "Đề tài của tôi"]].map(([key,label]) =>
@@ -103,26 +114,46 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     {message && !detailOpen && !createOpen && !registerOpen ? <p className="alert alert-info" role="status">{message}</p> : null}
     {loading ? <p role="status">Đang tải đề tài…</p> : !topics.length ?
       <div className="card empty-state"><FileText aria-hidden="true" /><h2>Chưa có đề tài trong danh sách này</h2><p>Thử đổi mục hoặc từ khóa tìm kiếm.</p></div> :
-      <div className="grid grid-auto">{topics.map((topic) => <article key={topic.id} className="card">
-        <div className="card-body stack">
-          <div className="flex gap-2 items-center"><span className="topic-code">{topic.code}</span><ThesisStatusBadge state={topic.state} /></div>
-          <h2 className="topic-card-title">{topic.title}</h2>
-          <p className="text-caption">{topic.round_label} · {topic.proposer_type === "STUDENT" ? "SV đề xuất" : "GV đề xuất"}</p>
-          <p className="text-body-sm text-truncate-2">{topic.description || "Chưa có mô tả."}</p>
-          <p className="text-body-sm">GV: {topic.receiving_lecturer_name || "Chờ bộ môn chọn"}</p>
-          <span className="badge badge-neutral"><Users size={14} aria-hidden="true" />
-            {topic.registered_member_count}/{topic.max_students} SV · còn {topic.remaining_slots} chỗ
-          </span>
-          <RequirementList items={topic.requirements} />
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" onClick={() => choose(topic)}>{head && topic.state === "SUBMITTED" ? "Xem và duyệt" : "Xem chi tiết"}</button>
-            {student && topic.state === "APPROVED" ? <button className="btn btn-primary" disabled={!topic.available}
-              onClick={() => {choose(topic,false); setRegisterOpen(true);}}>
-              {topic.available ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : "Đã đóng đăng ký"}
-            </button> : null}
+      <div className="grid topic-grid">{topics.map((topic) => {
+        const round = roundDisplay(topic.round_label);
+        const full = topic.registered_member_count >= topic.max_students;
+        const canRegister = topic.available && !full;
+        return <article key={topic.id} className="card topic-card">
+          <div className="card-body topic-card__body">
+            <div className="topic-card__top">
+              <span className="topic-code">{topic.code}</span>
+              <ThesisStatusBadge state={topic.state} />
+            </div>
+            <h2 className="topic-card-title">{topic.title}</h2>
+            <div className="topic-card__identity">
+              <div className="topic-card__year"><CalendarDays size={17} aria-hidden="true" />
+                <span><small>Năm học</small><strong>{round.year}</strong>{round.period ? <em>{round.period}</em> : null}</span>
+              </div>
+              <span className="topic-card__proposer">{topic.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
+            </div>
+            <div className="topic-card__summary">
+              <h3>Mô tả đề tài</h3>
+              <p className="topic-card__description">{topic.description || "Chưa có mô tả đề tài."}</p>
+            </div>
+            <div className="topic-card__facts">
+              <div className="topic-card__fact"><UserRound size={17} aria-hidden="true" /><span><small>Giảng viên tiếp nhận</small>
+                <LecturerLink id={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
+              <div className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
+                <Users size={17} aria-hidden="true" /><span><small>Sinh viên</small><strong>{topic.registered_member_count}/{topic.max_students} SV</strong></span>
+              </div>
+            </div>
+            <div className="topic-card__requirements"><h3>Kỹ năng và yêu cầu</h3>
+              <RequirementList items={topic.requirements} preview /></div>
+            <div className="topic-card__actions">
+              <button className="btn btn-secondary" onClick={() => choose(topic)}>{head && topic.state === "SUBMITTED" ? "Xem và duyệt" : "Xem chi tiết"}</button>
+              {student && topic.state === "APPROVED" ? <button className="btn btn-primary" disabled={!canRegister}
+                onClick={() => {choose(topic,false); setRegisterOpen(true);}}>
+                {canRegister ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : "Đã đóng đăng ký"}
+              </button> : null}
+            </div>
           </div>
-        </div>
-      </article>)}</div>}
+        </article>;
+      })}</div>}
     <nav className="pagination" aria-label="Phân trang đề tài">
       <button className="btn btn-secondary" disabled={!page || loading} onClick={() => setPage(page - 1)}>Trang trước</button>
       <span>Trang {page + 1}</span>
@@ -131,11 +162,18 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
 
     <Dialog open={detailOpen && !!selected} onClose={() => setDetailOpen(false)} busy={busy}
       title={selected ? selected.code + " · " + selected.title : "Chi tiết đề tài"} size="lg">
-      {selected ? <div className="stack">
-        <p>{selected.round_label} · <ThesisStatusBadge state={selected.state} /></p>
-        <p>{selected.description || "Chưa có mô tả."}</p>
-        <p>GV: {selected.receiving_lecturer_name || "Chờ bộ môn chọn"} · Tối đa {selected.max_students} SV</p>
-        <RequirementList items={selected.requirements} />
+      {selected ? <div className="stack topic-detail-content">
+        <div className="topic-detail-content__intro"><span>{selected.round_label}</span>
+          <span>{selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
+          <ThesisStatusBadge state={selected.state} /></div>
+        <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>
+          <p>{selected.description || "Chưa có mô tả."}</p></section>
+        <div className="topic-detail-content__facts">
+          <div><span>Giảng viên tiếp nhận</span><LecturerLink id={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
+          <div><span>Sinh viên</span><strong>{selected.registered_member_count}/{selected.max_students} SV</strong></div>
+        </div>
+        <section className="topic-detail-content__section"><h3>Kỹ năng và yêu cầu</h3>
+          <RequirementList items={selected.requirements} /></section>
         {selected.decision_reason ? <p className="alert alert-warning">Góp ý của bộ môn: {selected.decision_reason}</p> : null}
         {editable ? <>
           <TopicEditor key={selected.id + "-" + selected.row_version} topic={selected} rounds={rounds}
@@ -184,7 +222,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     <Dialog open={registerOpen && !!selected} onClose={() => setRegisterOpen(false)} busy={busy} title="Đăng ký đề tài" size="lg">
       {selected && registerOpen ? <div className="stack">
         <h3>{selected.title}</h3><p>{selected.code} · {selected.round_label}</p>
-        <p>Đã có {selected.registered_member_count}/{selected.max_students} SV · còn {selected.remaining_slots} chỗ.</p>
+        <p>Đã đăng ký: {selected.registered_member_count}/{selected.max_students} SV.</p>
         {selected.registration_state === "LECTURER_ACCEPTED" ? <p className="alert alert-info">Nhóm đã được nhận. Khi bạn tham gia, GV sẽ xét lại nhóm có thành viên mới.</p> : null}
         <RequirementList items={selected.requirements} />
         <RegistrationForm context={context} userId={userId} roundId={selected.round_id} busy={busy}

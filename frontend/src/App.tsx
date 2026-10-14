@@ -12,6 +12,7 @@ import AccountPage from "./pages/AccountPage";
 import AdministrationPage from "./pages/AdministrationPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
+import LecturerProfilePage from "./pages/LecturerProfilePage";
 const AIPage = lazy(() => import("./pages/AIPage"));
 import { Eye, EyeOff, LogIn } from "lucide-react";
 
@@ -27,7 +28,8 @@ function App() {
   const [restoring, setRestoring] = useState(true);
   useEffect(() => {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/ai":"Tra cứu thử nghiệm"};
-    document.title = `${context ? labels[location.pathname] || "Khóa luận" : "Đăng nhập"} · KLTN`;
+    const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên" : labels[location.pathname] || "Khóa luận";
+    document.title = `${context ? page : "Đăng nhập"} · KLTN`;
   }, [location.pathname, context]);
 
   const restore = useCallback(async () => {
@@ -229,6 +231,8 @@ function App() {
             <RegistrationsPage userId={context.user_id} context={context} />
             : <Navigate to="/" replace />}
         />
+        <Route path="/lecturers/:lecturerId" element={workflowAccess ?
+          <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
         <Route
           path="/ai"
           element={workflowAccess ? <AIPage userId={context.user_id} /> : <Navigate to="/" replace />}

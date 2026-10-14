@@ -77,10 +77,10 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
         const me = row.members.find((member) => member.student_id === context.student_id && member.active);
         const activeCount = row.members.filter((member) => member.active).length;
         const draft = ["DRAFT","RETURNED"].includes(row.state);
-        return <article className="card" key={row.id}><div className="card-body stack">
-          <div className="flex justify-between items-center gap-2"><h2 className="topic-card-title">{row.topic_title}</h2><ThesisStatusBadge state={row.state} /></div>
+        return <article className="card registration-card" key={row.id}><div className="card-body stack">
+          <div className="registration-card__heading"><div><span className="topic-code">{row.topic_code}</span>
+            <h2 className="topic-card-title">{row.topic_title}</h2></div><ThesisStatusBadge state={row.state} /></div>
           <dl className="registration-summary">
-            <dt>Mã đề tài</dt><dd>{row.topic_code}</dd>
             <dt>GV tiếp nhận</dt><dd>{row.receiving_lecturer_name || "Chờ bộ môn chọn"}</dd>
             <dt>Thành viên</dt><dd>{activeCount}/{row.expected_member_count} SV</dd>
             {row.submitted_at ? <><dt>Đã gửi</dt><dd>{new Date(row.submitted_at).toLocaleString("vi-VN")}</dd></> : null}
