@@ -1,6 +1,21 @@
--- Schema view compiled from official SQLAlchemy metadata at revision 20261015_0001_official.
--- Alembic is authoritative; do not apply this file over an existing database.
--- Tables: 32 business tables; alembic_version is maintained by Alembic.
+-- Schema-only export generated from Alembic revision 20261015_0001_official.
+-- 32 business tables; each table has one complete CREATE TABLE statement.
+-- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
+-- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
+-- For an expendable empty PostgreSQL database only. It does not create alembic_version.
+-- Initialize the permanent kltn_management database with Alembic, not this export.
+
+BEGIN;
+SET LOCAL search_path = public;
+DO $guard_empty_schema$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+    ) THEN
+        RAISE EXCEPTION 'Schema must be empty; use Alembic for the permanent database';
+    END IF;
+END $guard_empty_schema$;
 
 CREATE TABLE academic_year (
 	code VARCHAR(20) NOT NULL,
@@ -629,3 +644,5 @@ CREATE TABLE signature_confirmation (
 	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
+
+COMMIT;
