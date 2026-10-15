@@ -64,8 +64,8 @@ def main() -> None:
     parser.add_argument("--execute", action="store_true", help="Actually insert synthetic demo records")
     parser.add_argument("--create-credentials", action="store_true", help="Create the ignored local credential file if absent; never overwrite it")
     parser.add_argument(
-        "--database", choices=("kltn_dev",), default="kltn_dev",
-        help="Development database that receives demo records (default: kltn_dev)",
+        "--database", choices=("kltn_management",), default="kltn_management",
+        help="Official database; use only an isolated test instance for synthetic records",
     )
     args = parser.parse_args()
     load_local_env()
@@ -87,13 +87,15 @@ def main() -> None:
         demo_credentials = load_demo_credentials(args.database)
     except ValueError as exc:
         parser.error(str(exc))
-    database_url = make_url(os.environ["DATABASE_URL"]).set(database=args.database)
+    database_url = make_url(os.environ["DATABASE_URL"])
+    if database_url.database != "kltn_management" or os.getenv("KLTN_ALLOW_SYNTHETIC_SEED") != "true":
+        parser.error("Synthetic seed requires kltn_management and KLTN_ALLOW_SYNTHETIC_SEED=true")
     engine = create_engine(database_url)
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261010_0013":
-            parser.error("Upgrade the configured development DB to 20261010_0013 first")
+        if version != "20261015_0001_official":
+            parser.error("Upgrade the isolated official DB to 20261015_0001_official first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")

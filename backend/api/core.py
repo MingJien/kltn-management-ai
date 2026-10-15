@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 from backend.api.core_schemas import (
     AdvisorNomination, AdvisorResponse, AuditOut,
     DocumentCreate, DocumentDecision, DocumentOut, MilestoneClose, MilestoneCreate, MilestoneOut,
-    ProgressCreate, ProgressDecision, ProgressOut, ThesisWorkspaceOut, WorkCreate, WorkDecision, WorkOut,
+    ProgressCreate, ProgressDecision, ProgressOut, ProposalFinalization, ProposalOut,
+    ProposalReviewCreate, ProposalSignedCopy, ThesisWorkspaceOut, WorkCreate, WorkDecision, WorkOut,
 )
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
-from backend.services import documents, progress, theses
+from backend.services import documents, progress, proposals, theses
 
 router = APIRouter(prefix="/api/v1", tags=["NV5 core"])
 
@@ -34,6 +35,50 @@ def list_theses(user=Depends(current_user), session=Depends(core_session)):
 @router.get("/theses/{thesis_id}", response_model=ThesisWorkspaceOut)
 def thesis_detail(thesis_id: UUID, user=Depends(current_user), session=Depends(core_session)):
     return theses.workspace_out(session, user, theses.thesis_access(session, user, thesis_id))
+
+
+@router.get("/theses/{thesis_id}/proposal", response_model=ProposalOut)
+def proposal_detail(thesis_id: UUID, user=Depends(current_user), session=Depends(core_session)):
+    return proposals.get_proposal(session, user, thesis_id)
+
+
+@router.post("/theses/{thesis_id}/proposal/versions", response_model=ProposalOut, status_code=201,
+    openapi_extra={"requestBody": {"required": True, "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
+async def proposal_upload(thesis_id: UUID, request: Request,
+        if_match: int = Header(alias="If-Match", ge=0), x_file_name: str = Header(alias="X-File-Name"),
+        user=Depends(current_user), session=Depends(core_session)):
+    return await proposals.upload_version(session, user, thesis_id, request, if_match)
+
+
+@router.get("/theses/{thesis_id}/proposal/versions/{version_id}/download", response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
+def proposal_download(thesis_id: UUID, version_id: UUID,
+        user=Depends(current_user), session=Depends(core_session)):
+    return proposals.download_version(session, user, thesis_id, version_id)
+
+
+@router.post("/theses/{thesis_id}/proposal/reviewers", response_model=ProposalOut)
+def proposal_reviewer(thesis_id: UUID, data: AdvisorNomination,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    return proposals.assign_reviewer(session, user, thesis_id, data, if_match)
+
+
+@router.post("/theses/{thesis_id}/proposal/reviews", response_model=ProposalOut)
+def proposal_review(thesis_id: UUID, data: ProposalReviewCreate,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    return proposals.review(session, user, thesis_id, data, if_match)
+
+
+@router.post("/theses/{thesis_id}/proposal/department-finalization", response_model=ProposalOut)
+def proposal_finalize(thesis_id: UUID, data: ProposalFinalization,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    return proposals.finalize(session, user, thesis_id, data, if_match)
+
+
+@router.post("/theses/{thesis_id}/proposal/dean-signed-copy", response_model=ProposalOut)
+def proposal_dean_copy(thesis_id: UUID, data: ProposalSignedCopy,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    return proposals.record_dean_confirmation(session, user, thesis_id, data, if_match)
 
 
 @router.post("/theses/{thesis_id}/advisor-nomination", response_model=ThesisWorkspaceOut)

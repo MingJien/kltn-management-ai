@@ -66,6 +66,19 @@ class WorkDecision(BaseModel):
     comment: LongText
 
 
+class ProposalReviewCreate(BaseModel):
+    decision: Literal["COMMENT", "CONFIRM", "REVISION_REQUIRED"]
+    comment: LongText
+
+
+class ProposalFinalization(BaseModel):
+    reason: Reason
+
+
+class ProposalSignedCopy(BaseModel):
+    official_ref: ShortText
+
+
 class AdvisorOut(BaseModel):
     id: UUID
     lecturer_id: UUID
@@ -120,6 +133,29 @@ class ReviewOut(BaseModel):
     decision: str
     comment: str
     created_at: datetime
+
+
+class ProposalVersionOut(BaseModel):
+    id: UUID
+    version_no: int
+    file_name: str
+    byte_size: int
+    sha256: str
+    submitted_by_name: str
+    submitted_at: datetime
+    reviews: list[ReviewOut]
+
+
+class ProposalOut(BaseModel):
+    id: UUID | None
+    thesis_id: UUID
+    state: str
+    row_version: int
+    current_version_no: int | None
+    versions: list[ProposalVersionOut]
+    reviewers: list[PendingAdvisorOut]
+    department_confirmed: bool
+    dean_confirmed: bool
 
 
 class ProgressOut(BaseModel):

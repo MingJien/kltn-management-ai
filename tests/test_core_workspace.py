@@ -16,11 +16,12 @@ def workspace(scenario, monkeypatch, tmp_path):
     client, users, students, lecturers, topic, session = scenario
     monkeypatch.setenv("KLTN_DOCUMENT_DIR", str(tmp_path / "documents"))
     made = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
-        "topic_id": str(topic.id), "member_student_ids": [str(students[0].id), str(students[1].id)], "confirm_creator": True})
+        "topic_id": str(topic.id), "member_student_ids": [str(students[0].id)], "confirm_creator": True})
     assert made.status_code == 201, made.text
     reg = made.json()
-    assert client.post(f"/api/v1/topic-registrations/{reg['id']}/member-response", headers=hdr(users[1]),
-        json={"consent_status": "ACCEPTED"}).status_code == 200
+    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]), json={
+        "topic_id": str(topic.id), "member_student_ids": [str(students[1].id)], "confirm_creator": True})
+    assert joined.status_code == 201, joined.text
     submitted = client.post(f"/api/v1/topic-registrations/{reg['id']}/submit", headers=hdr(users[0])).json()
     accepted = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
         headers={**hdr(users[3]), "If-Match": str(submitted['row_version'])}, json={"decision": "ACCEPT"}).json()
@@ -190,15 +191,85 @@ def test_upload_validation_and_database_failure_remove_written_file(workspace, m
     assert client.get(path+"/documents", headers=hdr(users[0])).json()[0]["versions"] == []
 
 
-def test_proposal_file_does_not_bypass_academic_approval(workspace):
-    client, users, *_ , path = workspace
-    doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Proposal", "document_type": "PROPOSAL"}).json()
-    uploaded = upload(client, users[0], path, doc).json()
-    version = uploaded["versions"][0]
-    response = client.post(path+f"/documents/{doc['id']}/versions/{version['id']}/review", headers=version_headers(users[3], version),
-        json={"decision": "ACCEPT", "comment": "Should need proposal workflow"})
-    assert response.status_code == 409
+def test_proposal_versions_scoped_review_and_paper_reference(workspace, monkeypatch, tmp_path):
+    client, users, _, lecturers, session, path = workspace
+    monkeypatch.setenv("KLTN_PROPOSAL_DIR", str(tmp_path / "proposals"))
+    assert client.post(path+"/documents", headers=hdr(users[0]),
+        json={"title": "Proposal", "document_type": "PROPOSAL"}).status_code == 409
+    first = client.post(path+"/proposal/versions", headers={**hdr(users[0]), "If-Match": "0",
+        "X-File-Name": "proposal.pdf", "Content-Type": "application/octet-stream"}, content=b"%PDF-1.4\nsynthetic proposal")
+    assert first.status_code == 201, first.text
+    row = first.json()
+    assert row["state"] == "SUBMITTED" and row["current_version_no"] == 1
+    assert client.get(path+"/proposal", headers=hdr(users[2])).status_code == 404
+    assert client.post(path+"/proposal/reviews", headers=version_headers(users[5], row),
+        json={"decision": "CONFIRM", "comment": "Unauthorized"}).status_code == 404
+    assigned = client.post(path+"/proposal/reviewers", headers=version_headers(users[4], row),
+        json={"lecturer_id": str(lecturers[2].id), "reason": "Góp ý theo phân công"})
+    assert assigned.status_code == 200, assigned.text
+    row = assigned.json()
+    assert client.post(path+"/proposal/reviews", headers=version_headers(users[5], row),
+        json={"decision": "CONFIRM", "comment": "Cannot confirm"}).status_code == 403
+    comment = client.post(path+"/proposal/reviews", headers=version_headers(users[5], row),
+        json={"decision": "COMMENT", "comment": "Add evaluation data"})
+    assert comment.status_code == 200, comment.text
+    row = comment.json()
+    revision = client.post(path+"/proposal/reviews", headers=version_headers(users[3], row),
+        json={"decision": "REVISION_REQUIRED", "comment": "Add scope and data"})
+    assert revision.status_code == 200, revision.text
+    row = revision.json()
+    assert row["state"] == "REVISION_REQUIRED"
+    second = client.post(path+"/proposal/versions", headers={**version_headers(users[1], row),
+        "X-File-Name": "proposal-v2.pdf", "Content-Type": "application/octet-stream"},
+        content=b"%PDF-1.4\nrevised synthetic proposal")
+    assert second.status_code == 201, second.text
+    row = second.json()
+    assert [v["version_no"] for v in row["versions"]] == [2, 1]
+    old = row["versions"][1]
+    download = client.get(path+f"/proposal/versions/{old['id']}/download", headers=hdr(users[0]))
+    assert download.status_code == 200 and download.content == b"%PDF-1.4\nsynthetic proposal"
+    confirmed = client.post(path+"/proposal/reviews", headers=version_headers(users[3], row),
+        json={"decision": "CONFIRM", "comment": "Version 2 acceptable"})
+    assert confirmed.status_code == 200, confirmed.text
+    row = confirmed.json()
+    assert client.post(path+"/proposal/department-finalization", headers=version_headers(users[0], row),
+        json={"reason": "Cannot finalize"}).status_code == 403
+    finalized = client.post(path+"/proposal/department-finalization", headers=version_headers(users[4], row),
+        json={"reason": "Confirmed against paper workflow"})
+    assert finalized.status_code == 200, finalized.text
+    row = finalized.json()
+    assert row["department_confirmed"] is True
+    assert client.post(path+"/proposal/dean-signed-copy", headers=version_headers(users[4], row),
+        json={"official_ref": "SYN-REF-001"}).status_code == 403
+    faculty_id = session.get(m.Department, lecturers[2].department_id).faculty_id
+    position = m.OrganizationalPosition(id=uuid4(), code="FACULTY_DEAN", name="Synthetic dean")
+    session.add(position)
+    session.flush()
+    session.add(m.PositionAssignment(id=uuid4(), lecturer_id=lecturers[2].id,
+        position_id=position.id, faculty_id=faculty_id, effective_from=now()-timedelta(days=1), state="ACTIVE"))
+    session.flush()
+    signed = client.post(path+"/proposal/dean-signed-copy", headers=version_headers(users[5], row),
+        json={"official_ref": "SYN-REF-001"})
+    assert signed.status_code == 200, signed.text
+    assert signed.json()["dean_confirmed"] is True
+    assert client.post(path+"/proposal/versions", headers={**version_headers(users[0], signed.json()),
+        "X-File-Name": "new.pdf"}, content=b"%PDF-1.4\nnew").status_code == 409
     assert client.get(path, headers=hdr(users[0])).json()["state"] == "ACTIVE"
+
+
+def test_proposal_upload_commit_failure_removes_file_and_version(workspace, monkeypatch, tmp_path):
+    client, users, _, _, session, path = workspace
+    root = tmp_path / "proposals"
+    monkeypatch.setenv("KLTN_PROPOSAL_DIR", str(root))
+    original_commit = session.commit
+    monkeypatch.setattr(session, "commit", lambda: (_ for _ in ()).throw(RuntimeError("Synthetic commit failure")))
+    with pytest.raises(RuntimeError, match="Synthetic commit failure"):
+        client.post(path+"/proposal/versions", headers={**hdr(users[0]), "If-Match":"0",
+            "X-File-Name":"draft.pdf", "Content-Type":"application/octet-stream"},
+            content=b"%PDF-1.4\nsynthetic rollback")
+    monkeypatch.setattr(session, "commit", original_commit)
+    assert list(root.glob("*")) == []
+    assert client.get(path+"/proposal", headers=hdr(users[0])).json()["versions"] == []
 
 
 def test_individual_work_version_and_frozen_thesis(workspace):

@@ -43,7 +43,9 @@ def main() -> int:
     npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
     if not npm:
         raise RuntimeError('Node.js/npm is required')
-    url = make_url(os.environ['DATABASE_URL']).set(database='kltn_dev')
+    url = make_url(os.environ['DATABASE_URL'])
+    if url.database != 'kltn_management':
+        raise RuntimeError('E2E requires an explicit kltn_management URL')
     schema = 'e2e_' + uuid4().hex[:16]
     assert re.fullmatch(r'e2e_[0-9a-f]{16}', schema)
     directory = ROOT / 'tmp' / schema
@@ -62,9 +64,10 @@ def main() -> int:
         env = os.environ.copy()
         env.update(DATABASE_URL=private_url, KLTN_ENV='test', KLTN_DEV_AUTH='false',
             AUTH_SESSION_SECRET=secrets.token_urlsafe(48), PYTHONIOENCODING='utf-8',
+            KLTN_ALLOW_SYNTHETIC_SEED='true', KLTN_PROPOSAL_DIR=str(directory / 'uploads' / 'proposals'),
             KLTN_FRONTEND_URL=f'http://127.0.0.1:{WEB_PORT}', VITE_API_URL=f'http://127.0.0.1:{API_PORT}',
             KLTN_EVIDENCE_DIR=str(directory / 'uploads'), KLTN_E2E_RUN_DIR=str(directory))
-        migration = subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'],
+        migration = subprocess.run([sys.executable, '-m', 'alembic', '-c', 'alembic-official.ini', 'upgrade', 'head'],
             cwd=ROOT, env=env, text=True, capture_output=True)
         if migration.returncode:
             print('FAIL isolated migration (connection details withheld)')
@@ -95,7 +98,7 @@ def main() -> int:
                 base_role='ADMIN', status='ACTIVE')
             session.add(admin)
             accounts['admin'] = {'email':admin.email, 'password':admin_password}
-            for key in ('proposalPeer','race1','race2','race3'):
+            for key in ('proposalPeer','race1','race2','race3','proposalFlow'):
                 password = secrets.token_urlsafe(20)
                 email = key.lower() + '@e2e.test'
                 user = m.UserAccount(id=uuid4(),email=email,password_hash=hash_password(password),
@@ -126,7 +129,7 @@ def main() -> int:
                     if time.monotonic() >= deadline:
                         raise RuntimeError('Isolated API did not become ready')
                     time.sleep(.2)
-            print('PASS isolated fixture: kltn_dev, owned schema, cookie auth, synthetic accounts',flush=True)
+            print('PASS isolated fixture: kltn_management, owned schema, cookie auth, synthetic accounts',flush=True)
             result = subprocess.run([npm,'run','test:e2e'],cwd=ROOT/'frontend',env=env)
             return result.returncode
     finally:

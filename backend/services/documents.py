@@ -83,6 +83,8 @@ def document_out(session, item):
 
 def create_document(session, user, thesis_id, data):
     thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
+    if data.document_type == "PROPOSAL":
+        raise HTTPException(409, "Đề cương phải nộp tại luồng đề cương có xét duyệt riêng")
     item = m.Document(id=uuid4(), thesis_id=thesis_id, title=data.title, document_type=data.document_type,
         visibility="ASSIGNED", state="ACTIVE")
     session.add(item)

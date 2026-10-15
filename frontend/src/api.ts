@@ -186,6 +186,38 @@ export type DocumentVersion = {id: string; version_no: number; row_version: numb
 export type ThesisDocument = {id: string; title: string; document_type: "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
 export type WorkAssignment = {id: string; student_id: string; student_name: string; version_no: number; row_version: number; work_description: string; expected_output: string; state: string; review_comment: string | null; reviewed_by_name: string | null};
 export type AuditEvent = {action: string; actor_name: string; reason: string | null; occurred_at: string};
+export type Proposal = {
+  id: string | null;
+  thesis_id: string;
+  state: string;
+  row_version: number;
+  current_version_no: number | null;
+  versions: {id: string; version_no: number; file_name: string; byte_size: number; sha256: string; submitted_by_name: string; submitted_at: string; reviews: Review[]}[];
+  reviewers: {lecturer_id: string; display_name: string}[];
+  department_confirmed: boolean;
+  dean_confirmed: boolean;
+};
+
+export function uploadProposal(thesisId: string, proposal: Proposal, userId: string, file: File) {
+  return request<Proposal>(`/theses/${thesisId}/proposal/versions`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "If-Match": String(proposal.row_version)},
+  });
+}
+
+export async function downloadProposal(thesisId: string, version: Proposal["versions"][number], userId: string) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/proposal/versions/${version.id}/download`, {
+    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url; link.download = version.file_name; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function uploadDocument(thesisId: string, doc: ThesisDocument, userId: string, file: File) {
   return request<ThesisDocument>(`/theses/${thesisId}/documents/${doc.id}/versions`, userId, {

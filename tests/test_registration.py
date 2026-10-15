@@ -77,6 +77,32 @@ def hdr(user):
     return {"X-Dev-User-Id": str(user.id)}
 
 
+def test_special_eligibility_decision_requires_authorized_verifier_and_official_reference(scenario):
+    client, users, students, _, topic, session = scenario
+    session.add(m.EligibilitySnapshot(id=uuid4(), student_id=students[0].id,
+        round_id=topic.round_id, version=2, passed_credit_ratio=0.6, gpa_4=2.0,
+        evidence_ref="SYNTHETIC_SOURCE", captured_at=datetime.now(timezone.utc), state="SUBMITTED"))
+    session.add(m.ResourceAssignment(id=uuid4(), user_id=users[4].id,
+        round_id=topic.round_id, assignment_type="ELIGIBILITY_VERIFIER",
+        effective_from=datetime.now(timezone.utc)-timedelta(days=1), state="ACTIVE"))
+    session.flush()
+    path = f"/api/v1/rounds/{topic.round_id}/roster/special-decision"
+    data = {"student_id":str(students[0].id), "official_ref":"SYN-RECTOR-001",
+        "reason":"Synthetic official exception to clause 2", "clause_1_verified":True}
+    assert client.post(path, headers=hdr(users[0]), json=data).status_code == 403
+    assert client.post(path, headers=hdr(users[4]), json={**data,"clause_1_verified":False}).status_code == 422
+    result = client.post(path, headers=hdr(users[4]), json=data)
+    assert result.status_code == 200, result.text
+    latest = session.scalar(select(m.EligibilitySnapshot).where(
+        m.EligibilitySnapshot.student_id == students[0].id,
+        m.EligibilitySnapshot.round_id == topic.round_id).order_by(m.EligibilitySnapshot.version.desc()))
+    assert latest.version == 3 and latest.state == "CONFIRMED"
+    assert latest.confirmed_by == users[4].id and latest.evidence_ref == "SYN-RECTOR-001"
+    assert session.scalar(select(m.AuditEvent.id).where(
+        m.AuditEvent.action == "ELIGIBILITY_SPECIAL_DECISION_RECORDED",
+        m.AuditEvent.resource_id == latest.id)) is not None
+
+
 def test_topic_to_lecturer_acceptance(scenario):
     client, users, students, lecturers, _, session = scenario
     round_id = session.scalar(select(m.ThesisRound.id).where(m.ThesisRound.code == "TEST"))

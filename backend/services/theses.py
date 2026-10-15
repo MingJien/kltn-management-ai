@@ -46,20 +46,44 @@ def resource_role(session, user_id, role, *, thesis_id=None, round_id=None):
     return session.scalar(query)
 
 
+def is_faculty_dean(session, lecturer_id, department_id):
+    department = session.get(m.Department, department_id)
+    if department is None:
+        return False
+    instant = now()
+    return session.scalar(select(m.PositionAssignment.id).join(m.OrganizationalPosition,
+        m.PositionAssignment.position_id == m.OrganizationalPosition.id).where(
+        m.PositionAssignment.lecturer_id == lecturer_id,
+        m.PositionAssignment.faculty_id == department.faculty_id,
+        m.PositionAssignment.state == "ACTIVE",
+        m.PositionAssignment.effective_from <= instant,
+        or_(m.PositionAssignment.effective_to.is_(None), m.PositionAssignment.effective_to > instant),
+        m.OrganizationalPosition.code == "FACULTY_DEAN").limit(1)) is not None
+
+
 def rights(session, user, thesis):
     result = set()
     if user.base_role == "STUDENT":
         student = profile(session, user, "STUDENT")
         if session.scalar(select(m.ThesisMember.id).where(m.ThesisMember.thesis_id == thesis.id,
                 m.ThesisMember.student_id == student.id, m.ThesisMember.active.is_(True))):
-            result.update({"view", "document:view", "progress:view", "work:view", "progress:submit", "document:submit", "work:submit"})
+            result.update({"view", "document:view", "progress:view", "work:view", "progress:submit", "document:submit", "work:submit", "proposal:view", "proposal:submit"})
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
         advisor = primary_advisor(session, thesis.id)
         if advisor and advisor.lecturer_id == lecturer.id:
-            result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review"})
+            result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review", "proposal:view", "proposal:review"})
         if _is_department_head(session, lecturer.id, thesis.department_id):
-            result.update({"view", "document:view", "progress:view", "work:view", "advisor:nominate", "progress:assign_reviewer", "audit:view"})
+            result.update({"view", "document:view", "progress:view", "work:view", "advisor:nominate", "progress:assign_reviewer", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
+        if is_faculty_dean(session, lecturer.id, thesis.department_id):
+            result.update({"view", "proposal:view", "proposal:dean_confirm"})
+        proposal = session.scalar(select(m.Proposal).where(m.Proposal.thesis_id == thesis.id))
+        if proposal and session.scalar(select(m.ReviewerAssignment.id).where(
+            m.ReviewerAssignment.proposal_id == proposal.id,
+            m.ReviewerAssignment.lecturer_id == lecturer.id,
+            m.ReviewerAssignment.review_scope == "PROPOSAL",
+            m.ReviewerAssignment.state == "ACTIVE").limit(1)):
+            result.update({"view", "proposal:view", "proposal:comment"})
         if resource_role(session, user.id, "PROGRESS_REVIEWER", thesis_id=thesis.id):
             result.update({"view", "progress:view", "progress:comment"})
         if resource_role(session, user.id, "ADVISOR_NOMINEE", thesis_id=thesis.id):
@@ -104,7 +128,7 @@ def workspace_out(session, user, thesis):
     actions = rights(session, user, thesis)
     if thesis.state not in EDITABLE:
         actions.difference_update({"progress:submit", "document:submit", "work:submit", "progress:review", "document:review",
-            "work:review", "advisor:nominate", "advisor:respond", "progress:assign_reviewer", "progress:comment", "milestone:manage"})
+            "work:review", "advisor:nominate", "advisor:respond", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
     return ThesisWorkspaceOut(id=thesis.id, title=thesis.current_title, state=thesis.state,
         row_version=thesis.row_version, round_id=thesis.round_id, round_label=f"{year.code} / {round_.code}",
         member_student_ids=[member.student_id for member in members], members=[member_out(member) for member in members],
@@ -125,15 +149,20 @@ def list_theses(session, user):
             m.ThesisMember.student_id == student.id, m.ThesisMember.active.is_(True))
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
-        heads = [dep for dep in session.scalars(select(m.Department.id)) if _is_department_head(session, lecturer.id, dep)]
+        heads = [dep for dep in session.scalars(select(m.Department.id)) if _is_department_head(session, lecturer.id, dep) or is_faculty_dean(session, lecturer.id, dep)]
         advisors = select(m.AdvisorAssignment.thesis_id).where(m.AdvisorAssignment.lecturer_id == lecturer.id,
             effective(m.AdvisorAssignment))
         resources = select(m.ResourceAssignment.thesis_id).where(m.ResourceAssignment.user_id == user.id,
             m.ResourceAssignment.assignment_type.in_(["ADVISOR_NOMINEE", "PROGRESS_REVIEWER"]), effective(m.ResourceAssignment))
         rounds = select(m.ResourceAssignment.round_id).where(m.ResourceAssignment.user_id == user.id,
             m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR", effective(m.ResourceAssignment))
+        proposal_reviews = select(m.Proposal.thesis_id).join(m.ReviewerAssignment,
+            m.ReviewerAssignment.proposal_id == m.Proposal.id).where(
+            m.ReviewerAssignment.lecturer_id == lecturer.id,
+            m.ReviewerAssignment.review_scope == "PROPOSAL",
+            m.ReviewerAssignment.state == "ACTIVE")
         query = select(m.Thesis).where(or_(m.Thesis.department_id.in_(heads), m.Thesis.id.in_(advisors),
-            m.Thesis.id.in_(resources), m.Thesis.round_id.in_(rounds)))
+            m.Thesis.id.in_(resources), m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews)))
     else:
         return []
     return [workspace_out(session, user, row) for row in session.scalars(query.order_by(m.Thesis.created_at.desc(), m.Thesis.id)).all()]

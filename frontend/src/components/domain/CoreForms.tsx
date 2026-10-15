@@ -9,6 +9,9 @@ export const stateLabel: Record<string, string> = {
   REVISION_REQUESTED: "Cần chỉnh sửa", ACCEPTED: "GVHD đã tiếp nhận", APPROVED: "Đã duyệt",
   OPEN: "Đang mở", CLOSED: "Đã đóng", ENDED: "Đã kết thúc", REVOKED: "Đã thu hồi",
   COMMENT_ONLY: "Góp ý chéo", CONFIRM: "Xác nhận", ACCEPT: "Tiếp nhận",
+  UNDER_REVIEW: "Đang nhận xét", ADVISOR_CONFIRMED: "GVHD đã xác nhận",
+  DEPARTMENT_FINALIZED: "Bộ môn đã chốt", DEAN_CONFIRMED: "Đã ghi nhận bản ký Trưởng khoa",
+  COMMENT: "Góp ý đề cương",
   LOCKED: "Đã khóa", DISABLED: "Ngừng sử dụng", FINAL: "Bản cuối đã khóa",
 };
 

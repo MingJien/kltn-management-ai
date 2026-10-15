@@ -64,7 +64,7 @@ export default function ThesisDocuments({thesis, docs, userId, busy, run}: {
       <h3>Thêm tài liệu</h3>
       <div className="input-group"><label htmlFor="document-title">Tên tài liệu</label><input className="input" id="document-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="document-type">Loại tài liệu</label><select className="input" id="document-type" value={type} onChange={event => setType(event.target.value)} disabled={busy}>
-        <option value="REPORT">Báo cáo khóa luận</option><option value="PROPOSAL">Tệp đề cương</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>
+        <option value="REPORT">Báo cáo khóa luận</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>
       </select></div>
       <button className="btn btn-primary" disabled={busy || !title.trim()}>Tạo hồ sơ tài liệu</button>
     </div></form>}

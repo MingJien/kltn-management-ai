@@ -51,6 +51,13 @@ class RevokeStudent(BaseModel):
     basis_ref: str = Field(min_length=3, max_length=500)
 
 
+class SpecialDecision(BaseModel):
+    student_id: UUID
+    official_ref: str = Field(min_length=3, max_length=500)
+    reason: str = Field(min_length=5, max_length=2000)
+    clause_1_verified: bool
+
+
 class CorrectStudent(BaseModel):
     student_code: str = Field(min_length=1, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
@@ -157,6 +164,39 @@ def confirm_roster(round_id: UUID, payload: ConfirmRows,
         occurred_at=now, correlation_id=uuid4()))
     session.commit()
     return {"confirmed": len(snapshots)}
+
+
+@router.post("/special-decision")
+def record_special_decision(round_id: UUID, payload: SpecialDecision,
+                            user: m.UserAccount = Depends(current_user),
+                            session: Session = Depends(get_session)) -> dict:
+    """Record a rector's exception to QĐ5964 clause 2; never self-certify."""
+    require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
+    if not payload.clause_1_verified:
+        raise HTTPException(422, "Ngoại lệ khoản 2 chỉ áp dụng sau khi đối chiếu khoản 1 Điều 2 QĐ5964")
+    latest = session.scalar(select(m.EligibilitySnapshot).where(
+        m.EligibilitySnapshot.student_id == payload.student_id,
+        m.EligibilitySnapshot.round_id == round_id).order_by(
+            m.EligibilitySnapshot.version.desc()).limit(1).with_for_update())
+    if latest is None:
+        raise HTTPException(404, "Sinh viên chưa có trong danh sách đợt này")
+    if latest.state == "CONFIRMED":
+        raise HTTPException(409, "Kết quả hiện hành đã được xác nhận")
+    now = datetime.now(timezone.utc)
+    replacement = m.EligibilitySnapshot(id=uuid4(), student_id=latest.student_id,
+        round_id=round_id, version=latest.version + 1,
+        passed_credit_ratio=latest.passed_credit_ratio, gpa_4=latest.gpa_4,
+        evidence_ref=payload.official_ref.strip(), captured_at=now,
+        confirmed_by=user.id, confirmed_at=now,
+        decision_reason=payload.reason.strip(), state="CONFIRMED")
+    session.add(replacement)
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id,
+        action="ELIGIBILITY_SPECIAL_DECISION_RECORDED", resource_type="eligibility_snapshot",
+        resource_id=replacement.id,
+        reason=f"QĐ5964 Điều 2; khoản 1 đã được người xác nhận đối chiếu; ngoại lệ khoản 2 theo ref={payload.official_ref.strip()}",
+        occurred_at=now, correlation_id=uuid4()))
+    session.commit()
+    return {"state": "CONFIRMED", "snapshot_id": str(replacement.id)}
 
 
 @router.post("/revoke")

@@ -21,6 +21,10 @@ export default function RosterPage({context}: {context:Context}) {
   const [selected, setSelected] = useState<string[]>([]);
   const [revokeStudent, setRevokeStudent] = useState("");
   const [revokeReason, setRevokeReason] = useState("");
+  const [specialStudent, setSpecialStudent] = useState("");
+  const [specialRef, setSpecialRef] = useState("");
+  const [specialReason, setSpecialReason] = useState("");
+  const [specialClauseOne, setSpecialClauseOne] = useState(false);
   const [correctionStudent, setCorrectionStudent] = useState("");
   const [correctionCode, setCorrectionCode] = useState("");
   const [correctionName, setCorrectionName] = useState("");
@@ -104,6 +108,19 @@ export default function RosterPage({context}: {context:Context}) {
           onClick={()=>void run(async()=>{await request(`/rounds/${roundId}/roster/revoke`,context.user_id,{method:"POST",
             body:JSON.stringify({student_id:revokeStudent,reason:revokeReason,basis_ref:basis})});setRevokeStudent("");setRevokeReason("");},
             "Đã thu hồi quyền tham gia; hồ sơ cũ được giữ để rà soát.")}>Thu hồi quyền tham gia</button>
+        <h3>Ghi nhận quyết định đặc biệt của Hiệu trưởng</h3>
+        <p className="text-muted">QĐ5964 chỉ cho phép ngoại lệ đối với ngưỡng tín chỉ/GPA ở khoản 2 Điều 2. Chỉ ghi nhận khi đã có quyết định thật và đã đối chiếu khoản 1; không nhập chi tiết kỷ luật hoặc án tích.</p>
+        <label className="input-group">Sinh viên<select className="input" value={specialStudent} onChange={e=>setSpecialStudent(e.target.value)} disabled={busy}>
+          <option value="">Chọn sinh viên chưa được xác nhận</option>{roster.filter(r=>r.state!=="CONFIRMED").map(r=><option key={r.student_id} value={r.student_id}>{r.student_code} · {r.display_name}</option>)}
+        </select></label>
+        <label className="input-group">Số quyết định của Hiệu trưởng<input className="input" value={specialRef} onChange={e=>setSpecialRef(e.target.value)} maxLength={500} disabled={busy} /></label>
+        <label className="input-group">Lý do đối chiếu ngắn gọn<input className="input" value={specialReason} onChange={e=>setSpecialReason(e.target.value)} maxLength={2000} disabled={busy} /></label>
+        <label><input type="checkbox" checked={specialClauseOne} onChange={e=>setSpecialClauseOne(e.target.checked)} disabled={busy} /> Đã kiểm khoản 1 Điều 2 QĐ5964 và quyết định gốc</label>
+        <button className="btn btn-secondary" disabled={!specialStudent||specialRef.trim().length<3||specialReason.trim().length<5||!specialClauseOne||busy}
+          onClick={()=>void run(async()=>{await request(`/rounds/${roundId}/roster/special-decision`,context.user_id,{method:"POST",
+            body:JSON.stringify({student_id:specialStudent,official_ref:specialRef.trim(),reason:specialReason.trim(),clause_1_verified:specialClauseOne})});
+            setSpecialStudent("");setSpecialRef("");setSpecialReason("");setSpecialClauseOne(false);},
+            "Đã ghi nhận kết quả theo quyết định đặc biệt; phiên bản cũ được giữ.")}>Ghi nhận ngoại lệ</button>
         <h3>Đính chính thông tin theo văn bản Khoa</h3>
         <p className="text-muted">Đổi email sẽ vô hiệu mật khẩu và các phiên cũ; sinh viên cần kích hoạt lại bằng email mới. Việc đính chính không tự thay đổi kết quả đủ điều kiện.</p>
         <label className="input-group">Sinh viên<select className="input" value={correctionStudent} onChange={e=>{

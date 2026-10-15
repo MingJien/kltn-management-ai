@@ -125,7 +125,7 @@
 }
 .login-password-toggle:hover { background: var(--neutral-100); color: var(--primary-700); }
 .login-footer { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; }
-.login-footer p { color: var(--neutral-400); font: var(--text-caption); }
+.login-footer p { color: var(--neutral-600); font: var(--text-caption); }
 .login-spinner { width: 32px; height: 32px; margin: 0 auto; border: 3px solid var(--neutral-200); border-top-color: var(--primary-600); border-radius: 50%; animation: spin .8s linear infinite; }
 .login-spinner--sm { width: 16px; height: 16px; margin: 0; border-width: 2px; }
 @keyframes spin { to { transform: rotate(360deg); } }

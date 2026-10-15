@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { AuditEvent, Context, Lecturer, Milestone, ProgressReport, Thesis, ThesisDocument, WorkAssignment } from "../api";
+import type { AuditEvent, Context, Lecturer, Milestone, ProgressReport, Proposal, Thesis, ThesisDocument, WorkAssignment } from "../api";
 import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
 import { formatDate, ReviewForm, Status } from "../components/domain/CoreForms";
 import ThesisDocuments from "../components/domain/ThesisDocuments";
 import ThesisProgress from "../components/domain/ThesisProgress";
+import ThesisProposal from "../components/domain/ThesisProposal";
 import ThesisWork from "../components/domain/ThesisWork";
 
-type Data = {thesis: Thesis; milestones: Milestone[]; reports: ProgressReport[]; docs: ThesisDocument[]; work: WorkAssignment[]; lecturers: Lecturer[]; audit: AuditEvent[]};
+type Data = {thesis: Thesis; milestones: Milestone[]; reports: ProgressReport[]; docs: ThesisDocument[]; work: WorkAssignment[]; lecturers: Lecturer[]; audit: AuditEvent[]; proposal: Proposal | null};
 
 export default function ThesisViewPage({context}: {context: Context}) {
   const {thesisId} = useParams();
@@ -31,13 +32,14 @@ function ThesisWorkspace({context}: {context: Context}) {
     const thesis = await request<Thesis>(path, context.user_id, {signal});
     const get = <T,>(suffix: string, action?: string): Promise<T[]> => !action || thesis.actions.includes(action)
       ? request<T[]>(path+suffix, context.user_id, {signal}) : Promise.resolve([]);
-    const [milestones, reports, docs, work, lecturers, audit] = await Promise.all([
+    const [milestones, reports, docs, work, lecturers, audit, proposal] = await Promise.all([
       get<Milestone>("/milestones"), get<ProgressReport>("/progress-reports", "progress:view"),
       get<ThesisDocument>("/documents", "document:view"), get<WorkAssignment>("/work-assignments", "work:view"),
-      thesis.actions.includes("advisor:nominate") ? request<Lecturer[]>("/lecturers", context.user_id, {signal}) : Promise.resolve([]),
+      thesis.actions.includes("advisor:nominate") || thesis.actions.includes("proposal:assign_reviewer") ? request<Lecturer[]>("/lecturers", context.user_id, {signal}) : Promise.resolve([]),
       get<AuditEvent>("/audit", "audit:view"),
+      thesis.actions.includes("proposal:view") ? request<Proposal>(path+"/proposal", context.user_id, {signal}) : Promise.resolve(null),
     ]);
-    if (!signal?.aborted) setData({thesis, milestones, reports, docs, work, lecturers, audit});
+    if (!signal?.aborted) setData({thesis, milestones, reports, docs, work, lecturers, audit, proposal});
   }, [thesisId, context.user_id]);
 
   useEffect(() => {
@@ -56,15 +58,15 @@ function ThesisWorkspace({context}: {context: Context}) {
   }
 
   if (!data) return <><Link to="/theses">Quay lại khóa luận</Link>{error ? <div className="alert alert-danger" role="alert">{error}</div> : <p role="status">Đang tải hồ sơ khóa luận…</p>}</>;
-  const {thesis, docs, milestones, reports, work, lecturers, audit} = data;
-  const tabs = ["overview", ...(thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? ["progress"] : []),
+  const {thesis, docs, milestones, reports, work, lecturers, audit, proposal} = data;
+  const tabs = ["overview", ...(proposal ? ["proposal"] : []), ...(thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? ["progress"] : []),
     ...(thesis.actions.includes("document:view") ? ["documents"] : [])];
   const section = tabs.includes(params.get("section") || "") ? params.get("section")! : "overview";
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
   return <>
     <Link to="/theses">← Danh sách khóa luận</Link>
     <PageHeader title={thesis.title} description={`${thesis.round_label} · GVHD: ${thesis.advisor_name || "Chưa có"}`} />
-    <div className="core-toolbar"><Status value={thesis.state} />{tabs.map(tab => <button type="button" key={tab} className={`btn ${section === tab ? "btn-primary" : "btn-secondary"}`} aria-pressed={section === tab} onClick={() => setParams({section: tab})}>{tab === "overview" ? "Tổng quan & GVHD" : tab === "progress" ? "Tiến độ" : "Tài liệu"}</button>)}</div>
+    <div className="core-toolbar"><Status value={thesis.state} />{tabs.map(tab => <button type="button" key={tab} className={`btn ${section === tab ? "btn-primary" : "btn-secondary"}`} aria-pressed={section === tab} onClick={() => setParams({section: tab})}>{tab === "overview" ? "Tổng quan & GVHD" : tab === "proposal" ? "Đề cương" : tab === "progress" ? "Tiến độ" : "Tài liệu"}</button>)}</div>
     {error && <div className="alert alert-danger" role="alert">{error} <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void run(async () => {}, "Đã tải dữ liệu mới.")}>Tải lại dữ liệu</button></div>}
     {message && <div className="alert alert-success" role="status">{message}</div>}
     {busy && <p role="status">Đang lưu và cập nhật hồ sơ…</p>}
@@ -98,6 +100,7 @@ function ThesisWorkspace({context}: {context: Context}) {
       {thesis.actions.includes("audit:view") && <details className="card"><summary className="card-body">Lịch sử thao tác nghiệp vụ</summary><div className="card-body stack">{audit.map((event, index) => <p key={`${event.occurred_at}-${index}`}><strong>{event.actor_name}</strong> · {event.action} · {formatDate(event.occurred_at)}<br />{event.reason}</p>)}</div></details>}
     </div>}
     {section === "progress" && <ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} userId={context.user_id} busy={busy} run={run} />}
+    {section === "proposal" && proposal && <ThesisProposal thesis={thesis} proposal={proposal} lecturers={lecturers} userId={context.user_id} busy={busy} run={run} />}
     {section === "documents" && <ThesisDocuments thesis={thesis} docs={docs} userId={context.user_id} busy={busy} run={run} />}
   </>;
 }

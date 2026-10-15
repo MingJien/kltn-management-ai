@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Request, Security
 from fastapi.security import APIKeyCookie, APIKeyHeader
 from sqlalchemy import create_engine, select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.db.models.entities import UserAccount
@@ -35,6 +36,9 @@ def database_url() -> str:
     value = os.getenv("DATABASE_URL")
     if not value:
         raise RuntimeError("DATABASE_URL must be configured")
+    url = make_url(value)
+    if not url.drivername.startswith("postgresql") or url.database != "kltn_management":
+        raise RuntimeError("Phase-1 runtime requires PostgreSQL database kltn_management")
     return value
 
 

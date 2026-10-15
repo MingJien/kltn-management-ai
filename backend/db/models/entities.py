@@ -23,7 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from backend.db.base import Base, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
+from backend.db.base import Base, LegacyBase, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
 
 
 def fk(target: str, *, nullable: bool = False):
@@ -150,7 +150,7 @@ class ThesisRound(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class RoundPolicy(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class RoundPolicy(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "round_policy"
     __table_args__ = (
         UniqueConstraint("round_id", "policy_type", "version"),
@@ -171,21 +171,18 @@ class ResourceAssignment(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Ba
     __table_args__ = (
         CheckConstraint(
             "(CASE WHEN round_id IS NULL THEN 0 ELSE 1 END + "
-            "CASE WHEN thesis_id IS NULL THEN 0 ELSE 1 END + "
-            "CASE WHEN council_id IS NULL THEN 0 ELSE 1 END) = 1",
+            "CASE WHEN thesis_id IS NULL THEN 0 ELSE 1 END) = 1",
             name="exactly_one_resource",
         ),
         CheckConstraint("state IN ('ACTIVE','REVOKED','EXPIRED')", name="state"),
         CheckConstraint("effective_to IS NULL OR effective_to > effective_from", name="effective_window"),
         Index("uq_resource_assignment_round_scope", "assignment_type", "user_id", "round_id", unique=True, postgresql_where=text("round_id IS NOT NULL AND state = 'ACTIVE'")),
         Index("uq_resource_assignment_thesis_scope", "assignment_type", "user_id", "thesis_id", unique=True, postgresql_where=text("thesis_id IS NOT NULL AND state = 'ACTIVE'")),
-        Index("uq_resource_assignment_council_scope", "assignment_type", "user_id", "council_id", unique=True, postgresql_where=text("council_id IS NOT NULL AND state = 'ACTIVE'")),
     )
     assignment_type: Mapped[str] = mapped_column(String(50), nullable=False)
     user_id: Mapped[uuid.UUID] = fk("user_account.id")
     round_id: Mapped[Optional[uuid.UUID]] = fk("thesis_round.id", nullable=True)
     thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
-    council_id: Mapped[Optional[uuid.UUID]] = fk("council.id", nullable=True)
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
@@ -219,7 +216,7 @@ class EligibilitySnapshot(UuidPrimaryKeyMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class EligibilityException(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class EligibilityException(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "eligibility_exception"
     snapshot_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("eligibility_snapshot.id", ondelete="RESTRICT"), nullable=False, unique=True
@@ -230,7 +227,7 @@ class EligibilityException(UuidPrimaryKeyMixin, TimestampMixin, Base):
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class LecturerExpertise(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class LecturerExpertise(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "lecturer_expertise"
     __table_args__ = (
         UniqueConstraint("lecturer_id", "version"),
@@ -245,7 +242,7 @@ class LecturerExpertise(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
-class ExpertiseEvidence(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class ExpertiseEvidence(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "expertise_evidence"
     expertise_id: Mapped[uuid.UUID] = fk("lecturer_expertise.id")
     evidence_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -591,7 +588,7 @@ class ProgressReview(UuidPrimaryKeyMixin, TimestampMixin, Base):
     comment: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class TopicChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class TopicChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "topic_change_request"
     __table_args__ = (
         CheckConstraint(
@@ -612,7 +609,7 @@ class TopicChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Ba
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="SUBMITTED", server_default="SUBMITTED")
 
 
-class ExternalProcedureOutcome(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class ExternalProcedureOutcome(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "external_procedure_outcome"
     __table_args__ = (
         CheckConstraint("outcome_type IN ('WITHDRAWAL','EXTENSION')", name="outcome_type"),
@@ -658,7 +655,7 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class SimilarityPolicy(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class SimilarityPolicy(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "similarity_policy"
     __table_args__ = (
         UniqueConstraint("round_id", "version_no"),
@@ -676,7 +673,7 @@ class SimilarityPolicy(UuidPrimaryKeyMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class SimilarityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class SimilarityCheck(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "similarity_check"
     __table_args__ = (
         CheckConstraint("state IN ('QUEUED','RUNNING','COMPLETED','FAILED')", name="state"),
@@ -694,7 +691,7 @@ class SimilarityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
-class SimilarityMatch(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class SimilarityMatch(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "similarity_match"
     __table_args__ = (
         CheckConstraint("input_start >= 0 AND input_end > input_start", name="input_range"),
@@ -710,7 +707,7 @@ class SimilarityMatch(UuidPrimaryKeyMixin, TimestampMixin, Base):
     semantic_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6))
 
 
-class Council(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class Council(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "council"
     __table_args__ = (
         UniqueConstraint("round_id", "code"),
@@ -724,7 +721,7 @@ class Council(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="IMPORTED", server_default="IMPORTED")
 
 
-class CouncilMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class CouncilMember(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "council_member"
     __table_args__ = (
         UniqueConstraint("council_id", "lecturer_id"),
@@ -740,7 +737,7 @@ class CouncilMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
 
 
-class DefenseSession(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class DefenseSession(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "defense_session"
     __table_args__ = (
         UniqueConstraint("council_id", "code"),
@@ -756,7 +753,7 @@ class DefenseSession(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="SCHEDULED", server_default="SCHEDULED")
 
 
-class SessionThesis(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class SessionThesis(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "session_thesis"
     __table_args__ = (
         UniqueConstraint("session_id", "thesis_id"),
@@ -768,7 +765,7 @@ class SessionThesis(UuidPrimaryKeyMixin, TimestampMixin, Base):
     order_no: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class CouncilAttendance(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class CouncilAttendance(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "council_attendance"
     __table_args__ = (UniqueConstraint("session_id", "council_member_id"),)
     session_id: Mapped[uuid.UUID] = fk("defense_session.id")
@@ -779,7 +776,7 @@ class CouncilAttendance(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     note: Mapped[Optional[str]] = mapped_column(Text)
 
 
-class DefenseEligibilityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class DefenseEligibilityCheck(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "defense_eligibility_check"
     __table_args__ = (
         CheckConstraint("result IN ('ELIGIBLE','NOT_ELIGIBLE','PENDING_POLICY')", name="result"),
@@ -797,7 +794,7 @@ class DefenseEligibilityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
     checked_by: Mapped[uuid.UUID] = fk("user_account.id")
 
 
-class AdvisorReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class AdvisorReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "advisor_review"
     __table_args__ = (
         UniqueConstraint("advisor_assignment_id", "thesis_member_id", "version_no"),
@@ -814,7 +811,7 @@ class AdvisorReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     defense_recommendation: Mapped[str] = mapped_column(String(20), nullable=False)
 
 
-class ReviewerReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class ReviewerReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "reviewer_review"
     __table_args__ = (
         UniqueConstraint("reviewer_assignment_id", "thesis_member_id", "version_no"),
@@ -831,7 +828,7 @@ class ReviewerReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     overall: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class RubricTemplate(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class RubricTemplate(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "rubric_template"
     __table_args__ = (
         UniqueConstraint("code", "version_no"),
@@ -845,7 +842,7 @@ class RubricTemplate(UuidPrimaryKeyMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class RubricCriterion(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class RubricCriterion(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "rubric_criterion"
     __table_args__ = (
         UniqueConstraint("rubric_template_id", "code"),
@@ -865,7 +862,7 @@ class RubricCriterion(UuidPrimaryKeyMixin, TimestampMixin, Base):
     order_no: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class RubricAssignment(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class RubricAssignment(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "rubric_assignment"
     __table_args__ = (
         CheckConstraint(
@@ -881,7 +878,7 @@ class RubricAssignment(UuidPrimaryKeyMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
 
 
-class BonusEvidence(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class BonusEvidence(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "bonus_evidence"
     thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
     evidence_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -889,7 +886,7 @@ class BonusEvidence(UuidPrimaryKeyMixin, TimestampMixin, Base):
     stored_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
 
 
-class Evaluation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class Evaluation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "evaluation"
     __table_args__ = (
         UniqueConstraint("session_id", "evaluator_member_id", "thesis_member_id"),
@@ -909,7 +906,7 @@ class Evaluation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     correction_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
-class EvaluationItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class EvaluationItem(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "evaluation_item"
     __table_args__ = (
         UniqueConstraint("evaluation_id", "criterion_id"),
@@ -922,7 +919,7 @@ class EvaluationItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
     bonus_evidence_id: Mapped[Optional[uuid.UUID]] = fk("bonus_evidence.id", nullable=True)
 
 
-class FinalResult(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class FinalResult(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "final_result"
     __table_args__ = (
         UniqueConstraint("session_id", "thesis_member_id"),
@@ -942,7 +939,7 @@ class FinalResult(UuidPrimaryKeyMixin, TimestampMixin, Base):
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class CouncilMinute(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class CouncilMinute(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "council_minute"
     __table_args__ = (
         UniqueConstraint("session_id", "minute_no"),
@@ -959,7 +956,7 @@ class CouncilMinute(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
-class MinuteVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class MinuteVersion(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "minute_version"
     __table_args__ = (
         UniqueConstraint("minute_id", "version_no"),
@@ -976,7 +973,7 @@ class MinuteVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
     void_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
-class MinuteSignature(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class MinuteSignature(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "minute_signature"
     __table_args__ = (UniqueConstraint("minute_version_id", "signer_member_id"),)
     minute_version_id: Mapped[uuid.UUID] = fk("minute_version.id")
@@ -985,7 +982,7 @@ class MinuteSignature(UuidPrimaryKeyMixin, TimestampMixin, Base):
     signature_ref: Mapped[Optional[str]] = mapped_column(String(500))
 
 
-class RepositoryItem(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+class RepositoryItem(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, LegacyBase):
     __tablename__ = "repository_item"
     __table_args__ = (
         CheckConstraint("visibility IN ('INTERNAL','PUBLISHED','REVOKED')", name="visibility"),
@@ -1022,7 +1019,7 @@ class RepositoryItem(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
-class SearchIndexMetadata(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class SearchIndexMetadata(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "search_index_metadata"
     __table_args__ = (
         UniqueConstraint("repository_item_id", "index_name", "index_version"),
@@ -1039,7 +1036,7 @@ class SearchIndexMetadata(UuidPrimaryKeyMixin, TimestampMixin, Base):
     indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
-class RetrievalAudit(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class RetrievalAudit(UuidPrimaryKeyMixin, TimestampMixin, LegacyBase):
     __tablename__ = "retrieval_audit"
     __table_args__ = (
         CheckConstraint("outcome IN ('ANSWERED','NO_EVIDENCE','DEPENDENCY_FAILED','DENIED')", name="outcome"),
