@@ -9,7 +9,9 @@ type Round = {id:string; code:string; state:string};
 type Account = {id:string; email:string; base_role:string; status:string; verified:boolean};
 type Assignment = {id:string; round_id:string; round_code:string; user_id:string; email:string; assignment_type:string};
 
-export default function AdministrationPage({context}: {context:Context}) {
+export default function AdministrationPage({context,onPermissionsChanged}: {
+  context:Context; onPermissionsChanged:()=>Promise<void>;
+}) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -37,9 +39,11 @@ export default function AdministrationPage({context}: {context:Context}) {
     setDepartments(d); setRounds(r); setAccounts(u); setAssignments(a);
   }, [context.user_id]);
   useEffect(() => {void refresh().catch(cause=>setError(errorMessage(cause)));}, [refresh]);
-  async function run(action:()=>Promise<unknown>, message:string) {
+  async function run(action:()=>Promise<unknown>, message:string, permissionsChanged=false) {
     setBusy(true); setError(""); setNotice("");
-    try {const result=await action(); await refresh(search); setNotice(typeof result==="string"?result:message);} catch(cause) {setError(errorMessage(cause));}
+    try {const result=await action(); await refresh(search);
+      if (permissionsChanged) await onPermissionsChanged();
+      setNotice(typeof result==="string"?result:message);} catch(cause) {setError(errorMessage(cause));}
     finally {setBusy(false);}
   }
   return <><PageHeader title="Quản trị tài khoản" description="Cấp tài khoản và ghi nhận phân công theo đợt" />
@@ -65,7 +69,7 @@ export default function AdministrationPage({context}: {context:Context}) {
         </div></section>
         <section className="card"><div className="card-body stack"><h2>Phân công theo đợt</h2>
           <form className="stack" onSubmit={e=>{e.preventDefault();void run(()=>request("/admin/round-assignments",context.user_id,
-            {method:"POST",body:JSON.stringify({round_id:roundId,user_id:userId,assignment_type:kind,basis_ref:basis})}),"Đã lưu phân công.");}}>
+            {method:"POST",body:JSON.stringify({round_id:roundId,user_id:userId,assignment_type:kind,basis_ref:basis})}),"Đã lưu phân công.",true);}}>
             <label className="input-group">Đợt<select className="input" required value={roundId} onChange={e=>setRoundId(e.target.value)}>
               <option value="">Chọn đợt</option>{rounds.filter(r=>r.state==="DRAFT"||r.state==="OPEN").map(r=><option key={r.id} value={r.id}>{r.code} · {r.state}</option>)}</select></label>
             <label className="input-group">Người được giao<select className="input" required value={userId} onChange={e=>setUserId(e.target.value)}>
@@ -83,7 +87,7 @@ export default function AdministrationPage({context}: {context:Context}) {
           <span>{a.round_code} · {a.email} · {a.assignment_type === "ELIGIBILITY_VERIFIER" ? "Xác nhận" : "Nhập danh sách"}</span>
           <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
             onClick={()=>void run(()=>request(`/admin/round-assignments/${a.id}/revoke`,context.user_id,
-              {method:"POST",body:JSON.stringify({reason})}),"Đã thu hồi phân công.")}>Thu hồi</button>
+              {method:"POST",body:JSON.stringify({reason})}),"Đã thu hồi phân công.",true)}>Thu hồi</button>
         </div>)}{!assignments.length ? <p>Chưa có phân công.</p> : null}</div>
       </div></section>
       <section className="card"><div className="card-body stack"><h2>Tài khoản</h2>

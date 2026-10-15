@@ -83,8 +83,11 @@ function App() {
 
   if (restoring) return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
 
-  if (!context && ["/account/activation-request", "/account/forgot-password",
-    "/account/activate", "/account/reset-password"].includes(location.pathname)) return <AccountAccessPage />;
+  // An email link must work even when this browser still has another user's session.
+  if (["/account/activation-request", "/account/forgot-password",
+    "/account/activate", "/account/reset-password"].includes(location.pathname)) return <AccountAccessPage
+      signedInAs={context?.display_name || null}
+      onPasswordUpdated={context ? signOut : undefined} />;
 
   // Not connected — show the branded login screen.
   if (!context) {
@@ -106,7 +109,7 @@ function App() {
           setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
         }} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
-          <AdministrationPage context={context} /> : <Navigate to="/" replace />} />
+          <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
         <Route path="/rounds" element={context.actions.includes("account:manage") ?
           <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?

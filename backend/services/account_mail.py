@@ -10,7 +10,20 @@ from pathlib import Path
 from uuid import uuid4
 
 
+def mail_delivery_ready() -> bool:
+    """Accept a complete SMTP setup, or the explicit development outbox."""
+    sender = os.getenv("KLTN_MAIL_FROM", "").strip()
+    host = os.getenv("KLTN_SMTP_HOST", "").strip()
+    username = os.getenv("KLTN_SMTP_USER", "").strip()
+    password = os.getenv("KLTN_SMTP_PASSWORD", "").strip()
+    if not any((sender, host, username, password)):
+        return os.getenv("KLTN_ENV") in {"development", "test"}
+    return bool(sender and host and (bool(username) == bool(password)))
+
+
 def send_account_link(recipient: str, subject: str, text: str) -> None:
+    if not mail_delivery_ready():
+        raise RuntimeError("Email delivery is not fully configured")
     sender = os.getenv("KLTN_MAIL_FROM", "").strip()
     host = os.getenv("KLTN_SMTP_HOST", "").strip()
     if not sender or not host:
@@ -34,5 +47,5 @@ def send_account_link(recipient: str, subject: str, text: str) -> None:
         client.starttls(context=ssl.create_default_context())
         username = os.getenv("KLTN_SMTP_USER", "").strip()
         if username:
-            client.login(username, os.environ["KLTN_SMTP_PASSWORD"])
+            client.login(username, os.environ["KLTN_SMTP_PASSWORD"].strip())
         client.send_message(message)

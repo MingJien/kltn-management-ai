@@ -2,13 +2,14 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 const accounts: Record<string,{email:string;password:string}> = JSON.parse(process.env.KLTN_E2E_ACCOUNTS_JSON || "{}");
-const api = "http://127.0.0.1:8001/api/v1";
+const web = `http://127.0.0.1:${process.env.KLTN_E2E_WEB_PORT || "5174"}`;
+const api = `http://127.0.0.1:${process.env.KLTN_E2E_API_PORT || "8001"}/api/v1`;
 async function login(browser: Browser, key: string) {
   const context = await browser.newContext({viewport:{width:1440,height:1000}});
   const page = await context.newPage();
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("http://127.0.0.1:5174/");
+  await page.goto(web + "/");
   await page.getByLabel("Email",{exact:true}).fill(accounts[key].email);
   await page.getByLabel("Mật khẩu",{exact:true}).fill(accounts[key].password);
   await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
@@ -28,7 +29,7 @@ async function write(page: Page, path: string, options: {data?: unknown; headers
 }
 function card(page: Page, title: string) {return page.locator("article").filter({has:page.getByRole("heading",{name:title,exact:true})});}
 async function find(page: Page, title: string) {
-  await page.goto("http://127.0.0.1:5174/topics");
+  await page.goto(web + "/topics");
   await page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
   await page.getByLabel("Tìm đề tài").fill(title);
   await expect(card(page,title)).toHaveCount(1);
@@ -48,7 +49,7 @@ async function proof(page: Page, title: string) {
   await expect(card(page,title).getByRole("link",{name:/Tải minh chứng/}).last()).toBeVisible();
 }
 async function review(page: Page, title: string, receiver?: string) {
-  await page.goto("http://127.0.0.1:5174/topics");
+  await page.goto(web + "/topics");
   await page.getByLabel("Tìm đề tài").fill(title);
   await card(page,title).getByRole("button",{name:"Xem và duyệt"}).click();
   const dialog = page.getByRole("dialog");
@@ -64,7 +65,7 @@ test("GV tạo → TBM duyệt/sửa tên → SV tự đăng ký → GV nhận; 
   const [gv,tbm,sv1,sv2,sv3] = actors;
   try {
     const title = "E2E Quản lý đề tài và đăng ký";
-    await gv.page.goto("http://127.0.0.1:5174/topics");
+    await gv.page.goto(web + "/topics");
     await gv.page.getByRole("button",{name:"Tạo đề tài",exact:true}).click();
     let dialog = gv.page.getByRole("dialog");
     await dialog.getByLabel("Tên đề tài",{exact:true}).fill(title);
@@ -91,7 +92,7 @@ test("GV tạo → TBM duyệt/sửa tên → SV tự đăng ký → GV nhận; 
     await proof(sv1.page,approved);
     await card(sv1.page,approved).getByRole("button",{name:"Gửi đăng ký cho GV"}).click();
     await expect(card(sv1.page,approved).getByText("Đã gửi",{exact:true}).first()).toBeVisible();
-    await gv.page.goto("http://127.0.0.1:5174/registrations");
+    await gv.page.goto(web + "/registrations");
     await card(gv.page,approved).getByRole("button",{name:"Chấp nhận",exact:true}).click();
     await expect(card(gv.page,approved).getByText("GV đã chấp nhận",{exact:true})).toBeVisible();
     await join(sv2.page,approved,true);
@@ -119,7 +120,7 @@ test("GV tạo → TBM duyệt/sửa tên → SV tự đăng ký → GV nhận; 
     await sv1.page.reload();
     await expect(sv1.page.getByRole("heading",{name:"Đăng ký đề tài",exact:true})).toBeVisible();
     expect((await write(sv1.page,"/topics",{data:{round_id:topic.round_id,title:"SV không được tạo đề tài GV"}})).status()).toBe(403);
-    await tbm.page.goto("http://127.0.0.1:5174/registrations");
+    await tbm.page.goto(web + "/registrations");
     await card(tbm.page,approved).getByRole("button",{name:"Chốt đăng ký và GVHD"}).click();
     dialog = tbm.page.getByRole("dialog");
     await expect(dialog).toContainText("GVHD chính");
@@ -135,7 +136,7 @@ test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham 
   try {
     const receiver = (await read(sv.page,"/lecturers")).find((l:{lecturer_code:string}) => l.lecturer_code === "SYN-DEMO-GV-1");
     const title = "E2E Đề tài do sinh viên đề xuất";
-    await sv.page.goto("http://127.0.0.1:5174/topics");
+    await sv.page.goto(web + "/topics");
     await sv.page.getByRole("button",{name:"Tự đề xuất đề tài",exact:true}).click();
     let dialog = sv.page.getByRole("dialog");
     await dialog.getByLabel("Tên đề tài",{exact:true}).fill(title);
@@ -147,7 +148,7 @@ test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham 
     await sv.page.getByRole("button",{name:"Gửi đề xuất cho bộ môn"}).click();
     await expect(sv.page.getByText(/Đề xuất đang chờ/)).toBeVisible();
     expect(await read(peer.page,"/topics?search=" + encodeURIComponent(title))).toEqual([]);
-    await tbm.page.goto("http://127.0.0.1:5174/topics");
+    await tbm.page.goto(web + "/topics");
     await tbm.page.getByLabel("Tìm đề tài").fill(title);
     await card(tbm.page,title).getByRole("button",{name:"Xem và duyệt"}).click();
     dialog = tbm.page.getByRole("dialog");
@@ -155,7 +156,7 @@ test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham 
     await dialog.getByRole("button",{name:"Trả lại để sửa"}).click();
     await expect(dialog.getByText("Trả lại để sửa",{exact:true}).first()).toBeVisible();
     await dialog.getByRole("button",{name:"Đóng",exact:true}).click();
-    await sv.page.goto("http://127.0.0.1:5174/topics");
+    await sv.page.goto(web + "/topics");
     await sv.page.getByRole("button",{name:"Đề xuất của tôi"}).click();
     await card(sv.page,title).getByRole("button",{name:"Xem chi tiết"}).click();
     dialog = sv.page.getByRole("dialog");
@@ -163,12 +164,12 @@ test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham 
     await dialog.getByRole("button",{name:"Lưu chỉnh sửa"}).click();
     await expect(dialog.getByText("Đã lưu đề tài.",{exact:true})).toBeVisible();
     await dialog.getByRole("button",{name:"Đóng",exact:true}).click();
-    await sv.page.goto("http://127.0.0.1:5174/registrations");
+    await sv.page.goto(web + "/registrations");
     await sv.page.getByRole("button",{name:"Gửi đề xuất cho bộ môn"}).click();
     await review(tbm.page,title,receiver.id);
     await expect((await find(peer.page,title + " đã duyệt")).getByText("Sinh viên đề xuất",{exact:true})).toBeVisible();
     await join(peer.page,title + " đã duyệt",true);
-    await gv.page.goto("http://127.0.0.1:5174/registrations");
+    await gv.page.goto(web + "/registrations");
     await card(gv.page,title + " đã duyệt").getByRole("button",{name:"Từ chối",exact:true}).click();
     dialog = gv.page.getByRole("dialog");
     await expect(dialog.getByRole("button",{name:"Xác nhận từ chối"})).toBeDisabled();
@@ -259,7 +260,7 @@ test("Di động, bàn phím, lỗi tiếng Việt, phiên đăng nhập và acc
     expect(result.violations.map(v => ({id:v.id,targets:v.nodes.map(n => n.target)}))).toEqual([]);
   }
   try {
-    await page.goto("http://127.0.0.1:5174/");
+    await page.goto(web + "/");
     await page.getByLabel("Email",{exact:true}).fill(accounts.sv1.email);
     await page.getByLabel("Mật khẩu",{exact:true}).fill("incorrect-synthetic-password");
     await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
@@ -268,7 +269,7 @@ test("Di động, bàn phím, lỗi tiếng Việt, phiên đăng nhập và acc
     await page.getByLabel("Mật khẩu",{exact:true}).fill(accounts.sv1.password);
     await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
     await expect(page.getByRole("heading",{name:"Tổng quan",exact:true})).toBeVisible();
-    await page.goto("http://127.0.0.1:5174/topics");
+    await page.goto(web + "/topics");
     await expect(page.getByRole("heading",{name:"Đề tài",exact:true})).toBeVisible();
     await expect(page.locator("article").first()).toBeVisible();
     await expect(page).toHaveTitle("Đề tài · KLTN");

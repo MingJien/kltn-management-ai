@@ -26,19 +26,35 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 ROOT = Path(__file__).resolve().parents[1]
-API_PORT, WEB_PORT = 8001, 5174
+DEFAULT_API_PORT, DEFAULT_WEB_PORT = 8001, 5174
 
 
 def free_port(port: int):
     with socket.socket() as probe:
+        probe.settimeout(1)
         if probe.connect_ex(('127.0.0.1', port)) == 0:
             raise RuntimeError(f'Port {port} is in use; refusing to reuse or stop an existing server')
+
+
+def available_port(preferred: int) -> int:
+    """Keep the familiar port when free; otherwise use an OS-assigned free port."""
+    if preferred:
+        with socket.socket() as probe:
+            probe.settimeout(1)
+            if probe.connect_ex(('127.0.0.1', preferred)) != 0:
+                return preferred
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        return probe.getsockname()[1]
 
 
 def main() -> int:
     from backend.db.validate_schema import load_env
     load_env()
-    for port in (API_PORT, WEB_PORT):
+    api_port, web_port = available_port(DEFAULT_API_PORT), available_port(DEFAULT_WEB_PORT)
+    if api_port == web_port:
+        web_port = available_port(0)
+    for port in (api_port, web_port):
         free_port(port)
     npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
     if not npm:
@@ -65,8 +81,11 @@ def main() -> int:
         env.update(DATABASE_URL=private_url, KLTN_ENV='test', KLTN_DEV_AUTH='false',
             AUTH_SESSION_SECRET=secrets.token_urlsafe(48), PYTHONIOENCODING='utf-8',
             KLTN_ALLOW_SYNTHETIC_SEED='true', KLTN_PROPOSAL_DIR=str(directory / 'uploads' / 'proposals'),
-            KLTN_FRONTEND_URL=f'http://127.0.0.1:{WEB_PORT}', VITE_API_URL=f'http://127.0.0.1:{API_PORT}',
-            KLTN_EVIDENCE_DIR=str(directory / 'uploads'), KLTN_E2E_RUN_DIR=str(directory))
+            KLTN_FRONTEND_URL=f'http://127.0.0.1:{web_port}', VITE_API_URL=f'http://127.0.0.1:{api_port}',
+            KLTN_E2E_API_PORT=str(api_port), KLTN_E2E_WEB_PORT=str(web_port),
+            KLTN_EVIDENCE_DIR=str(directory / 'uploads'), KLTN_E2E_RUN_DIR=str(directory),
+            # Never deliver synthetic test account links through the developer's real SMTP.
+            KLTN_MAIL_FROM='', KLTN_SMTP_HOST='', KLTN_SMTP_USER='', KLTN_SMTP_PASSWORD='')
         migration = subprocess.run([sys.executable, '-m', 'alembic', '-c', 'alembic-official.ini', 'upgrade', 'head'],
             cwd=ROOT, env=env, text=True, capture_output=True)
         if migration.returncode:
@@ -115,14 +134,14 @@ def main() -> int:
         env['KLTN_E2E_ACCOUNTS_JSON'] = json.dumps(accounts)
         with (directory / 'api.log').open('w', encoding='utf-8') as log:
             api = subprocess.Popen([sys.executable,'-m','uvicorn','backend.api.main:app',
-                '--host','127.0.0.1','--port',str(API_PORT)],cwd=ROOT,env=env,stdout=log,stderr=log,
+                '--host','127.0.0.1','--port',str(api_port)],cwd=ROOT,env=env,stdout=log,stderr=log,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             deadline = time.monotonic() + 30
             while True:
                 if api.poll() is not None:
                     raise RuntimeError('Isolated API exited; see the local temporary API log')
                 try:
-                    with urlopen(f'http://127.0.0.1:{API_PORT}/health/ready', timeout=1) as response:
+                    with urlopen(f'http://127.0.0.1:{api_port}/health/ready', timeout=1) as response:
                         if response.status == 200:
                             break
                 except Exception:

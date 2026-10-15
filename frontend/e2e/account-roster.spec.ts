@@ -3,8 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const accounts: Record<string,{email:string;password:string}> = JSON.parse(process.env.KLTN_E2E_ACCOUNTS_JSON || "{}");
-const web = "http://127.0.0.1:5174";
-const api = "http://127.0.0.1:8001/api/v1";
+const web = `http://127.0.0.1:${process.env.KLTN_E2E_WEB_PORT || "5174"}`;
 
 test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạt", async ({browser}) => {
   const admin = await browser.newContext();
@@ -41,19 +40,15 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
     await page.getByRole("dialog").getByLabel("Lý do / căn cứ").fill("SYNTHETIC E2E CLOSE");
     await page.getByRole("dialog").getByRole("button",{name:"Đóng đợt"}).click();
     await expect(newRound).toContainText("Đã đóng");
-    const current = await (await page.request.get(api+"/me/context")).json();
-    const rounds = await (await page.request.get(api+"/admin/rounds")).json();
-    const round = rounds.find((item:{code:string})=>item.code==="SYN-DEMO");
-    expect(round).toBeTruthy();
-    for (const assignment_type of ["ELIGIBILITY_IMPORTER","ELIGIBILITY_VERIFIER"]) {
-      const response = await page.request.post(api+"/admin/round-assignments",{
-        headers:{"X-CSRF-Token":current.csrf_token},
-        data:{round_id:round.id,user_id:current.user_id,assignment_type,basis_ref:"SYNTHETIC-E2E"},
-      });
-      expect(response.status()).toBe(201);
-    }
-    await page.reload();
-    await page.goto(web+"/roster");
+    await page.getByRole("link",{name:"Tài khoản và phân công"}).click();
+    await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption({label:"SYN-DEMO · OPEN"});
+    await page.getByLabel("Người được giao").selectOption({label:accounts.admin.email});
+    await page.getByLabel("Căn cứ phân công").fill("SYNTHETIC-E2E");
+    await page.getByRole("button",{name:"Lưu phân công"}).click();
+    await expect(page.getByRole("link",{name:"Danh sách sinh viên"})).toBeVisible();
+    await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_VERIFIER");
+    await page.getByRole("button",{name:"Lưu phân công"}).click();
+    await page.getByRole("link",{name:"Danh sách sinh viên"}).click();
     await expect(page.getByRole("heading",{name:"Danh sách đủ điều kiện"})).toBeVisible();
     const code = "E2E-ROSTER-001";
     const email = "roster-student@e2e.test";
@@ -89,12 +84,17 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
         }
         return link;
       }).not.toBe("");
-      await studentPage.goto(link);
-      await studentPage.getByLabel("Mật khẩu mới").fill("synthetic-password-123456");
-      await studentPage.getByLabel("Nhập lại mật khẩu").fill("synthetic-password-123456");
-      await studentPage.getByRole("button",{name:"Lưu mật khẩu"}).click();
-      await expect(studentPage.getByText(/Đã cập nhật mật khẩu/)).toBeVisible();
-      await studentPage.getByRole("link",{name:"Quay lại đăng nhập"}).click();
+      // The email link must render even in a browser already signed in as Admin.
+      await page.goto(link);
+      await expect(page.getByRole("heading",{name:"Tạo mật khẩu"})).toBeVisible();
+      await expect(page.getByText(/Bạn đang đăng nhập với tài khoản/)).toBeVisible();
+      await page.getByLabel("Mật khẩu mới").fill("synthetic-password-123456");
+      await page.getByLabel("Nhập lại mật khẩu").fill("synthetic-password-123456");
+      await page.getByRole("button",{name:"Lưu mật khẩu"}).click();
+      await expect(page.getByText(/Đã cập nhật mật khẩu/)).toBeVisible();
+      await page.getByRole("link",{name:"Quay lại đăng nhập"}).click();
+      await expect(page.getByLabel("Email",{exact:true})).toBeVisible();
+      await studentPage.goto(web);
       await studentPage.getByLabel("Email",{exact:true}).fill(email);
       await studentPage.getByLabel("Mật khẩu",{exact:true}).fill("synthetic-password-123456");
       await studentPage.getByRole("button",{name:"Đăng nhập",exact:true}).click();

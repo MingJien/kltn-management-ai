@@ -5,7 +5,9 @@ import { request } from "../api";
 
 type Mode = "activation-request" | "forgot-password" | "activate" | "reset-password";
 
-export default function AccountAccessPage() {
+export default function AccountAccessPage({signedInAs, onPasswordUpdated}: {
+  signedInAs: string | null; onPasswordUpdated?: () => Promise<void>;
+}) {
   const location = useLocation();
   const mode = location.pathname.split("/").at(-1) as Mode;
   const [token] = useState(() => new URLSearchParams(location.search).get("token") || "");
@@ -39,6 +41,7 @@ export default function AccountAccessPage() {
         await request(mode === "activate" ? "/account/activate" : "/account/password-reset", "",
           {method:"POST", body:JSON.stringify({token, password})});
         setPassword(""); setConfirm("");
+        if (onPasswordUpdated) await onPasswordUpdated();
       }
       setNotice(settingPassword ? "Đã cập nhật mật khẩu. Bạn có thể đăng nhập." :
         "Nếu thông tin hợp lệ, hướng dẫn sẽ được gửi tới email đã đăng ký.");
@@ -52,6 +55,7 @@ export default function AccountAccessPage() {
     <p className="text-muted">{settingPassword ? "Liên kết chỉ có hiệu lực một lần. Mật khẩu cần ít nhất 12 ký tự." :
       mode === "activation-request" ? "Chỉ tài khoản trong danh sách đã được Khoa xác nhận mới được kích hoạt." :
         "Nhập email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu."}</p>
+    {settingPassword && signedInAs ? <p className="alert">Bạn đang đăng nhập với tài khoản {signedInAs}. Sau khi lưu mật khẩu, hệ thống sẽ đăng xuất tài khoản này để bạn đăng nhập tài khoản vừa kích hoạt.</p> : null}
     <form onSubmit={(event) => void submit(event)} className="stack">
       {mode === "activation-request" ? <label className="input-group">MSSV hoặc mã giảng viên
         <input className="input" required maxLength={32} value={identifier} onChange={e=>setIdentifier(e.target.value)} />

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from backend.api.auth import _login_throttled, _record_failure, _same_app_origin
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
-from backend.services.account_mail import send_account_link
+from backend.services.account_mail import mail_delivery_ready, send_account_link
 from backend.services.account_tokens import make_token, token_account
 from backend.services.passwords import hash_password, verify_password
 from backend.services.registration import confirmed_student_ids
@@ -68,8 +68,7 @@ def _mail_link(user: m.UserAccount, purpose: str) -> None:
 
 
 def _mail_ready() -> None:
-    if os.getenv("KLTN_ENV") == "production" and not (
-            os.getenv("KLTN_SMTP_HOST") and os.getenv("KLTN_MAIL_FROM")):
+    if not mail_delivery_ready():
         raise HTTPException(503, "Email delivery is unavailable")
 
 
