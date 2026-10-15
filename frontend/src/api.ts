@@ -168,8 +168,47 @@ export type Thesis = {
   title: string;
   state: string;
   member_student_ids: string[];
-  advisor_lecturer_id: string;
+  advisor_lecturer_id: string | null;
+  advisor_name: string | null;
+  row_version: number;
+  round_id: string;
+  round_label: string;
+  members: {student_id: string; display_name: string; student_code: string; is_coordinator: boolean}[];
+  advisor_history: {id: string; lecturer_id: string; display_name: string; state: string; effective_from: string; effective_to: string | null}[];
+  pending_advisor: {lecturer_id: string; display_name: string} | null;
+  cross_reviewers: {lecturer_id: string; display_name: string}[];
+  actions: string[];
 };
+export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
+export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
+export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_at: string; late: boolean; evidence_document_version_id: string | null; reviews: Review[]};
+export type DocumentVersion = {id: string; version_no: number; row_version: number; state: string; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_at: string; submitted_by_name: string; reviews: Review[]};
+export type ThesisDocument = {id: string; title: string; document_type: "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
+export type WorkAssignment = {id: string; student_id: string; student_name: string; version_no: number; row_version: number; work_description: string; expected_output: string; state: string; review_comment: string | null; reviewed_by_name: string | null};
+export type AuditEvent = {action: string; actor_name: string; reason: string | null; occurred_at: string};
+
+export function uploadDocument(thesisId: string, doc: ThesisDocument, userId: string, file: File) {
+  return request<ThesisDocument>(`/theses/${thesisId}/documents/${doc.id}/versions`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "If-Match": String(doc.row_version)},
+  });
+}
+
+export async function downloadDocument(thesisId: string, doc: ThesisDocument, version: DocumentVersion, userId: string) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/download`, {
+    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = version.file_name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export type Citation = {
   source_id: string; source_type: string; origin_type: string; title: string;
   provenance: string; source_ref: string | null; source_url: string | null;

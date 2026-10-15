@@ -14,11 +14,12 @@ from backend.api.auth import allowed_frontend_origins, router as auth_router
 from backend.api.account import router as account_router
 from backend.api.roster import router as roster_router, assignment_router
 from backend.api.account_admin import router as account_admin_router
+from backend.api.core import router as thesis_workspace_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
     RegistrationCreate, RegistrationOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
-    SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, ThesisOut, StudentProposalCreate, LecturerOut, MyEligibilityOut,
+    SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, StudentProposalCreate, LecturerOut, MyEligibilityOut,
 )
 from backend.db.models import entities as m
 from backend.services.registration import (
@@ -60,6 +61,7 @@ app.include_router(account_router)
 app.include_router(roster_router)
 app.include_router(assignment_router)
 app.include_router(account_admin_router)
+app.include_router(thesis_workspace_router)
 
 
 @app.middleware("http")
@@ -423,36 +425,3 @@ def topic_detail(
     session: Session = Depends(get_session),
 ) -> TopicOut:
     return get_visible_topic(session, user, topic_id)
-
-
-@app.get("/api/v1/theses/{thesis_id}", response_model=ThesisOut)
-def thesis_detail(
-    thesis_id: UUID,
-    user: m.UserAccount = Depends(current_user),
-    session: Session = Depends(get_session),
-) -> ThesisOut:
-    thesis = session.get(m.Thesis, thesis_id)
-    if thesis is None:
-        raise HTTPException(404, "Thesis not found")
-    members = session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis_id,
-                                                           m.ThesisMember.active.is_(True))).all()
-    advisor = session.scalar(select(m.AdvisorAssignment).where(
-        m.AdvisorAssignment.thesis_id == thesis_id, m.AdvisorAssignment.state == "ACTIVE",
-        m.AdvisorAssignment.assignment_type == "PRIMARY",
-    ))
-    allowed = False
-    if user.base_role == "STUDENT":
-        student = profile(session, user, "STUDENT")
-        allowed = any(member.student_id == student.id for member in members)
-    elif user.base_role == "LECTURER":
-        lecturer = profile(session, user, "LECTURER")
-        allowed = (advisor is not None and advisor.lecturer_id == lecturer.id) or _is_department_head(
-            session, lecturer.id, thesis.department_id
-        )
-    if not allowed:
-        raise HTTPException(404, "Thesis not found")
-    if advisor is None:
-        raise HTTPException(409, "Primary advisor assignment missing")
-    return ThesisOut(id=thesis.id, title=thesis.current_title, state=thesis.state,
-                     member_student_ids=[member.student_id for member in members],
-                     advisor_lecturer_id=advisor.lecturer_id)

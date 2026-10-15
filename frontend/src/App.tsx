@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorMessage } from "./errors";
 import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
@@ -13,15 +13,15 @@ import AdministrationPage from "./pages/AdministrationPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
 import LecturerProfilePage from "./pages/LecturerProfilePage";
+import ThesesPage from "./pages/ThesesPage";
+import LoginPage from "./pages/LoginPage";
 const AIPage = lazy(() => import("./pages/AIPage"));
-import { Eye, EyeOff, LogIn } from "lucide-react";
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [context, setContext] = useState<Context | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -86,118 +86,10 @@ function App() {
   if (!context && ["/account/activation-request", "/account/forgot-password",
     "/account/activate", "/account/reset-password"].includes(location.pathname)) return <AccountAccessPage />;
 
-  // Not connected — show login card
+  // Not connected — show the branded login screen.
   if (!context) {
-    return (
-      <div
-        className="flex items-center justify-center"
-        style={{ minHeight: "100dvh", background: "var(--neutral-50)" }}
-      >
-        <div style={{ width: "100%", maxWidth: 420, padding: "var(--space-4)" }}>
-          {/* Brand */}
-          <div
-            className="flex items-center justify-center gap-3"
-            style={{ marginBottom: "var(--space-8)" }}
-          >
-            <div
-              className="sidebar__brand-mark"
-              style={{ width: 48, height: 48, fontSize: 24 }}
-            >
-              K
-            </div>
-            <div>
-              <div style={{ font: "var(--text-h1)", color: "var(--neutral-900)" }}>
-                KLTN
-              </div>
-              <div className="text-body-sm text-muted">
-                Hệ thống Quản lý Khóa luận
-              </div>
-            </div>
-          </div>
-
-          {/* Login card */}
-          <div className="card">
-            <div className="card-body">
-              <h2 style={{ marginBottom: "var(--space-1)" }}>Đăng nhập</h2>
-              <p
-                className="text-body-sm text-muted"
-                style={{ marginBottom: "var(--space-5)" }}
-              >
-                Dùng tài khoản KLTN đã được cấp quyền.
-              </p>
-
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void signIn();
-                }}
-              >
-                <div
-                  className="input-group"
-                  style={{ marginBottom: "var(--space-4)" }}
-                >
-                  <label htmlFor="login-email">Email</label>
-                  <input
-                    id="login-email"
-                    className="input"
-                    type="email"
-                    required
-                    autoComplete="username"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="Nhập email đăng nhập"
-                    autoFocus
-                  />
-                </div>
-                <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
-                  <label htmlFor="login-password">Mật khẩu</label>
-                  <div className="login-password-field">
-                    <input id="login-password" className="input" type={showPassword ? "text" : "password"} required
-                      autoComplete="current-password" value={password}
-                      onChange={(event) => setPassword(event.target.value)} />
-                    <button type="button" className="login-password-toggle"
-                      aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                      aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
-                      {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-                    </button>
-                  </div>
-                </div>
-                <button
-                  className="btn btn-primary"
-                  disabled={loading || !email.trim() || !password}
-                  style={{ width: "100%" }}
-                >
-                  <LogIn size={16} />
-                  {loading ? "Đang đăng nhập…" : "Đăng nhập"}
-                </button>
-              </form>
-
-              <div className="account-entry__links">
-                <Link to="/account/activation-request">Kích hoạt tài khoản</Link>
-                <Link to="/account/forgot-password">Quên mật khẩu?</Link>
-              </div>
-
-              {error && (
-                <div
-                  className="alert alert-danger"
-                  role="alert"
-                  style={{ marginTop: "var(--space-4)" }}
-                >
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {import.meta.env.DEV ? <p
-            className="text-caption text-muted"
-            style={{ textAlign: "center", marginTop: "var(--space-4)" }}
-          >
-            Bản thử nghiệm · Chỉ dùng tài khoản giả lập trong môi trường phát triển.
-          </p> : null}
-        </div>
-      </div>
-    );
+    return <LoginPage email={email} password={password} loading={loading} error={error}
+      onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={() => void signIn()} />;
   }
 
   // Connected — show app shell with routes
@@ -231,6 +123,7 @@ function App() {
             <RegistrationsPage userId={context.user_id} context={context} />
             : <Navigate to="/" replace />}
         />
+        <Route path="/theses" element={workflowAccess ? <ThesesPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/lecturers/:lecturerId" element={workflowAccess ?
           <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
         <Route
@@ -239,7 +132,7 @@ function App() {
         />
         <Route
           path="/theses/:thesisId"
-          element={workflowAccess ? <ThesisViewPage userId={context.user_id} /> : <Navigate to="/" replace />}
+          element={workflowAccess ? <ThesisViewPage context={context} /> : <Navigate to="/" replace />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></Suspense>
