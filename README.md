@@ -1,4 +1,4 @@
-# Quản lý khóa luận tốt nghiệp
+# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
 React + FastAPI + PostgreSQL. CSDL nghiệp vụ chính thức là `kltn_management`; revision đầu `20261015_0001_official` tạo 32 bảng giai đoạn 1. Hai schema 32/62 bảng cũ chỉ để đối chiếu. Runtime từ chối URL trỏ sang database cũ.
 
