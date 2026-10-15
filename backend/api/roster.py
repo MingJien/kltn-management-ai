@@ -28,7 +28,8 @@ assignment_router = APIRouter(prefix="/api/v1/me", tags=["eligibility roster"])
 def my_round_assignments(user: m.UserAccount = Depends(current_user),
                          session: Session = Depends(get_session)) -> list[dict]:
     now = datetime.now(timezone.utc)
-    rows = session.scalars(select(m.ResourceAssignment).where(
+    rows = session.execute(select(
+        m.ResourceAssignment.round_id, m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.user_id == user.id,
         m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
         m.ResourceAssignment.round_id.is_not(None),

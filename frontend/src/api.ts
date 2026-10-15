@@ -157,7 +157,7 @@ export async function request<T>(
       sessionCsrfToken = null;
       window.dispatchEvent(new Event("kltn:session-expired"));
     }
-    throw new ApiError(response.status, apiMessage(response.status, body?.detail));
+    throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

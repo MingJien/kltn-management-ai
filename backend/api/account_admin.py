@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -296,34 +296,37 @@ def grant_round_assignment(payload: RoundAssignment,
         raise HTTPException(422, "An active staff account is required")
     if not round_ or round_.state not in {"DRAFT", "OPEN"}:
         raise HTTPException(422, "Round is unavailable")
-    existing = session.scalar(select(m.ResourceAssignment).where(
+    existing = session.scalar(select(m.ResourceAssignment.id).where(
         m.ResourceAssignment.user_id == target.id,
         m.ResourceAssignment.round_id == round_.id,
         m.ResourceAssignment.assignment_type == payload.assignment_type,
         m.ResourceAssignment.state == "ACTIVE"))
     if existing:
         raise HTTPException(409, "This assignment already exists")
-    grant = m.ResourceAssignment(id=uuid4(), user_id=target.id,
-        round_id=round_.id, assignment_type=payload.assignment_type,
-        effective_from=datetime.now(timezone.utc), state="ACTIVE")
-    session.add(grant)
-    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_PERMISSION_GRANTED",
-        resource_type="resource_assignment", resource_id=grant.id,
-        reason=payload.basis_ref.strip(), occurred_at=datetime.now(timezone.utc),
-        correlation_id=uuid4()))
+    assignment_id = uuid4()
     try:
+        session.execute(m.ResourceAssignment.__table__.insert().values(
+            id=assignment_id, user_id=target.id, round_id=round_.id,
+            assignment_type=payload.assignment_type,
+            effective_from=datetime.now(timezone.utc), state="ACTIVE"))
+        session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_PERMISSION_GRANTED",
+            resource_type="resource_assignment", resource_id=assignment_id,
+            reason=payload.basis_ref.strip(), occurred_at=datetime.now(timezone.utc),
+            correlation_id=uuid4()))
         session.commit()
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(409, "Assignment was created concurrently") from exc
-    return {"assignment_id": str(grant.id)}
+    return {"assignment_id": str(assignment_id)}
 
 
 @router.get("/round-assignments")
 def round_assignments(user: m.UserAccount = Depends(current_user),
                       session: Session = Depends(get_session)) -> list[dict]:
     _admin(user)
-    rows = session.scalars(select(m.ResourceAssignment).where(
+    rows = session.execute(select(
+        m.ResourceAssignment.id, m.ResourceAssignment.round_id,
+        m.ResourceAssignment.user_id, m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE").order_by(m.ResourceAssignment.effective_from.desc()).limit(200)).all()
@@ -338,14 +341,17 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
                       user: m.UserAccount = Depends(current_user),
                       session: Session = Depends(get_session)) -> None:
     _admin(user)
-    assignment = session.scalar(select(m.ResourceAssignment).where(
-        m.ResourceAssignment.id == assignment_id).with_for_update())
+    assignment = session.execute(select(
+        m.ResourceAssignment.id, m.ResourceAssignment.state,
+        m.ResourceAssignment.assignment_type).where(
+        m.ResourceAssignment.id == assignment_id).with_for_update()).one_or_none()
     if not assignment or assignment.state != "ACTIVE" or assignment.assignment_type not in {
             "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"}:
         raise HTTPException(404, "Active assignment not found")
-    assignment.state = "REVOKED"
-    assignment.effective_to = datetime.now(timezone.utc)
-    assignment.row_version += 1
+    session.execute(update(m.ResourceAssignment).where(
+        m.ResourceAssignment.id == assignment_id).values(
+        state="REVOKED", effective_to=datetime.now(timezone.utc),
+        row_version=m.ResourceAssignment.row_version + 1))
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_PERMISSION_REVOKED",
         resource_type="resource_assignment", resource_id=assignment.id,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),

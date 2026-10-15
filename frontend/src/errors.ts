@@ -43,7 +43,30 @@ const messages: Record<string, string> = {
   "Revised title is too short": "Tên đề tài sau duyệt cần ít nhất 5 ký tự có nội dung.",
 };
 
-export function apiMessage(status: number, detail: unknown): string {
+export function apiMessage(status: number, detail: unknown, path = ""): string {
+  if (status === 422 && path.includes("/roster")) {
+    if (Array.isArray(detail)) {
+      const locations = detail.flatMap(item => Array.isArray(item?.loc) ? item.loc : []);
+      if (locations.includes("X-File-Name")) return "Không nhận được tên tệp. Hãy chọn lại tệp CSV/XLSX rồi thử lại.";
+      if (locations.includes("round_id")) return "Đợt KLTN chưa hợp lệ. Hãy chọn lại đợt rồi thử lại.";
+    }
+    if (typeof detail === "string") {
+      const row = /^Row (\d+)(.*)$/.exec(detail);
+      if (row) {
+        const line = `Dòng ${row[1]}`;
+        if (row[2].includes("department code")) return `${line}: mã bộ môn không tồn tại hoặc bị trùng trong hệ thống.`;
+        if (row[2].includes("major does not match")) return `${line}: mã ngành không khớp bộ môn.`;
+        if (row[2].includes("duplicates")) return `${line}: MSSV hoặc email bị trùng trong tệp.`;
+        if (row[2].includes("formula-like")) return `${line}: không được nhập công thức bảng tính.`;
+        if (row[2].includes("invalid required value")) return `${line}: thiếu hoặc sai MSSV, tên, email, bộ môn, lớp hoặc mã ngành.`;
+        if (row[2].includes("empty or has extra cells")) return `${line}: dòng rỗng hoặc thừa ô.`;
+      }
+      if (detail.startsWith("Required columns:")) return "Tệp thiếu cột bắt buộc: student_code, display_name, email, department_code, class_name, major_code.";
+      if (detail === "The roster contains an unsupported column") return "Tệp có cột ngoài sáu cột được hướng dẫn. Hãy dùng đúng tệp CSV mẫu.";
+      if (detail.startsWith("Invalid roster:")) return "Không đọc được tệp CSV UTF-8 hoặc XLSX. Hãy chọn lại tệp mẫu, không đổi phần mở rộng bằng tay.";
+      if (detail.startsWith("Roster must contain")) return "Tệp cần có dữ liệu và không vượt quá 2 MB.";
+    }
+  }
   if (Array.isArray(detail)) return "Thông tin chưa hợp lệ. Kiểm tra các ô bắt buộc, độ dài và giới hạn số lượng.";
   if (typeof detail === "string" && messages[detail]) return messages[detail];
   if (status === 401) return "Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.";
