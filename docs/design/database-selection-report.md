@@ -1,6 +1,7 @@
 # Ma trận lựa chọn CSDL chính thức `kltn_management`
 
 Nguồn kỹ thuật: `database/kltn-schema-consolidated.sql` (62 bảng nghiệp vụ; SHA-256 d11ef22e507db56cdf090ed9f3924c47c02eadc51738d2decc3a926a80152fba). Bản 32 bảng là tài liệu tham khảo, không là chỉ tiêu.
+Baseline tham khảo `database/kltn-db-baseline.sql` chỉ có ở checkout gốc (Git bỏ qua): đã đối chiếu read-only 63 tên bảng gồm `alembic_version`, trùng danh sách bản 62; SHA-256 `90e41e9da9588a96e4f49055df9d1bb21393bb896eb7dd6f7414815ed62f961f`. Baseline này ghi revision cũ `20261014_0014`, không dùng để tạo CSDL mới.
 Nguồn nghiệp vụ: góp ý GVHD 30/09–07/10, QĐ2919 (bản ghi đối chiếu dự án), QĐ5964 và Mẫu 1a/1b/3 từ Drive của Khoa.
 Cột API/service chỉ ghi đường dẫn có tham chiếu model thật. Kết quả chạy và giới hạn kiểm thử ở [báo cáo kiểm chứng](../evidence/official-db-validation.md).
 
