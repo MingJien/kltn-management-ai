@@ -1,11 +1,10 @@
-# Hệ thống quản lý khóa luận tốt nghiệp
+# Hệ thống quản lý khóa luận tốt nghiệp tích hơp chatbot AI
 
 Ứng dụng React, FastAPI và PostgreSQL hỗ trợ tài khoản, phân quyền, danh sách sinh viên đủ điều kiện, tạo và duyệt đề tài, đăng ký cá nhân/nhóm, tiếp nhận của giảng viên, đề cương, tiến độ và tài liệu theo phiên bản. AI hiện chỉ được thử trên dữ liệu giả; chưa kết nối Gemini.
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic revision `20261015_0001_official`: 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
-
+PostgreSQL `kltn_management`, Alembic revision `20261015_0001_official`: 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) 
 ## Chạy local
 
 Tạo `.env` từ `.env.example`, đặt `DATABASE_URL` trỏ đúng `kltn_management`, rồi cài dependencies:
