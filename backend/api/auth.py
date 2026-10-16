@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import threading
 import time
 from collections import deque
@@ -26,13 +27,28 @@ class LocalLogin(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
+def allowed_frontend_origins() -> list[str]:
+    configured = os.getenv("KLTN_FRONTEND_URL", "").strip().rstrip("/")
+    if os.getenv("KLTN_ENV") == "production":
+        return [configured] if configured else []
+    return list(dict.fromkeys(origin for origin in (
+        "http://localhost:5173", "http://127.0.0.1:5173", configured,
+    ) if origin))
+
+
 def _same_app_origin(request: Request) -> bool:
     origin = request.headers.get("origin")
     if not origin:
-        return True  # Command-line clients do not send Origin.
-    configured = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    allowed = {"http://localhost:5173", "http://127.0.0.1:5173", configured}
-    return origin.rstrip("/") in allowed
+        # Browser writes provide Origin. Allow origin-less local test/CLI requests only.
+        return os.getenv("KLTN_ENV") in {"development", "test"}
+    return origin in allowed_frontend_origins()
+
+
+def require_csrf(request: Request) -> None:
+    expected = request.session.get("csrf_token")
+    provided = request.headers.get("x-csrf-token", "")
+    if not isinstance(expected, str) or not secrets.compare_digest(expected, provided):
+        raise HTTPException(403, "Request verification failed")
 
 
 def _throttle_key(request: Request, email: str) -> str:
@@ -128,6 +144,7 @@ def local_login(payload: LocalLogin, request: Request, session: Session = Depend
     request.session.clear()
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
     if needs_rehash(user.password_hash):
         from backend.services.passwords import hash_password
         user.password_hash = hash_password(payload.password)
@@ -168,10 +185,16 @@ async def callback(request: Request, session: Session = Depends(get_session)):
 
     request.session.clear()
     request.session["user_id"] = str(user.id)
+    request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
     frontend_url = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
     return RedirectResponse(f"{frontend_url}/?login=success", status_code=303)
 
 
 @router.post("/logout", status_code=204)
 def logout(request: Request) -> None:
+    if not _same_app_origin(request):
+        raise HTTPException(403, "Request origin is not allowed")
+    if request.session.get("user_id"):
+        require_csrf(request)
     request.session.clear()

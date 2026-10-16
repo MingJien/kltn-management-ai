@@ -45,12 +45,12 @@ button {
 }
 
 a {
-  color: var(--primary-600);
+  color: var(--primary-700);
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--primary-500);
+  color: var(--primary-800);
 }
 
 ul, ol {

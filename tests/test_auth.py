@@ -8,7 +8,7 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from backend.api.auth import authentication_mode, oidc_is_configured
+from backend.api.auth import allowed_frontend_origins, authentication_mode, oidc_is_configured
 from backend.api import auth
 from backend.api.dependencies import current_user
 
@@ -24,7 +24,7 @@ class FakeSession:
 def request_with_session(user_id: str | None = None) -> Request:
     scope = {"type": "http", "headers": [], "method": "GET", "path": "/", "query_string": b"", "session": {}}
     if user_id is not None:
-        scope["session"] = {"user_id": user_id}
+        scope["session"] = {"user_id": user_id, "credential_version": 1, "csrf_token": "test-csrf-token"}
     return Request(scope)
 
 
@@ -47,9 +47,16 @@ def test_auth_mode_requires_complete_oidc_and_session_config(monkeypatch):
     assert authentication_mode() == "university_oidc"
 
 
+def test_production_cors_uses_only_the_configured_frontend(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "production")
+    monkeypatch.setenv("KLTN_FRONTEND_URL", "https://kltn.example/")
+    assert allowed_frontend_origins() == ["https://kltn.example"]
+    assert not auth._same_app_origin(request_with_session())
+
+
 def test_oidc_session_maps_to_internal_account(monkeypatch):
     user_id = uuid4()
-    user = object()
+    user = SimpleNamespace(row_version=1)
     monkeypatch.setenv("KLTN_ENV", "production")
     monkeypatch.setenv("KLTN_DEV_AUTH", "false")
     result = current_user(request_with_session(str(user_id)), FakeSession(user), dev_user_id=None)
@@ -82,14 +89,16 @@ class FakeOIDCClient:
 
 
 def test_oidc_callback_links_only_an_existing_account(monkeypatch):
-    account = SimpleNamespace(id=uuid4())
+    account = SimpleNamespace(id=uuid4(), row_version=1)
     monkeypatch.setattr(auth, "_oidc_client", FakeOIDCClient)
     monkeypatch.setenv("KLTN_FRONTEND_URL", "https://kltn.example")
     request = request_with_session()
     response = asyncio.run(auth.callback(request, FakeSession(account)))
     assert response.status_code == 303
     assert response.headers["location"] == "https://kltn.example/?login=success"
-    assert request.session == {"user_id": str(account.id)}
+    assert request.session["user_id"] == str(account.id)
+    assert request.session["credential_version"] == 1
+    assert request.session["csrf_token"]
 
 
 def test_oidc_callback_refuses_unlinked_account(monkeypatch):

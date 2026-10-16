@@ -1,3 +1,5 @@
+import { ApiError, apiMessage } from "./errors";
+
 export type Context = {
   user_id: string;
   base_role: string;
@@ -8,7 +10,11 @@ export type Context = {
   department_id: string | null;
   email: string | null;
   student_code: string | null;
+  class_name: string | null;
+  major_code: string | null;
   lecturer_code: string | null;
+  csrf_token: string | null;
+  can_change_password: boolean;
 };
 export type Topic = {
   id: string;
@@ -29,6 +35,9 @@ export type Topic = {
   requirements: Requirement[];
   title_versions: {version_no: number; title: string; change_reason: string | null; created_at: string}[];
   available: boolean;
+  registered_member_count: number;
+  remaining_slots: number;
+  registration_state: string | null;
 };
 export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
 export type Lecturer = {id: string; display_name: string; lecturer_code: string};
@@ -42,6 +51,7 @@ export type RegistrationMember = {
   active: boolean;
   consent_status: "PENDING" | "ACCEPTED" | "DECLINED";
   evidence_file_name: string | null;
+  can_upload_evidence: boolean;
 };
 export type Registration = {
   id: string;
@@ -49,6 +59,8 @@ export type Registration = {
   round_id: string;
   state: string;
   row_version: number;
+  expected_member_count: number;
+  submitted_at: string | null;
   member_student_ids: string[];
   members: RegistrationMember[];
   lecturer_decided_at: string | null;
@@ -81,6 +93,7 @@ export type SearchHit = {
 const baseUrl = import.meta.env.VITE_API_URL
   || `${window.location.protocol}//${window.location.hostname}:8000`;
 let developmentAuthEnabled = false;
+let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {
   return `${baseUrl}/api/v1/topic-registrations/${registrationId}/members/${studentId}/evidence`;
@@ -97,6 +110,10 @@ export type AuthenticationMode = "development" | "university_oidc" | "local_emai
 
 export function setDevelopmentAuthEnabled(enabled: boolean) {
   developmentAuthEnabled = enabled;
+}
+
+export function setSessionCsrfToken(token: string | null) {
+  sessionCsrfToken = token;
 }
 
 export function universityLoginUrl() {
@@ -116,18 +133,31 @@ export async function logout(): Promise<void> {
 export async function request<T>(
   path: string, userId: string, init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(baseUrl + "/api/v1" + path, {
+  let response: Response;
+  const method = (init.method || "GET").toUpperCase();
+  const abort = new AbortController();
+  const timer = window.setTimeout(() => abort.abort(), path.startsWith("/ai/") || path.includes("/roster") ? 90000 : 30000);
+  try { response = await fetch(baseUrl + "/api/v1" + path, {
     ...init,
     credentials: "include",
+    signal: init.signal || abort.signal,
     headers: {
       "Content-Type": "application/json",
       ...(developmentAuthEnabled && userId ? { "X-Dev-User-Id": userId } : {}),
+      ...(sessionCsrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)
+        ? { "X-CSRF-Token": sessionCsrfToken } : {}),
       ...(init.headers || {}),
     },
-  });
+  }); } catch {
+    throw new Error("Không kết nối được máy chủ hoặc yêu cầu quá lâu. Kiểm tra kết nối rồi thử lại.");
+  } finally {window.clearTimeout(timer);}
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
+    if (response.status === 401 && path !== "/auth/login" && path !== "/me/context") {
+      sessionCsrfToken = null;
+      window.dispatchEvent(new Event("kltn:session-expired"));
+    }
+    throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -138,8 +168,79 @@ export type Thesis = {
   title: string;
   state: string;
   member_student_ids: string[];
-  advisor_lecturer_id: string;
+  advisor_lecturer_id: string | null;
+  advisor_name: string | null;
+  row_version: number;
+  round_id: string;
+  round_label: string;
+  members: {student_id: string; display_name: string; student_code: string; is_coordinator: boolean}[];
+  advisor_history: {id: string; lecturer_id: string; display_name: string; state: string; effective_from: string; effective_to: string | null}[];
+  pending_advisor: {lecturer_id: string; display_name: string} | null;
+  cross_reviewers: {lecturer_id: string; display_name: string}[];
+  actions: string[];
 };
+export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
+export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
+export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_at: string; late: boolean; evidence_document_version_id: string | null; reviews: Review[]};
+export type DocumentVersion = {id: string; version_no: number; row_version: number; state: string; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_at: string; submitted_by_name: string; reviews: Review[]};
+export type ThesisDocument = {id: string; title: string; document_type: "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
+export type WorkAssignment = {id: string; student_id: string; student_name: string; version_no: number; row_version: number; work_description: string; expected_output: string; state: string; review_comment: string | null; reviewed_by_name: string | null};
+export type AuditEvent = {action: string; actor_name: string; reason: string | null; occurred_at: string};
+export type Proposal = {
+  id: string | null;
+  thesis_id: string;
+  state: string;
+  row_version: number;
+  current_version_no: number | null;
+  versions: {id: string; version_no: number; file_name: string; byte_size: number; sha256: string; submitted_by_name: string; submitted_at: string; reviews: Review[]}[];
+  reviewers: {lecturer_id: string; display_name: string}[];
+  department_confirmed: boolean;
+  dean_confirmed: boolean;
+};
+
+export function uploadProposal(thesisId: string, proposal: Proposal, userId: string, file: File) {
+  return request<Proposal>(`/theses/${thesisId}/proposal/versions`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "If-Match": String(proposal.row_version)},
+  });
+}
+
+export async function downloadProposal(thesisId: string, version: Proposal["versions"][number], userId: string) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/proposal/versions/${version.id}/download`, {
+    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url; link.download = version.file_name; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function uploadDocument(thesisId: string, doc: ThesisDocument, userId: string, file: File) {
+  return request<ThesisDocument>(`/theses/${thesisId}/documents/${doc.id}/versions`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "If-Match": String(doc.row_version)},
+  });
+}
+
+export async function downloadDocument(thesisId: string, doc: ThesisDocument, version: DocumentVersion, userId: string) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/download`, {
+    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = version.file_name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export type Citation = {
   source_id: string; source_type: string; origin_type: string; title: string;
   provenance: string; source_ref: string | null; source_url: string | null;

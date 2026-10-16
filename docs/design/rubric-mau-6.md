@@ -1,6 +1,7 @@
-# Rubric Mẫu 6 — baseline dữ liệu
+> Đây là tài liệu tham khảo cho phân hệ chấm điểm ở giai đoạn sau, không phải chức năng hoặc bảng đang chạy. Khi đến giai đoạn đó, cần đối chiếu lại biểu mẫu và quyết định đang có hiệu lực tại Khoa trước khi tạo migration.
+# Mẫu 6 — tài liệu thiết kế cho giai đoạn sau
 
-Migration [`20260925_0006_mau6_baseline.py`](../../backend/migrations/versions/20260925_0006_mau6_baseline.py) nạp baseline thiết kế từ `SRC-MAU-06` vào `rubric_template` và `rubric_criterion`. `code=MAU-06-HOIDONG`, `version_no=1`, `state=DRAFT`. DRAFT nghĩa là **chưa được gắn vào đợt hoặc phiên chấm thật** vì runtime chấm điểm/gán rubric theo đợt chưa triển khai. Mẫu 6 (2/4/4, thưởng tối đa 1, tổng tối đa 10) là baseline thiết kế đã chốt của dự án; khác biệt nguồn với QĐ2919 được lưu để truy vết, không làm mở lại lựa chọn baseline.
+Bản thiết kế trước đây mô tả dữ liệu `SRC-MAU-06` trong các bảng `rubric_template` và `rubric_criterion` ở schema mở rộng. Các bảng này chưa có trong PostgreSQL hiện hành `kltn_management` revision `20261015_0001_official`; do đó rubric chưa được nạp vào database hoặc gắn vào phiên chấm thật. Mẫu 6 (2/4/4, thưởng tối đa 1, tổng tối đa 10) là baseline thiết kế đã chốt của dự án; khác biệt nguồn với QĐ2919 được lưu để truy vết, không làm mở lại lựa chọn baseline.
 
 | Mã | Nhóm cha | Nội dung tiêu chí | Điểm tối đa | Kiểu |
 | --- | --- | --- | ---: | --- |
@@ -25,4 +26,4 @@ Ba dòng `GROUP` có điểm tối đa 2 + 4 + 4, nhưng chỉ là tổng của 
 
 Phiên bản 1 này giữ nguyên để đối chiếu lịch sử. Nếu Khoa ban hành biểu mẫu khác, tạo `RubricTemplate` phiên bản mới và chỉ gắn cho đợt/phiên tương ứng; không sửa nội dung phiếu đã chấm.
 
-Nguồn: [đăng ký nguồn](../references/source-register.md) `SRC-MAU-06`; [quy tắc nghiệp vụ](../requirements/business-rules.md) `BR-EVAL-003`.
+Nguồn: Mẫu 6 của Khoa; [quy tắc nghiệp vụ](../requirements/business-rules.md) `BR-EVAL-003`.

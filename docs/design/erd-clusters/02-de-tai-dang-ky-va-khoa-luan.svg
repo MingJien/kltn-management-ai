@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="4840" height="3248" viewBox="0 0 4840 3248">
 <rect width="4840" height="3248" fill="#F7F9FC"/>
 <text x="130" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="700" fill="#14243A">02  Đề tài, đăng ký và khóa luận</text>
-<text x="130" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="400" fill="#52667E">kltn_ai  •  PostgreSQL 17.11  •  Alembic 20261004_0011  •  18 bảng  •  23 FK</text>
+<text x="130" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="400" fill="#52667E">kltn_ai  •  PostgreSQL 17.11  •  Alembic 20261010_0013  •  18 bảng  •  23 FK</text>
 <text x="130" y="184" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#52667E">Bảng xanh: nghiệp vụ chính    •    Bảng xám: ngữ cảnh    •    Các đường nối lấy từ khóa ngoại thật</text>
 <polyline points="520,812 520,857 1022,857 1022,523 1080,523" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="3370,812 3370,864 975,864 975,2057 910,2057" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -348,7 +348,10 @@
 <text x="2050" y="2228" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
 <text x="2535" y="2227" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
 <text x="2690" y="2225" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
-<text x="2050" y="2328" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">14 cột • 5 FK • ẩn 3 cột phụ</text>
+<rect x="2032" y="2239" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="2263" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">expected_member_count</text>
+<text x="2535" y="2262" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">int</text>
+<text x="2050" y="2328" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">15 cột • 5 FK • ẩn 3 cột phụ</text>
 <rect x="2980" y="1769" width="780" height="577" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
 <rect x="2980" y="1769" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
 <rect x="2981" y="1829" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
@@ -609,5 +612,5 @@
 <text x="2424" y="2378" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
 <rect x="1019" y="2808" width="50" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
 <text x="1030" y="2830" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">≤1</text>
-<text x="130" y="3207" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">Nguồn: PostgreSQL public (live, read-only)  •  2026-10-04 21:39 SE Asia Standard Time  •  1 = bảng cha, N = nhiều bản ghi con; ≤1 = FK duy nhất</text>
+<text x="130" y="3207" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">Nguồn: PostgreSQL public (live, read-only)  •  2026-10-10 21:02 SE Asia Standard Time  •  1 = bảng cha, N = nhiều bản ghi con; ≤1 = FK duy nhất</text>
 </svg>

@@ -18,7 +18,7 @@
 | EligibilitySnapshot | SV của mình; ELIG-V/TBM/TKHOA theo scope | SV/import service | SV trước submit | SV | ELIG-V | ELIG-V đúng round | — | — | người có quyền báo cáo | ELIG-V confirm | — | Chưa confirm không dùng chốt; lưu source/time/actor. |
 | LecturerExpertise | chủ hồ sơ; TBM/TKHOA theo scope | GV | chủ hồ sơ tạo version | GV | TBM `PROPOSED` | TBM cùng Bộ môn; nếu hồ sơ của TBM thì Trưởng khoa/người được giao; không tự verify | — | — | — | — | — | Mặc định `SELF_DECLARED`. |
 | Topic/TopicRequirement | người dùng theo round/visibility | GV hoặc SV | proposer khi draft; TBM chỉ chỉnh title có version | proposer | TBM theo Bộ môn; GVHD chỉ sau khi có assignment liên quan | TBM approve/reject | — | — | danh sách theo quyền | TBM mở/đóng đăng ký | — | Preferred GPA không là hard gate. |
-| TopicRegistration/Member | thành viên; GVHD/TBM theo scope | SV | thành viên trước submit | SV/coordinator | GVHD | GVHD accept/reject; TBM finalize | TBM tạo AdvisorAssignment khi finalize | — | — | TBM finalize | — | Một active registration/SV/round; 1–3 SV; không ghép hậu đăng ký. |
+| TopicRegistration/Member | thành viên; GV tiếp nhận/TBM theo scope | SV tự tham gia | chính SV trước hạn, khi còn chỗ | SV/coordinator | GV tiếp nhận | GV nhận/từ chối; TBM chốt | TBM tạo AdvisorAssignment khi chốt | — | — | TBM chốt | — | Một đăng ký hoạt động/SV/đợt; 1–3 SV; bổ sung sau GV nhận buộc xét lại. |
 | MemberWorkAssignment | member; GVHD/GVPB/HĐ theo assignment | SV/nhóm | SV tạo version trước duyệt | SV | GVHD | GVHD approve/return | — | — | — | khóa version làm evidence | — | Mỗi ThesisMember phải có bản được duyệt trước chấm. |
 | Proposal/Version | thành viên; actor có assignment/position | SV | SV bằng version mới | SV | GVHD, GVPB/HĐ đề cương | GVHD confirm; TBM approve/return | ReviewerAssignment do người có thẩm quyền cấu hình | — | SV/actor có quyền in | TBM finalize; TKHOA sign/confirm | — | Không ghi đè version; TKHOA không chốt nội dung thay TBM. |
 | ProgressMilestone/Report | thành viên; GVHD/TBM theo scope | actor quản lý round tạo milestone; SV tạo report | milestone trước mở; SV tạo report version mới | SV | GVHD | GVHD confirm/return | — | — | theo REQ-RPT-001 | đóng milestone theo policy | — | GVHD xác nhận tiến độ; GVHD khác góp ý nội bộ chỉ khi được phân công. Ngày/version theo round. |
@@ -51,7 +51,7 @@
 | Resource/action | Chủ thể được phép | Giới hạn |
 | --- | --- | --- |
 | Tạo nhóm đăng ký | SV đã có eligibility CONFIRMED trong round | 1–3 SV cùng department; người tạo phải thuộc nhóm; một active registration/SV/round |
-| Lecturer decision | Giảng viên đề xuất đề tài đã duyệt trong prototype; phiên bản đầy đủ sẽ dùng advisor nomination/assignment rõ ràng | Không thêm/ghép SV, không quyết định đề tài khác |
+| Lecturer decision | GV tiếp nhận đề tài đã được TBM duyệt; có thể nhận/từ chối nhóm thuộc đề tài đó | Không thêm SV thay người khác, không quyết định đề tài khác |
 | Department finalization | TBM có PositionAssignment ACTIVE đúng department | Tạo Thesis/Member/AdvisorAssignment cùng transaction; không chốt lặp |
 | Mốc đợt | ResourceAssignment KLTN_COORDINATOR đúng round | Không đồng nghĩa Secretary Council hoặc GVHD |
 | Ký Mẫu 9 | CouncilMember CHAIR và SECRETARY đúng council/version | Cần đủ hai, không TBM/Admin bypass |

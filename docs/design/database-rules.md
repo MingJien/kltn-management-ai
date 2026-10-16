@@ -1,3 +1,4 @@
+> **Tài liệu quy tắc cho toàn đề tài, gồm cả giai đoạn sau; không phải mô tả schema đang chạy.** PostgreSQL hiện hành là `kltn_management`, revision `20261015_0001_official`, gồm 32 bảng nghiệp vụ. Các quy tắc bên dưới có thể nhắc bảng chưa có trong revision này. Đối chiếu cấu trúc đang chạy bằng [ERD hiện hành](erd-kltn-management.md) và [từ điển dữ liệu](database-dictionary.md); chỉ coi quy tắc đã triển khai khi có migration, API và kiểm thử tương ứng.
 # Quy tắc và ràng buộc CSDL
 
 ## Nguyên tắc

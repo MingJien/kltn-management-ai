@@ -64,8 +64,8 @@ def main() -> None:
     parser.add_argument("--execute", action="store_true", help="Actually insert synthetic demo records")
     parser.add_argument("--create-credentials", action="store_true", help="Create the ignored local credential file if absent; never overwrite it")
     parser.add_argument(
-        "--database", choices=("kltn_dev",), default="kltn_dev",
-        help="Development database that receives demo records (default: kltn_dev)",
+        "--database", choices=("kltn_management",), default="kltn_management",
+        help="Official database; use only an isolated test instance for synthetic records",
     )
     args = parser.parse_args()
     load_local_env()
@@ -87,13 +87,15 @@ def main() -> None:
         demo_credentials = load_demo_credentials(args.database)
     except ValueError as exc:
         parser.error(str(exc))
-    database_url = make_url(os.environ["DATABASE_URL"]).set(database=args.database)
+    database_url = make_url(os.environ["DATABASE_URL"])
+    if database_url.database != "kltn_management" or os.getenv("KLTN_ALLOW_SYNTHETIC_SEED") != "true":
+        parser.error("Synthetic seed requires kltn_management and KLTN_ALLOW_SYNTHETIC_SEED=true")
     engine = create_engine(database_url)
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261004_0011":
-            parser.error("Upgrade the configured development DB to 20261004_0011 first")
+        if version != "20261015_0001_official":
+            parser.error("Upgrade the isolated official DB to 20261015_0001_official first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")
@@ -145,13 +147,9 @@ def main() -> None:
         for i, student in enumerate(students, 1):
             snapshot = ensure(session, m.EligibilitySnapshot, f"eligibility-{i}",
                    student_id=student.id, round_id=round_.id, version=1,
-                   passed_credit_ratio=0.8, gpa_4=3.0,
                    evidence_ref="SYNTHETIC_DEMO",
                    captured_at=now, confirmed_by=lecturer_users[1].id,
                    confirmed_at=now, state="CONFIRMED")
-            if snapshot.evidence_ref == "SYNTHETIC_DEMO":
-                snapshot.passed_credit_ratio = 0.8
-                snapshot.gpa_4 = 3.0
         ensure(session, m.Topic, "topic", round_id=round_.id, department_id=department.id,
                code=allocate_topic_code(session, round_), receiving_lecturer_id=lecturers[0].id,
                proposer_user_id=lecturer_users[0].id, proposer_type="LECTURER",

@@ -21,6 +21,12 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+class LegacyBase(DeclarativeBase):
+    """Isolated mappings for old 62-table/AI experiments; never official DDL."""
+
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+
 class UuidPrimaryKeyMixin:
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

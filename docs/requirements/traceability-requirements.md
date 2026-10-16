@@ -7,7 +7,7 @@
 | Điều kiện | QĐ 5964, QĐ 2919 | REQ-ELIG-001..002, REQ-DEF-001 | BR-ELIG-001..002 | UC-ELIG-001, UC-DEF-001 | Người Khoa được giao; CONFLICT-006 |
 | Expertise | GVHD | REQ-EXP-001 | safe label self-declared | UC-EXP-001 | TBM/Trưởng khoa theo scope |
 | Topic/yêu cầu GVHD | GVHD, QĐ 2919, quyết định dự án | REQ-TOPIC-001..003 | BR-TOPIC-001..002 | UC-TOPIC-001..003 | — |
-| Đăng ký/nhóm | GVHD, QĐ 2919, Mẫu 1a/1b | REQ-REG-001..006 | BR-REG-001..006 | UC-REG-001/002, UC-ASSIGN-001 | CONFLICT-005; từng thành viên tự xác nhận trước gửi, khóa sau gửi; đề tài SV xét sau đăng ký |
+| Đăng ký/nhóm | GVHD, QĐ 2919, Mẫu 1a/1b | REQ-REG-001..006 | BR-REG-001..006 | UC-REG-001/002, UC-ASSIGN-001 | Mỗi SV tự tham gia trước hạn/chỉ tiêu; bổ sung thì GV xét lại; đề tài SV xét sau đăng ký cá nhân |
 | Phân công cá nhân | GVHD, Mẫu 2 | REQ-REG-004 | BR-REG-004 | UC-WORK-001 | — |
 | Đề cương | GVHD, QĐ 2919, Mẫu 3 | REQ-PROP-001..003 | BR-PROP-001..002 | UC-PROP-001..004 | — |
 | Tiến độ | GVHD, Mẫu 2, IN4299N | REQ-PROG-001..002 | BR-PROG-001..002 | UC-PROG-001/002 | Ngày theo round; CONFLICT-002/004 |

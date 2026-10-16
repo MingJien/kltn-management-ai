@@ -1,0 +1,110 @@
+import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { BookOpen, Eye, EyeOff, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
+import "../styles/login.css";
+
+interface LoginPageProps {
+  email: string;
+  password: string;
+  loading: boolean;
+  error: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onSubmit: () => void;
+}
+
+const FEATURES = [
+  { icon: GraduationCap, title: "Quản lý đề tài", description: "Đăng ký, xét duyệt và phân công hướng dẫn" },
+  { icon: BookOpen, title: "Theo dõi tiến độ", description: "Đề cương, bản thảo và nhận xét" },
+  { icon: FileText, title: "Hồ sơ tài liệu", description: "Lưu phiên bản, nhận xét và lịch sử xử lý" },
+  { icon: ShieldCheck, title: "Minh bạch & Truy vết", description: "Lịch sử thao tác, phân quyền theo vai trò" },
+];
+
+export default function LoginPage({
+  email, password, loading, error, onEmailChange, onPasswordChange, onSubmit,
+}: LoginPageProps) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit();
+  }
+
+  return (
+    <main className="login-page">
+      <section className="login-page__left" aria-label="Giới thiệu hệ thống">
+        <div className="login-brand">
+          <div className="login-brand__shape login-brand__shape--1" aria-hidden="true" />
+          <div className="login-brand__shape login-brand__shape--2" aria-hidden="true" />
+          <div className="login-brand__shape login-brand__shape--3" aria-hidden="true" />
+
+          <div className="login-brand__content">
+            <img className="login-brand__logo" src="/assets/dthu-logo.png" alt="" />
+            <h1 className="login-brand__title">Hệ thống Quản lý<br />Khóa luận Tốt nghiệp</h1>
+            <p className="login-brand__subtitle">Khoa Công Nghệ và Kỹ thuật — Đại học Đồng Tháp</p>
+
+            <div className="login-brand__features">
+              {FEATURES.map(({ icon: Icon, title, description }) => (
+                <div className="login-brand__feature" key={title}>
+                  <div className="login-brand__feature-icon"><Icon size={20} aria-hidden="true" /></div>
+                  <div><strong>{title}</strong><span>{description}</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="login-page__right" aria-label="Đăng nhập">
+        <div className="login-card-wrapper">
+          <div className="login-card">
+            <div className="login-card__header">
+              <img className="login-card__logo" src="/assets/dthu-logo.png" alt="Logo Đại học Đồng Tháp" />
+              <h2>Đăng nhập hệ thống</h2>
+              <p>Sử dụng tài khoản được cấp để truy cập</p>
+            </div>
+
+            <form className="login-card__form" onSubmit={submit}>
+              <div className="input-group">
+                <label htmlFor="login-email">Email</label>
+                <input id="login-email" className="input input--lg" type="email" required
+                  autoComplete="username" value={email}
+                  onChange={(event) => onEmailChange(event.target.value)}
+                  placeholder="email@dthu.edu.vn" autoFocus />
+              </div>
+              <div className="input-group">
+                <label htmlFor="login-password">Mật khẩu</label>
+                <div className="login-password-field">
+                  <input id="login-password" className="input input--lg" type={showPassword ? "text" : "password"}
+                    required autoComplete="current-password" value={password}
+                    onChange={(event) => onPasswordChange(event.target.value)} placeholder="Nhập mật khẩu" />
+                  <button type="button" className="login-password-toggle"
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
+                    {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                  </button>
+                </div>
+              </div>
+              <button className="btn btn-primary login-card__submit"
+                disabled={loading || !email.trim() || !password}>
+                {loading ? <><span className="login-spinner login-spinner--sm" />Đang đăng nhập…</>
+                  : <><LogIn size={16} aria-hidden="true" />Đăng nhập</>}
+              </button>
+            </form>
+
+            <div className="account-entry__links">
+              <Link to="/account/activation-request">Kích hoạt tài khoản</Link>
+              <Link to="/account/forgot-password">Quên mật khẩu?</Link>
+            </div>
+
+            {error && <div className="alert alert-danger" role="alert" style={{ marginTop: 16 }}>{error}</div>}
+          </div>
+
+          <footer className="login-footer">
+            <p>© 2026 Khoa Công Nghệ và Kỹ thuật — Đại học Đồng Tháp</p>
+          </footer>
+        </div>
+      </section>
+    </main>
+  );
+}

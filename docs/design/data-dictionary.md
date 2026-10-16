@@ -1,6 +1,7 @@
+> **Từ điển của mô hình thiết kế mở rộng ở revision trước, không phải schema PostgreSQL hiện hành.** Database đang dùng là `kltn_management`, revision `20261015_0001_official`, gồm 32 bảng nghiệp vụ. Tra cứu cấu trúc hiện tại tại [database-dictionary.md](database-dictionary.md).
 # Từ điển dữ liệu logical + physical PostgreSQL
 
-> Canonical field dictionary đồng bộ từ SQLAlchemy metadata và các migration 20260920_0001 → 20261004_0011. Mọi bảng dùng UUID PK; FK nghiệp vụ ON DELETE RESTRICT; validation nghiệp vụ dùng dữ liệu synthetic; migration 0006 nạp riêng rubric Mẫu 6 DRAFT không chứa dữ liệu cá nhân.
+> Từ điển cột đối chiếu SQLAlchemy metadata/Alembic đến `20261010_0013`. Mọi bảng nghiệp vụ dùng UUID PK; FK nghiệp vụ mặc định ON DELETE RESTRICT. Không chứa dữ liệu sinh viên thật.
 
 ## Quy ước
 
@@ -49,8 +50,8 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | external_subject | VARCHAR(255) | NULL | — | — | — | uq_user_account_external_subject | ck_user_account_identity_present | Định danh DEV/SSO tùy chọn; tài khoản email local để NULL. | PII | Migration 0010 |
 | email | VARCHAR(255) | NULL | — | — | — | uq_user_account_email_lower | ck_user_account_identity_present, ck_user_account_local_credentials_pair, ck_user_account_email_normalized | Email đăng nhập local, lưu chữ thường; NULL ở tài khoản cũ. | PII | Migration 0010 |
-| password_hash | VARCHAR(255) | NULL | — | — | — | — | ck_user_account_local_credentials_pair | Mã băm mật khẩu, không phải mật khẩu gốc; dự kiến Argon2id. | SECRET | Migration 0010 |
-| email_verified_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm xác minh email; chưa có luồng gửi mã/xác minh. | PII | Migration 0010 |
+| password_hash | VARCHAR(255) | NULL | — | — | — | — | ck_user_account_local_credentials_pair | Mã băm mật khẩu Argon2id, không lưu mật khẩu gốc. | SECRET | Migration 0010 |
+| email_verified_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm xác minh qua liên kết email. | PII | Migration 0010 |
 | base_role | VARCHAR(20) | NOT NULL | — | — | — | — | ck_user_account_base_role | Thuộc tính nghiệp vụ của user_account. | PII | Physical metadata 20260920_0001 |
 | status | VARCHAR(20) | NOT NULL | ACTIVE | — | — | — | ck_user_account_status | Trạng thái lifecycle. | NON_PII | Physical metadata 20260920_0001 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | NON_PII | Physical metadata 20260920_0001 |
@@ -69,6 +70,8 @@
 | student_code | VARCHAR(32) | NOT NULL | — | — | — | uq_student_profile_student_code | — | Thuộc tính nghiệp vụ của student_profile. | PII | Physical metadata 20260920_0001 |
 | department_id | UUID | NOT NULL | — | — | department.id | — | — | Tham chiếu department.id. | PII | Physical metadata 20260920_0001 |
 | display_name | VARCHAR(255) | NOT NULL | — | — | — | — | — | Thuộc tính nghiệp vụ của student_profile. | PII | Physical metadata 20260920_0001 |
+| class_name | VARCHAR(100) | NULL | — | — | — | — | — | Lớp từ danh sách SV do Khoa cung cấp. | PII | Migration 20261010_0013 |
+| major_code | VARCHAR(32) | NULL | — | — | — | — | — | Mã ngành từ danh sách SV do Khoa cung cấp. | PII | Migration 20261010_0013 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
 | created_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm tạo record. | PII | Physical metadata 20260920_0001 |
 | updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL | now() | — | — | — | — | Thời điểm cập nhật gần nhất. | PII | Physical metadata 20260920_0001 |
@@ -329,6 +332,7 @@
 | round_id | UUID | NOT NULL | — | — | thesis_round.id | uq_topic_registration_id_round_id | — | Tham chiếu thesis_round.id. | NON_PII | Physical metadata 20260920_0001 |
 | topic_id | UUID | NOT NULL | — | — | topic.id | — | — | Tham chiếu topic.id. | NON_PII | Physical metadata 20260920_0001 |
 | created_by | UUID | NOT NULL | — | — | student_profile.id | — | — | Tham chiếu student_profile.id. | PII | Physical metadata 20260920_0001 |
+| expected_member_count | INTEGER | NOT NULL | 1 | — | — | — | ck_topic_registration_expected_member_count | Quy mô dự kiến 1–3, service lấy mức tối đa của đề tài; không bắt buộc đủ trước gửi. Số thực tế đếm RegistrationMember active. | NON_PII | Migration 20261004_0012 |
 | state | VARCHAR(30) | NOT NULL | DRAFT | — | — | — | ck_topic_registration_state | Trạng thái lifecycle của aggregate/entity. | NON_PII | Physical metadata 20260920_0001 |
 | submitted_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | — | Thời điểm submit. | NON_PII | Physical metadata 20260920_0001 |
 | lecturer_decided_by | UUID | NULL | — | — | lecturer_profile.id | — | — | Tham chiếu lecturer_profile.id. | PII | Physical metadata 20260920_0001 |
@@ -353,8 +357,8 @@
 | student_id | UUID | NOT NULL | — | — | student_profile.id | uq_registration_member_registration_id_student_id, uq_registration_member_student_round_active | — | Tham chiếu student_profile.id. | PII | Physical metadata 20260920_0001 |
 | is_coordinator | BOOLEAN | NOT NULL | false | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
 | active | BOOLEAN | NOT NULL | true | — | — | — | — | Thuộc tính nghiệp vụ của registration_member. | PII | Physical metadata 20260920_0001 |
-| consent_status | VARCHAR(20) | NOT NULL | PENDING | — | — | — | ck_registration_member_consent_consistency | PENDING trước phản hồi; ACCEPTED/DECLINED sau khi chính SV trả lời. Service phải đối chiếu đúng tài khoản với student_id. | PII | Migration 0007 |
-| responded_by_user_id | UUID | NULL | — | — | user_account.id | — | ck_registration_member_consent_consistency | Tài khoản đã tự phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
+| consent_status | VARCHAR(20) | NOT NULL | PENDING | — | — | — | ck_registration_member_consent_consistency | Runtime mới ghi ACCEPTED khi chính SV tự tham gia; PENDING/DECLINED giữ tương thích lịch sử. Không tạo lời mời; service đối chiếu tài khoản với student_id. | PII | Migration 0007; luồng 04/10 |
+| responded_by_user_id | UUID | NULL | — | — | user_account.id | — | ck_registration_member_consent_consistency | Chính tài khoản SV tự tham gia/xác nhận; không cho người khác gửi thay. | PII | Migration 0007 |
 | responded_at | TIMESTAMP WITH TIME ZONE | NULL | — | — | — | — | ck_registration_member_consent_consistency | Thời điểm phản hồi; chỉ có khi đã chấp nhận/từ chối. | PII | Migration 0007 |
 | evidence_file_id | UUID | NULL | — | — | stored_file.id | — | — | Metadata minh chứng của chính thành viên; chỉ nhóm/GV tiếp nhận/TBM được tải. | PII | Physical metadata 20261004_0011 |
 | id | UUID | NOT NULL | application | Có | — | — | — | Khóa chính UUID. | PII | Physical metadata 20260920_0001 |
@@ -1138,6 +1142,6 @@
 ## Kiểm soát đồng bộ
 
 - Tổng số bảng: 62.
-- Tổng số field: 618 (sau migration 20261004_0011).
+- Tổng số field: 622 (sau migration 20261004_0012), chưa tính cột của alembic_version.
 - Migration và model là nguồn physical; thay đổi schema phải cập nhật migration mới và tái sinh tài liệu.
 - Không có field plagiarism verdict; threshold similarity không hard-code 90%.

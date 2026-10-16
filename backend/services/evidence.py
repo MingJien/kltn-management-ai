@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.auth import _same_app_origin
 from backend.db.models import entities as m
-from backend.services.registration import get_registration, profile, registration_out
+from backend.services.registration import get_registration, profile, registration_out, may_upload_evidence
 
 MAX_BYTES = 5 * 1024 * 1024
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +39,7 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
             m.RegistrationMember.student_id == student.id, m.RegistrationMember.active.is_(True)))
         if not member:
             raise HTTPException(404, "Registration not found")
-        if reg.state not in {"DRAFT", "RETURNED"}:
+        if not may_upload_evidence(reg, member):
             raise HTTPException(409, "Evidence is locked after submission")
         # One bounded file per member. A PDF may contain multiple supporting pages.
         from urllib.parse import unquote

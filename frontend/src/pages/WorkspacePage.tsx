@@ -1,77 +1,67 @@
-import { useCallback, useEffect, useState } from "react";
-import { LayoutDashboard, BookOpen, ClipboardList } from "lucide-react";
-import type { Context } from "../api";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { BookOpen, ClipboardList } from "lucide-react";
+import type { Context, OpenRound, Registration, Topic } from "../api";
+import { request } from "../api";
+import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
+import { roleLabel } from "../components/layout/Sidebar";
 
-interface WorkspacePageProps {
-  context: Context;
-}
-
-export default function WorkspacePage({ context }: WorkspacePageProps) {
-  return (
-    <>
-      <PageHeader
-        title={`Xin chào`}
-        description="Tổng quan hoạt động và công việc cần xử lý"
-      />
-
-      {/* Role info */}
-      <div className="flex gap-2 items-center" style={{ marginBottom: "var(--space-6)" }}>
-        <span className="badge badge-primary">{context.base_role}</span>
-        <span className="text-body-sm">
-          {context.actions.length > 0
-            ? `${context.actions.length} quyền hệ thống`
-            : "Chỉ xem"}
-        </span>
+export default function WorkspacePage({context}: {context: Context}) {
+  const [rounds, setRounds] = useState<OpenRound[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const head = context.actions.includes("topic:department_decide");
+  const workflowAccess = context.base_role === "STUDENT" || context.base_role === "LECTURER";
+  useEffect(() => {
+    if (!workflowAccess) {setLoading(false); return;}
+    let alive = true;
+    Promise.all([request<OpenRound[]>("/rounds/open", context.user_id),
+      request<Topic[]>("/topics?limit=5&view=" + (head ? "pending" : context.base_role === "LECTURER" ? "mine" : "all"), context.user_id),
+      request<Registration[]>("/topic-registrations?limit=5", context.user_id)])
+      .then(([r,t,g]) => {if (alive) {setRounds(r); setTopics(t); setRegistrations(g);}})
+      .catch((cause) => {if (alive) setError(errorMessage(cause));})
+      .finally(() => {if (alive) setLoading(false);});
+    return () => {alive = false;};
+  }, [context.user_id, context.base_role, head, workflowAccess]);
+  if (!workflowAccess) return <>
+    <PageHeader title="Tổng quan" description={"Xin chào " + context.display_name + " · " + roleLabel(context)} />
+    <section className="card overview-card"><div className="card-body stack">
+      <h2>Quản trị đợt và tài khoản</h2>
+      <p>Tạo đợt đăng ký, cấp tài khoản giảng viên và phân công người nhập hoặc xác nhận danh sách sinh viên.</p>
+      <div className="flex gap-2"><Link className="btn btn-primary" to="/rounds">Quản lý đợt KLTN</Link>
+        <Link className="btn btn-secondary" to="/administration">Tài khoản và phân công</Link></div>
+    </div></section>
+  </>;
+  return <>
+    <PageHeader title="Tổng quan" description={"Xin chào " + context.display_name + " · " + roleLabel(context)} />
+    {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
+    {loading ? <p role="status">Đang tải công việc…</p> : <div className="stack">
+      <section className="card overview-card"><div className="card-body stack">
+        <h2>Đợt đăng ký đang mở</h2>
+        {rounds.length ? rounds.map((round) => <div className="overview-round" key={round.id}>
+          <strong>{round.label}</strong><span>Hạn đăng ký: {new Date(round.closes_at).toLocaleString("vi-VN")}</span>
+        </div>) : <p>Hiện chưa có đợt đăng ký đang mở.</p>}
+      </div></section>
+      <div className="grid grid-auto">
+        <section className="card overview-card"><div className="card-body stack">
+          <h2><BookOpen size={18} aria-hidden="true" /> {head ? "Đề tài chờ duyệt" : context.base_role === "LECTURER" ? "Đề tài của tôi gần đây" : "Đề tài đã duyệt gần đây"}</h2>
+          {topics.length ? <ul className="overview-list">{topics.map((topic) => <li key={topic.id}>
+            <span><span className="topic-code">{topic.code}</span>{topic.title}</span><ThesisStatusBadge state={topic.state} />
+          </li>)}</ul> : <p>Chưa có đề tài trong mục này.</p>}
+          <Link className="btn btn-secondary" to="/topics">Mở danh sách đề tài</Link>
+        </div></section>
+        <section className="card overview-card"><div className="card-body stack">
+          <h2><ClipboardList size={18} aria-hidden="true" /> Đăng ký gần đây</h2>
+          {registrations.length ? <ul className="overview-list">{registrations.map((row) => <li key={row.id}>
+            <span><span className="topic-code">{row.topic_code}</span>{row.topic_title}</span><ThesisStatusBadge state={row.state} />
+          </li>)}</ul> : <p>Chưa có đăng ký trong phạm vi của bạn.</p>}
+          <Link className="btn btn-secondary" to="/registrations">Mở danh sách đăng ký</Link>
+        </div></section>
       </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-3" style={{ marginBottom: "var(--space-8)" }}>
-        <div className="card metric-card">
-          <div className="metric-card__label">
-            <LayoutDashboard size={14} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />
-            Vai trò
-          </div>
-          <div className="metric-card__value">{context.base_role}</div>
-          <div className="metric-card__desc">
-            {context.student_id ? "Sinh viên" : context.lecturer_id ? "Giảng viên" : "Quản trị"}
-          </div>
-        </div>
-
-        <div className="card metric-card">
-          <div className="metric-card__label">
-            <BookOpen size={14} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />
-            Quyền hạn
-          </div>
-          <div className="metric-card__value">{context.actions.length}</div>
-          <div className="metric-card__desc">
-            {context.actions.length > 0 ? context.actions.slice(0, 3).join(", ") : "Chỉ xem"}
-          </div>
-        </div>
-
-        <div className="card metric-card">
-          <div className="metric-card__label">
-            <ClipboardList size={14} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />
-            Mã định danh
-          </div>
-          <div className="metric-card__value" style={{ fontSize: 14, fontFamily: "var(--font-mono)" }}>
-            {context.user_id.slice(0, 8)}…
-          </div>
-          <div className="metric-card__desc">User ID</div>
-        </div>
-      </div>
-
-      {/* Work queue placeholder */}
-      <div className="card">
-        <div className="card-body">
-          <h2 style={{ marginBottom: "var(--space-4)" }}>Công việc cần xử lý</h2>
-          <div className="empty-state">
-            <ClipboardList />
-            <h3>Chưa có công việc</h3>
-            <p>Hàng đợi công việc sẽ hiển thị khi có đăng ký, đề cương, hoặc phiên bảo vệ cần xử lý.</p>
-          </div>
-        </div>
-      </div>
-    </>
-  );
+    </div>}
+  </>;
 }

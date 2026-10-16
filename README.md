@@ -1,41 +1,22 @@
-# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
+# Hệ thống quản lý khóa luận tốt nghiệp
 
-Source của hệ thống quản lý khóa luận tốt nghiệp, gồm PostgreSQL, FastAPI và React. AI hiện ở mức thử nghiệm truy xuất tài liệu và tìm đề tài tương tự trên dữ liệu giả; không tự chấm đạo văn hoặc quyết định kết quả học tập.
+Ứng dụng React, FastAPI và PostgreSQL hỗ trợ tài khoản, phân quyền, danh sách sinh viên đủ điều kiện, tạo và duyệt đề tài, đăng ký cá nhân/nhóm, tiếp nhận của giảng viên, đề cương, tiến độ và tài liệu theo phiên bản. AI hiện chỉ được thử trên dữ liệu giả; chưa kết nối Gemini.
 
-## Chức năng đã có
+## CSDL hiện hành
 
-- Đăng nhập email/mật khẩu thử nghiệm và kiểm tra quyền theo vai trò.
-- Giảng viên tạo, sửa và gửi đề tài.
-- Trưởng bộ môn duyệt, trả về để sửa hoặc từ chối đề tài thuộc bộ môn.
-- Sinh viên đăng ký đề tài cá nhân hoặc theo nhóm.
-- Giảng viên tiếp nhận hoặc từ chối đăng ký.
-- Thử nghiệm tìm đề tài tương tự và tra cứu nguồn trên corpus giả.
+PostgreSQL `kltn_management`, Alembic revision `20261015_0001_official`: 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
 
-Phân công GVHD, tiến độ, tài liệu, hội đồng, chấm điểm, biên bản và tích hợp Gemini tiếp tục được phát triển ở các giai đoạn sau.
+## Chạy local
 
-## Cấu trúc
-
-| Thư mục | Nội dung |
-| --- | --- |
-| `backend/` | API FastAPI, nghiệp vụ, mô hình SQLAlchemy và Alembic migrations. |
-| `frontend/` | Giao diện React. |
-| `database/` | Schema PostgreSQL để dựng database mới và schema lõi để xem thiết kế. |
-| `docs/` | Yêu cầu, thiết kế, ERD, API và minh chứng kiểm thử. |
-| `tests/` | Kiểm thử backend. |
-| `tools/` | Script seed dữ liệu giả, sinh ERD và kiểm tra CSDL. |
-
-## Chạy trên máy phát triển
-
-1. Sao chép `.env.example` thành `.env` và điền cấu hình PostgreSQL trên máy. Không đưa `.env`, mật khẩu, dữ liệu thật hoặc tài liệu gốc lên Git.
-2. Cài môi trường và nâng CSDL:
+Tạo `.env` từ `.env.example`, đặt `DATABASE_URL` trỏ đúng `kltn_management`, rồi cài dependencies:
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic -c alembic-official.ini upgrade head
 ```
 
-3. Chạy API và giao diện ở hai terminal:
+Chạy API và giao diện ở hai terminal:
 
 ```powershell
 .\.venv\Scripts\python.exe -m tools.run_demo_api
@@ -46,26 +27,25 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Mở `http://localhost:5173`. Dữ liệu và tài khoản demo chỉ tạo trên máy, không nằm trong repository.
+Mở `http://localhost:5173`. Dữ liệu tài khoản thử nghiệm và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
 
-## Kiểm thử
+## Kiểm tra
 
 ```powershell
-.\.venv\Scripts\python.exe -m backend.db.validate_schema
+.\.venv\Scripts\python.exe -m tools.validate_official_database
 .\.venv\Scripts\python.exe -m pytest tests -q
 npm run build --prefix frontend
+.\.venv\Scripts\python.exe -m tools.run_e2e
 ```
+
+`run_e2e` tạo schema kiểm thử ngẫu nhiên riêng trong `kltn_management`, không dùng hay xóa bảng nghiệp vụ hiện có.
 
 ## Tài liệu chính
 
-- [Yêu cầu, quy trình và phân quyền](docs/requirements/)
-- [ERD và từ điển dữ liệu](docs/design/erd.md)
-- [Schema lõi PostgreSQL](database/core/kltn-core-schema.sql)
-- [Schema đầy đủ PostgreSQL](database/kltn-schema-consolidated.sql)
-- [Đặc tả API](docs/design/openapi.yaml)
-- [Minh chứng prototype](docs/evidence/prototype-validation.md)
-- [Thiết kế thử nghiệm AI](docs/ai/prototype.md)
+- [Đặc tả API](docs/design/api-design.md)
+- [ERD hiện hành](docs/design/erd-kltn-management.md) · [ERD theo cụm](docs/design/erd-clusters/README.md)
+- [Từ điển dữ liệu](docs/design/database-dictionary.md)
+- [Quy trình đăng ký](docs/design/registration-workflow.md)
+- [Minh chứng cấu trúc CSDL](docs/evidence/official-db-validation.md)
 
-## Phạm vi dữ liệu
-
-Repository chỉ dùng dữ liệu giả và cấu hình mẫu. PostgreSQL là nguồn dữ liệu nghiệp vụ; Qdrant chỉ lưu chỉ mục truy xuất có thể tái tạo. Việc sử dụng tài liệu thật hoặc gửi nội dung cho dịch vụ AI phải theo chính sách được Khoa/Trường phê duyệt.
+Repository không chứa dữ liệu thật hay cấu hình bí mật. Nội dung AI thử nghiệm dùng corpus giả cục bộ; việc gửi tài liệu cho dịch vụ AI cần theo chính sách của Khoa/Trường.

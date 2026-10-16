@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
+import json
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -17,6 +19,8 @@ def fail(code: int, message: str) -> None:
 
 
 def profile(session: Session, user: m.UserAccount, kind: str):
+    if user.base_role != kind:
+        fail(403, "Account role does not match the requested profile")
     model = m.StudentProfile if kind == "STUDENT" else m.LecturerProfile
     found = session.scalar(select(model).where(model.user_id == user.id))
     if found is None:
@@ -38,11 +42,57 @@ def confirmed_student_ids(session: Session, round_id: UUID, student_ids: list[UU
         .where(m.EligibilitySnapshot.round_id == round_id, m.EligibilitySnapshot.state == "CONFIRMED")).all())
 
 
+def valid_group(session: Session, topic: m.Topic, members: list[m.RegistrationMember]) -> bool:
+    ids = {member.student_id for member in members if member.active}
+    if not 1 <= len(ids) <= topic.max_students or any(member.consent_status != "ACCEPTED" for member in members):
+        return False
+    active_ids = set(session.scalars(select(m.StudentProfile.id).join(m.UserAccount,
+        m.UserAccount.id == m.StudentProfile.user_id).where(m.StudentProfile.id.in_(ids),
+        m.StudentProfile.department_id == topic.department_id,
+        m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "STUDENT")).all())
+    return active_ids == ids and confirmed_student_ids(session, topic.round_id, list(ids)) == ids
+
+
+def _registration_hash(session: Session, reg: m.TopicRegistration) -> str:
+    members = session.execute(select(m.RegistrationMember.student_id, m.RegistrationMember.active,
+        m.RegistrationMember.consent_status).where(m.RegistrationMember.registration_id == reg.id)
+        .order_by(m.RegistrationMember.student_id)).all()
+    content = {"state": reg.state, "version": reg.row_version,
+        "capacity": reg.expected_member_count, "members": [tuple(map(str, item)) for item in members],
+        "decision_by": str(reg.lecturer_decided_by), "decision_at": str(reg.lecturer_decided_at),
+        "reason": reg.lecturer_reason}
+    return hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
+
+
+def _registration_audit(session: Session, reg: m.TopicRegistration, user: m.UserAccount,
+                        action: str, before: str | None, reason: str | None = None):
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action=action,
+        resource_type="topic_registration", resource_id=reg.id, before_hash=before,
+        after_hash=_registration_hash(session, reg), reason=reason,
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+
+
 def registration_out(session: Session, reg: m.TopicRegistration) -> RegistrationOut:
+    return registrations_out(session, [reg])[0]
+
+
+def may_upload_evidence(reg: m.TopicRegistration, member: m.RegistrationMember) -> bool:
+    # A student joining an already submitted group may add their first proof
+    # before the new lecturer decision. Existing submitted evidence stays locked.
+    return member.active and (reg.state in {"DRAFT", "RETURNED"} or (
+        reg.state == "SUBMITTED" and member.evidence_file_id is None
+        and reg.submitted_at is not None and member.responded_at is not None
+        and member.responded_at > reg.submitted_at))
+
+
+def registrations_out(session: Session, registrations: list[m.TopicRegistration]) -> list[RegistrationOut]:
+    if not registrations:
+        return []
+    ids = [reg.id for reg in registrations]
     members = session.scalars(
         select(m.RegistrationMember).where(
-            m.RegistrationMember.registration_id == reg.id,
-        ).order_by(m.RegistrationMember.is_coordinator.desc())
+            m.RegistrationMember.registration_id.in_(ids),
+        ).order_by(m.RegistrationMember.is_coordinator.desc(), m.RegistrationMember.created_at, m.RegistrationMember.id)
     ).all()
     profiles = {
         student.id: student
@@ -52,12 +102,22 @@ def registration_out(session: Session, reg: m.TopicRegistration) -> Registration
             )
         ).all()
     } if members else {}
-    thesis = session.scalar(select(m.Thesis).where(m.Thesis.registration_id == reg.id))
-    topic = session.get(m.Topic, reg.topic_id)
-    receiver = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else None
-    return RegistrationOut(
+    theses = {t.registration_id: t for t in session.scalars(select(m.Thesis).where(m.Thesis.registration_id.in_(ids))).all()}
+    topics = {t.id: t for t in session.scalars(select(m.Topic).where(m.Topic.id.in_({r.topic_id for r in registrations}))).all()}
+    receivers = {l.id: l for l in session.scalars(select(m.LecturerProfile).where(
+        m.LecturerProfile.id.in_([t.receiving_lecturer_id for t in topics.values() if t.receiving_lecturer_id]))).all()}
+    files = {f.id: f for f in session.scalars(select(m.StoredFile).where(
+        m.StoredFile.id.in_([mem.evidence_file_id for mem in members if mem.evidence_file_id]))).all()}
+    result = []
+    for reg in registrations:
+        topic = topics[reg.topic_id]
+        receiver = receivers.get(topic.receiving_lecturer_id)
+        thesis = theses.get(reg.id)
+        reg_members = [item for item in members if item.registration_id == reg.id]
+        result.append(RegistrationOut(
         id=reg.id, topic_id=reg.topic_id, round_id=reg.round_id, state=reg.state, row_version=reg.row_version,
-        member_student_ids=[item.student_id for item in members],
+        expected_member_count=reg.expected_member_count, submitted_at=reg.submitted_at,
+        member_student_ids=[item.student_id for item in reg_members],
         members=[RegistrationMemberOut(
             student_id=item.student_id,
             student_code=profiles[item.student_id].student_code,
@@ -65,8 +125,9 @@ def registration_out(session: Session, reg: m.TopicRegistration) -> Registration
             is_coordinator=item.is_coordinator,
             active=item.active,
             consent_status=item.consent_status,
-            evidence_file_name=session.get(m.StoredFile, item.evidence_file_id).original_name if item.evidence_file_id else None,
-        ) for item in members],
+            evidence_file_name=files[item.evidence_file_id].original_name if item.evidence_file_id else None,
+            can_upload_evidence=may_upload_evidence(reg, item),
+        ) for item in reg_members],
         lecturer_decided_at=reg.lecturer_decided_at,
         thesis_id=thesis.id if thesis else None,
         topic_title=topic.current_title,
@@ -75,16 +136,17 @@ def registration_out(session: Session, reg: m.TopicRegistration) -> Registration
         receiving_lecturer_user_id=receiver.user_id if receiver else (topic.proposer_user_id if topic.proposer_type == "LECTURER" else None),
         receiving_lecturer_name=receiver.display_name if receiver else None,
         lecturer_reason=reg.lecturer_reason,
-    )
+        ))
+    return result
 
 
 def create_registration(session: Session, user: m.UserAccount, data: RegistrationCreate) -> RegistrationOut:
     if user.base_role != "STUDENT":
         fail(403, "Only students create a registration group")
     student = profile(session, user, "STUDENT")
-    members = data.member_student_ids
-    if student.id not in members or len(set(members)) != len(members):
-        fail(422, "The creator must be a member and each member must appear once")
+    members = data.member_student_ids or [student.id]
+    if members != [student.id] or not data.confirm_creator:
+        fail(422, "Students must register themselves and confirm their own participation")
     now = datetime.now(timezone.utc)
     try:
         topic = session.scalar(select(m.Topic).where(m.Topic.id == data.topic_id).with_for_update())
@@ -95,15 +157,32 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         allowed_state = topic.state == "APPROVED" or (student_proposal and topic.state == "DRAFT")
         if not allowed_state or round_ is None or round_.state != "OPEN" or not (round_.opens_at <= now <= round_.closes_at):
             fail(409, "Topic or registration round is not open")
-        if topic.proposer_type == "STUDENT" and not student_proposal:
+        if topic.proposer_type == "STUDENT" and topic.state != "APPROVED" and not student_proposal:
             fail(403, "Student proposals belong to their proposing group")
-        if session.scalar(select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id,
-            m.TopicRegistration.state.in_(["LECTURER_ACCEPTED", "FINALIZED"])).limit(1)):
-            fail(409, "This topic already has an accepted group")
-        if len(members) > topic.max_students:
+        expected = topic.max_students
+        if data.expected_member_count is not None and data.expected_member_count != expected:
             fail(422, "Group exceeds topic capacity")
+        # Topic-first locking prevents two applicants creating competing groups
+        # or claiming the final place simultaneously.
+        active_regs = session.scalars(select(m.TopicRegistration).where(
+            m.TopicRegistration.topic_id == topic.id,
+            m.TopicRegistration.state.in_(["DRAFT", "RETURNED", "SUBMITTED", "LECTURER_ACCEPTED", "FINALIZED"])
+        ).order_by(m.TopicRegistration.created_at, m.TopicRegistration.id).with_for_update()).all()
+        if len(active_regs) > 1:
+            fail(409, "This topic has legacy competing groups; department review is required")
+        reg = active_regs[0] if active_regs else None
+        if reg and reg.state == "FINALIZED":
+            fail(409, "Group membership is locked after submission")
+        if reg and topic.proposer_type == "STUDENT" and topic.state != "APPROVED":
+            fail(409, "Student proposals start with one student; others join after department approval")
+        active_count = session.scalar(select(func.count()).select_from(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id, m.RegistrationMember.active.is_(True))) if reg else 0
+        if reg and active_count >= topic.max_students:
+            fail(409, "Topic registration capacity is full")
         students = session.scalars(
-            select(m.StudentProfile).where(m.StudentProfile.id.in_(members)).with_for_update()
+            select(m.StudentProfile).join(m.UserAccount, m.UserAccount.id == m.StudentProfile.user_id)
+            .where(m.StudentProfile.id.in_(members), m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "STUDENT")
+            .order_by(m.StudentProfile.id).with_for_update(of=m.StudentProfile)
         ).all()
         if len(students) != len(members) or any(item.department_id != topic.department_id for item in students):
             fail(422, "Group members must be valid students in the topic department")
@@ -116,21 +195,35 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         ).limit(1))
         if existing is not None:
             fail(409, "A member already has an active registration in this round")
-        reg = m.TopicRegistration(
-            id=uuid4(), topic_id=topic.id, round_id=topic.round_id,
-            created_by=student.id, state="DRAFT",
-        )
-        session.add(reg)
-        session.flush()
+        first_member = reg is None
+        before = _registration_hash(session, reg) if reg else None
+        previous_decision = None
+        if first_member:
+            reg = m.TopicRegistration(
+                id=uuid4(), topic_id=topic.id, round_id=topic.round_id,
+                created_by=student.id, state="DRAFT", expected_member_count=expected,
+            )
+            session.add(reg)
+            session.flush()
+        else:
+            reg.row_version += 1
+            reg.expected_member_count = expected
+            if reg.state in {"SUBMITTED", "LECTURER_ACCEPTED"}:
+                if reg.lecturer_decided_at:
+                    previous_decision = f"Previous {reg.state}; lecturer {reg.lecturer_decided_by}; at {reg.lecturer_decided_at}; reason: {reg.lecturer_reason or '-'}"
+                reg.state = "SUBMITTED"
+                reg.lecturer_decided_by = None
+                reg.lecturer_decided_at = None
+                reg.lecturer_reason = None
         for member_id in members:
             session.add(m.RegistrationMember(
                 id=uuid4(), registration_id=reg.id, round_id=topic.round_id,
-                student_id=member_id, is_coordinator=(member_id == student.id), active=True,
-                consent_status="ACCEPTED" if data.confirm_creator and member_id == student.id else "PENDING",
-                responded_by_user_id=user.id if data.confirm_creator and member_id == student.id else None,
-                responded_at=now if data.confirm_creator and member_id == student.id else None,
+                student_id=member_id, is_coordinator=first_member, active=True,
+                consent_status="ACCEPTED", responded_by_user_id=user.id, responded_at=now,
             ))
         session.flush()
+        _registration_audit(session, reg, user,
+            "REGISTRATION_CREATED" if first_member else "REGISTRATION_MEMBER_JOINED", before, previous_decision)
         result = registration_out(session, reg)
         session.commit()
         return result
@@ -144,7 +237,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
 
 def respond_to_registration(session: Session, user: m.UserAccount, registration_id: UUID, data: MemberResponse) -> RegistrationOut:
     if user.base_role != "STUDENT":
-        fail(403, "Only an invited student can respond to a group registration")
+        fail(403, "Only a student can confirm their own legacy draft registration")
     student = profile(session, user, "STUDENT")
     try:
         reg = _registration(session, registration_id, lock=True)
@@ -211,16 +304,20 @@ def submit_registration(session: Session, user: m.UserAccount, registration_id: 
         eligible_ids = confirmed_student_ids(session, reg.round_id, [member.student_id for member in members])
         if eligible_ids != {member.student_id for member in members}:
             fail(409, "Every group member must still have a confirmed eligibility snapshot")
+        if not valid_group(session, topic, members):
+            fail(409, "Group membership or account eligibility has changed; reload before submission")
         if student_proposal and topic.state in {"DRAFT", "RETURNED"}:
             from backend.services.topics import _audit, _fingerprint
             before = _fingerprint(topic, session)
             topic.state = "SUBMITTED"
             topic.row_version += 1
             _audit(session, topic, user.id, "TOPIC_SUBMITTED", before)
+        before = _registration_hash(session, reg)
         reg.state = "SUBMITTED"
         reg.submitted_at = now
         reg.row_version += 1
         session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_SUBMITTED", before)
         result = registration_out(session, reg)
         session.commit()
         return result
@@ -245,6 +342,7 @@ def cancel_registration(session: Session, user: m.UserAccount, registration_id: 
         ))
         if coordinator is None:
             fail(403, "Only the student who created the group can cancel it")
+        before = _registration_hash(session, reg)
         reg.state = "CANCELLED"
         reg.row_version += 1
         for member in session.scalars(select(m.RegistrationMember).where(
@@ -253,6 +351,7 @@ def cancel_registration(session: Session, user: m.UserAccount, registration_id: 
         )).all():
             member.active = False
         session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_CANCELLED", before)
         result = registration_out(session, reg)
         session.commit()
         return result
@@ -320,6 +419,10 @@ def lecturer_decision(
         if reg.state != "SUBMITTED" or topic.state != "APPROVED":
             fail(409, "Department topic approval is required before the lecturer decision")
         if data.decision == "ACCEPT":
+            members = session.scalars(select(m.RegistrationMember).where(
+                m.RegistrationMember.registration_id == reg.id, m.RegistrationMember.active.is_(True))).all()
+            if not valid_group(session, topic, members):
+                fail(409, "Group membership or account eligibility has changed; acceptance is unavailable")
             other = session.scalar(select(m.TopicRegistration.id).where(
                 m.TopicRegistration.topic_id == topic.id,
                 m.TopicRegistration.id != reg.id,
@@ -329,6 +432,7 @@ def lecturer_decision(
                 fail(409, "Another group has already been accepted for this topic")
         if data.decision == "REJECT" and not (data.reason and data.reason.strip()):
             fail(422, "A rejection requires a reason")
+        before = _registration_hash(session, reg)
         reg.state = "LECTURER_ACCEPTED" if data.decision == "ACCEPT" else "LECTURER_REJECTED"
         reg.lecturer_decided_by = lecturer.id
         reg.lecturer_decided_at = datetime.now(timezone.utc)
@@ -340,6 +444,7 @@ def lecturer_decision(
             )).all():
                 member.active = False
         session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_" + data.decision, before, data.reason)
         result = registration_out(session, reg)
         session.commit()
         return result
@@ -385,12 +490,16 @@ def finalize_registration(
         proposer = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == topic.proposer_user_id))
         if proposer is None:
             fail(409, "Proposing lecturer profile is unavailable")
+        lecturer_account = session.get(m.UserAccount, proposer.user_id)
+        if proposer.department_id != topic.department_id or lecturer_account is None or lecturer_account.status != "ACTIVE":
+            fail(409, "Receiving lecturer is no longer active in this department")
         members = session.scalars(select(m.RegistrationMember).where(
             m.RegistrationMember.registration_id == reg.id,
             m.RegistrationMember.active.is_(True),
         )).all()
-        if not (1 <= len(members) <= topic.max_students <= 3):
-            fail(409, "Group membership is invalid")
+        if not valid_group(session, topic, members):
+            fail(409, "Group membership or eligibility has changed; review before finalization")
+        before = _registration_hash(session, reg)
         now = datetime.now(timezone.utc)
         thesis = m.Thesis(
             id=uuid4(), round_id=reg.round_id, topic_id=topic.id, registration_id=reg.id,
@@ -413,6 +522,7 @@ def finalize_registration(
         reg.department_finalized_at = now
         reg.row_version += 1
         session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_FINALIZED", before)
         result = registration_out(session, reg)
         session.commit()
         return result

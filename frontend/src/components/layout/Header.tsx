@@ -6,21 +6,10 @@ import { Menu, LogOut } from "lucide-react";
  * Only includes paths that are statically known.
  */
 const BREADCRUMB_MAP: Record<string, string> = {
-  "/": "Workspace",
-  "/rounds": "Đợt & Năm học",
-  "/eligibility": "Điều kiện SV",
+  "/": "Tổng quan",
   "/topics": "Đề tài",
   "/registrations": "Đăng ký",
-  "/proposals": "Đề cương",
-  "/progress": "Tiến độ",
-  "/documents": "Tài liệu",
-  "/councils": "Hội đồng & Phiên",
-  "/reviews": "Nhận xét",
-  "/scoring": "Chấm điểm",
-  "/minutes": "Biên bản",
-  "/archive": "Kho & Báo cáo",
-  "/ai": "Chatbot AI",
-  "/similarity": "Tìm tương đồng",
+  "/ai": "Tra cứu thử nghiệm",
 };
 
 interface HeaderProps {
@@ -39,12 +28,12 @@ export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
           <button
             className="header__toggle"
             onClick={onToggleSidebar}
-            aria-label="Toggle sidebar"
+            aria-label="Mở hoặc đóng menu"
           >
             <Menu size={20} />
           </button>
-          <nav className="header__breadcrumb" aria-label="Breadcrumb">
-            Workspace
+          <nav className="header__breadcrumb" aria-label="Vị trí trang">
+            KLTN
             <span className="header__breadcrumb-sep">/</span>
             <span>{currentLabel}</span>
           </nav>

@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 interface DialogProps {
   open: boolean;
@@ -8,6 +8,7 @@ interface DialogProps {
   size?: "sm" | "md" | "lg";
   children: React.ReactNode;
   footer?: React.ReactNode;
+  busy?: boolean;
 }
 
 export default function Dialog({
@@ -17,19 +18,23 @@ export default function Dialog({
   size = "sm",
   children,
   footer,
+  busy = false,
 }: DialogProps) {
+  const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
 
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
-    const focusables = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]') || []);
+    const focusables = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]') || []).filter((node) => node.getClientRects().length > 0);
     focusables()[0]?.focus();
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeRef.current();
+      if (e.key === "Escape" && !busyRef.current) closeRef.current();
       if (e.key === "Tab") {
         const nodes = focusables();
         const first = nodes[0], last = nodes[nodes.length - 1];
@@ -51,17 +56,19 @@ export default function Dialog({
   return (
     <div
       className="dialog-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
+      aria-busy={busy}
     >
       <div className={`dialog dialog--${size}`} ref={dialogRef}>
         <div className="dialog__header">
-          <h2 id="dialog-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <button
             className="btn btn-ghost btn-icon btn-sm"
             onClick={onClose}
+            disabled={busy}
             aria-label="Đóng"
           >
             <X size={18} />

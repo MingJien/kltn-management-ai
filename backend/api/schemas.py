@@ -55,6 +55,9 @@ class TopicOut(BaseModel):
     requirements: list[RequirementInput]
     title_versions: list[TitleVersionOut]
     available: bool
+    registered_member_count: int = 0
+    remaining_slots: int = 0
+    registration_state: str | None = None
 
 
 class TopicCreate(BaseModel):
@@ -91,13 +94,16 @@ class OpenRoundOut(BaseModel):
 
 class RegistrationCreate(BaseModel):
     topic_id: UUID
-    member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
-    confirm_creator: bool = False
+    # Legacy clients may send their own ID. Selecting another student is rejected.
+    member_student_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=1)
+    confirm_creator: bool = True
+    expected_member_count: int | None = Field(default=None, ge=1, le=3)
 
 
 class StudentProposalCreate(TopicCreate):
-    member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
-    confirm_creator: bool = False
+    member_student_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=1)
+    confirm_creator: bool = True
+    expected_member_count: int | None = Field(default=None, ge=1, le=3)
 
 
 class RegistrationMemberOut(BaseModel):
@@ -108,10 +114,11 @@ class RegistrationMemberOut(BaseModel):
     active: bool
     consent_status: str
     evidence_file_name: str | None = None
+    can_upload_evidence: bool = False
 
 
 class MemberResponse(BaseModel):
-    consent_status: Literal["ACCEPTED", "DECLINED"]
+    consent_status: Literal["ACCEPTED"]
 
 
 class RegistrationOut(BaseModel):
@@ -120,6 +127,8 @@ class RegistrationOut(BaseModel):
     round_id: UUID
     state: str
     row_version: int
+    expected_member_count: int
+    submitted_at: datetime | None = None
     member_student_ids: list[UUID]
     members: list[RegistrationMemberOut]
     lecturer_decided_at: datetime | None = None
@@ -149,7 +158,11 @@ class ContextOut(BaseModel):
     department_id: UUID | None = None
     email: str | None = None
     student_code: str | None = None
+    class_name: str | None = None
+    major_code: str | None = None
     lecturer_code: str | None = None
+    csrf_token: str | None = None
+    can_change_password: bool = False
 
 
 class ErrorOut(BaseModel):
@@ -210,6 +223,11 @@ class EligibleStudentOut(BaseModel):
     id: UUID
     display_name: str
     student_code: str
+
+
+class MyEligibilityOut(BaseModel):
+    eligible: bool
+    has_active_registration: bool
 
 
 class ThesisOut(BaseModel):

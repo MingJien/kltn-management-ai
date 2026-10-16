@@ -1,8 +1,9 @@
+> **ERD thiết kế mở rộng, không phải schema PostgreSQL hiện hành.** Sơ đồ dưới đây có các bảng dự kiến cho giai đoạn sau. Cấu trúc hiện đang chạy nằm ở [ERD `kltn_management`](erd-kltn-management.md) và [ERD theo cụm](erd-clusters/README.md).
 # ERD logical + physical PostgreSQL
 
-> ERD văn bản canonical đồng bộ từ SQLAlchemy metadata/migration 20260920_0001 → 20261004_0011. Hai bản Draw.io và ERD văn bản đều thể hiện khóa ngoại ghép nối chữ ký với đúng phiên bản đề cương. Mỗi diagram chỉ vẽ FK nội page để đọc được; bảng quan hệ FK phía dưới gồm cả quan hệ liên trang.
+> ERD tổng thể đối chiếu SQLAlchemy metadata/Alembic đến `20261010_0013`. [Bản Draw.io để trình bày](erd-for-advisor.drawio) và bảng quan hệ bên dưới thể hiện FK; các cột không phải khóa tra trong [từ điển dữ liệu](data-dictionary.md).
 
-Bộ [6 ERD theo cụm nghiệp vụ](erd-clusters/README.md) được tái sinh từ schema PostgreSQL `kltn_ai` đang chạy, có PNG/SVG và kiểm PK/FK đối chiếu SQLAlchemy. ERD trên trang này vẫn là mục tra tổng thể.
+Bộ [6 ERD theo cụm nghiệp vụ](erd-clusters/README.md) được sinh từ PostgreSQL `kltn_ai` khi tạo ảnh; migration `0012–0013` chỉ thêm cột không phải FK. ERD trang này là mục tra tổng thể.
 
 ## Ký hiệu
 
@@ -768,6 +769,6 @@ erDiagram
 - `search_index_metadata.document_version_id` NULL được cho nguồn nhập/official, nhưng `repository_item_id` luôn NOT NULL.
 - `similarity_match.source_repository_item_id` là FK tùy chọn đến nguồn, song song với `source_document_version_id` của tài liệu vận hành.
 
-Dữ liệu thực tế theo PostgreSQL 17 local sau 0011: 62 entity/621 cột; thêm `alembic_version` là 63 bảng/622 cột. Qdrant không thuộc ERD quan hệ vì chỉ giữ chỉ mục dẫn xuất.
+SQLAlchemy metadata tại head `0013` có 62 bảng nghiệp vụ/624 cột; PostgreSQL có thêm bảng `alembic_version`. Qdrant là chỉ mục dẫn xuất, không thuộc ERD quan hệ.
 
 Migration 0004 thêm `repository_item.external_source_id` (UNIQUE) và `source_url` (HTTPS); giữ ID nguồn ổn định để đồng bộ PostgreSQL/Qdrant.
