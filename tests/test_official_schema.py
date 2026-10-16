@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from alembic.config import Config
 
 from backend.api.dependencies import database_url
 from backend.db.metadata import target_metadata
@@ -24,6 +25,11 @@ def test_official_migration_is_independent_of_legacy_history():
     assert "down_revision = None" in source
     assert "20261004_0011" not in source
     assert "create_all" not in source
+
+
+def test_default_alembic_config_uses_official_migrations():
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    assert config.get_main_option("script_location").endswith("/backend/migrations_official")
 
 
 def test_review_sql_matches_official_database_table_set():

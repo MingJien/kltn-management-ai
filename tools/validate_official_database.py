@@ -1,7 +1,7 @@
 """Read-only structural verification of the permanent PostgreSQL schema.
 
-Requires an explicit DATABASE_URL ending in /kltn_management.  It never loads
-the legacy .env, seeds data, runs DDL, or touches other databases.
+Reads DATABASE_URL from the process environment or local .env and requires
+PostgreSQL kltn_management. It never seeds data or runs DDL.
 """
 from __future__ import annotations
 
@@ -11,15 +11,17 @@ from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, 
 from sqlalchemy.engine import make_url
 
 from backend.db.metadata import target_metadata
+from backend.db.validate_schema import load_env
 from tools.official_schema import SELECTED_TABLES
 
 HEAD = "20261015_0001_official"
 
 
 def main() -> int:
+    load_env()
     raw = os.environ.get("DATABASE_URL")
     if not raw:
-        raise RuntimeError("Set DATABASE_URL explicitly to kltn_management")
+        raise RuntimeError("Set DATABASE_URL to kltn_management")
     url = make_url(raw)
     if url.database != "kltn_management" or not url.drivername.startswith("postgresql"):
         raise RuntimeError("Refusing to inspect a database other than PostgreSQL kltn_management")

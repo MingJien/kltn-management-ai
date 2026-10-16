@@ -86,7 +86,7 @@ def main() -> int:
             KLTN_EVIDENCE_DIR=str(directory / 'uploads'), KLTN_E2E_RUN_DIR=str(directory),
             # Never deliver synthetic test account links through the developer's real SMTP.
             KLTN_MAIL_FROM='', KLTN_SMTP_HOST='', KLTN_SMTP_USER='', KLTN_SMTP_PASSWORD='')
-        migration = subprocess.run([sys.executable, '-m', 'alembic', '-c', 'alembic-official.ini', 'upgrade', 'head'],
+        migration = subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'],
             cwd=ROOT, env=env, text=True, capture_output=True)
         if migration.returncode:
             print('FAIL isolated migration (connection details withheld)')

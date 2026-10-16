@@ -2,7 +2,7 @@
 
 Nguồn tạo: **PostgreSQL public (live, read-only)**. Database: **`kltn_management`**, schema **`public`**; PostgreSQL **17.11**; Alembic **`20261015_0001_official`**. Ngày sinh: **2026-10-16 10:54 SE Asia Standard Time**.
 
-Sáu ảnh được liên kết bên dưới là ERD hiện hành, sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu. Các tệp ảnh không được liên kết trong bảng dưới không thuộc bộ ERD hiện hành.
+Sáu ảnh bên dưới là ERD hiện hành, sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu.
 
 ## Chạy lại bằng một lệnh
 

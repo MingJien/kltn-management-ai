@@ -1,3 +1,5 @@
+> Tài liệu này ghi lại các quyết định của mô hình mở rộng trước đây. Cấu trúc PostgreSQL đang dùng là `kltn_management` ở revision `20261015_0001_official`; xem [quyết định chọn bảng hiện hành](database-selection-report.md), [ERD](erd-kltn-management.md) và [từ điển dữ liệu](database-dictionary.md). Những bảng không nằm trong 32 bảng hiện hành chỉ là hướng phát triển sau.
+
 # Quyết định thiết kế CSDL
 
 ## Quy ước trạng thái

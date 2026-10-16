@@ -1,7 +1,7 @@
 """Alembic environment for the permanent kltn_management database only.
 
-An explicit DATABASE_URL is required; this migration environment never
-selects a database implicitly.
+The process environment or the local .env supplies DATABASE_URL. The exact
+database name is verified before a connection is opened.
 """
 from __future__ import annotations
 
@@ -13,11 +13,13 @@ from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import make_url
 
 from backend.db.metadata import target_metadata
+from backend.db.validate_schema import load_env
 
 config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
+load_env()
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
     raise RuntimeError("Set DATABASE_URL explicitly to the new kltn_management database")
