@@ -187,7 +187,7 @@ async def callback(request: Request, session: Session = Depends(get_session)):
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
     request.session["csrf_token"] = secrets.token_urlsafe(32)
-    frontend_url = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    frontend_url = os.getenv("KLTN_FRONTEND_URL", "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{frontend_url}/?login=success", status_code=303)
 
 

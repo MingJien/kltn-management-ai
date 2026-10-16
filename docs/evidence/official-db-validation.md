@@ -9,6 +9,7 @@ PostgreSQL local được kiểm tra trực tiếp: database `kltn_management`, 
 - `python -m tools.export_runtime_openapi --check`: **PASS**; tệp OpenAPI công bố khớp trực tiếp FastAPI (72 đường dẫn, 83 thao tác).
 - `npm run build --prefix frontend`: thành công sau khi đồng bộ mã về `D:\KLTN`.
 - `python -m tools.run_e2e`: **6 passed**; chỉ tạo rồi xóa schema kiểm thử ngẫu nhiên do lượt chạy này sở hữu trong `kltn_management`.
+- Model runtime và chuỗi Alembic đang hoạt động chỉ định nghĩa 32 bảng chính thức; model/migration 62 bảng cũ đã được rút khỏi source đang chạy. SQL cũ được giữ riêng trên máy để tham khảo.
 
 Các lượt kiểm cấu trúc và E2E không sửa dữ liệu trong schema `public`. Kết quả này xác nhận database local và code tại máy khi chạy; không tự động xác nhận database trên máy khác.
 

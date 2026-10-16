@@ -27,7 +27,7 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Mở `http://localhost:5173`. Dữ liệu tài khoản thử nghiệm và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Mở `http://127.0.0.1:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Dữ liệu tài khoản thử nghiệm và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
 
 ## Kiểm tra
 

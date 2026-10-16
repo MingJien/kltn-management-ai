@@ -1,6 +1,6 @@
 """Reviewed phase-one selection for the permanent kltn_management database.
 
-The legacy 62-table SQL and migrations remain immutable references.  This
+The old schema is excluded from the active models and migration chain. This
 manifest is intentionally explicit: a future phase adds a new Alembic revision
 instead of silently importing an old table into the official baseline.
 """
