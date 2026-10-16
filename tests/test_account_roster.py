@@ -116,13 +116,24 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
         password_change(PasswordChange(current_password="new-password-123456",
             new_password="third-password-123456"), post_request(), account, session)
         assert verify_password(account.password_hash, "third-password-123456")
+        round_.state = "CLOSED"
+        monkeypatch.setattr("backend.api.roster.mail_delivery_ready", lambda: True)
+        correction_tasks = BackgroundTasks()
         correction = correct_student(round_.id, student.id, CorrectStudent(
             student_code=student_code, display_name="Synthetic corrected student",
             email=f"corrected-{suffix}@example.test", class_name="CS-02", major_code="7480201",
-            basis_ref="KHOA-2026-CORRECTION"), staff, session)
-        assert correction["activation_required"] and account.status == "DISABLED"
+            basis_ref="KHOA-2026-CORRECTION", reason="Official email correction"),
+            correction_tasks, staff, session)
+        assert correction["activation_required"] and correction["activation_sent"]
+        assert len(correction_tasks.tasks) == 1
+        assert correction_tasks.tasks[0].args[0] is account
+        assert account.status == "DISABLED"
         assert not verify_password(account.password_hash, "third-password-123456")
         assert student.class_name == "CS-02" and student.display_name == "Synthetic corrected student"
+        recovered_tasks = BackgroundTasks()
+        activation_request(ActivationRequest(identifier=student_code, email=account.email),
+                           post_request(), recovered_tasks, session)
+        assert len(recovered_tasks.tasks) == 1
         revoke_eligibility(round_.id, RevokeStudent(student_id=student.id,
             reason="Synthetic later correction", basis_ref="KHOA-2026-CORRECTION-2"), staff, session)
         assert student.id not in confirmed_student_ids(session, round_.id, [student.id])

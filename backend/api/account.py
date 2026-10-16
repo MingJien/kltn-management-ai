@@ -79,6 +79,14 @@ def _audit(session: Session, user: m.UserAccount, action: str, actor_id=None) ->
     ))
 
 
+def _student_can_activate(session: Session, student: m.StudentProfile) -> bool:
+    """A confirmed student may activate or recover access after registration closes."""
+    round_ids = session.scalars(select(m.EligibilitySnapshot.round_id).where(
+        m.EligibilitySnapshot.student_id == student.id).distinct()).all()
+    return any(student.id in confirmed_student_ids(session, round_id, [student.id])
+               for round_id in round_ids)
+
+
 @router.post("/activation-request", status_code=202)
 def activation_request(payload: ActivationRequest, request: Request, tasks: BackgroundTasks,
                        session: Session = Depends(get_session)) -> dict[str, str]:
@@ -94,11 +102,8 @@ def activation_request(payload: ActivationRequest, request: Request, tasks: Back
     if user and user.base_role == "STUDENT":
         student = session.scalar(select(m.StudentProfile).where(
             m.StudentProfile.user_id == user.id, m.StudentProfile.student_code == identifier))
-        if student:
-            rounds = session.scalars(select(m.ThesisRound).where(
-                m.ThesisRound.state.in_(["DRAFT", "OPEN"]))).all()
-            if any(student.id in confirmed_student_ids(session, round_.id, [student.id]) for round_ in rounds):
-                tasks.add_task(_mail_link, user, "activate")
+        if student and _student_can_activate(session, student):
+            tasks.add_task(_mail_link, user, "activate")
     elif user and user.base_role == "LECTURER":
         lecturer = session.scalar(select(m.LecturerProfile).where(
             m.LecturerProfile.user_id == user.id, m.LecturerProfile.lecturer_code == identifier))
@@ -121,10 +126,7 @@ def activate(payload: LinkPassword, request: Request,
         raise HTTPException(400, "The link is invalid or has expired")
     if user.base_role == "STUDENT":
         student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == user.id))
-        rounds = session.scalars(select(m.ThesisRound).where(
-            m.ThesisRound.state.in_(["DRAFT", "OPEN"]))).all()
-        if not student or not any(student.id in confirmed_student_ids(session, round_.id, [student.id])
-                                  for round_ in rounds):
+        if not student or not _student_can_activate(session, student):
             raise HTTPException(403, "Participation approval is no longer active")
     user.password_hash = hash_password(payload.password)
     user.email_verified_at = datetime.now(timezone.utc)

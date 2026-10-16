@@ -1,8 +1,8 @@
 -- Schema-only export generated from Alembic revision 20261015_0001_official.
--- 32 business tables; each table has one complete CREATE TABLE statement.
+-- 32 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
--- For an expendable empty PostgreSQL database only. It does not create alembic_version.
+-- For an expendable empty PostgreSQL database only; this snapshot has no business data.
 -- Initialize the permanent kltn_management database with Alembic, not this export.
 
 BEGIN;
@@ -643,6 +643,11 @@ CREATE TABLE signature_confirmation (
 	CONSTRAINT fk_signature_confirmation_proposal_version_pair FOREIGN KEY(proposal_id, proposal_version_no) REFERENCES proposal_version (proposal_id, version_no) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE alembic_version (
+    version_num VARCHAR(32) NOT NULL,
+    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
 COMMIT;

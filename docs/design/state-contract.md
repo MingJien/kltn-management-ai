@@ -1,6 +1,7 @@
-# Hợp đồng trạng thái NV4 đến hết CSDL
+> **Tài liệu thiết kế toàn đề tài, không phải mô tả database đang chạy.** CSDL PostgreSQL hiện hành là `kltn_management`, revision `20261015_0001_official`, với 32 bảng nghiệp vụ. Phần dưới đây có trạng thái/bảng cho giai đoạn sau; xác nhận phạm vi vật lý bằng [ERD hiện hành](erd-kltn-management.md) và [từ điển dữ liệu](database-dictionary.md).
+# Hợp đồng trạng thái thiết kế lịch sử — không thuộc schema hiện hành
 
-Danh sách trạng thái đối chiếu SQLAlchemy/Alembic head `20261010_0013`. PostgreSQL CHECK chỉ giới hạn **tập giá trị**; quyền và chuyển trạng thái do backend kiểm. Nguồn nghiệp vụ và quyết định xem [quyết định CSDL](database-design-decisions.md).
+Các bảng và trạng thái trong phần dưới đây phản ánh mô hình thiết kế mở rộng ở thời điểm trước, không phải danh sách bảng vật lý tại revision hiện hành. PostgreSQL CHECK chỉ giới hạn **tập giá trị**; quyền và chuyển trạng thái do backend kiểm. Quy trình đang chạy xem [đặc tả đề tài và đăng ký](registration-workflow.md).
 
 | Aggregate/bảng | Tập trạng thái trong DB | Luồng hợp lệ chính | Guard và actor quyết định | Điều kiện cấu hình/triển khai |
 | --- | --- | --- | --- | --- |

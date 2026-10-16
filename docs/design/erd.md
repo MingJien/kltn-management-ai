@@ -1,3 +1,4 @@
+> **ERD thiết kế mở rộng, không phải schema PostgreSQL hiện hành.** Sơ đồ dưới đây có các bảng dự kiến cho giai đoạn sau. Cấu trúc hiện đang chạy nằm ở [ERD `kltn_management`](erd-kltn-management.md) và [ERD theo cụm](erd-clusters/README.md).
 # ERD logical + physical PostgreSQL
 
 > ERD tổng thể đối chiếu SQLAlchemy metadata/Alembic đến `20261010_0013`. [Bản Draw.io để trình bày](erd-for-advisor.drawio) và bảng quan hệ bên dưới thể hiện FK; các cột không phải khóa tra trong [từ điển dữ liệu](data-dictionary.md).

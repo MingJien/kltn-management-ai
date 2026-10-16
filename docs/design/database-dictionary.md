@@ -1,6 +1,6 @@
 # Từ điển dữ liệu CSDL chính thức `kltn_management`
 
-Sinh tự động từ metadata SQLAlchemy của revision `20261015_0001_official`; 32 bảng nghiệp vụ, không tính `alembic_version`. Hai bản SQL 32/62 chỉ là nguồn đối chiếu.
+Sinh từ metadata SQLAlchemy của revision Alembic `20261015_0001_official`; 32 bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.
 
 `NULL` ở đây là ràng buộc vật lý. Mọi hành động quan trọng còn chịu kiểm tra quyền/trạng thái trong service và audit. Ví dụ đều là dữ liệu giả.
 
@@ -172,7 +172,7 @@ Sinh tự động từ metadata SQLAlchemy của revision `20261015_0001_officia
 ## 07. `eligibility_snapshot` — Kết quả điều kiện đăng ký
 
 **Mục đích và lý do tồn tại:** Xác nhận đủ điều kiện theo đợt. Nếu bỏ, mất dữ liệu/quan hệ riêng của kết quả điều kiện đăng ký hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/main.py`, `backend/api/roster.py`, `backend/services/registration.py`, `backend/services/roster.py`.
+**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/account.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/registration.py`, `backend/services/roster.py`.
 **Vai trò thao tác:** Người Khoa được giao ELIGIBILITY_IMPORTER/VERIFIER theo đợt; SV chỉ xem kết quả của mình.
 **Tình huống giả:** Khoa xác nhận SV-DEMO đủ điều kiện đợt chính theo danh sách nguồn; quyết định đặc biệt tạo snapshot v2 có số quyết định Hiệu trưởng.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -723,7 +723,7 @@ Sinh tự động từ metadata SQLAlchemy của revision `20261015_0001_officia
 ## 27. `thesis_round` — Đợt KLTN
 
 **Mục đích và lý do tồn tại:** Đợt chính/bổ sung và thời hạn. Nếu bỏ, mất dữ liệu/quan hệ riêng của đợt kltn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Đợt chính/bổ sung và thời hạn; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/roster.py`, `backend/services/progress.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/theses.py`, `backend/services/topics.py`.
+**Use case/API/service:** Đợt chính/bổ sung và thời hạn; `backend/api/account_admin.py`, `backend/api/roster.py`, `backend/services/progress.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/theses.py`, `backend/services/topics.py`.
 **Vai trò thao tác:** Admin kỹ thuật cấu hình đợt; Khoa xác nhận danh sách theo phân công; SV/GV xem đợt mở.
 **Tình huống giả:** Năm học DEMO có đợt MAIN; SUPPLEMENTARY thêm khi Khoa mở.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.

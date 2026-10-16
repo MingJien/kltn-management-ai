@@ -4,15 +4,15 @@ from pathlib import Path
 import pytest
 
 from backend.api.dependencies import database_url
-from backend.db.base import LegacyBase
 from backend.db.metadata import target_metadata
 from tools.official_schema import SELECTED_TABLES
+from tools.export_official_schema_sql import build_sql
 
 
 def test_official_metadata_excludes_later_phase_tables():
     assert set(target_metadata.tables) == SELECTED_TABLES
     assert len(target_metadata.tables) == 32
-    assert "council" in LegacyBase.metadata.tables
+    assert "council" not in target_metadata.tables
     for table in target_metadata.tables.values():
         for foreign_key in table.foreign_keys:
             assert foreign_key.column.table.name in SELECTED_TABLES
@@ -24,6 +24,18 @@ def test_official_migration_is_independent_of_legacy_history():
     assert "down_revision = None" in source
     assert "20261004_0011" not in source
     assert "create_all" not in source
+
+
+def test_review_sql_matches_official_database_table_set():
+    import re
+
+    sql = build_sql()
+    names = re.findall(r"^CREATE TABLE (\w+)", sql, re.MULTILINE)
+    assert set(names) == SELECTED_TABLES | {"alembic_version"}
+    assert len(names) == 33
+    assert "version_num VARCHAR(32) NOT NULL" in sql
+    assert "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)" in sql
+    assert not re.search(r"^\s*ALTER TABLE\b", sql, re.IGNORECASE | re.MULTILINE)
 
 
 @pytest.mark.parametrize("url", [

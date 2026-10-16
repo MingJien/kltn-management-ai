@@ -1,11 +1,11 @@
-# CSDL nộp
+# PostgreSQL `kltn_management`
 
-Repository chỉ giữ một schema CSDL dùng để trình bày phạm vi hiện tại của dự án:
+The application database currently uses Alembic revision `20261015_0001_official`: 32 business tables and `alembic_version`.
 
-| Tệp | Nội dung |
+| File | Purpose |
 | --- | --- |
-| [core/kltn-core-schema.sql](core/kltn-core-schema.sql) | Schema lõi gồm 32 bảng nghiệp vụ: tài khoản, phân quyền, đợt KLTN, điều kiện đăng ký, đề tài, đăng ký, khóa luận, GVHD, đề cương, tiến độ và tài liệu. Mỗi bảng có đầy đủ cột và ràng buộc trong một lệnh `CREATE TABLE`. |
+| [official/kltn-management-schema.sql](official/kltn-management-schema.sql) | Schema-only snapshot of the current database structure; no user data. |
 
-Schema không có dữ liệu sinh viên, đề tài, hồ sơ hay mật khẩu. Mọi thay đổi cấu trúc chính thức của ứng dụng vẫn được quản lý qua Alembic migration trong `backend/migrations/`.
+Update an existing database only through [the official Alembic migrations](../backend/migrations_official/) using `alembic-official.ini`. Never run the SQL snapshot against a database that already contains data.
 
-Chi tiết mục đích và ràng buộc của 32 bảng nằm tại [core/README.md](core/README.md).
+See the [ERD](../docs/design/erd-kltn-management.md) and [data dictionary](../docs/design/database-dictionary.md) for relationships and column meanings.

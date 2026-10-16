@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2940" height="1364" viewBox="0 0 2940 1364">
+<rect width="2940" height="1364" fill="#F7F9FC"/>
+<text x="130" y="92" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="700" fill="#14243A">05  Đề cương và xác nhận phiên bản</text>
+<text x="130" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="400" fill="#52667E">kltn_management  •  PostgreSQL 17.11  •  Alembic 20261015_0001_official  •  6 bảng  •  7 FK</text>
+<text x="130" y="184" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#52667E">Bảng xanh: nghiệp vụ chính    •    Bảng xám: ngữ cảnh    •    Các đường nối lấy từ khóa ngoại thật</text>
+<polyline points="1446,637 1446,682 1972,682 1972,426 2030,426" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1470,637 1470,689 975,689 975,1028 910,1028" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1494,637 1494,696 1958,696 1958,1018 2030,1018" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2408,637 2408,703 1001,703 1001,1018 1080,1018" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2432,637 2432,710 1972,710 1972,1038 2030,1038" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="520,827 520,782 1015,782 1015,1038 1080,1038" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="520,637 520,689 1958,689 1958,446 2030,446" fill="none" stroke="#7696B6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="130" y="235" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="130" y="235" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="131" y="295" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="152" y="281" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">stored_file</text>
+<text x="150" y="344" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">storage_key</text>
+<text x="635" y="343" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(500)</text>
+<text x="790" y="341" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">UK</text>
+<rect x="132" y="355" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="379" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">original_name</text>
+<text x="635" y="378" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(500)</text>
+<text x="150" y="414" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">media_type</text>
+<text x="635" y="413" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(150)</text>
+<rect x="132" y="425" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="449" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">byte_size</text>
+<text x="635" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">int</text>
+<text x="150" y="484" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">sha256</text>
+<text x="635" y="483" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(64)</text>
+<rect x="132" y="495" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="519" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">scan_state</text>
+<text x="635" y="518" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(20)</text>
+<text x="150" y="554" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">scanned_at</text>
+<text x="635" y="553" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">timestamp</text>
+<rect x="132" y="565" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="589" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="635" y="588" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="586" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="150" y="619" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">10 cột • 0 FK • ẩn 2 cột phụ</text>
+<rect x="1080" y="235" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="1080" y="235" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="1081" y="295" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="1102" y="281" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">proposal</text>
+<text x="1100" y="344" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">thesis_id</text>
+<text x="1585" y="343" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="341" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK/UK</text>
+<rect x="1082" y="355" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="1100" y="379" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">current_version_no</text>
+<text x="1585" y="378" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">int</text>
+<text x="1100" y="414" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">state</text>
+<text x="1585" y="413" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(40)</text>
+<rect x="1082" y="425" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="1100" y="449" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="1585" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="446" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="1100" y="619" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">7 cột • 1 FK • ẩn 3 cột phụ</text>
+<rect x="2030" y="235" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="2030" y="235" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="2031" y="295" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="2052" y="281" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">proposal_version</text>
+<text x="2050" y="344" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">proposal_id</text>
+<text x="2535" y="343" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="341" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK/UK</text>
+<rect x="2032" y="355" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="379" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">version_no</text>
+<text x="2535" y="378" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">int</text>
+<text x="2690" y="376" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">UK</text>
+<text x="2050" y="414" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">stored_file_id</text>
+<text x="2535" y="413" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="411" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="2032" y="425" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="449" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">submitted_by</text>
+<text x="2535" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="446" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<text x="2050" y="484" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">submitted_at</text>
+<text x="2535" y="483" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">timestamp</text>
+<rect x="2032" y="495" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="519" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">content_sha256</text>
+<text x="2535" y="518" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(64)</text>
+<text x="2050" y="554" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="2535" y="553" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="551" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="2050" y="619" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">9 cột • 3 FK • ẩn 2 cột phụ</text>
+<rect x="130" y="827" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="130" y="827" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="131" y="887" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="152" y="873" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">reviewer_assignment</text>
+<text x="150" y="936" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">lecturer_id</text>
+<text x="635" y="935" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="933" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="132" y="947" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="971" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">proposal_id</text>
+<text x="635" y="970" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="968" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<text x="150" y="1006" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">thesis_id</text>
+<text x="635" y="1005" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="1003" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="132" y="1017" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="1041" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">review_scope</text>
+<text x="635" y="1040" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(20)</text>
+<text x="150" y="1076" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">assigned_by</text>
+<text x="635" y="1075" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="1073" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="132" y="1087" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="1111" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">assigned_at</text>
+<text x="635" y="1110" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">timestamp</text>
+<text x="150" y="1146" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">state</text>
+<text x="635" y="1145" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(20)</text>
+<rect x="132" y="1157" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="150" y="1181" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="635" y="1180" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="790" y="1178" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="150" y="1211" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">11 cột • 4 FK • ẩn 3 cột phụ</text>
+<rect x="1080" y="827" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="1080" y="827" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="1081" y="887" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="1102" y="873" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">proposal_review</text>
+<text x="1100" y="936" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">proposal_version_id</text>
+<text x="1585" y="935" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="933" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="1082" y="947" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="1100" y="971" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">reviewer_assignment_id</text>
+<text x="1585" y="970" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="968" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<text x="1100" y="1006" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">reviewer_user_id</text>
+<text x="1585" y="1005" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="1003" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<rect x="1082" y="1017" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="1100" y="1041" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">decision</text>
+<text x="1585" y="1040" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(30)</text>
+<text x="1100" y="1076" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">comment</text>
+<text x="1585" y="1075" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">text</text>
+<rect x="1082" y="1087" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="1100" y="1111" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="1585" y="1110" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="1740" y="1108" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="1100" y="1211" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">8 cột • 3 FK • ẩn 2 cột phụ</text>
+<rect x="2030" y="827" width="780" height="402" rx="17" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="2"/>
+<rect x="2030" y="827" width="780" height="78" rx="16" fill="#1F527B" stroke="#1F527B" stroke-width="1"/>
+<rect x="2031" y="887" width="778" height="18" rx="0" fill="#1F527B" stroke="#1F527B" stroke-width="2"/>
+<text x="2052" y="873" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700" fill="#FFFFFF">signature_confirmation</text>
+<text x="2050" y="936" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">proposal_id</text>
+<text x="2535" y="935" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="933" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK/UK</text>
+<rect x="2032" y="947" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="971" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">proposal_version_no</text>
+<text x="2535" y="970" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">int</text>
+<text x="2690" y="968" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<text x="2050" y="1006" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">signature_type</text>
+<text x="2535" y="1005" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(40)</text>
+<text x="2690" y="1003" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">UK</text>
+<rect x="2032" y="1017" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="1041" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">signer_user_id</text>
+<text x="2535" y="1040" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="1038" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">FK</text>
+<text x="2050" y="1076" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">confirmed_at</text>
+<text x="2535" y="1075" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">timestamp</text>
+<rect x="2032" y="1087" width="776" height="36" rx="0" fill="#F1F5FA" stroke="#F1F5FA" stroke-width="2"/>
+<text x="2050" y="1111" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="400" fill="#14243A">official_ref</text>
+<text x="2535" y="1110" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">varchar(500)</text>
+<text x="2050" y="1146" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#14243A">id</text>
+<text x="2535" y="1145" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">uuid</text>
+<text x="2690" y="1143" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">PK</text>
+<text x="2050" y="1211" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="400" fill="#52667E">9 cột • 3 FK • ẩn 2 cột phụ</text>
+<rect x="1427" y="595" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1438" y="617" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1969" y="390" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1980" y="412" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="1451" y="647" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1462" y="669" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="920" y="992" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="931" y="1014" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="1475" y="647" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1486" y="669" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1969" y="982" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1980" y="1004" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="2389" y="647" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="2400" y="669" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1019" y="982" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1030" y="1004" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="2413" y="647" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="2424" y="669" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1969" y="1002" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1980" y="1024" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="501" y="785" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="512" y="807" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1019" y="1002" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1030" y="1024" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<rect x="501" y="595" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="512" y="617" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">1</text>
+<rect x="1969" y="410" width="36" height="31" rx="10" fill="#FFFFFF" stroke="#B8C7D8" stroke-width="1"/>
+<text x="1980" y="432" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#1F527B">N</text>
+<text x="130" y="1323" font-family="Segoe UI, Arial, sans-serif" font-size="21" font-weight="400" fill="#52667E">Nguồn: PostgreSQL public (live, read-only)  •  2026-10-16 10:54 SE Asia Standard Time  •  1 = bảng cha, N = nhiều bản ghi con; ≤1 = FK duy nhất</text>
+</svg>

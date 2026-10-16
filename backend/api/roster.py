@@ -7,14 +7,16 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.api.account import _mail_link, _student_can_activate
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
+from backend.services.account_mail import mail_delivery_ready
 from backend.services.roster import (
     CODE, EMAIL, MAX_BYTES, assigned, import_roster, parse_roster, require_assignment, validate_rows,
 )
@@ -66,6 +68,7 @@ class CorrectStudent(BaseModel):
     class_name: str = Field(min_length=1, max_length=100)
     major_code: str = Field(min_length=1, max_length=32)
     basis_ref: str = Field(min_length=3, max_length=500)
+    reason: str = Field(min_length=5, max_length=1000)
 
 
 async def _read_file(request: Request, name: str) -> tuple[list, str]:
@@ -229,6 +232,7 @@ def revoke_eligibility(round_id: UUID, payload: RevokeStudent,
 
 @router.patch("/{student_id}")
 def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
+                    tasks: BackgroundTasks,
                     user: m.UserAccount = Depends(current_user),
                     session: Session = Depends(get_session)) -> dict:
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
@@ -239,8 +243,8 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
     major_code = payload.major_code.strip()
     if (not CODE.fullmatch(code) or not EMAIL.fullmatch(email) or not name
             or not class_name or not CODE.fullmatch(major_code)
-            or len(payload.basis_ref.strip()) < 3):
-        raise HTTPException(422, "Invalid correction or missing document reference")
+            or len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5):
+        raise HTTPException(422, "Invalid correction or missing document reference/reason")
     snapshot = session.scalar(select(m.EligibilitySnapshot.id).where(
         m.EligibilitySnapshot.student_id == student_id,
         m.EligibilitySnapshot.round_id == round_id).limit(1))
@@ -278,11 +282,17 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
         account.row_version += 1
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROSTER_IDENTITY_CORRECTED",
         resource_type="student_profile", resource_id=student.id,
-        before_hash=before, after_hash=fingerprint(), reason=payload.basis_ref.strip(),
+        before_hash=before, after_hash=fingerprint(),
+        reason=f"{payload.reason.strip()}; reference={payload.basis_ref.strip()}",
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
     try:
         session.commit()
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(409, "Identity changed concurrently; reload and retry") from exc
-    return {"student_id": str(student.id), "activation_required": email_changed}
+    activation_sent = bool(email_changed and account.status == "DISABLED"
+                           and _student_can_activate(session, student) and mail_delivery_ready())
+    if activation_sent:
+        tasks.add_task(_mail_link, account, "activate")
+    return {"student_id": str(student.id), "activation_required": email_changed,
+            "activation_sent": activation_sent}

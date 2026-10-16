@@ -57,7 +57,7 @@
 
 ## Ranh giới migration
 
-Alembic giữ lịch sử thay đổi từ `0001` đến head `20261010_0013`. `0012` thêm quy mô nhóm dự kiến; `0013` thêm lớp/ngành từ danh sách SV được Khoa duyệt. Schema hiện có 62 bảng nghiệp vụ và bảng `alembic_version`; bản SQL lõi 32 bảng dùng trình bày, không chạy lại trên CSDL đang dùng. Mẫu 6 đã được nạp ở trạng thái DRAFT, chưa dùng chấm thật. Thay đổi tiếp theo phải tạo migration mới.
+PostgreSQL hiện hành là `kltn_management`, Alembic revision `20261015_0001_official`, gồm 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc được quản lý trong `backend/migrations_official/`; xem [schema-only SQL](../../database/official/kltn-management-schema.sql). Các chức năng hội đồng/chấm điểm chưa thuộc database hiện hành. Mọi thay đổi cấu trúc tiếp theo phải tạo migration mới trên revision chính thức.
 
 | ID | Quyết định bổ sung | Hệ quả | Trạng thái |
 | --- | --- | --- | --- |

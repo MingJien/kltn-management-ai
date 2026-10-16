@@ -1,3 +1,4 @@
+> **Từ điển của mô hình thiết kế mở rộng ở revision trước, không phải schema PostgreSQL hiện hành.** Database đang dùng là `kltn_management`, revision `20261015_0001_official`, gồm 32 bảng nghiệp vụ. Tra cứu cấu trúc hiện tại tại [database-dictionary.md](database-dictionary.md).
 # Từ điển dữ liệu logical + physical PostgreSQL
 
 > Từ điển cột đối chiếu SQLAlchemy metadata/Alembic đến `20261010_0013`. Mọi bảng nghiệp vụ dùng UUID PK; FK nghiệp vụ mặc định ON DELETE RESTRICT. Không chứa dữ liệu sinh viên thật.

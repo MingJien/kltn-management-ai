@@ -31,6 +31,7 @@ export default function RosterPage({context}: {context:Context}) {
   const [correctionEmail, setCorrectionEmail] = useState("");
   const [correctionClass, setCorrectionClass] = useState("");
   const [correctionMajor, setCorrectionMajor] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -122,7 +123,7 @@ export default function RosterPage({context}: {context:Context}) {
             setSpecialStudent("");setSpecialRef("");setSpecialReason("");setSpecialClauseOne(false);},
             "Đã ghi nhận kết quả theo quyết định đặc biệt; phiên bản cũ được giữ.")}>Ghi nhận ngoại lệ</button>
         <h3>Đính chính thông tin theo văn bản Khoa</h3>
-        <p className="text-muted">Đổi email sẽ vô hiệu mật khẩu và các phiên cũ; sinh viên cần kích hoạt lại bằng email mới. Việc đính chính không tự thay đổi kết quả đủ điều kiện.</p>
+        <p className="text-muted">Đổi email sẽ vô hiệu mật khẩu và các phiên cũ. Nếu dịch vụ thư sẵn sàng, hệ thống gửi liên kết kích hoạt tới email mới; hồ sơ và kết quả đủ điều kiện được giữ nguyên.</p>
         <label className="input-group">Sinh viên<select className="input" value={correctionStudent} onChange={e=>{
           const row=roster.find(r=>r.student_id===e.target.value);setCorrectionStudent(e.target.value);
           setCorrectionCode(row?.student_code||"");setCorrectionName(row?.display_name||"");
@@ -135,11 +136,19 @@ export default function RosterPage({context}: {context:Context}) {
           <label className="input-group">Lớp<input className="input" value={correctionClass} onChange={e=>setCorrectionClass(e.target.value)} /></label>
           <label className="input-group">Mã ngành<input className="input" value={correctionMajor} onChange={e=>setCorrectionMajor(e.target.value)} /></label>
         </div>:null}
-        <button className="btn btn-secondary" disabled={!correctionStudent||basis.trim().length<3||busy}
-          onClick={()=>void run(()=>request(`/rounds/${roundId}/roster/${correctionStudent}`,context.user_id,
-            {method:"PATCH",body:JSON.stringify({student_code:correctionCode,display_name:correctionName,
-              email:correctionEmail,class_name:correctionClass,major_code:correctionMajor,basis_ref:basis})}),
-            "Đã ghi đính chính và lưu dấu vết; nếu đổi email, sinh viên phải kích hoạt lại.")}>Lưu đính chính</button>
+        <label className="input-group">Lý do đính chính<input className="input" minLength={5} value={correctionReason} onChange={e=>setCorrectionReason(e.target.value)} /></label>
+        <button className="btn btn-secondary" disabled={!correctionStudent||basis.trim().length<3||correctionReason.trim().length<5||busy}
+          onClick={()=>void run(async()=>{
+            const result=await request<{activation_required:boolean;activation_sent:boolean}>(`/rounds/${roundId}/roster/${correctionStudent}`,context.user_id,
+              {method:"PATCH",body:JSON.stringify({student_code:correctionCode,display_name:correctionName,
+                email:correctionEmail,class_name:correctionClass,major_code:correctionMajor,
+                basis_ref:basis,reason:correctionReason})});
+            return result.activation_required
+              ? result.activation_sent
+                ? "Đã đính chính tài khoản cũ và gửi liên kết kích hoạt tới email mới."
+                : "Đã đính chính tài khoản cũ; cần gửi lại liên kết kích hoạt khi dịch vụ thư sẵn sàng."
+              : "Đã đính chính thông tin và lưu dấu vết.";
+          }, "Đã đính chính thông tin.")}>Lưu đính chính</button>
       </div></section>:null}
       {!canConfirm&&roundId?<section className="card"><div className="card-body stack"><h2>Trạng thái danh sách</h2>
         <p>{roster.length} sinh viên; {pending.length} kết quả đang chờ người được giao xác nhận.</p></div></section>:null}

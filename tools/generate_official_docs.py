@@ -1,11 +1,9 @@
-"""Generate the selection matrix and dictionary from reviewed ORM metadata.
+"""Generate the current ERD and data dictionary from official ORM metadata.
 
-Run from the repository root after changing the official schema.  The two
-reference SQL files are read-only inputs and are never rewritten here.
+This tool reads no archived SQL and does not connect to PostgreSQL.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 from pathlib import Path
 
@@ -16,8 +14,6 @@ from backend.db.metadata import target_metadata
 from tools.official_schema import SELECTED_TABLES, TABLE_INFO
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "database/kltn-schema-consolidated.sql"
-CORE = ROOT / "database/core/kltn-core-schema.sql"
 DESIGN = ROOT / "docs/design"
 
 COLUMN_VI = {
@@ -184,7 +180,7 @@ ROLE_GROUPS = {
 def make_dictionary() -> None:
     assert set(target_metadata.tables) == SELECTED_TABLES
     lines = ["# Từ điển dữ liệu CSDL chính thức `kltn_management`", "",
-        "Sinh tự động từ metadata SQLAlchemy của revision `20261015_0001_official`; 32 bảng nghiệp vụ, không tính `alembic_version`. Hai bản SQL 32/62 chỉ là nguồn đối chiếu.",
+        "Sinh từ metadata SQLAlchemy của revision Alembic `20261015_0001_official`; 32 bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.",
         "", "`NULL` ở đây là ràng buộc vật lý. Mọi hành động quan trọng còn chịu kiểm tra quyền/trạng thái trong service và audit. Ví dụ đều là dữ liệu giả.", ""]
     for number, table in enumerate(sorted(target_metadata.tables.values(), key=lambda item: item.name), 1):
         title, function = TABLE_INFO[table.name]
@@ -254,19 +250,6 @@ def make_erd() -> None:
     (DESIGN / "erd-kltn-management.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def source_tables(path: Path) -> dict[str, str]:
-    content = path.read_text(encoding="utf-8")
-    return {name: definition for name, definition in re.findall(
-        r"CREATE TABLE\s+(\w+)\s*\((.*?)\n\);", content, re.S | re.I
-    )}
-
-
-def references(table: str, source_sql: str) -> list[str]:
-    # pg_dump places foreign keys after CREATE TABLE in ALTER TABLE ONLY.
-    pattern = rf"ALTER TABLE ONLY\s+{re.escape(table)}\s+ADD CONSTRAINT\s+\w+\s+FOREIGN KEY\s*\(.*?\)\s+REFERENCES\s+(\w+)\s*\("
-    return sorted(set(re.findall(pattern, source_sql, re.S | re.I)))
-
-
 def callers(table: str) -> list[str]:
     cls = "".join(token.title() for token in table.split("_"))
     used = []
@@ -278,78 +261,6 @@ def callers(table: str) -> list[str]:
     return used
 
 
-def decision_reason(table: str, function: str, used: list[str]) -> str:
-    if table == "resource_assignment":
-        return "Giữ quyền theo đợt/KLTN; bỏ council_id và CHECK liên quan vì hội đồng thuộc giai đoạn sau."
-    if table == "eligibility_exception":
-        return "Phiên bản eligibility_snapshot đã giữ kết quả, số quyết định Hiệu trưởng, người và thời gian Khoa xác nhận; chưa cần quan hệ riêng."
-    if table == "round_policy":
-        return "Chưa có policy bổ sung đã ban hành và chưa có API đọc/ghi; thêm bằng migration khi có nguồn."
-    if table in SELECTED_TABLES:
-        return ("API/service đang đọc hoặc ghi; cần để " if used else "Phụ trợ bắt buộc cho FK, phạm vi quyền hoặc dữ liệu tổ chức: ") + function.lower() + "."
-    return function + "; không có API giai đoạn 1, thêm qua migration khi triển khai."
-
-
-def make_selection_report() -> None:
-    source_sql = SOURCE.read_text(encoding="utf-8")
-    source = source_tables(SOURCE)
-    core = source_tables(CORE)
-    business = set(source) - {"alembic_version"}
-    assert business == set(TABLE_INFO), (business - set(TABLE_INFO), set(TABLE_INFO) - business)
-    assert len(business) == 62
-    assert len(core) == 32
-    assert SELECTED_TABLES <= business
-    lines = [
-        "# Ma trận lựa chọn CSDL chính thức `kltn_management`",
-        "",
-        "Nguồn kỹ thuật: `database/kltn-schema-consolidated.sql` (62 bảng nghiệp vụ; SHA-256 "
-        + hashlib.sha256(SOURCE.read_bytes()).hexdigest() + "). Bản 32 bảng là tài liệu tham khảo, không là chỉ tiêu.",
-        "Baseline tham khảo `database/kltn-db-baseline.sql` chỉ có ở checkout gốc (Git bỏ qua): đã đối chiếu read-only 63 tên bảng gồm `alembic_version`, trùng danh sách bản 62; SHA-256 `90e41e9da9588a96e4f49055df9d1bb21393bb896eb7dd6f7414815ed62f961f`. Baseline này ghi revision cũ `20261014_0014`, không dùng để tạo CSDL mới.",
-        "Nguồn nghiệp vụ: góp ý GVHD 30/09–07/10, QĐ2919 (bản ghi đối chiếu dự án), QĐ5964 và Mẫu 1a/1b/3 từ Drive của Khoa.",
-        "Cột API/service chỉ ghi đường dẫn có tham chiếu model thật. Kết quả chạy và giới hạn kiểm thử ở [báo cáo kiểm chứng](../evidence/official-db-validation.md).",
-        "",
-        f"**Kết quả chọn: {len(SELECTED_TABLES)} bảng nghiệp vụ; không chọn {len(business - SELECTED_TABLES)} bảng.**",
-        "",
-        "| STT | Bảng SQL | Tên tiếng Việt | Chức năng / use case | API/service hiện tại | PK, FK nguồn | Mức độ | Quyết định và lý do |",
-        "|---:|---|---|---|---|---|---|---|",
-    ]
-    for index, name in enumerate(sorted(business), 1):
-        title, function = TABLE_INFO[name]
-        used = callers(name)
-        refs = references(name, source_sql)
-        links = ", ".join(f"`{p}`" for p in used) if used else "Chưa có"
-        relation = "PK `id`; FK → " + (", ".join(f"`{r}`" for r in refs) if refs else "—")
-        level = "Trực tiếp" if used and name in SELECTED_TABLES else "Phụ trợ" if name in SELECTED_TABLES else "Giai đoạn sau"
-        outcome = "Chọn" if name in SELECTED_TABLES else "Không chọn"
-        lines.append(f"| {index} | `{name}` | {title} | {function} | {links} | {relation} | {level} | {outcome}: {decision_reason(name, function, used)} |")
-    selected = sorted(SELECTED_TABLES)
-    omitted = sorted(business - SELECTED_TABLES)
-    lines += [
-        "", "## Kết luận phạm vi", "",
-        "**Bảng chọn:** " + ", ".join(f"`{n}`" for n in selected) + ".",
-        "", "**Bảng chưa chọn:** " + ", ".join(f"`{n}`" for n in omitted) + ".",
-        "", "**Bảng phụ trợ bắt buộc:** `faculty`, `department`, `organizational_position`, `position_assignment`, `resource_assignment`, `stored_file`, `audit_event`, `topic_title_version`, `reviewer_assignment`, `signature_confirmation`. Chúng giữ FK, phạm vi quyền, phiên bản hoặc quyết định.",
-        "", "## Điều chỉnh so với bản 62", "",
-        "- `resource_assignment.council_id` cùng FK, index và nhánh CHECK council được tách ra; giai đoạn 1 chỉ còn đúng một trong `round_id`/`thesis_id`.",
-        "- Các lớp model ngoài tập chọn không được đăng ký vào metadata chính thức. Các module AI thử nghiệm không được xem là đã chạy trên schema mới.",
-        "- Không chuyển dữ liệu thật từ `kltn_ai`, `kltn_dev` hoặc `kltn_core`. Mọi mở rộng sau này phải tạo revision Alembic mới trên chính `kltn_management`.",
-        "", "## Đối chiếu bản tham khảo 32 bảng", "",
-        "**Có trong bản 32 và được chọn:** " + ", ".join(f"`{n}`" for n in sorted(SELECTED_TABLES & set(core))) + ".",
-        "", "**Có trong bản 32 nhưng chưa chọn:** " + ", ".join(f"`{n}`" for n in sorted(set(core) - SELECTED_TABLES)) + ".",
-        "", "**Cần cho giai đoạn 1 nhưng không có trong bản 32:** " + ", ".join(f"`{n}`" for n in sorted(SELECTED_TABLES - set(core))) + ".",
-        "", "## Tình trạng chạy", "",
-        "Các luồng giai đoạn 1 gồm đề cương và ghi ngoại lệ QĐ5964 đã qua kiểm thử API trên PostgreSQL cô lập; sáu kịch bản trình duyệt tới API/CSDL cũng qua. CSDL thường trực trên cluster hiện hữu chưa được tạo do tài khoản ứng dụng thiếu CREATEDB; xem [bằng chứng và bước còn lại](../evidence/official-db-validation.md).",
-        "", "## Nguồn quy định", "",
-        "- [QĐ5964 sửa Điều 2 của QĐ2919](https://drive.google.com/file/d/12Azwk8tiP9KAlQupUph7vKLBuMcph82q/view).",
-        "- [QĐ2919 bản PDF ảnh](https://drive.google.com/file/d/1dQvfF2ZXisBEwvqidmQAkG9wtFqQ3Zcp/view): connector không trích xuất chữ; chỉ dùng phần đã có biên bản đối chiếu trong dự án, không suy diễn nội dung mới.",
-        "- [Mẫu 1a](https://docs.google.com/document/d/1S_AaUZgxUJT7IVuUUzWZjpziUvGVqU9T/edit), [Mẫu 1b](https://docs.google.com/document/d/1aj7yisvXtR-hrEMUtJadD1VCcSK4_DUn/edit), [Mẫu 3](https://docs.google.com/document/d/1VOP2z5qC-aSMnmsWcjUIdBVZh_3VJu_R/edit).",
-        "",
-    ]
-    DESIGN.mkdir(parents=True, exist_ok=True)
-    (DESIGN / "database-selection-report.md").write_text("\n".join(lines), encoding="utf-8")
-
-
 if __name__ == "__main__":
-    make_selection_report()
     make_dictionary()
     make_erd()

@@ -53,6 +53,12 @@ def initial_ddl() -> list[str]:
         )
     if len(tables) != len(set(tables)):
         raise RuntimeError("Initial migration creates a business table more than once")
+    statements.append(
+        "CREATE TABLE alembic_version (\n"
+        "    version_num VARCHAR(32) NOT NULL,\n"
+        "    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)\n"
+        ");"
+    )
     return statements
 
 
@@ -60,10 +66,10 @@ def build_sql() -> str:
     statements = initial_ddl()
     lines = [
         "-- Schema-only export generated from Alembic revision 20261015_0001_official.",
-        f"-- {len(SELECTED_TABLES)} business tables; each table has one complete CREATE TABLE statement.",
+        f"-- {len(SELECTED_TABLES)} business tables plus alembic_version; each table has one complete CREATE TABLE statement.",
         "-- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.",
         "-- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.",
-        "-- For an expendable empty PostgreSQL database only. It does not create alembic_version.",
+        "-- For an expendable empty PostgreSQL database only; this snapshot has no business data.",
         "-- Initialize the permanent kltn_management database with Alembic, not this export.",
         "",
         "BEGIN;",
@@ -88,8 +94,9 @@ def build_sql() -> str:
 def main() -> None:
     sql = build_sql()
     emitted_tables = re.findall(r"^CREATE\s+TABLE\s+(\w+)\b", sql, re.IGNORECASE | re.MULTILINE)
-    if len(emitted_tables) != len(SELECTED_TABLES) or len(set(emitted_tables)) != len(emitted_tables):
-        raise RuntimeError("Export must contain exactly one CREATE TABLE for every selected business table")
+    expected_tables = SELECTED_TABLES | {"alembic_version"}
+    if len(emitted_tables) != len(expected_tables) or set(emitted_tables) != expected_tables:
+        raise RuntimeError("Export must contain exactly 32 business tables and alembic_version")
     if re.search(r"^\s*ALTER\s+TABLE\b", sql, re.IGNORECASE | re.MULTILINE):
         raise RuntimeError("Export must not alter tables after creation")
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

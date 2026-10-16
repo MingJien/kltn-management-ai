@@ -1,7 +1,7 @@
-"""Alembic environment for the permanent database only.
+"""Alembic environment for the permanent kltn_management database only.
 
-An explicit DATABASE_URL is required.  The old .env is deliberately ignored
-because it may point at kltn_ai or kltn_dev.
+An explicit DATABASE_URL is required; this migration environment never
+selects a database implicitly.
 """
 from __future__ import annotations
 

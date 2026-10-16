@@ -1,7 +1,51 @@
-# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
+# Hệ thống quản lý khóa luận tốt nghiệp
 
-Ứng dụng React, FastAPI và PostgreSQL hỗ trợ quản lý đề tài, đăng ký cá nhân/nhóm, xét duyệt, phân công GVHD, đề cương, tiến độ và tài liệu theo phiên bản. Hệ thống có đăng nhập, phân quyền theo nhiệm vụ và ghi nhận lịch sử thao tác.
+Ứng dụng React, FastAPI và PostgreSQL hỗ trợ tài khoản, phân quyền, danh sách sinh viên đủ điều kiện, tạo và duyệt đề tài, đăng ký cá nhân/nhóm, tiếp nhận của giảng viên, đề cương, tiến độ và tài liệu theo phiên bản. AI hiện chỉ được thử trên dữ liệu giả; chưa kết nối Gemini.
 
-Schema cho CSDL nghiệp vụ chính thức `kltn_management` được quản lý bằng Alembic. Revision đầu tạo 32 bảng phục vụ giai đoạn 1; hai schema 32 và 62 bảng cũ được giữ làm tài liệu tham khảo. Phần hội đồng bảo vệ, chấm điểm và biên bản chưa triển khai; chatbot AI hiện là prototype.
+## CSDL hiện hành
 
-Tài liệu cần đối chiếu: [schema lõi 32 bảng](database/core/kltn-core-schema.sql), [schema nguồn 62 bảng](database/kltn-schema-consolidated.sql), [schema chính thức](database/official/kltn-management-schema.sql), [đặc tả API](docs/design/api-design.md), [luồng đăng ký đề tài](docs/design/registration-workflow.md) và [video demo](docs/demo/video-luong-dang-ky-de-tai.mp4).
+PostgreSQL `kltn_management`, Alembic revision `20261015_0001_official`: 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
+
+## Chạy local
+
+Tạo `.env` từ `.env.example`, đặt `DATABASE_URL` trỏ đúng `kltn_management`, rồi cài dependencies:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m alembic -c alembic-official.ini upgrade head
+```
+
+Chạy API và giao diện ở hai terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m tools.run_demo_api
+```
+
+```powershell
+npm ci --prefix frontend
+npm run dev --prefix frontend
+```
+
+Mở `http://localhost:5173`. Dữ liệu tài khoản thử nghiệm và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+
+## Kiểm tra
+
+```powershell
+.\.venv\Scripts\python.exe -m tools.validate_official_database
+.\.venv\Scripts\python.exe -m pytest tests -q
+npm run build --prefix frontend
+.\.venv\Scripts\python.exe -m tools.run_e2e
+```
+
+`run_e2e` tạo schema kiểm thử ngẫu nhiên riêng trong `kltn_management`, không dùng hay xóa bảng nghiệp vụ hiện có.
+
+## Tài liệu chính
+
+- [Đặc tả API](docs/design/api-design.md)
+- [ERD hiện hành](docs/design/erd-kltn-management.md) · [ERD theo cụm](docs/design/erd-clusters/README.md)
+- [Từ điển dữ liệu](docs/design/database-dictionary.md)
+- [Quy trình đăng ký](docs/design/registration-workflow.md)
+- [Minh chứng cấu trúc CSDL](docs/evidence/official-db-validation.md)
+
+Repository không chứa dữ liệu thật hay cấu hình bí mật. Nội dung AI thử nghiệm dùng corpus giả cục bộ; việc gửi tài liệu cho dịch vụ AI cần theo chính sách của Khoa/Trường.
