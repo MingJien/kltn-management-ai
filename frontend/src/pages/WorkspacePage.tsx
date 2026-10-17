@@ -6,7 +6,7 @@ import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
-import { roleLabel } from "../components/layout/Sidebar";
+import { roleLabel } from "../components/layout/roleLabel";
 
 export default function WorkspacePage({context}: {context: Context}) {
   const [rounds, setRounds] = useState<OpenRound[]>([]);

@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { Menu, LogOut } from "lucide-react";
+import { plannedPages, type PlannedPageId } from "../../plannedPages";
 
 /**
  * Route path → breadcrumb label mapping.
@@ -9,6 +10,14 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/": "Tổng quan",
   "/topics": "Đề tài",
   "/registrations": "Đăng ký",
+  "/theses": "Khóa luận & GVHD",
+  "/proposals": "Đề cương",
+  "/progress": "Tiến độ",
+  "/documents": "Tài liệu",
+  "/account": "Tài khoản",
+  "/administration": "Quản trị",
+  "/rounds": "Đợt KLTN",
+  "/roster": "Danh sách sinh viên",
   "/ai": "Tra cứu thử nghiệm",
 };
 
@@ -19,7 +28,10 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
   const location = useLocation();
-  const currentLabel = BREADCRUMB_MAP[location.pathname] || "Trang";
+  const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
+  const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
+    ? plannedPages[plannedId as PlannedPageId].title
+    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/theses/") ? "Khóa luận" : "Trang");
 
   return (
     <header className="app-shell__header">

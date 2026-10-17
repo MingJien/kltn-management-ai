@@ -14,7 +14,9 @@ import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
 import LecturerProfilePage from "./pages/LecturerProfilePage";
 import ThesesPage from "./pages/ThesesPage";
+import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
+import { plannedPages, type PlannedPageId } from "./plannedPages";
 const AIPage = lazy(() => import("./pages/AIPage"));
 
 function App() {
@@ -27,8 +29,11 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(true);
   useEffect(() => {
-    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/ai":"Tra cứu thử nghiệm"};
-    const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên" : labels[location.pathname] || "Khóa luận";
+    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm"};
+    const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
+    const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
+      : plannedId && Object.hasOwn(plannedPages, plannedId) ? plannedPages[plannedId as PlannedPageId].title
+      : labels[location.pathname] || "Khóa luận";
     document.title = `${context ? page : "Đăng nhập"} · KLTN`;
   }, [location.pathname, context]);
 
@@ -127,6 +132,10 @@ function App() {
             : <Navigate to="/" replace />}
         />
         <Route path="/theses" element={workflowAccess ? <ThesesPage context={context} /> : <Navigate to="/" replace />} />
+        <Route path="/proposals" element={workflowAccess ? <ThesesPage context={context} section="proposal" /> : <Navigate to="/" replace />} />
+        <Route path="/progress" element={workflowAccess ? <ThesesPage context={context} section="progress" /> : <Navigate to="/" replace />} />
+        <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
+        <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
         <Route path="/lecturers/:lecturerId" element={workflowAccess ?
           <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
         <Route

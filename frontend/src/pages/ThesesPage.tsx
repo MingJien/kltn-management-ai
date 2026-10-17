@@ -5,7 +5,9 @@ import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
 import { Status } from "../components/domain/CoreForms";
 
-export default function ThesesPage({context, section = "overview"}: {context: Context; section?: string}) {
+type ThesisSection = "overview" | "proposal" | "progress" | "documents";
+
+export default function ThesesPage({context, section = "overview"}: {context: Context; section?: ThesisSection}) {
   const [rows, setRows] = useState<Thesis[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export default function ThesesPage({context, section = "overview"}: {context: Co
       .finally(() => {if (!controller.signal.aborted) setLoading(false);});
     return () => controller.abort();
   }, [context.user_id]);
-  const title = section === "progress" ? "Tiến độ khóa luận" : section === "documents" ? "Tài liệu khóa luận" : "Khóa luận & GVHD";
+  const title = section === "proposal" ? "Đề cương khóa luận" : section === "progress" ? "Tiến độ khóa luận" : section === "documents" ? "Tài liệu khóa luận" : "Khóa luận & GVHD";
   return <>
     <PageHeader title={title} description="Khóa luận thuộc phạm vi của bạn; mở hồ sơ để xử lý công việc." />
     {error && <div className="alert alert-danger" role="alert">{error}</div>}
