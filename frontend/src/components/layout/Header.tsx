@@ -45,8 +45,8 @@ export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
             <Menu size={20} />
           </button>
           <nav className="header__breadcrumb" aria-label="Vị trí trang">
-            KLTN
-            <span className="header__breadcrumb-sep">/</span>
+            <span className="header__breadcrumb-root">KLTN</span>
+            <span className="header__breadcrumb-sep" aria-hidden="true">/</span>
             <span>{currentLabel}</span>
           </nav>
         </div>

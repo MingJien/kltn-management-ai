@@ -38,6 +38,7 @@
 .app-shell__content {
   flex: 1;
   padding: var(--content-padding);
+  background: var(--neutral-50);
 }
 
 /* ── Sidebar collapsed state ── */

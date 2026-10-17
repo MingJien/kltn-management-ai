@@ -35,8 +35,10 @@ export default function Sidebar({context, isOpen, onClose}: {
     <aside className={"app-shell__sidebar " + (isOpen ? "sidebar--open" : "")} aria-label="Điều hướng chính">
       <div className="sidebar">
         <div className="sidebar__brand">
-          <div className="sidebar__brand-mark">K</div>
-          <div className="sidebar__brand-text"><strong>KLTN</strong><span>Quản lý Khóa luận</span></div>
+          <img className="sidebar__brand-mark" src="/assets/dthu-logo.png" alt="Đại học Đồng Tháp" />
+          <span className="sidebar__brand-eyebrow">HỆ THỐNG QUẢN LÝ</span>
+          <strong className="sidebar__brand-title">Khóa luận Tốt nghiệp</strong>
+          <span className="sidebar__brand-faculty">Khoa Công nghệ và Kỹ thuật</span>
         </div>
         <nav className="sidebar__nav" aria-label="Chức năng">
           <SidebarGroup label="TỔNG QUAN" active={pathname === "/" || pathname === "/planned/reports"}>
