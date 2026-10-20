@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorMessage } from "./errors";
-import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled, setSessionCsrfToken } from "./api";
+import { Context, demoLogin, emailLogin, logout, request, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
 import WorkspacePage from "./pages/WorkspacePage";
 import TopicsPage from "./pages/TopicsPage";
@@ -56,7 +56,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    setDevelopmentAuthEnabled(false);
     void restore();
     const expired = () => {setSessionCsrfToken(null); setContext(null); setPassword(""); setError("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");};
     window.addEventListener("kltn:session-expired", expired);
@@ -81,6 +80,22 @@ function App() {
     }
   }
 
+  async function signInDemo(key: string) {
+    if (loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      await demoLogin(key);
+      const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
+      setContext(result);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function signOut() {
     try { await logout(); setSessionCsrfToken(null); setContext(null); setPassword(""); }
     catch (cause) { setError(errorMessage(cause)); }
@@ -97,7 +112,8 @@ function App() {
   // Not connected — show the branded login screen.
   if (!context) {
     return <LoginPage email={email} password={password} loading={loading} error={error}
-      onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={() => void signIn()} />;
+      onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={() => void signIn()}
+      onDemoSignIn={(key) => void signInDemo(key)} />;
   }
 
   // Connected — show app shell with routes

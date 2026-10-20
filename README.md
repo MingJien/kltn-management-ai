@@ -27,7 +27,8 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Mở `http://127.0.0.1:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Dữ liệu tài khoản thử nghiệm và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Mở `http://127.0.0.1:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Trên máy phát triển, `KLTN_DEMO_MODE=true` trong `.env` hiện lựa chọn SV/GV/TBM giả lập tại trang đăng nhập; tài khoản kích hoạt qua email vẫn đăng nhập bằng mật khẩu.
 
 ## Kiểm tra
 

@@ -16,7 +16,9 @@
   bottom: 0;
   width: var(--sidebar-width);
   z-index: 40;
-  transition: transform var(--duration-slow) var(--ease-standard);
+  transition:
+    transform var(--duration-slow) var(--ease-standard),
+    width var(--duration-slow) var(--ease-standard);
 }
 
 .app-shell__main {
@@ -41,13 +43,15 @@
   background: var(--neutral-50);
 }
 
-/* ── Sidebar collapsed state ── */
-.app-shell--collapsed .app-shell__sidebar {
-  width: var(--sidebar-collapsed);
-}
+/* ── Sidebar collapsed state (desktop only; mobile giữ drawer nguyên bản) ── */
+@media (min-width: 1024px) {
+  .app-shell--collapsed .app-shell__sidebar {
+    width: var(--sidebar-collapsed);
+  }
 
-.app-shell--collapsed .app-shell__main {
-  margin-left: var(--sidebar-collapsed);
+  .app-shell--collapsed .app-shell__main {
+    margin-left: var(--sidebar-collapsed);
+  }
 }
 
 /* ── Page layouts ── */
@@ -119,10 +123,6 @@
   }
 
   .app-shell__main {
-    margin-left: 0;
-  }
-
-  .app-shell--collapsed .app-shell__main {
     margin-left: 0;
   }
 

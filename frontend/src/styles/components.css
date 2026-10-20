@@ -425,15 +425,51 @@ textarea.input {
   flex-shrink: 0;
 }
 
-.app-shell--collapsed .sidebar__brand {
-  justify-content: center;
-  padding-inline: var(--space-3);
-}
+/* Thu gọn sidebar — chỉ áp dụng desktop (≥1024px); mobile dùng drawer nguyên bản */
+@media (min-width: 1024px) {
+  .app-shell--collapsed .sidebar__brand {
+    justify-content: center;
+    gap: 0;
+    padding: 14px var(--space-3) 12px;
+  }
 
-.app-shell--collapsed .sidebar__brand-eyebrow,
-.app-shell--collapsed .sidebar__brand-title,
-.app-shell--collapsed .sidebar__brand-faculty {
-  display: none;
+  .app-shell--collapsed .sidebar__brand-mark {
+    margin-bottom: 0;
+  }
+
+  .app-shell--collapsed .sidebar__brand-eyebrow,
+  .app-shell--collapsed .sidebar__brand-title,
+  .app-shell--collapsed .sidebar__brand-faculty {
+    display: none;
+  }
+
+  .app-shell--collapsed .sidebar__item {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .app-shell--collapsed .sidebar__item > span {
+    display: none;
+  }
+
+  .app-shell--collapsed .sidebar__footer {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .app-shell--collapsed .sidebar__user {
+    flex: none;
+    justify-content: center;
+    padding: var(--space-1);
+    border-radius: var(--radius-full);
+  }
+
+  .app-shell--collapsed .sidebar__user-info {
+    display: none;
+  }
 }
 
 .sidebar__nav {
@@ -565,6 +601,9 @@ textarea.input {
 }
 
 .sidebar__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-color);
   background: var(--neutral-50);
@@ -576,6 +615,46 @@ textarea.input {
   gap: var(--space-3);
   padding: var(--space-2);
   border-radius: var(--radius-md);
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.sidebar__user:hover {
+  background: var(--neutral-150);
+}
+
+.sidebar__user:focus-visible {
+  outline: 2px solid var(--primary-600);
+  outline-offset: -2px;
+}
+
+.sidebar__collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.sidebar__collapse:hover {
+  background: var(--neutral-150);
+  color: var(--neutral-800);
+}
+
+.sidebar__collapse:focus-visible {
+  outline: 2px solid var(--primary-600);
+  outline-offset: -2px;
 }
 
 .sidebar__avatar {
@@ -587,8 +666,9 @@ textarea.input {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .02em;
   flex-shrink: 0;
 }
 
@@ -676,6 +756,72 @@ textarea.input {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.header__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 4px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.header__user:hover {
+  background: var(--neutral-100);
+}
+
+.header__user:focus-visible {
+  outline: 2px solid var(--primary-600);
+  outline-offset: 2px;
+}
+
+.header__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: var(--primary-100);
+  color: var(--primary-700);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  flex-shrink: 0;
+}
+
+.header__user-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.header__user-name {
+  color: var(--neutral-900);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.header__user-role {
+  color: var(--neutral-500);
+  font-size: 11px;
+}
+
+@media (max-width: 639px) {
+  .header__user-info {
+    display: none;
+  }
+
+  .header__user {
+    padding: 4px;
+  }
 }
 
 /* ════════════════════════════════════

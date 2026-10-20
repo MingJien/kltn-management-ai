@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import ipaddress
 import secrets
 import threading
 import time
 from collections import deque
 from collections.abc import Mapping
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -25,6 +27,44 @@ _login_lock = threading.Lock()
 class LocalLogin(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=1024)
+
+
+DemoKey = Literal["sv1", "sv2", "sv3", "gv", "tbm"]
+
+
+class DemoLogin(BaseModel):
+    key: DemoKey
+
+
+_DEMO_ACCOUNTS = {
+    "sv1": ("synthetic-demo-student-1", "sv1@demo.test", "STUDENT", "Sinh viên demo 1"),
+    "sv2": ("synthetic-demo-student-2", "sv2@demo.test", "STUDENT", "Sinh viên demo 2"),
+    "sv3": ("synthetic-demo-student-3", "sv3@demo.test", "STUDENT", "Sinh viên demo 3"),
+    "gv": ("synthetic-demo-lecturer-1", "gv@demo.test", "LECTURER", "Giảng viên demo"),
+    "tbm": ("synthetic-demo-lecturer-2", "tbm@demo.test", "LECTURER", "Trưởng bộ môn demo"),
+}
+
+
+def _require_local_demo(request: Request) -> None:
+    if os.getenv("KLTN_ENV") != "development" or os.getenv("KLTN_DEMO_MODE") != "true":
+        raise HTTPException(404, "Demo mode is unavailable")
+    try:
+        if not request.client or not ipaddress.ip_address(request.client.host).is_loopback:
+            raise HTTPException(404, "Demo mode is unavailable")
+    except ValueError:
+        raise HTTPException(404, "Demo mode is unavailable") from None
+    if not _same_app_origin(request):
+        raise HTTPException(403, "Request origin is not allowed")
+
+
+def _demo_user(session: Session, key: DemoKey) -> UserAccount | None:
+    subject, email, role, _ = _DEMO_ACCOUNTS[key]
+    return session.scalar(select(UserAccount).where(
+        UserAccount.external_subject == subject,
+        UserAccount.email == email,
+        UserAccount.base_role == role,
+        UserAccount.status == "ACTIVE",
+    ))
 
 
 def allowed_frontend_origins() -> list[str]:
@@ -86,7 +126,7 @@ def oidc_is_configured() -> bool:
 
 
 def development_auth_is_enabled() -> bool:
-    return os.getenv("KLTN_ENV") in {"development", "test"} and os.getenv("KLTN_DEV_AUTH") == "true"
+    return os.getenv("KLTN_ENV") == "test" and os.getenv("KLTN_DEV_AUTH") == "true"
 
 
 def authentication_mode() -> str:
@@ -122,6 +162,30 @@ def _oidc_client():
 @router.get("/config")
 def auth_config() -> dict[str, str]:
     return {"mode": authentication_mode()}
+
+
+@router.get("/demo-accounts")
+def demo_accounts(request: Request, session: Session = Depends(get_session)) -> list[dict[str, str]]:
+    _require_local_demo(request)
+    return [
+        {"key": key, "email": email, "role": role, "label": label}
+        for key, (_, email, role, label) in _DEMO_ACCOUNTS.items()
+        if _demo_user(session, key) is not None
+    ]
+
+
+@router.post("/demo-login", status_code=204)
+def demo_login(payload: DemoLogin, request: Request, session: Session = Depends(get_session)) -> None:
+    _require_local_demo(request)
+    if "session" not in request.scope:
+        raise HTTPException(503, "Session support is not configured")
+    user = _demo_user(session, payload.key)
+    if user is None:
+        raise HTTPException(404, "Demo account is unavailable")
+    request.session.clear()
+    request.session["user_id"] = str(user.id)
+    request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
 
 
 @router.post("/login", status_code=204)

@@ -261,6 +261,42 @@ def test_email_login_and_session_access(scenario, monkeypatch):
     assert client.get("/api/v1/me/context").status_code == 401
 
 
+def test_local_demo_login_uses_only_seeded_identity_and_real_session(scenario, monkeypatch):
+    from backend.api import auth
+
+    client, users, *_ = scenario
+    user = users[0]
+    monkeypatch.setattr(auth, "_demo_user", lambda _session, key: user if key == "sv1" else None)
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_DEMO_MODE", "true")
+    monkeypatch.setenv("KLTN_DEV_AUTH", "false")
+    origin = {"Origin": "http://127.0.0.1:5173"}
+
+    with TestClient(app, client=("127.0.0.1", 53001)) as local:
+        accounts = local.get("/api/v1/auth/demo-accounts", headers=origin)
+        assert accounts.status_code == 200
+        assert [item["key"] for item in accounts.json()] == ["sv1"]
+        assert local.post("/api/v1/auth/demo-login", json={"key": "admin"}, headers=origin).status_code == 422
+        assert local.post("/api/v1/auth/demo-login", json={"key": "sv1"},
+            headers={"Origin": "https://untrusted.example"}).status_code == 403
+        signed_in = local.post("/api/v1/auth/demo-login", json={"key": "sv1"}, headers=origin)
+        assert signed_in.status_code == 204
+        context = local.get("/api/v1/me/context", headers=origin).json()
+        assert context["user_id"] == str(user.id)
+        assert context["base_role"] == "STUDENT" and context["csrf_token"]
+        assert local.post("/api/v1/auth/logout", headers={**origin,
+            "X-CSRF-Token": context["csrf_token"]}).status_code == 204
+        assert local.get("/api/v1/me/context", headers=origin).status_code == 401
+        monkeypatch.setenv("KLTN_ENV", "production")
+        assert local.get("/api/v1/auth/demo-accounts", headers=origin).status_code == 404
+
+    monkeypatch.setenv("KLTN_ENV", "development")
+    with TestClient(app, client=("192.0.2.15", 53002)) as remote:
+        assert remote.get("/api/v1/auth/demo-accounts", headers=origin).status_code == 404
+    monkeypatch.setenv("KLTN_DEMO_MODE", "false")
+    assert client.get("/api/v1/auth/demo-accounts", headers=origin).status_code == 404
+
+
 def test_registration_vertical_slice(scenario):
     client, users, students, lecturers, topic, session = scenario
     reg = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={"topic_id":str(topic.id)}).json()

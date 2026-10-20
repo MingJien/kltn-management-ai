@@ -73,7 +73,7 @@ def current_user(
         except (TypeError, ValueError):
             request.session.clear()
             raise HTTPException(401, "Invalid sign-in session")
-    elif os.getenv("KLTN_ENV") in {"development", "test"} and os.getenv("KLTN_DEV_AUTH") == "true":
+    elif os.getenv("KLTN_ENV") == "test" and os.getenv("KLTN_DEV_AUTH") == "true":
         if dev_user_id is None:
             raise HTTPException(401, "Missing development identity")
         try:

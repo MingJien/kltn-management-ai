@@ -76,6 +76,14 @@ def test_production_ignores_development_uuid_header(monkeypatch):
     assert error.value.status_code == 401
 
 
+def test_development_uuid_header_cannot_replace_demo_login(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_DEV_AUTH", "true")
+    with pytest.raises(HTTPException) as error:
+        current_user(request_with_session(), FakeSession(object()), dev_user_id=str(uuid4()))
+    assert error.value.status_code == 401
+
+
 def test_development_uuid_header_remains_test_only(monkeypatch):
     user = object()
     monkeypatch.setenv("KLTN_ENV", "test")

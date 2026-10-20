@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Eye, EyeOff, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
+import { listDemoAccounts, type DemoAccount } from "../api";
 import "../styles/login.css";
 
 interface LoginPageProps {
@@ -11,6 +12,7 @@ interface LoginPageProps {
   onEmailChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
+  onDemoSignIn: (key: string) => void;
 }
 
 const FEATURES = [
@@ -21,9 +23,21 @@ const FEATURES = [
 ];
 
 export default function LoginPage({
-  email, password, loading, error, onEmailChange, onPasswordChange, onSubmit,
+  email, password, loading, error, onEmailChange, onPasswordChange, onSubmit, onDemoSignIn,
 }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
+  const [demoKey, setDemoKey] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    void listDemoAccounts().then((accounts) => {
+      if (!mounted) return;
+      setDemoAccounts(accounts);
+      setDemoKey(accounts[0]?.key ?? "");
+    }).catch(() => { /* Demo mode is optional; normal email sign-in remains available. */ });
+    return () => { mounted = false; };
+  }, []);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,6 +112,22 @@ export default function LoginPage({
             </div>
 
             {error && <div className="alert alert-danger" role="alert" style={{ marginTop: 16 }}>{error}</div>}
+
+            {demoAccounts.length > 0 && <section className="login-demo" aria-labelledby="login-demo-heading">
+              <h3 id="login-demo-heading">Dùng tài khoản demo</h3>
+              <p>Chọn vai trò giả lập để thử chức năng trên máy này.</p>
+              <label htmlFor="login-demo-account">Tài khoản thử nghiệm</label>
+              <select id="login-demo-account" className="input" value={demoKey}
+                onChange={(event) => setDemoKey(event.target.value)}>
+                {demoAccounts.map((account) => <option key={account.key} value={account.key}>
+                  {account.label} · {account.email}
+                </option>)}
+              </select>
+              <button type="button" className="btn btn-secondary login-demo__submit"
+                disabled={loading || !demoKey} onClick={() => onDemoSignIn(demoKey)}>
+                {loading ? "Đang mở…" : "Vào bản demo"}
+              </button>
+            </section>}
           </div>
 
           <footer className="login-footer">

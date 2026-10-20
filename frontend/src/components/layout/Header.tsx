@@ -1,6 +1,9 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, LogOut } from "lucide-react";
 import { plannedPages, type PlannedPageId } from "../../plannedPages";
+import type { Context } from "../../api";
+import { roleLabel } from "./roleLabel";
+import { initialsOf } from "./initials";
 
 /**
  * Route path → breadcrumb label mapping.
@@ -22,11 +25,12 @@ const BREADCRUMB_MAP: Record<string, string> = {
 };
 
 interface HeaderProps {
+  context: Context;
   onToggleSidebar: () => void;
   onLogout: () => void;
 }
 
-export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
+export default function Header({ context, onToggleSidebar, onLogout }: HeaderProps) {
   const location = useLocation();
   const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
   const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
@@ -51,6 +55,13 @@ export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
           </nav>
         </div>
         <div className="header__right">
+          <Link to="/account" className="header__user" aria-label="Quản lý tài khoản" title="Quản lý tài khoản">
+            <span className="header__avatar" aria-hidden="true">{initialsOf(context.display_name)}</span>
+            <span className="header__user-info">
+              <span className="header__user-name">{context.display_name}</span>
+              <span className="header__user-role">{roleLabel(context)}</span>
+            </span>
+          </Link>
           <button className="btn btn-ghost btn-sm" onClick={onLogout} aria-label="Đăng xuất">
             <LogOut size={18} /> Đăng xuất
           </button>

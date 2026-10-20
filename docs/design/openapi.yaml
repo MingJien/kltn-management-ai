@@ -31,6 +31,68 @@
         }
       }
     },
+    "/api/v1/auth/demo-accounts": {
+      "get": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Demo Accounts",
+        "operationId": "demo_accounts_api_v1_auth_demo_accounts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Demo Accounts Api V1 Auth Demo Accounts Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/demo-login": {
+      "post": {
+        "tags": [
+          "authentication"
+        ],
+        "summary": "Demo Login",
+        "operationId": "demo_login_api_v1_auth_demo_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "get": {
         "tags": [
@@ -6355,6 +6417,26 @@
           "reason"
         ],
         "title": "CorrectStudent"
+      },
+      "DemoLogin": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "sv1",
+              "sv2",
+              "sv3",
+              "gv",
+              "tbm"
+            ],
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "DemoLogin"
       },
       "DocumentCreate": {
         "properties": {
