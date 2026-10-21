@@ -1,10 +1,18 @@
 # Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
-Ứng dụng React, FastAPI và PostgreSQL hỗ trợ tài khoản, phân quyền, danh sách sinh viên đủ điều kiện, tạo và duyệt đề tài, đăng ký cá nhân/nhóm, tiếp nhận của giảng viên, đề cương, tiến độ và tài liệu theo phiên bản. AI hiện chỉ được thử trên dữ liệu giả; chưa kết nối Gemini.
+Ứng dụng React, FastAPI và PostgreSQL quản lý tài khoản, đề tài, đăng ký khóa luận, GVHD, tiến độ và tài liệu. Chatbot AI hiện ở mức prototype, dùng dữ liệu giả.
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic revision `20261015_0001_official`: 32 bảng nghiệp vụ và `alembic_version`. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
+PostgreSQL `kltn_management`, Alembic head `20261021_0003`: **33 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) chỉ để xem hoặc dựng database trống tạm, không chạy trên database đang dùng. Nếu máy còn ở revision `20261015_0001_official`, chạy `.\.venv\Scripts\python.exe -m alembic upgrade head` trong PowerShell để áp dụng hai migration tiếp theo.
+
+## Tình hình hiện tại
+
+- UI/API có quản lý tài khoản và phân quyền, danh sách sinh viên đủ điều kiện; luồng tạo/duyệt đề tài, đăng ký cá nhân hoặc nhóm, xác nhận thành viên và giảng viên tiếp nhận/từ chối. Khi giảng viên chấp nhận, hệ thống tạo hồ sơ khóa luận, thành viên và GVHD chính trong cùng giao dịch.
+- Trong hồ sơ khóa luận có thông tin GVHD và lịch sử phân công; nộp đề cương theo phiên bản, nhận xét và chốt; tạo mốc tiến độ cho đợt, nộp báo cáo, GVHD xác nhận hoặc yêu cầu sửa. Nộp trễ vẫn được nhận khi mốc còn mở và được đánh dấu `!` màu đỏ; người điều phối có thể gia hạn cả đợt kèm lý do và lịch sử.
+- Tài liệu hỗ trợ nộp nhiều phiên bản, lưu mã kiểm tra, nhận xét/duyệt và tải theo quyền. Bản đề cương đủ điều kiện có thể xuất để ký ngoài với địa chỉ hệ thống, mã và thời gian; bản gốc được giữ nguyên.
+
+Hội đồng/lịch bảo vệ, chấm điểm và biên bản chưa hoàn thiện. Chatbot chưa kết nối Gemini.
 
 ## Chạy local
 
