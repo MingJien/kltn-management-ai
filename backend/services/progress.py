@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from backend.api.core_schemas import MilestoneOut, ProgressOut, ReviewOut, WorkOut
 from backend.db.models import entities as m
+from backend.services import documents
 from backend.services.documents import require_clean
 from backend.services.registration import profile, row_version
 from backend.services.theses import audit, eligible_lecturer, now, rights, thesis_access
@@ -88,14 +89,19 @@ def extend_milestone(session, user, thesis_id, milestone_id, data, expected):
 def progress_out(session, item):
     reviews = session.scalars(select(m.ProgressReview).where(m.ProgressReview.progress_report_id == item.id)
         .order_by(m.ProgressReview.created_at, m.ProgressReview.id)).all()
-    version = session.scalar(select(m.DocumentVersion.id).join(m.Document, m.Document.id == m.DocumentVersion.document_id)
+    version = session.scalar(select(m.DocumentVersion).join(m.Document, m.Document.id == m.DocumentVersion.document_id)
         .where(m.Document.thesis_id == item.thesis_id, m.DocumentVersion.stored_file_id == item.evidence_file_id)
         .limit(1)) if item.evidence_file_id else None
+    file = session.get(m.StoredFile, item.evidence_file_id) if item.evidence_file_id else None
     return ProgressOut(id=item.id, milestone_id=item.milestone_id, version_no=item.version_no,
         row_version=item.row_version, state=item.state, summary=item.summary, reported_ratio=item.reported_ratio,
-        submitted_by_name=session.get(m.StudentProfile, item.submitted_by).display_name, submitted_at=item.created_at,
+        submitted_by_name=session.get(m.StudentProfile, item.submitted_by).display_name,
+        submitted_by_student_id=item.submitted_by, submitted_at=item.created_at,
         due_at_at_submission=item.due_at_at_submission,
-        late=bool(item.due_at_at_submission and item.created_at > item.due_at_at_submission), evidence_document_version_id=version,
+        late=bool(item.due_at_at_submission and item.created_at > item.due_at_at_submission),
+        evidence_document_version_id=version.id if version else None,
+        evidence_scan_state=file.scan_state if file else None,
+        evidence_file_name=file.original_name if file else None,
         reviews=[ReviewOut(reviewer_name=session.get(m.LecturerProfile, review.reviewer_id).display_name,
             decision=review.decision, comment=review.comment, created_at=review.created_at) for review in reviews])
 
@@ -133,6 +139,57 @@ def create_progress(session, user, thesis_id, data):
     return result
 
 
+async def attach_evidence(session, user, thesis_id, report_id, request, expected):
+    """Attach a local file to an already submitted report without changing its submission time."""
+    path = None
+    try:
+        thesis = thesis_access(session, user, thesis_id, action="progress:submit", lock=True, write=True)
+        student = profile(session, user, "STUDENT")
+        report = session.scalar(select(m.ProgressReport).where(m.ProgressReport.id == report_id,
+            m.ProgressReport.thesis_id == thesis.id).with_for_update())
+        if not report:
+            raise HTTPException(404, "Không tìm thấy báo cáo")
+        row_version(expected, report.row_version)
+        if report.submitted_by != student.id:
+            raise HTTPException(403, "Chỉ người nộp được thêm minh chứng cho báo cáo này")
+        if report.state != "SUBMITTED" or report.evidence_file_id:
+            raise HTTPException(409, "Báo cáo đã được xử lý hoặc đã có minh chứng")
+        latest = session.scalar(select(func.max(m.ProgressReport.version_no)).where(
+            m.ProgressReport.thesis_id == thesis.id, m.ProgressReport.milestone_id == report.milestone_id))
+        if report.version_no != latest:
+            raise HTTPException(409, "Chỉ được thêm minh chứng cho phiên bản báo cáo mới nhất")
+        if session.scalar(select(m.ProgressReview.id).where(m.ProgressReview.progress_report_id == report.id).limit(1)):
+            raise HTTPException(409, "Báo cáo đã được nhận xét; không thể thêm minh chứng")
+        name, content, mime = await documents.read_upload(request)
+        file, digest, path = documents.persist_upload(session, name, content, mime)
+        milestone = session.get(m.ProgressMilestone, report.milestone_id)
+        item = m.Document(id=uuid4(), thesis_id=thesis.id,
+            title=f"Minh chứng tiến độ {milestone.code} · lần {report.version_no}",
+            document_type="SUPPORTING", visibility="ASSIGNED", state="ACTIVE")
+        session.add(item)
+        session.flush()
+        version = m.DocumentVersion(id=uuid4(), document_id=item.id, version_no=1,
+            stored_file_id=file.id, submitted_by=student.id, submitted_at=now(),
+            content_sha256=digest, state="SUBMITTED")
+        session.add(version)
+        report.evidence_file_id = file.id
+        report.row_version += 1
+        audit(session, user, "PROGRESS_EVIDENCE_UPLOADED", "thesis", thesis.id,
+            f"Báo cáo {report.id}; tệp {name}; SHA-256 {digest}")
+        session.flush()
+        result = progress_out(session, report)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        if path and path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        raise
+
+
 def review_progress(session, user, thesis_id, report_id, data, expected):
     thesis = thesis_access(session, user, thesis_id, lock=True, write=True)
     permissions = rights(session, user, thesis)
@@ -149,6 +206,8 @@ def review_progress(session, user, thesis_id, report_id, data, expected):
         m.ProgressReport.milestone_id == report.milestone_id))
     if report.version_no != latest or report.state != "SUBMITTED":
         raise HTTPException(409, "Chỉ nhận xét phiên bản mới nhất đang chờ duyệt")
+    if data.decision == "CONFIRM" and report.evidence_file_id:
+        require_clean(session.get(m.StoredFile, report.evidence_file_id), "xác nhận tiến độ")
     lecturer = profile(session, user, "LECTURER")
     if session.scalar(select(m.ProgressReview.id).where(m.ProgressReview.progress_report_id == report.id,
             m.ProgressReview.reviewer_id == lecturer.id)):

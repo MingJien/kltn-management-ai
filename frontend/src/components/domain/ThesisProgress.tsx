@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AuditEvent, Milestone, ProgressReport, Thesis, ThesisDocument } from "../../api";
-import { request } from "../../api";
+import { request, uploadProgressEvidence } from "../../api";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
@@ -26,9 +26,9 @@ function ExtendForm({thesis, milestone, userId, busy, run}: {
   </form></details>;
 }
 
-export default function ThesisProgress({thesis, milestones, reports, docs, milestoneHistory, userId, busy, run}: {
+export default function ThesisProgress({thesis, milestones, reports, docs, milestoneHistory, userId, studentId, busy, run}: {
   thesis: Thesis; milestones: Milestone[]; reports: ProgressReport[]; docs: ThesisDocument[];
-  milestoneHistory: AuditEvent[]; userId: string; busy: boolean; run: CoreRun;
+  milestoneHistory: AuditEvent[]; userId: string; studentId: string | null; busy: boolean; run: CoreRun;
 }) {
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
@@ -38,6 +38,8 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
   const [summary, setSummary] = useState("");
   const [ratio, setRatio] = useState(0);
   const [evidence, setEvidence] = useState("");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceNotice, setEvidenceNotice] = useState("");
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
   const latest = new Map<string, ProgressReport>();
   for (const report of reports) {
@@ -118,9 +120,20 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     )}
     {thesis.actions.includes("progress:submit") && active && <form className="card" onSubmit={async event => {
       event.preventDefault();
-      if (await run(() => request(`/theses/${thesis.id}/progress-reports`, userId, {method: "POST", body: JSON.stringify({
+      let created: ProgressReport | null = null;
+      const sent = await run(async () => {created = await request<ProgressReport>(`/theses/${thesis.id}/progress-reports`, userId, {method: "POST", body: JSON.stringify({
         milestone_id: selected, summary, reported_ratio: ratio, document_version_id: evidence || null,
-      })}), "Đã gửi báo cáo tiến độ cho GVHD.")) {setSummary(""); setMilestoneId(""); setEvidence("");}
+      })});}, "Đã gửi báo cáo tiến độ cho GVHD.");
+      if (sent) {
+        setSummary(""); setMilestoneId(""); setEvidence("");
+        if (evidenceFile && created) {
+          const uploaded = await run(() => uploadProgressEvidence(thesis.id, created!, userId, evidenceFile),
+            "Đã lưu minh chứng; tệp chờ quét an toàn trước khi GVHD xác nhận.");
+          setEvidenceNotice(uploaded ? "Minh chứng đã lưu ở mục Tài liệu và đang chờ quét an toàn." :
+            "Báo cáo đã gửi nhưng tải minh chứng chưa thành công. Hãy tải lại tại thẻ báo cáo bên dưới.");
+          if (uploaded) setEvidenceFile(null);
+        }
+      }
     }}><div className="card-body core-form">
       <h3>Nộp báo cáo tiến độ</h3>
       <p className="text-body-sm text-muted">Nêu kết quả đã làm, phần còn thiếu và kế hoạch tiếp theo. Có thể nộp trễ khi mốc còn mở; hệ thống ghi rõ thời điểm.</p>
@@ -129,11 +142,18 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       </select></div>
       <div className="input-group"><label htmlFor="report-summary">Kết quả, khó khăn và kế hoạch</label><textarea className="input" id="report-summary" value={summary} onChange={event => setSummary(event.target.value)} required maxLength={10000} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="report-ratio">Tiến độ tự báo cáo (%)</label><input className="input" id="report-ratio" type="number" min={0} max={100} step="0.01" value={ratio} onChange={event => setRatio(Number(event.target.value))} required disabled={busy} /></div>
-      <div className="input-group"><label htmlFor="report-evidence">Tài liệu minh chứng (không bắt buộc)</label><select className="input" id="report-evidence" value={evidence} onChange={event => setEvidence(event.target.value)} disabled={busy}>
+      <div className="input-group"><label htmlFor="report-evidence">Tài liệu minh chứng đã có (không bắt buộc)</label><select className="input" id="report-evidence" value={evidence} onChange={event => setEvidence(event.target.value)} disabled={busy || !!evidenceFile}>
         <option value="">Không đính kèm</option>{cleanDocs.map(({doc, version}) => <option key={version.id} value={version.id}>{doc.title} · v{version.version_no}</option>)}
       </select>
-      {cleanDocs.length === 0 && <p className="text-caption">Chưa có tệp nào được quét an toàn. Tệp mới ở trạng thái “Đang cách ly – chưa quét” nên chưa dùng làm minh chứng được; có thể nộp báo cáo không kèm tệp.</p>}</div>
-      <button className="btn btn-primary" disabled={busy || !selected || !summary.trim()}>Gửi báo cáo</button>
+      {cleanDocs.length === 0 && <p className="text-caption">Chưa có tệp nào đã quét an toàn để chọn.</p>}</div>
+      <div className="input-group"><label htmlFor="report-evidence-file">Hoặc tải minh chứng từ máy (PDF, DOCX, TXT; tối đa 10 MB)</label>
+        <input className="input" id="report-evidence-file" type="file" accept=".pdf,.docx,.txt" disabled={busy || !!evidence}
+          onChange={event => setEvidenceFile(event.target.files?.[0] || null)} />
+        <p className="text-caption">Có thể để trống. Tệp mới được lưu riêng theo phiên bản, cách ly chờ quét; GVHD chưa thể xác nhận khi tệp chưa sạch.</p>
+        {evidenceFile && evidenceFile.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
+      </div>
+      {evidenceNotice && <p role="status" className="alert alert-info">{evidenceNotice}</p>}
+      <button className="btn btn-primary" disabled={busy || !selected || !summary.trim() || !!(evidenceFile && evidenceFile.size > 10*1024*1024)}>Gửi báo cáo</button>
     </div></form>}
     <h2>Lịch sử báo cáo và nhận xét</h2>
     {reports.map(report => <article className="card" key={report.id}><div className="card-body stack">
@@ -141,7 +161,19 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}</p>
       <p className="text-body-sm text-muted">Hạn áp dụng lúc nộp: {formatDate(report.due_at_at_submission)}</p>
       <p className="core-prewrap">{report.summary}</p>
-      {report.evidence_document_version_id && <p className="text-body-sm">Có tài liệu minh chứng trong tab Tài liệu.</p>}
+      {report.evidence_document_version_id && <p className="text-body-sm">Minh chứng: {report.evidence_file_name} · {report.evidence_scan_state === "CLEAN" ? "đã quét an toàn" : "đang cách ly/chưa thể tải hoặc xác nhận"}. Xem tại mục Tài liệu.</p>}
+      {report.state === "SUBMITTED" && !report.evidence_document_version_id && report.submitted_by_student_id === studentId && report.reviews.length === 0 && latest.get(report.milestone_id)?.id === report.id &&
+        <div className="input-group"><label htmlFor={`retry-evidence-${report.id}`}>Bổ sung minh chứng từ máy cho báo cáo này (không bắt buộc)</label>
+          <input className="input" id={`retry-evidence-${report.id}`} type="file" accept=".pdf,.docx,.txt" disabled={busy}
+            onChange={async event => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (file.size > 10*1024*1024) {setEvidenceNotice("Tệp vượt quá 10 MB."); return;}
+              if (await run(() => uploadProgressEvidence(thesis.id, report, userId, file), "Đã lưu minh chứng, chờ quét an toàn.")) {
+                setEvidenceNotice(""); event.target.value = "";
+              }
+            }} />
+        </div>}
       <Reviews items={report.reviews} />
       {active && report.state === "SUBMITTED" && latest.get(report.milestone_id)?.id === report.id &&
         ((thesis.actions.includes("progress:review") || thesis.actions.includes("progress:comment"))) &&

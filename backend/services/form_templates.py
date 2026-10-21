@@ -84,14 +84,26 @@ OFFICIAL_FORMS = [
     },
 ]
 
+STUDENT_FORM_IDS = {"mau-01a", "mau-01b", "mau-02", "mau-03", "mau-04", "mau-05"}
 
-def list_official_templates() -> list[dict]:
+
+def allowed_form(meta: dict, role: str) -> bool:
+    if role == "LECTURER":
+        return True
+    if role == "STUDENT":
+        return meta["id"] in STUDENT_FORM_IDS
+    raise HTTPException(403, "Vai trò này không được tải biểu mẫu nghiệp vụ")
+
+
+def list_official_templates(role: str) -> list[dict]:
     items = []
+    if role not in {"STUDENT", "LECTURER"}:
+        raise HTTPException(403, "Vai trò này không được tải biểu mẫu nghiệp vụ")
     if not OFFICIAL_DIR.is_dir():
         return items
     for meta in OFFICIAL_FORMS:
         path = OFFICIAL_DIR / meta["filename"]
-        if path.is_file():
+        if allowed_form(meta, role) and path.is_file():
             items.append({
                 "id": meta["id"],
                 "title": meta["title"],
@@ -102,7 +114,7 @@ def list_official_templates() -> list[dict]:
     return items
 
 
-def official_template_by_id(template_id: str) -> tuple[bytes, str, str]:
+def official_template_by_id(template_id: str, role: str) -> tuple[bytes, str, str]:
     if template_id == "plan":
         template_id = "mau-02"
     elif template_id == "proposal":
@@ -110,6 +122,8 @@ def official_template_by_id(template_id: str) -> tuple[bytes, str, str]:
     meta = next((item for item in OFFICIAL_FORMS if item["id"] == template_id), None)
     if meta is None:
         raise HTTPException(404, "Không tìm thấy biểu mẫu này")
+    if not allowed_form(meta, role):
+        raise HTTPException(403, "Bạn không được tải biểu mẫu này")
     path = OFFICIAL_DIR / meta["filename"]
     if not path.is_file():
         raise HTTPException(409, UNAVAILABLE)

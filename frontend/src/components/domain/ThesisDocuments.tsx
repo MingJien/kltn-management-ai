@@ -96,8 +96,9 @@ export default function ThesisDocuments({thesis, docs, userId, busy, run}: {
 
   return <div className="stack">
     <div className="card"><div className="card-body stack">
-      <h2>Biểu mẫu chính thức từ Khoa (docs/BieuMau)</h2>
+      <h2>Biểu mẫu chính thức từ Khoa</h2>
       <p className="text-body-sm text-muted">Tải biểu mẫu chính thức do Khoa ban hành, điền thông tin theo quy định rồi nộp vào hồ sơ tương ứng. Hệ thống sử dụng trực tiếp tệp gốc từ Khoa, không tự dựng mẫu thay thế.</p>
+      <p className="text-body-sm text-muted">Sinh viên xem và tải Mẫu 1a, 1b, 2–5; giảng viên xem toàn bộ 12 tệp biểu mẫu hiện có.</p>
       <div className="flex gap-2" style={{flexWrap: "wrap", marginTop: "var(--space-2)"}}>
         <button type="button" className="btn btn-primary" onClick={async () => {
           setTemplateError("");
@@ -135,7 +136,8 @@ export default function ThesisDocuments({thesis, docs, userId, busy, run}: {
       event.preventDefault();
       if (await run(() => request(`/theses/${thesis.id}/documents`, userId, {method: "POST", body: JSON.stringify({title, document_type: type})}), "Đã tạo hồ sơ tài liệu; chọn tệp để nộp.")) setTitle("");
     }}><div className="card-body core-form">
-      <h3>Thêm tài liệu</h3>
+      <h3>Thêm tài liệu khác vào hồ sơ khóa luận</h3>
+      <p className="text-body-sm text-muted">Dùng cho kế hoạch thực hiện (Mẫu 2), báo cáo khóa luận hoặc tài liệu hỗ trợ cần theo dõi nhiều phiên bản và GVHD tiếp nhận. Minh chứng của một mốc tiến độ có thể tải ngay tại mục Tiến độ; không cần tạo hồ sơ ở đây.</p>
       <div className="input-group"><label htmlFor="document-title">Tên tài liệu</label><input className="input" id="document-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="document-type">Loại tài liệu</label><select className="input" id="document-type" value={type} onChange={event => setType(event.target.value)} disabled={busy}>
         <option value="PLAN">Kế hoạch thực hiện (Mẫu 2)</option><option value="REPORT">Báo cáo khóa luận</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>

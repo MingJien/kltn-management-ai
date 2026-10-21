@@ -168,10 +168,13 @@ class ProgressOut(BaseModel):
     summary: str
     reported_ratio: float | None
     submitted_by_name: str
+    submitted_by_student_id: UUID
     submitted_at: datetime
     due_at_at_submission: datetime | None
     late: bool
     evidence_document_version_id: UUID | None
+    evidence_scan_state: str | None
+    evidence_file_name: str | None
     reviews: list[ReviewOut]
 
 

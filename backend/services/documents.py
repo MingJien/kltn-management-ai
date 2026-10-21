@@ -62,6 +62,39 @@ def valid_content(name, content):
     raise HTTPException(422, "Chỉ nhận PDF, DOCX không macro hoặc TXT UTF-8 với nội dung phù hợp")
 
 
+async def read_upload(request):
+    from backend.api.auth import _same_app_origin
+    if not _same_app_origin(request):
+        raise HTTPException(403, "Nguồn yêu cầu không được phép")
+    name = unquote(request.headers.get("X-File-Name", "")).replace("\\", "/").split("/")[-1].strip()
+    if not name or len(name) > 180 or any(ord(c) < 32 for c in name):
+        raise HTTPException(422, "Tên tệp không hợp lệ")
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_BYTES:
+            raise HTTPException(413, "Tệp tối đa 10 MB")
+        chunks.append(chunk)
+    content = b"".join(chunks)
+    if not content:
+        raise HTTPException(422, "Tệp rỗng")
+    return name, content, valid_content(name, content)
+
+
+def persist_upload(session, name, content, mime):
+    root = storage_root()
+    root.mkdir(parents=True, exist_ok=True)
+    key = uuid4().hex + Path(name).suffix.lower()
+    path = root / key
+    with path.open("xb") as handle:
+        handle.write(content)
+    digest = hashlib.sha256(content).hexdigest()
+    file = m.StoredFile(id=uuid4(), storage_key="documents/" + key, original_name=name,
+        media_type=mime, byte_size=len(content), sha256=digest, scan_state="QUARANTINED")
+    session.add(file)
+    return file, digest, path
+
+
 def document(session, thesis_id, document_id, *, lock=False):
     query = select(m.Document).where(m.Document.id == document_id, m.Document.thesis_id == thesis_id,
         m.Document.state == "ACTIVE", m.Document.visibility == "ASSIGNED")
@@ -111,42 +144,17 @@ def create_document(session, user, thesis_id, data):
 
 
 async def upload_version(session, user, thesis_id, document_id, request, expected):
-    from backend.api.auth import _same_app_origin
-    if not _same_app_origin(request):
-        raise HTTPException(403, "Nguồn yêu cầu không được phép")
     path = None
     try:
         thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
         item = document(session, thesis_id, document_id, lock=True)
         row_version(expected, item.row_version)
-        name = unquote(request.headers.get("X-File-Name", "")).replace("\\", "/").split("/")[-1].strip()
-        if not name or len(name) > 180 or any(ord(c) < 32 for c in name):
-            raise HTTPException(422, "Tên tệp không hợp lệ")
-        chunks, size = [], 0
-        async for chunk in request.stream():
-            size += len(chunk)
-            if size > MAX_BYTES:
-                raise HTTPException(413, "Tệp tối đa 10 MB")
-            chunks.append(chunk)
-        content = b"".join(chunks)
-        if not content:
-            raise HTTPException(422, "Tệp rỗng")
-        mime = valid_content(name, content)
+        name, content, mime = await read_upload(request)
         latest = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == item.id)
             .order_by(m.DocumentVersion.version_no.desc()).limit(1))
         if latest and latest.state == "FINAL":
             raise HTTPException(409, "Bản cuối đã khóa")
-        root = storage_root()
-        root.mkdir(parents=True, exist_ok=True)
-        key = uuid4().hex + Path(name).suffix.lower()
-        path = root / key
-        with path.open("xb") as handle:
-            handle.write(content)
-        digest = hashlib.sha256(content).hexdigest()
-        file = m.StoredFile(id=uuid4(), storage_key="documents/" + key, original_name=name,
-            media_type=mime, byte_size=size, sha256=digest, scan_state="QUARANTINED")
-        session.add(file)
-        session.flush()
+        file, digest, path = persist_upload(session, name, content, mime)
         version = m.DocumentVersion(id=uuid4(), document_id=item.id, version_no=latest.version_no + 1 if latest else 1,
             stored_file_id=file.id, submitted_by=profile(session, user, "STUDENT").id,
             submitted_at=now(), content_sha256=digest, state="SUBMITTED")

@@ -101,7 +101,7 @@ function ThesisWorkspace({context}: {context: Context}) {
       {thesis.actions.includes("work:view") && <div className="card"><div className="card-body"><ThesisWork thesis={thesis} assignments={work} context={context} busy={busy} run={run} /></div></div>}
       {thesis.actions.includes("audit:view") && <details className="card"><summary className="card-body">Lịch sử thao tác nghiệp vụ</summary><div className="card-body stack">{audit.map((event, index) => <p key={`${event.occurred_at}-${index}`}><strong>{event.actor_name}</strong> · {event.action} · {formatDate(event.occurred_at)}<br />{event.reason}</p>)}</div></details>}
     </div>}
-    {section === "progress" && <ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} busy={busy} run={run} />}
+    {section === "progress" && <ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} studentId={context.student_id} busy={busy} run={run} />}
     {section === "proposal" && proposal && <ThesisProposal thesis={thesis} proposal={proposal} lecturers={lecturers} userId={context.user_id} busy={busy} run={run} />}
     {section === "documents" && <ThesisDocuments thesis={thesis} docs={docs} userId={context.user_id} busy={busy} run={run} />}
   </>;

@@ -1,5 +1,6 @@
 """NV5 implemented routes. Academic authority always comes from a scoped assignment."""
 from uuid import UUID
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import FileResponse, Response
@@ -16,24 +17,24 @@ from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
 from backend.services import documents, progress, proposals, theses
 from backend.services.proposal_export import export_document, export_proposal
-from backend.services.form_templates import list_official_templates, official_template, official_template_by_id
+from backend.services.form_templates import list_official_templates, official_template, official_template_by_id, allowed_form
 
 router = APIRouter(prefix="/api/v1", tags=["NV5 core"])
 
 
 @router.get("/form-templates")
 def get_form_templates(user=Depends(current_user)):
-    return list_official_templates()
+    return list_official_templates(user.base_role)
 
 
 @router.get("/form-templates/{template_id}/download")
 def download_official_template(template_id: str, user=Depends(current_user)):
-    content, filename, media_type = official_template_by_id(template_id)
+    content, filename, media_type = official_template_by_id(template_id, user.base_role)
     return Response(
         content,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f"attachment; filename=official-form{'.xlsx' if filename.endswith('.xlsx') else '.docx'}; filename*=UTF-8''{quote(filename)}",
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
         },
@@ -42,6 +43,7 @@ def download_official_template(template_id: str, user=Depends(current_user)):
 
 @router.get("/form-templates/plan")
 def plan_template(user=Depends(current_user)):
+    allowed_form({"id": "mau-02"}, user.base_role)
     return Response(official_template("plan"),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="mau-02-ke-hoach.docx"',
@@ -50,6 +52,7 @@ def plan_template(user=Depends(current_user)):
 
 @router.get("/form-templates/proposal")
 def proposal_template(user=Depends(current_user)):
+    allowed_form({"id": "mau-03"}, user.base_role)
     return Response(official_template("proposal"),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="mau-03-de-cuong.docx"',
@@ -180,6 +183,14 @@ def reports(thesis_id: UUID, user=Depends(current_user), session=Depends(core_se
 @router.post("/theses/{thesis_id}/progress-reports", response_model=ProgressOut, status_code=201)
 def report_create(thesis_id: UUID, data: ProgressCreate, user=Depends(current_user), session=Depends(core_session)):
     return progress.create_progress(session, user, thesis_id, data)
+
+
+@router.post("/theses/{thesis_id}/progress-reports/{report_id}/evidence", response_model=ProgressOut,
+    openapi_extra={"requestBody": {"required": True, "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
+async def report_evidence(thesis_id: UUID, report_id: UUID, request: Request,
+        if_match: int = Header(alias="If-Match", ge=1), x_file_name: str = Header(alias="X-File-Name"),
+        user=Depends(current_user), session=Depends(core_session)):
+    return await progress.attach_evidence(session, user, thesis_id, report_id, request, if_match)
 
 
 @router.post("/theses/{thesis_id}/progress-reports/{report_id}/review", response_model=ProgressOut)

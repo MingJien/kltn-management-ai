@@ -187,7 +187,14 @@ export type Thesis = {
 };
 export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
 export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
-export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; evidence_document_version_id: string | null; reviews: Review[]};
+export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_by_student_id: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; evidence_document_version_id: string | null; evidence_scan_state: string | null; evidence_file_name: string | null; reviews: Review[]};
+
+export function uploadProgressEvidence(thesisId: string, report: ProgressReport, userId: string, file: File) {
+  return request<ProgressReport>(`/theses/${thesisId}/progress-reports/${report.id}/evidence`, userId, {
+    method: "POST", body: file,
+    headers: {"Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name), "If-Match": String(report.row_version)},
+  });
+}
 export type DocumentVersion = {id: string; version_no: number; row_version: number; state: string; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_at: string; submitted_by_name: string; reviews: Review[]};
 export type ThesisDocument = {id: string; title: string; document_type: "PLAN" | "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
 export type WorkAssignment = {id: string; student_id: string; student_name: string; version_no: number; row_version: number; work_description: string; expected_output: string; state: string; review_comment: string | null; reviewed_by_name: string | null};

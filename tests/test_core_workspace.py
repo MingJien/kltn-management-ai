@@ -128,6 +128,57 @@ def test_progress_revision_cross_comment_and_closed_milestone(workspace):
     assert client.post(path+"/progress-reports", headers=hdr(users[0]), json=payload).status_code == 409
 
 
+def test_progress_optional_local_evidence_is_versioned_scoped_and_quarantined(workspace):
+    client, users, students, _, session, path = workspace
+    milestone = open_milestone(client, users, path)
+    report = client.post(path+"/progress-reports", headers=hdr(users[0]), json={
+        "milestone_id": milestone["id"], "summary": "Completed prototype", "reported_ratio": 40})
+    assert report.status_code == 201, report.text
+    item = report.json()
+    assert item["evidence_document_version_id"] is None
+    evidence_path = path+f"/progress-reports/{item['id']}/evidence"
+    def attach(user, payload, name="proof.txt", row=item):
+        return client.post(evidence_path, headers={**version_headers(user, row),
+            "Content-Type": "application/octet-stream", "X-File-Name": name}, content=payload)
+    assert attach(users[1], b"Peer file").status_code == 403
+    assert attach(users[0], b"not pdf", "proof.pdf").status_code == 422
+    assert attach(users[0], b"Proof content").status_code == 200
+    attached = client.get(path+"/progress-reports", headers=hdr(users[0])).json()[0]
+    assert attached["evidence_scan_state"] == "QUARANTINED"
+    assert attached["evidence_file_name"] == "proof.txt"
+    assert attached["submitted_by_student_id"] == str(students[0].id)
+    assert attach(users[0], b"Second attachment", row=attached).status_code == 409
+    docs = client.get(path+"/documents", headers=hdr(users[0])).json()
+    assert len(docs) == 1 and docs[0]["versions"][0]["id"] == attached["evidence_document_version_id"]
+    assert client.post(evidence_path.removesuffix("/evidence")+"/review", headers=version_headers(users[3], attached),
+        json={"decision": "CONFIRM", "comment": "Looks good"}).status_code == 409
+    stored = session.get(m.StoredFile, session.get(m.ProgressReport, item["id"]).evidence_file_id)
+    stored.scan_state = "CLEAN"  # Synthetic scanner result; production does not set this itself.
+    session.commit()
+    assert client.post(evidence_path.removesuffix("/evidence")+"/review", headers=version_headers(users[3], attached),
+        json={"decision": "CONFIRM", "comment": "Looks good"}).status_code == 200
+
+
+def test_progress_evidence_upload_rollback_removes_file_and_metadata(workspace, monkeypatch):
+    client, users, _, _, session, path = workspace
+    milestone = open_milestone(client, users, path)
+    report = client.post(path+"/progress-reports", headers=hdr(users[0]), json={
+        "milestone_id": milestone["id"], "summary": "Results", "reported_ratio": 30}).json()
+    from backend.services import documents
+    original_commit = session.commit
+    def fail_commit():
+        raise RuntimeError("Synthetic database commit failure")
+    monkeypatch.setattr(session, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="Synthetic database"):
+        client.post(path+f"/progress-reports/{report['id']}/evidence",
+            headers={**version_headers(users[0], report), "Content-Type": "application/octet-stream",
+                "X-File-Name": "proof.txt"}, content=b"Synthetic evidence")
+    monkeypatch.setattr(session, "commit", original_commit)
+    assert client.get(path+"/progress-reports", headers=hdr(users[0])).json()[0]["evidence_document_version_id"] is None
+    assert client.get(path+"/documents", headers=hdr(users[0])).json() == []
+    assert list(documents.storage_root().glob("*")) == []
+
+
 def test_late_submission_marked_not_faked_as_on_time(workspace):
     client, users, *_ , path = workspace
     milestone = open_milestone(client, users, path, due_at=(now()-timedelta(days=1)).isoformat())
