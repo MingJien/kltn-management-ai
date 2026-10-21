@@ -230,9 +230,18 @@ def upload(client, user, path, doc, content=b"Synthetic report", name="report.tx
         "Content-Type": "application/octet-stream", "X-File-Name": name}, content=content)
 
 
+def test_progress_report_cannot_be_created_as_standalone_document(workspace):
+    client, users, _, _, _, path = workspace
+    response = client.post(path+"/documents", headers=hdr(users[0]),
+        json={"title": "Progress report outside milestone", "document_type": "REPORT"})
+    assert response.status_code == 409
+    assert "Tiến độ" in response.json()["detail"]
+    assert client.get(path+"/documents", headers=hdr(users[0])).json() == []
+
+
 def test_document_versions_review_download_and_corruption_detection(workspace, monkeypatch):
     client, users, _, _, session, path = workspace
-    doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "REPORT"}).json()
+    doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "SUPPORTING"}).json()
     first = upload(client, users[0], path, doc)
     assert first.status_code == 201, first.text
     doc1 = first.json()
@@ -270,7 +279,7 @@ def test_document_versions_review_download_and_corruption_detection(workspace, m
 def test_student_withdraws_mistaken_document_without_erasing_versions(workspace):
     client, users, _, _, session, path = workspace
     created = client.post(path+"/documents", headers=hdr(users[0]),
-        json={"title": "Wrong report", "document_type": "REPORT"}).json()
+        json={"title": "Wrong report", "document_type": "SUPPORTING"}).json()
     uploaded = upload(client, users[0], path, created, b"Wrong attachment", "wrong.txt")
     assert uploaded.status_code == 201, uploaded.text
     doc = uploaded.json()
@@ -290,7 +299,7 @@ def test_student_withdraws_mistaken_document_without_erasing_versions(workspace)
 def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace):
     client, users, _, _, _, path = workspace
     created = client.post(path+"/documents", headers=hdr(users[0]),
-        json={"title": "Report for advisor", "document_type": "REPORT"}).json()
+        json={"title": "Report for advisor", "document_type": "SUPPORTING"}).json()
     uploaded = upload(client, users[0], path, created, b"Synthetic content", "report.txt")
     doc = uploaded.json()
     version = doc["versions"][0]
@@ -343,7 +352,7 @@ def test_approved_document_print_copy_has_footer_and_preserves_source(workspace)
 
 def test_upload_validation_and_database_failure_remove_written_file(workspace, monkeypatch):
     client, users, _, _, session, path = workspace
-    doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "REPORT"}).json()
+    doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "SUPPORTING"}).json()
     from backend.services import documents
     assert upload(client, users[0], path, doc, b"not a pdf", "report.pdf").status_code == 422
     assert upload(client, users[0], path, doc, b"", "report.txt").status_code == 422
@@ -363,7 +372,7 @@ def test_upload_storage_failure_leaves_no_metadata_or_file(workspace, monkeypatc
     client, users, _, _, session, path = workspace
     from backend.services import documents
     doc = client.post(path+"/documents", headers=hdr(users[0]),
-        json={"title": "Results", "document_type": "REPORT"}).json()
+        json={"title": "Results", "document_type": "SUPPORTING"}).json()
     stored_before = session.scalar(select(func.count(m.StoredFile.id)))
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory", encoding="utf-8")
@@ -382,7 +391,7 @@ def test_upload_delete_failure_does_not_hide_original_error(workspace, monkeypat
     root = tmp_path / "documents"
     monkeypatch.setenv("KLTN_DOCUMENT_DIR", str(root))
     doc = client.post(path+"/documents", headers=hdr(users[0]),
-        json={"title": "Results", "document_type": "REPORT"}).json()
+        json={"title": "Results", "document_type": "SUPPORTING"}).json()
     original_commit = session.commit
     original_unlink = Path.unlink
 

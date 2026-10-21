@@ -129,6 +129,8 @@ def create_document(session, user, thesis_id, data):
     thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
     if data.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải nộp tại luồng đề cương có xét duyệt riêng")
+    if data.document_type == "REPORT":
+        raise HTTPException(409, "Báo cáo tiến độ phải nộp tại mục Tiến độ theo mốc của đợt")
     if data.document_type == "PLAN" and session.scalar(select(m.Document.id).where(
             m.Document.thesis_id == thesis_id, m.Document.document_type == "PLAN",
             m.Document.state == "ACTIVE").limit(1)):
@@ -178,6 +180,10 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
         thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
         item = document(session, thesis_id, document_id, lock=True)
         row_version(expected, item.row_version)
+        if item.document_type == "PROPOSAL":
+            raise HTTPException(409, "Đề cương phải nộp tại mục Đề cương")
+        if item.document_type == "REPORT":
+            raise HTTPException(409, "Hồ sơ báo cáo cũ chỉ để đối chiếu; nộp tiến độ tại mục Tiến độ")
         name, content, mime = await read_upload(request)
         latest = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == item.id)
             .order_by(m.DocumentVersion.version_no.desc()).limit(1))

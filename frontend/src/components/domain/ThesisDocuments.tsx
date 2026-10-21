@@ -20,13 +20,13 @@ function DocumentCard({doc, thesis, progressEvidenceIds, userId, busy, run}: {
   const [downloadError, setDownloadError] = useState("");
   const [printNotice, setPrintNotice] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const canSubmit = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
-  const canWithdraw = canSubmit && doc.document_type !== "PROPOSAL" && doc.versions.every(version =>
+  const canSubmit = !["REPORT", "PROPOSAL"].includes(doc.document_type) && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
+  const canWithdraw = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && doc.document_type !== "PROPOSAL" && doc.versions.every(version =>
     version.state === "SUBMITTED" && version.reviews.length === 0 && !progressEvidenceIds.has(version.id));
   const latestAccepted = doc.versions.filter(version => ["ACCEPTED", "FINAL"].includes(version.state))
     .sort((a, b) => b.version_no - a.version_no)[0];
   return <article className="card"><div className="card-body stack">
-    <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : doc.document_type === "REPORT" ? "Báo cáo" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
+    <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : doc.document_type === "REPORT" ? "Báo cáo khóa luận đã tạo trước đây" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
     {doc.document_type === "PLAN" && <p className="text-body-sm text-muted">Điền nội dung vào Mẫu 2 chính thức của Khoa trên Word, nộp bản PDF/DOCX tại đây. Nếu GVHD yêu cầu sửa, nộp một phiên bản mới; bản đã tiếp nhận được dùng làm bản chính thức trong hồ sơ.</p>}
     {doc.document_type === "PROPOSAL" && <p className="text-body-sm">Lưu tệp đề cương ở đây. Quy trình GVHD → phản biện → TBM → Trưởng khoa sẽ được xử lý riêng.</p>}
     {canWithdraw && <details><summary>Rút hồ sơ tài liệu nộp nhầm</summary><form className="core-form" onSubmit={async event => {
@@ -100,11 +100,12 @@ export default function ThesisDocuments({thesis, docs, reports, userId, busy, ru
   thesis: Thesis; docs: ThesisDocument[]; reports: ProgressReport[]; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [title, setTitle] = useState("");
-  const [type, setType] = useState("REPORT");
+  const [type, setType] = useState("PLAN");
   const [templateError, setTemplateError] = useState("");
   const [templates, setTemplates] = useState<OfficialFormTemplate[]>([]);
   const [downloadingTmpl, setDownloadingTmpl] = useState<string | null>(null);
   const progressEvidenceIds = new Set(reports.map(report => report.evidence_document_version_id).filter((id): id is string => !!id));
+  const visibleDocs = docs.filter(doc => !(doc.document_type === "SUPPORTING" && doc.title.startsWith("Minh chứng tiến độ ") && doc.versions.some(version => progressEvidenceIds.has(version.id))));
 
   useEffect(() => {
     let alive = true;
@@ -155,20 +156,20 @@ export default function ThesisDocuments({thesis, docs, reports, userId, busy, ru
       if (await run(() => request(`/theses/${thesis.id}/documents`, userId, {method: "POST", body: JSON.stringify({title, document_type: type})}), "Đã tạo hồ sơ tài liệu; chọn tệp để nộp.")) setTitle("");
     }}><div className="card-body core-form">
       <h3>Thêm tài liệu khác vào hồ sơ khóa luận</h3>
-      <p className="text-body-sm text-muted">Dùng cho kế hoạch thực hiện (Mẫu 2), báo cáo khóa luận hoặc tài liệu hỗ trợ cần theo dõi nhiều phiên bản và GVHD tiếp nhận. Minh chứng của một mốc tiến độ có thể tải ngay tại mục Tiến độ; không cần tạo hồ sơ ở đây.</p>
+      <p className="text-body-sm text-muted">Chỉ dùng cho kế hoạch thực hiện (Mẫu 2) và tài liệu hỗ trợ của khóa luận. Báo cáo tiến độ cùng tệp minh chứng được nộp, xem và nhận xét tại mục Tiến độ. Biểu mẫu gốc của Khoa chỉ được tải về, không tạo hoặc tải lên tại đây.</p>
       <div className="input-group"><label htmlFor="document-title">Tên tài liệu</label><input className="input" id="document-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="document-type">Loại tài liệu</label><select className="input" id="document-type" value={type} onChange={event => setType(event.target.value)} disabled={busy}>
-        <option value="PLAN">Kế hoạch thực hiện (Mẫu 2)</option><option value="REPORT">Báo cáo khóa luận</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>
+        <option value="PLAN">Kế hoạch thực hiện (Mẫu 2)</option><option value="SUPPORTING">Tài liệu hỗ trợ khóa luận</option>
       </select></div>
       <button className="btn btn-primary" disabled={busy || !title.trim()}>Tạo hồ sơ tài liệu</button>
     </div></form>}
-    {docs.map(doc => <DocumentCard key={doc.id} doc={doc} thesis={thesis} progressEvidenceIds={progressEvidenceIds} userId={userId} busy={busy} run={run} />)}
-    {docs.length === 0 && <div className="card"><div className="card-body">
+    {visibleDocs.map(doc => <DocumentCard key={doc.id} doc={doc} thesis={thesis} progressEvidenceIds={progressEvidenceIds} userId={userId} busy={busy} run={run} />)}
+    {visibleDocs.length === 0 && <div className="card"><div className="card-body">
       <h3>Chưa có tài liệu nào trong hồ sơ</h3>
       <p className="text-muted">
         {thesis.actions.includes("document:submit")
-          ? "Sinh viên trong nhóm hãy sử dụng form bên trên để tạo hồ sơ tài liệu (Kế hoạch thực hiện Mẫu 2, Báo cáo khóa luận hoặc Tài liệu hỗ trợ) và tải phiên bản đầu tiên lên."
-          : "Sinh viên trong nhóm phụ trách nộp Kế hoạch thực hiện (Mẫu 2) và Báo cáo. Sau khi sinh viên nộp và tệp được quét an toàn, GVHD sẽ xem xét và tiếp nhận."}
+          ? "Sinh viên trong nhóm hãy sử dụng form bên trên để tạo hồ sơ tài liệu (Kế hoạch thực hiện Mẫu 2 hoặc tài liệu hỗ trợ khóa luận) và tải phiên bản đầu tiên lên."
+          : "Báo cáo tiến độ và minh chứng nằm tại mục Tiến độ. Tại đây chỉ hiển thị kế hoạch thực hiện và tài liệu hỗ trợ khóa luận được giao."}
       </p>
     </div></div>}
   </div>;
