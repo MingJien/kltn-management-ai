@@ -58,7 +58,6 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
       return <article className="card" key={version.id}><div className="card-body stack">
       <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong>{index === 0 && <Status value={proposal.state} />}</div>
       <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
-      <details><summary>SHA-256</summary><code className="core-hash">{version.sha256}</code></details>
       <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
       <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
         setDownloadError(""); setDownloading(true);

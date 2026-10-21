@@ -103,6 +103,6 @@ function ThesisWorkspace({context}: {context: Context}) {
     </div>}
     {section === "progress" && <ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} studentId={context.student_id} busy={busy} run={run} />}
     {section === "proposal" && proposal && <ThesisProposal thesis={thesis} proposal={proposal} lecturers={lecturers} userId={context.user_id} busy={busy} run={run} />}
-    {section === "documents" && <ThesisDocuments thesis={thesis} docs={docs} userId={context.user_id} busy={busy} run={run} />}
+    {section === "documents" && <ThesisDocuments thesis={thesis} docs={docs} reports={reports} userId={context.user_id} busy={busy} run={run} />}
   </>;
 }

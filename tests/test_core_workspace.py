@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from pypdf import PdfReader, PdfWriter
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from test_registration import hdr, scenario
 from backend.db.models import entities as m
@@ -150,6 +150,8 @@ def test_progress_optional_local_evidence_is_versioned_scoped_and_quarantined(wo
     assert attach(users[0], b"Second attachment", row=attached).status_code == 409
     docs = client.get(path+"/documents", headers=hdr(users[0])).json()
     assert len(docs) == 1 and docs[0]["versions"][0]["id"] == attached["evidence_document_version_id"]
+    assert client.post(path+f"/documents/{docs[0]['id']}/withdraw", headers=version_headers(users[0], docs[0]),
+        json={"reason": "Referenced by progress"}).status_code == 409
     assert client.post(evidence_path.removesuffix("/evidence")+"/review", headers=version_headers(users[3], attached),
         json={"decision": "CONFIRM", "comment": "Looks good"}).status_code == 409
     stored = session.get(m.StoredFile, session.get(m.ProgressReport, item["id"]).evidence_file_id)
@@ -242,7 +244,7 @@ def test_document_versions_review_download_and_corruption_detection(workspace, m
     # Unscanned uploads must not be downloadable or reviewed.
     assert client.get(download, headers=hdr(users[3])).status_code == 409
     assert client.post(path+f"/documents/{doc['id']}/versions/{v1['id']}/review", headers=version_headers(users[3], v1),
-        json={"decision": "REVISION_REQUIRED", "comment": "Not scanned"}).status_code == 409
+        json={"decision": "ACCEPT", "comment": "Cannot accept unscanned file"}).status_code == 409
     # Simulate a real scanner clearing the file; production never assigns CLEAN by itself.
     stored = session.get(m.StoredFile, session.get(m.DocumentVersion, v1["id"]).stored_file_id)
     stored.scan_state = "CLEAN"
@@ -263,6 +265,47 @@ def test_document_versions_review_download_and_corruption_detection(workspace, m
     key = stored.storage_key.removeprefix("documents/")
     (storage_root()/key).write_bytes(b"Altered bytes")
     assert client.get(download, headers=hdr(users[0])).status_code == 409
+
+
+def test_student_withdraws_mistaken_document_without_erasing_versions(workspace):
+    client, users, _, _, session, path = workspace
+    created = client.post(path+"/documents", headers=hdr(users[0]),
+        json={"title": "Wrong report", "document_type": "REPORT"}).json()
+    uploaded = upload(client, users[0], path, created, b"Wrong attachment", "wrong.txt")
+    assert uploaded.status_code == 201, uploaded.text
+    doc = uploaded.json()
+    withdraw = path+f"/documents/{doc['id']}/withdraw"
+    assert client.post(withdraw, headers=version_headers(users[3], doc),
+        json={"reason": "Wrong attachment"}).status_code == 403
+    assert client.post(withdraw, headers=version_headers(users[0], doc), json={"reason": "x"}).status_code == 422
+    assert client.post(withdraw, headers=version_headers(users[0], doc),
+        json={"reason": "Uploaded the wrong faculty form"}).status_code == 204
+    assert client.get(path+"/documents", headers=hdr(users[0])).json() == []
+    assert session.get(m.Document, doc["id"]).state == "REVOKED"
+    version = session.get(m.DocumentVersion, doc["versions"][0]["id"])
+    assert version and session.get(m.StoredFile, version.stored_file_id)
+    assert session.scalar(select(m.AuditEvent.id).where(m.AuditEvent.action == "DOCUMENT_WITHDRAWN"))
+
+
+def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace):
+    client, users, _, _, _, path = workspace
+    created = client.post(path+"/documents", headers=hdr(users[0]),
+        json={"title": "Report for advisor", "document_type": "REPORT"}).json()
+    uploaded = upload(client, users[0], path, created, b"Synthetic content", "report.txt")
+    doc = uploaded.json()
+    version = doc["versions"][0]
+    review = path+f"/documents/{doc['id']}/versions/{version['id']}/review"
+    assert client.post(review, headers=version_headers(users[3], version),
+        json={"decision": "ACCEPT", "comment": "Cannot accept without scan"}).status_code == 409
+    returned = client.post(review, headers=version_headers(users[3], version),
+        json={"decision": "REVISION_REQUIRED", "comment": "Wrong form; submit a new report"})
+    assert returned.status_code == 200, returned.text
+    assert returned.json()["versions"][0]["state"] == "REVISION_REQUESTED"
+    assert client.post(path+f"/documents/{doc['id']}/withdraw", headers=version_headers(users[0], returned.json()),
+        json={"reason": "Cannot erase advisor review"}).status_code == 409
+    revised = upload(client, users[0], path, returned.json(), b"Revised content", "report-revised.txt")
+    assert revised.status_code == 201, revised.text
+    assert [row["version_no"] for row in revised.json()["versions"]] == [2, 1]
 
 
 def test_approved_document_print_copy_has_footer_and_preserves_source(workspace):
@@ -321,14 +364,14 @@ def test_upload_storage_failure_leaves_no_metadata_or_file(workspace, monkeypatc
     from backend.services import documents
     doc = client.post(path+"/documents", headers=hdr(users[0]),
         json={"title": "Results", "document_type": "REPORT"}).json()
+    stored_before = session.scalar(select(func.count(m.StoredFile.id)))
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory", encoding="utf-8")
     monkeypatch.setattr(documents, "storage_root", lambda: blocked)
     with pytest.raises(OSError):
         upload(client, users[0], path, doc)
     assert client.get(path+"/documents", headers=hdr(users[0])).json()[0]["versions"] == []
-    assert session.scalar(select(m.StoredFile.id).where(
-        m.StoredFile.storage_key.like("documents/%"))) is None
+    assert session.scalar(select(func.count(m.StoredFile.id))) == stored_before
 
 
 def test_upload_delete_failure_does_not_hide_original_error(workspace, monkeypatch, tmp_path):

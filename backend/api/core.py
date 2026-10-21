@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.core_schemas import (
     AuditOut, LecturerAssignment,
-    DocumentCreate, DocumentDecision, DocumentOut, MilestoneClose, MilestoneCreate, MilestoneExtend, MilestoneOut,
+    DocumentCreate, DocumentDecision, DocumentOut, DocumentWithdraw, MilestoneClose, MilestoneCreate, MilestoneExtend, MilestoneOut,
     ProgressCreate, ProgressDecision, ProgressOut, ProposalFinalization, ProposalOut,
     ProposalReviewCreate, ProposalSignedCopy, ThesisWorkspaceOut, WorkCreate, WorkDecision, WorkOut,
 )
@@ -229,6 +229,12 @@ def docs(thesis_id: UUID, user=Depends(current_user), session=Depends(core_sessi
 @router.post("/theses/{thesis_id}/documents", response_model=DocumentOut, status_code=201)
 def document_create(thesis_id: UUID, data: DocumentCreate, user=Depends(current_user), session=Depends(core_session)):
     return documents.create_document(session, user, thesis_id, data)
+
+
+@router.post("/theses/{thesis_id}/documents/{document_id}/withdraw", status_code=204)
+def document_withdraw(thesis_id: UUID, document_id: UUID, data: DocumentWithdraw,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    documents.withdraw_document(session, user, thesis_id, document_id, data, if_match)
 
 
 @router.post("/theses/{thesis_id}/documents/{document_id}/versions", response_model=DocumentOut, status_code=201,

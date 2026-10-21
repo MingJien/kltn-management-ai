@@ -143,6 +143,35 @@ def create_document(session, user, thesis_id, data):
     return result
 
 
+def withdraw_document(session, user, thesis_id, document_id, data, expected):
+    """Hide a mistaken submission while retaining its versions, bytes and audit trail."""
+    thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
+    item = document(session, thesis_id, document_id, lock=True)
+    row_version(expected, item.row_version)
+    if item.document_type == "PROPOSAL":
+        raise HTTPException(409, "Đề cương phải xử lý ở luồng đề cương")
+    versions = session.scalars(select(m.DocumentVersion).where(
+        m.DocumentVersion.document_id == item.id).with_for_update()).all()
+    if any(version.state != "SUBMITTED" for version in versions):
+        raise HTTPException(409, "Tài liệu đã được xử lý; cần giữ trong hồ sơ và nộp phiên bản sửa")
+    if versions:
+        version_ids = [version.id for version in versions]
+        if session.scalar(select(m.AuditEvent.id).where(
+            m.AuditEvent.resource_type == "document_version",
+            m.AuditEvent.resource_id.in_(version_ids),
+            m.AuditEvent.action.in_(["DOCUMENT_ACCEPT", "DOCUMENT_REVISION_REQUIRED"])).limit(1)):
+            raise HTTPException(409, "GVHD đã nhận xét; không thể rút hồ sơ này")
+        file_ids = [version.stored_file_id for version in versions]
+        if session.scalar(select(m.ProgressReport.id).where(
+            m.ProgressReport.evidence_file_id.in_(file_ids)).limit(1)):
+            raise HTTPException(409, "Tệp đang là minh chứng tiến độ; không thể rút hồ sơ")
+    item.state = "REVOKED"
+    item.row_version += 1
+    audit(session, user, "DOCUMENT_WITHDRAWN", "thesis", thesis_id,
+        f"{item.id} · {item.title}: {data.reason}")
+    session.commit()
+
+
 async def upload_version(session, user, thesis_id, document_id, request, expected):
     path = None
     try:
@@ -191,8 +220,8 @@ def review_version(session, user, thesis_id, document_id, version_id, data, expe
     if version.version_no != latest or version.state != "SUBMITTED":
         raise HTTPException(409, "Chỉ duyệt phiên bản mới nhất đang chờ")
     file = session.get(m.StoredFile, version.stored_file_id)
-    require_clean(file, "duyệt tài liệu")
     if data.decision == "ACCEPT":
+        require_clean(file, "tiếp nhận tài liệu")
         prior = session.scalars(select(m.DocumentVersion).where(
             m.DocumentVersion.document_id == item.id,
             m.DocumentVersion.version_no < version.version_no,

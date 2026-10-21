@@ -1245,7 +1245,6 @@ textarea.input {
 .core-review { padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
 .core-prewrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 .core-version { padding: var(--space-3); border-left: 3px solid var(--primary-300); background: var(--neutral-50); }
-.core-hash { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-caption-size); }
 .core-thesis-link { color: var(--primary-700); text-decoration: none; }
 .core-thesis-link:hover { text-decoration: underline; }
 .login-password-field { position: relative; }

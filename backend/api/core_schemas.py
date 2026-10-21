@@ -55,6 +55,10 @@ class DocumentDecision(BaseModel):
     comment: LongText
 
 
+class DocumentWithdraw(BaseModel):
+    reason: Reason
+
+
 class WorkCreate(BaseModel):
     student_id: UUID
     work_description: LongText
