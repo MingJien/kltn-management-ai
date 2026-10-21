@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { errorMessage } from "../errors";
 import { request } from "../api";
+import PasswordInput from "../components/ui/PasswordInput";
 
 type Mode = "activation-request" | "forgot-password" | "activate" | "reset-password";
 
@@ -64,14 +65,14 @@ export default function AccountAccessPage({signedInAs, onPasswordUpdated}: {
         <input className="input" type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} />
       </label> : null}
       {settingPassword ? <>
-        <label className="input-group">Mật khẩu mới
-          <input className="input" type="password" minLength={12} required autoComplete="new-password"
-            value={password} onChange={e=>setPassword(e.target.value)} />
-        </label>
-        <label className="input-group">Nhập lại mật khẩu
-          <input className="input" type="password" minLength={12} required autoComplete="new-password"
-            value={confirm} onChange={e=>setConfirm(e.target.value)} />
-        </label>
+        <div className="input-group"><label htmlFor="account-access-password">Mật khẩu mới</label>
+          <PasswordInput id="account-access-password" label="Mật khẩu mới" minLength={12} required autoComplete="new-password"
+            value={password} onChange={e=>setPassword(e.target.value)} disabled={busy} />
+        </div>
+        <div className="input-group"><label htmlFor="account-access-confirm">Nhập lại mật khẩu</label>
+          <PasswordInput id="account-access-confirm" label="Nhập lại mật khẩu" minLength={12} required autoComplete="new-password"
+            value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} />
+        </div>
       </> : null}
       {settingPassword && !token ? <p role="alert" className="alert alert-danger">Liên kết không hợp lệ hoặc đã được sử dụng.</p> : null}
       <button className="btn btn-primary" disabled={busy || (settingPassword && !token)}>

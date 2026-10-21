@@ -3,6 +3,7 @@ import type { Context } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import PasswordInput from "../components/ui/PasswordInput";
 
 export default function AccountPage({context, onPasswordChanged}: {context:Context; onPasswordChanged:()=>void}) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -34,12 +35,15 @@ export default function AccountPage({context, onPasswordChanged}: {context:Conte
       </div></section>
       {context.can_change_password ? <section className="card"><div className="card-body stack"><h2>Đổi mật khẩu</h2>
         <form onSubmit={(event)=>void change(event)} className="stack">
-          <label className="input-group">Mật khẩu hiện tại<input className="input" type="password" required autoComplete="current-password"
-            value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} /></label>
-          <label className="input-group">Mật khẩu mới<input className="input" type="password" required minLength={12} autoComplete="new-password"
-            value={newPassword} onChange={e=>setNewPassword(e.target.value)} /></label>
-          <label className="input-group">Nhập lại mật khẩu mới<input className="input" type="password" required minLength={12} autoComplete="new-password"
-            value={confirm} onChange={e=>setConfirm(e.target.value)} /></label>
+          <div className="input-group"><label htmlFor="current-password">Mật khẩu hiện tại</label>
+            <PasswordInput id="current-password" label="Mật khẩu hiện tại" required autoComplete="current-password"
+              value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} disabled={busy} /></div>
+          <div className="input-group"><label htmlFor="new-password">Mật khẩu mới</label>
+            <PasswordInput id="new-password" label="Mật khẩu mới" required minLength={12} autoComplete="new-password"
+              value={newPassword} onChange={e=>setNewPassword(e.target.value)} disabled={busy} /></div>
+          <div className="input-group"><label htmlFor="confirm-password">Nhập lại mật khẩu mới</label>
+            <PasswordInput id="confirm-password" label="Nhập lại mật khẩu mới" required minLength={12} autoComplete="new-password"
+              value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} /></div>
           <button className="btn btn-primary" disabled={busy}>{busy ? "Đang lưu…" : "Đổi mật khẩu"}</button>
         </form>
         {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}

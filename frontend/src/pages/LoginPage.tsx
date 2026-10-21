@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Eye, EyeOff, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
+import { BookOpen, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
 import { listDemoAccounts, type DemoAccount } from "../api";
+import PasswordInput from "../components/ui/PasswordInput";
 import "../styles/login.css";
 
 interface LoginPageProps {
@@ -25,7 +26,6 @@ const FEATURES = [
 export default function LoginPage({
   email, password, loading, error, onEmailChange, onPasswordChange, onSubmit, onDemoSignIn,
 }: LoginPageProps) {
-  const [showPassword, setShowPassword] = useState(false);
   const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
   const [demoKey, setDemoKey] = useState("");
 
@@ -88,16 +88,9 @@ export default function LoginPage({
               </div>
               <div className="input-group">
                 <label htmlFor="login-password">Mật khẩu</label>
-                <div className="login-password-field">
-                  <input id="login-password" className="input input--lg" type={showPassword ? "text" : "password"}
-                    required autoComplete="current-password" value={password}
-                    onChange={(event) => onPasswordChange(event.target.value)} placeholder="Nhập mật khẩu" />
-                  <button type="button" className="login-password-toggle"
-                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                    aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
-                    {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-                  </button>
-                </div>
+                <PasswordInput id="login-password" label="Mật khẩu" className="input input--lg"
+                  required autoComplete="current-password" value={password}
+                  onChange={(event) => onPasswordChange(event.target.value)} placeholder="Nhập mật khẩu" />
               </div>
               <button className="btn btn-primary login-card__submit"
                 disabled={loading || !email.trim() || !password}>
