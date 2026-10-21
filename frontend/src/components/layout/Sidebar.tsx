@@ -85,8 +85,8 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
           {context.actions.includes("account:manage") ? <SidebarGroup label="QUẢN TRỊ" active={["/administration", "/rounds"].includes(pathname)} collapsed={collapsed}>
             <NavLink to="/administration" title={collapsed ? "Tài khoản và phân công" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản và phân công</span></NavLink>
-            <NavLink to="/rounds" title={collapsed ? "Đợt KLTN" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
-              onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink>
+            {context.base_role === "ADMIN" ? <NavLink to="/rounds" title={collapsed ? "Đợt KLTN" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink> : null}
           </SidebarGroup> : null}
           {context.actions.some(a=>a.startsWith("eligibility:")) ? <SidebarGroup label="ĐIỀU KIỆN THEO ĐỢT" active={pathname === "/roster"} collapsed={collapsed}>
             <NavLink to="/roster" title={collapsed ? "Danh sách sinh viên" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}

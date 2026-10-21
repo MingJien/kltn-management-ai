@@ -523,6 +523,7 @@ class ProgressReport(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     reported_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
@@ -582,3 +583,20 @@ class AuditEvent(UuidPrimaryKeyMixin, Base):
     reason: Mapped[Optional[str]] = mapped_column(Text)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+
+
+class UserNotification(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "user_notification"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED')",
+            name="kind",
+        ),
+        Index("ix_user_notification_recipient_created", "recipient_user_id", "created_at"),
+    )
+    recipient_user_id: Mapped[uuid.UUID] = fk("user_account.id")
+    actor_user_id: Mapped[uuid.UUID] = fk("user_account.id")
+    registration_id: Mapped[uuid.UUID] = fk("topic_registration.id")
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

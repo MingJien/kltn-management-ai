@@ -16,6 +16,7 @@ from tools.official_schema import SELECTED_TABLES
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261015_0001_official.py"
+NOTIFICATION_MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261021_0003_user_notification.py"
 OUTPUT = ROOT / "database" / "official" / "kltn-management-schema.sql"
 
 
@@ -45,14 +46,37 @@ def initial_ddl() -> list[str]:
         for statement in statements
         if (match := re.match(r"^CREATE\s+TABLE\s+(\w+)\b", statement, re.IGNORECASE))
     ]
-    if len(tables) != len(SELECTED_TABLES) or set(tables) != set(SELECTED_TABLES):
+    initial_tables = SELECTED_TABLES - {"user_notification"}
+    if len(tables) != len(initial_tables) or set(tables) != initial_tables:
         raise RuntimeError(
             "Initial migration does not match the official selection: "
-            f"missing={sorted(set(SELECTED_TABLES) - set(tables))}, "
-            f"unexpected={sorted(set(tables) - set(SELECTED_TABLES))}, count={len(tables)}"
+            f"missing={sorted(initial_tables - set(tables))}, "
+            f"unexpected={sorted(set(tables) - initial_tables)}, count={len(tables)}"
         )
     if len(tables) != len(set(tables)):
         raise RuntimeError("Initial migration creates a business table more than once")
+    # Project the additive 0002 migration into the review snapshot. The live
+    # database still gets this change only through Alembic; the snapshot keeps
+    # one complete CREATE TABLE per table and never appends ALTER statements.
+    for index, statement in enumerate(statements):
+        if statement.startswith("CREATE TABLE progress_report ("):
+            needle = "\tCONSTRAINT pk_progress_report PRIMARY KEY"
+            if statement.count(needle) != 1:
+                raise RuntimeError("Progress report DDL changed; update snapshot projection")
+            statements[index] = statement.replace(needle,
+                "\tdue_at_at_submission TIMESTAMP WITH TIME ZONE,\n" + needle)
+            break
+    else:
+        raise RuntimeError("Progress report table missing from initial migration")
+    notification_source = NOTIFICATION_MIGRATION.read_text(encoding="utf-8")
+    additions = re.findall(r'CREATE (?:TABLE|INDEX) user_notification\b[\s\S]*?;', notification_source)
+    if len(additions) != 1:
+        # The index name differs from the table name; match it separately.
+        additions = re.findall(r'CREATE TABLE user_notification\b[\s\S]*?;', notification_source)
+    indexes = re.findall(r'CREATE INDEX ix_user_notification_recipient_created\b[\s\S]*?;', notification_source)
+    if len(additions) != 1 or len(indexes) != 1:
+        raise RuntimeError("Notification migration DDL changed; update snapshot projection")
+    statements.extend([additions[0], indexes[0]])
     statements.append(
         "CREATE TABLE alembic_version (\n"
         "    version_num VARCHAR(32) NOT NULL,\n"
@@ -65,7 +89,7 @@ def initial_ddl() -> list[str]:
 def build_sql() -> str:
     statements = initial_ddl()
     lines = [
-        "-- Schema-only export generated from Alembic revision 20261015_0001_official.",
+        "-- Schema-only review snapshot at Alembic revision 20261021_0003.",
         f"-- {len(SELECTED_TABLES)} business tables plus alembic_version; each table has one complete CREATE TABLE statement.",
         "-- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.",
         "-- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.",
@@ -96,7 +120,7 @@ def main() -> None:
     emitted_tables = re.findall(r"^CREATE\s+TABLE\s+(\w+)\b", sql, re.IGNORECASE | re.MULTILINE)
     expected_tables = SELECTED_TABLES | {"alembic_version"}
     if len(emitted_tables) != len(expected_tables) or set(emitted_tables) != expected_tables:
-        raise RuntimeError("Export must contain exactly 32 business tables and alembic_version")
+        raise RuntimeError("Export table set does not match official metadata")
     if re.search(r"^\s*ALTER\s+TABLE\b", sql, re.IGNORECASE | re.MULTILINE):
         raise RuntimeError("Export must not alter tables after creation")
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

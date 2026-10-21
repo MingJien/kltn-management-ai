@@ -50,20 +50,55 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
     await page.getByRole("button",{name:"Lưu phân công"}).click();
     await page.getByRole("link",{name:"Danh sách sinh viên"}).click();
     await expect(page.getByRole("heading",{name:"Danh sách đủ điều kiện"})).toBeVisible();
+    await page.getByRole("tab",{name:/Nhập danh sách/}).click();
     const code = "E2E-ROSTER-001";
     const email = "roster-student@e2e.test";
-    const csv = ["student_code,display_name,email,department_code,class_name,major_code",
-      `${code},Sinh viên giả lập,${email},SYN-DEMO-DEP,CNTT-E2E,7480201`].join("\n");
+    const csv = ["MSSV;Họ và tên;Email;Mã bộ môn;Lớp;Mã ngành",
+      `${code};Sinh viên giả lập;${email};SYN-DEMO-DEP;CNTT-E2E;7480201`].join("\n");
     await page.locator('input[type="file"]').setInputFiles({name:"roster.csv",mimeType:"text/csv",buffer:Buffer.from(csv)});
     await page.getByLabel("Mã/số văn bản nguồn").fill("SYNTHETIC-E2E");
     await page.getByRole("button",{name:"Kiểm tra tệp"}).click();
     await expect(page.getByRole("heading",{name:/Xem trước: 1 sinh viên/})).toBeVisible();
     await page.getByRole("button",{name:"Nhập sau khi kiểm"}).click();
     await expect(page.getByText(/Đã nhập 1 kết quả chờ xác nhận/)).toBeVisible();
-    await page.getByLabel("Căn cứ xác nhận/thu hồi").fill("SYNTHETIC-E2E-APPROVAL");
+    await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
+    // Simulate a backend process that has not yet restarted after adding account_activated.
+    await page.route("**/api/v1/rounds/*/roster",async route=>{
+      if(route.request().method()!=="GET") return route.continue();
+      const response=await route.fetch();
+      const rows=await response.json() as Array<Record<string,unknown>>;
+      for(const row of rows) delete row.account_activated;
+      await route.fulfill({response,json:rows});
+    });
+    await page.reload();
+    await page.getByRole("combobox",{name:"Kích hoạt tài khoản"}).selectOption("activated");
+    await expect(page.getByText(/Đang hiện [1-9]\d*\/\d+ sinh viên thuộc đợt đã chọn/)).toBeVisible();
+    await page.getByRole("combobox",{name:"Kích hoạt tài khoản"}).selectOption("not-activated");
+    await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill(code);
+    await expect(page.getByText(/Đang hiện 1\/\d+ sinh viên thuộc đợt đã chọn/)).toBeVisible();
+    await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill("khong-ton-tai");
+    await expect(page.getByText("Không có sinh viên khớp bộ lọc.")).toBeVisible();
+    await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill(code);
+    await page.getByRole("tab",{name:/Ngoại lệ Hiệu trưởng/}).click();
+    await page.getByRole("searchbox",{name:"Tìm sinh viên được xét ngoại lệ"}).fill(code);
+    await expect(page.getByRole("combobox",{name:"Sinh viên được xét ngoại lệ"}).locator("option")).toHaveCount(2);
+    await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
+    await page.getByLabel("Căn cứ đối chiếu danh sách").fill("SYNTHETIC-E2E-APPROVAL");
     await page.getByRole("button",{name:"Chọn tất cả chờ xác nhận"}).click();
     await page.getByRole("button",{name:"Xác nhận đã đối chiếu"}).click();
     await expect(page.getByText(/Đã xác nhận 1 sinh viên/)).toBeVisible();
+    await page.getByText("Thu hồi kết quả đã xác nhận",{exact:false}).click();
+    await page.getByRole("searchbox",{name:"Tìm sinh viên cần thu hồi"}).fill(code);
+    await expect(page.getByRole("combobox",{name:"Sinh viên cần thu hồi"}).locator("option")).toHaveCount(2);
+    await page.getByRole("combobox",{name:"Sinh viên cần thu hồi"}).selectOption({label:`${code} · Sinh viên giả lập`});
+    await page.getByLabel("Văn bản nguồn thu hồi").fill("SYNTHETIC-E2E-REVOKE");
+    await page.getByLabel("Lý do",{exact:true}).fill("SYNTHETIC-E2E-REASON");
+    await page.getByRole("button",{name:"Thu hồi quyền tham gia"}).click();
+    await expect(page.getByText(/Đã thu hồi quyền tham gia/)).toBeVisible();
+    await page.getByRole("tab",{name:/Đính chính hồ sơ/}).click();
+    await page.getByRole("searchbox",{name:/Tìm sinh viên cần đính chính/}).fill(code);
+    await page.getByRole("combobox",{name:"Sinh viên cần đính chính"}).selectOption({label:`${code} · Sinh viên giả lập`});
+    await expect(page.getByRole("combobox",{name:"Sinh viên cần đính chính"})).toHaveValue(/.+/);
 
     const student = await browser.newContext();
     const studentPage = await student.newPage();

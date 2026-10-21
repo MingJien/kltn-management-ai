@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import or_, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from backend.api.auth import allowed_frontend_origins, router as auth_router
@@ -18,12 +18,14 @@ from backend.api.core import router as thesis_workspace_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
-    RegistrationCreate, RegistrationOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
+    RegistrationCreate, RegistrationOut, PendingRegistrationSummaryOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
     SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, StudentProposalCreate, LecturerOut, MyEligibilityOut,
+    NotificationSummaryOut,
 )
 from backend.db.models import entities as m
 from backend.services.registration import (
-    _is_department_head, cancel_registration, create_registration, finalize_registration,
+    _is_department_head, cancel_registration, create_registration,
+    withdraw_registration,
     get_registration, lecturer_decision, profile, registration_out, registrations_out,
     respond_to_registration, submit_registration,
     confirmed_student_ids,
@@ -55,6 +57,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-Preview-SHA256", "X-CSRF-Token"],
+    expose_headers=["X-Document-Code", "X-Exported-At", "X-Print-SHA256", "Content-Disposition"],
 )
 app.include_router(auth_router)
 app.include_router(account_router)
@@ -62,6 +65,22 @@ app.include_router(roster_router)
 app.include_router(assignment_router)
 app.include_router(account_admin_router)
 app.include_router(thesis_workspace_router)
+
+
+@app.get("/api/v1/notifications", response_model=NotificationSummaryOut)
+def notifications(user: m.UserAccount = Depends(current_user),
+                  session: Session = Depends(get_session)) -> NotificationSummaryOut:
+    from backend.services.notifications import list_notices
+
+    return list_notices(session, user.id)
+
+
+@app.post("/api/v1/notifications/{notification_id}/read", status_code=204)
+def read_notification(notification_id: UUID, user: m.UserAccount = Depends(current_user),
+                      session: Session = Depends(get_session)) -> None:
+    from backend.services.notifications import mark_notice_read
+
+    mark_notice_read(session, user.id, notification_id)
 
 
 @app.middleware("http")
@@ -124,12 +143,14 @@ def context(
         m.ResourceAssignment.state == "ACTIVE",
         m.ResourceAssignment.effective_from <= now,
         or_(m.ResourceAssignment.effective_to.is_(None), m.ResourceAssignment.effective_to > now),
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"]),
     )).all()
     if "ELIGIBILITY_IMPORTER" in assignment_types:
         actions.append("eligibility:import")
     if "ELIGIBILITY_VERIFIER" in assignment_types:
         actions.append("eligibility:confirm")
+    if "ACCOUNT_MANAGER" in assignment_types:
+        actions.append("account:manage")
     if lecturer and user.base_role == "LECTURER":
         actions.extend(["topic:create", "topic:submit"])
         if session.scalar(select(m.Topic.id).where(
@@ -138,7 +159,6 @@ def context(
             actions.append("registration:lecturer_decide")
         if _is_department_head(session, lecturer.id, lecturer.department_id):
             actions.append("topic:department_decide")
-            actions.append("registration:department_finalize")
     return ContextOut(
         user_id=user.id, base_role=user.base_role,
         student_id=student.id if student else None,
@@ -171,7 +191,7 @@ def topics(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     search: str | None = Query(default=None, max_length=200),
-    view: str = Query(default="all", pattern="^(all|mine|pending)$"),
+    view: str = Query(default="all", pattern="^(all|mine|pending|suggested)$"),
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> list[TopicOut]:
@@ -274,6 +294,31 @@ def registrations(
     return registrations_out(session, rows)
 
 
+@app.get("/api/v1/topic-registrations/pending-summary", response_model=PendingRegistrationSummaryOut)
+def pending_registration_summary(
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> PendingRegistrationSummaryOut:
+    if user.base_role != "LECTURER":
+        raise HTTPException(403, "Only lecturers can view pending registrations")
+    lecturer = profile(session, user, "LECTURER")
+    receiving = or_(
+        m.Topic.receiving_lecturer_id == lecturer.id,
+        (m.Topic.receiving_lecturer_id.is_(None)) & (m.Topic.proposer_type == "LECTURER")
+        & (m.Topic.proposer_user_id == user.id),
+    )
+    query = select(m.TopicRegistration).join(m.Topic, m.Topic.id == m.TopicRegistration.topic_id).where(
+        m.TopicRegistration.state == "SUBMITTED",
+        m.TopicRegistration.submitted_at.is_not(None),
+        m.Topic.state == "APPROVED",
+        receiving,
+    )
+    count = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = session.scalars(query.order_by(m.TopicRegistration.submitted_at.desc(),
+        m.TopicRegistration.id).limit(5)).all()
+    return PendingRegistrationSummaryOut(count=count, items=registrations_out(session, rows))
+
+
 @app.get("/api/v1/topic-registrations/{registration_id}", response_model=RegistrationOut)
 def registration(
     registration_id: UUID,
@@ -311,6 +356,15 @@ def registration_cancel(
     return cancel_registration(session, user, registration_id)
 
 
+@app.post("/api/v1/topic-registrations/{registration_id}/withdraw", response_model=RegistrationOut)
+def registration_withdraw(
+    registration_id: UUID,
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return withdraw_registration(session, user, registration_id)
+
+
 @app.post("/api/v1/topic-registrations/{registration_id}/lecturer-decision", response_model=RegistrationOut)
 def decide(
     registration_id: UUID,
@@ -320,16 +374,6 @@ def decide(
     session: Session = Depends(get_session),
 ) -> RegistrationOut:
     return lecturer_decision(session, user, registration_id, payload, if_match)
-
-
-@app.post("/api/v1/topic-registrations/{registration_id}/department-finalization", response_model=RegistrationOut)
-def finalize(
-    registration_id: UUID,
-    if_match: int = Header(alias="If-Match"),
-    user: m.UserAccount = Depends(current_user),
-    session: Session = Depends(get_session),
-) -> RegistrationOut:
-    return finalize_registration(session, user, registration_id, if_match)
 
 
 from functools import lru_cache

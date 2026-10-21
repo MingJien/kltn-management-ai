@@ -1,5 +1,5 @@
--- Schema-only export generated from Alembic revision 20261015_0001_official.
--- 32 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261021_0003.
+-- 33 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -440,6 +440,7 @@ CREATE TABLE progress_report (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	row_version INTEGER DEFAULT '1' NOT NULL,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	CONSTRAINT pk_progress_report PRIMARY KEY (id),
 	CONSTRAINT uq_progress_report_thesis_id_milestone_id_version_no UNIQUE (thesis_id, milestone_id, version_no),
 	CONSTRAINT ck_progress_report_version_positive CHECK (version_no > 0),
@@ -644,6 +645,26 @@ CREATE TABLE signature_confirmation (
 	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
+
+CREATE TABLE user_notification (
+        recipient_user_id UUID NOT NULL,
+        actor_user_id UUID NOT NULL,
+        registration_id UUID NOT NULL,
+        kind VARCHAR(32) NOT NULL,
+        read_at TIMESTAMP WITH TIME ZONE,
+        revoked_at TIMESTAMP WITH TIME ZONE,
+        id UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        CONSTRAINT pk_user_notification PRIMARY KEY (id),
+        CONSTRAINT ck_user_notification_kind CHECK (kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED')),
+        CONSTRAINT fk_user_notification_recipient_user_id_user_account FOREIGN KEY(recipient_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_user_notification_actor_user_id_user_account FOREIGN KEY(actor_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_user_notification_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT
+    );
+
+CREATE INDEX ix_user_notification_recipient_created
+        ON user_notification (recipient_user_id, created_at);
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

@@ -8,10 +8,13 @@ import PageHeader from "../components/layout/PageHeader";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import { roleLabel } from "../components/layout/roleLabel";
 
+type PendingSummary = {count: number; items: Registration[]};
+
 export default function WorkspacePage({context}: {context: Context}) {
   const [rounds, setRounds] = useState<OpenRound[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const head = context.actions.includes("topic:department_decide");
@@ -21,8 +24,13 @@ export default function WorkspacePage({context}: {context: Context}) {
     let alive = true;
     Promise.all([request<OpenRound[]>("/rounds/open", context.user_id),
       request<Topic[]>("/topics?limit=5&view=" + (head ? "pending" : context.base_role === "LECTURER" ? "mine" : "all"), context.user_id),
-      request<Registration[]>("/topic-registrations?limit=5", context.user_id)])
-      .then(([r,t,g]) => {if (alive) {setRounds(r); setTopics(t); setRegistrations(g);}})
+      context.base_role === "LECTURER"
+        ? request<PendingSummary>("/topic-registrations/pending-summary", context.user_id)
+        : request<Registration[]>("/topic-registrations?limit=5", context.user_id)])
+      .then(([r,t,g]) => {if (alive) {setRounds(r); setTopics(t);
+        if (Array.isArray(g)) setRegistrations(g);
+        else {setRegistrations(g.items); setPendingCount(g.count);}
+      }})
       .catch((cause) => {if (alive) setError(errorMessage(cause));})
       .finally(() => {if (alive) setLoading(false);});
     return () => {alive = false;};
@@ -55,11 +63,12 @@ export default function WorkspacePage({context}: {context: Context}) {
           <Link className="btn btn-secondary" to="/topics">Mở danh sách đề tài</Link>
         </div></section>
         <section className="card overview-card"><div className="card-body stack">
-          <h2><ClipboardList size={18} aria-hidden="true" /> Đăng ký gần đây</h2>
+          <h2><ClipboardList size={18} aria-hidden="true" /> {context.base_role === "LECTURER" ? <>Hồ sơ chờ xét <span className="overview-count">{pendingCount}</span></> : "Đăng ký gần đây"}</h2>
           {registrations.length ? <ul className="overview-list">{registrations.map((row) => <li key={row.id}>
-            <span><span className="topic-code">{row.topic_code}</span>{row.topic_title}</span><ThesisStatusBadge state={row.state} />
-          </li>)}</ul> : <p>Chưa có đăng ký trong phạm vi của bạn.</p>}
-          <Link className="btn btn-secondary" to="/registrations">Mở danh sách đăng ký</Link>
+            {context.base_role === "LECTURER" ? <Link to={`/registrations?focus=${row.id}`}><span className="topic-code">{row.topic_code}</span>{row.topic_title}</Link>
+              : <span><span className="topic-code">{row.topic_code}</span>{row.topic_title}</span>}<ThesisStatusBadge state={row.state} />
+          </li>)}</ul> : <p>{context.base_role === "LECTURER" ? "Không có hồ sơ nào đang chờ bạn xét." : "Chưa có đăng ký trong phạm vi của bạn."}</p>}
+          <Link className="btn btn-secondary" to="/registrations">{context.base_role === "LECTURER" ? "Mở hồ sơ chờ xét" : "Mở danh sách đăng ký"}</Link>
         </div></section>
       </div>
     </div>}

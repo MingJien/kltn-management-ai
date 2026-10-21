@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date, datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, select, update
+from pydantic import BaseModel, Field, StringConstraints, model_validator
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.account import _audit, _mail_link
+from backend.api.account import _audit, _mail_link, _student_can_activate
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
 from backend.services.passwords import unusable_password
 from backend.services.roster import EMAIL
+from backend.services.account_mail import mail_delivery_ready
 
 router = APIRouter(prefix="/api/v1/admin", tags=["account administration"])
+AccountReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
 
 
 class LecturerInvite(BaseModel):
@@ -31,13 +34,31 @@ class LecturerInvite(BaseModel):
 class RoundAssignment(BaseModel):
     round_id: UUID
     user_id: UUID
-    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER)$")
+    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR)$")
     basis_ref: str = Field(min_length=3, max_length=500)
 
 
 class AccountStatus(BaseModel):
     locked: bool
-    reason: str = Field(min_length=5, max_length=1000)
+    reason: AccountReason
+
+
+class AccountChangeReason(BaseModel):
+    reason: AccountReason
+
+
+class StudentEmailCorrection(BaseModel):
+    round_id: UUID
+    student_code: str = Field(min_length=1, max_length=32)
+    email: str = Field(min_length=3, max_length=255)
+    basis_ref: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    reason: AccountReason
+
+
+class StaffEmailCorrection(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    basis_ref: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    reason: AccountReason
 
 
 class AssignmentRevoke(BaseModel):
@@ -90,6 +111,34 @@ class RoundScheduleUpdate(BaseModel):
 def _admin(user: m.UserAccount) -> None:
     if user.base_role != "ADMIN":
         raise HTTPException(403, "Account administration requires ADMIN")
+
+
+def _managed_rounds(session: Session, user: m.UserAccount) -> list[UUID]:
+    instant = datetime.now(timezone.utc)
+    return list(session.scalars(select(m.ResourceAssignment.round_id).where(
+        m.ResourceAssignment.user_id == user.id,
+        m.ResourceAssignment.assignment_type == "ACCOUNT_MANAGER",
+        m.ResourceAssignment.round_id.is_not(None),
+        m.ResourceAssignment.state == "ACTIVE",
+        m.ResourceAssignment.effective_from <= instant,
+        (m.ResourceAssignment.effective_to.is_(None) | (m.ResourceAssignment.effective_to > instant)),
+    )).all())
+
+
+def _manageable_student(session: Session, actor: m.UserAccount, target: m.UserAccount,
+                        round_id: UUID | None = None) -> m.StudentProfile | None:
+    if actor.base_role == "ADMIN":
+        return session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == target.id))
+    rounds = _managed_rounds(session, actor)
+    if target.base_role != "STUDENT" or not rounds or (round_id is not None and round_id not in rounds):
+        raise HTTPException(403, "Account management is limited to assigned rounds")
+    profile = session.scalar(select(m.StudentProfile).join(m.EligibilitySnapshot,
+        m.EligibilitySnapshot.student_id == m.StudentProfile.id).where(
+        m.StudentProfile.user_id == target.id,
+        m.EligibilitySnapshot.round_id.in_([round_id] if round_id else rounds)).limit(1))
+    if profile is None:
+        raise HTTPException(403, "Student is outside assigned rounds")
+    return profile
 
 
 @router.get("/departments")
@@ -235,17 +284,33 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
 
 
 @router.get("/users")
-def users(search: str = "", user: m.UserAccount = Depends(current_user),
+def users(search: str = "", offset: int = 0, limit: int = 100,
+          user: m.UserAccount = Depends(current_user),
           session: Session = Depends(get_session)) -> list[dict]:
-    _admin(user)
+    rounds = _managed_rounds(session, user) if user.base_role != "ADMIN" else []
+    if user.base_role != "ADMIN" and not rounds:
+        raise HTTPException(403, "Account management assignment required")
     if len(search) > 100:
         raise HTTPException(422, "Search is too long")
-    query = select(m.UserAccount).order_by(m.UserAccount.created_at.desc()).limit(100)
+    if not 0 <= offset <= 100_000 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Invalid paging range")
+    query = select(m.UserAccount).order_by(m.UserAccount.created_at.desc()).offset(offset).limit(limit)
+    if user.base_role != "ADMIN":
+        query = query.where(m.UserAccount.id.in_(select(m.StudentProfile.user_id)
+            .join(m.EligibilitySnapshot, m.EligibilitySnapshot.student_id == m.StudentProfile.id)
+            .where(m.EligibilitySnapshot.round_id.in_(rounds))))
     if search.strip():
-        query = query.where(func.lower(m.UserAccount.email).contains(search.strip().lower()))
-    return [{"id": str(row.id), "email": row.email, "base_role": row.base_role,
-             "status": row.status, "verified": row.email_verified_at is not None}
-            for row in session.scalars(query).all()]
+        term = search.strip().lower()
+        query = query.where(or_(func.lower(m.UserAccount.email).contains(term),
+            m.UserAccount.id.in_(select(m.StudentProfile.user_id).where(
+                func.lower(m.StudentProfile.student_code).contains(term)))))
+    result = []
+    for row in session.scalars(query).all():
+        student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == row.id)) if row.base_role == "STUDENT" else None
+        result.append({"id": str(row.id), "email": row.email, "base_role": row.base_role,
+            "status": row.status, "verified": row.email_verified_at is not None,
+            "student_code": student.student_code if student else None})
+    return result
 
 
 @router.post("/lecturers", status_code=201)
@@ -294,6 +359,8 @@ def grant_round_assignment(payload: RoundAssignment,
     round_ = session.get(m.ThesisRound, payload.round_id)
     if not target or target.status != "ACTIVE" or target.base_role not in {"ADMIN", "LECTURER"}:
         raise HTTPException(422, "An active staff account is required")
+    if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR"} and target.base_role != "LECTURER":
+        raise HTTPException(422, "Round account/progress coordination must be assigned to a lecturer")
     if not round_ or round_.state not in {"DRAFT", "OPEN"}:
         raise HTTPException(422, "Round is unavailable")
     existing = session.scalar(select(m.ResourceAssignment.id).where(
@@ -327,7 +394,7 @@ def round_assignments(user: m.UserAccount = Depends(current_user),
     rows = session.execute(select(
         m.ResourceAssignment.id, m.ResourceAssignment.round_id,
         m.ResourceAssignment.user_id, m.ResourceAssignment.assignment_type).where(
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE").order_by(m.ResourceAssignment.effective_from.desc()).limit(200)).all()
     return [{"id": str(row.id), "round_id": str(row.round_id),
@@ -346,7 +413,7 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
         m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.id == assignment_id).with_for_update()).one_or_none()
     if not assignment or assignment.state != "ACTIVE" or assignment.assignment_type not in {
-            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"}:
+            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"}:
         raise HTTPException(404, "Active assignment not found")
     session.execute(update(m.ResourceAssignment).where(
         m.ResourceAssignment.id == assignment_id).values(
@@ -363,12 +430,12 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
 def lock_account(user_id: UUID, payload: AccountStatus,
                  user: m.UserAccount = Depends(current_user),
                  session: Session = Depends(get_session)) -> None:
-    _admin(user)
     if user_id == user.id:
         raise HTTPException(409, "An administrator cannot change their own lock state")
     target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
     if target is None:
         raise HTTPException(404, "Account not found")
+    _manageable_student(session, user, target)
     desired = "LOCKED" if payload.locked else ("ACTIVE" if target.email_verified_at else "DISABLED")
     if target.status == desired:
         return
@@ -380,3 +447,159 @@ def lock_account(user_id: UUID, payload: AccountStatus,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
         correlation_id=uuid4()))
     session.commit()
+
+
+@router.post("/users/{user_id}/disable", status_code=204)
+def disable_account(user_id: UUID, payload: AccountChangeReason,
+                    user: m.UserAccount = Depends(current_user),
+                    session: Session = Depends(get_session)) -> None:
+    if user_id == user.id:
+        raise HTTPException(409, "Cannot disable your own account")
+    target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
+    if target is None:
+        raise HTTPException(404, "Account not found")
+    _manageable_student(session, user, target)
+    if target.status == "DISABLED":
+        raise HTTPException(409, "Account is already disabled")
+    target.status = "DISABLED"
+    target.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_DISABLED",
+        resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    session.commit()
+
+
+@router.post("/users/{user_id}/restore", status_code=204)
+def restore_account(user_id: UUID, payload: AccountChangeReason,
+                    user: m.UserAccount = Depends(current_user),
+                    session: Session = Depends(get_session)) -> None:
+    if user_id == user.id:
+        raise HTTPException(409, "Cannot restore your own account")
+    target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
+    if target is None:
+        raise HTTPException(404, "Account not found")
+    _manageable_student(session, user, target)
+    if target.status != "DISABLED" or target.email_verified_at is None:
+        raise HTTPException(409, "Only previously verified disabled accounts can be restored")
+    target.status = "ACTIVE"
+    target.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_RESTORED",
+        resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    session.commit()
+
+
+@router.post("/users/{user_id}/reissue-link")
+def reissue_link(user_id: UUID, payload: AccountChangeReason,
+                 user: m.UserAccount = Depends(current_user),
+                 session: Session = Depends(get_session)) -> dict:
+    target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
+    if target is None:
+        raise HTTPException(404, "Account not found")
+    _manageable_student(session, user, target)
+    if target.status == "LOCKED" or (target.status == "DISABLED" and target.email_verified_at):
+        raise HTTPException(409, "Unlock or restore the account before issuing a link")
+    student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == target.id)) if target.base_role == "STUDENT" else None
+    if student and not _student_can_activate(session, student):
+        raise HTTPException(409, "Student participation is not confirmed")
+    if not mail_delivery_ready():
+        raise HTTPException(503, "Email delivery is unavailable")
+    target.row_version += 1  # Invalidate earlier links and sessions before issuing a new link.
+    purpose = "activate" if target.status == "DISABLED" else "reset"
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_LINK_REISSUED",
+        resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    session.commit()
+    try:
+        _mail_link(target, purpose)
+        delivered = True
+    except Exception:
+        delivered = False
+    return {"link_sent": delivered, "purpose": purpose}
+
+
+def _replace_email(session: Session, actor: m.UserAccount, target: m.UserAccount,
+                   email: str, basis_ref: str, reason: str) -> None:
+    """Keep the UUID and history; make every old link and password unusable."""
+    previous = target.email
+    target.email = email
+    target.email_verified_at = None
+    target.password_hash = unusable_password()
+    if target.status != "LOCKED":
+        target.status = "DISABLED"
+    target.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=actor.id, action="ACCOUNT_EMAIL_CORRECTED",
+        resource_type="user_account", resource_id=target.id,
+        before_hash=hashlib.sha256((previous or "").encode()).hexdigest(),
+        after_hash=hashlib.sha256(email.encode()).hexdigest(),
+        reason=f"{reason.strip()}; reference={basis_ref.strip()}",
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(409, "Email was assigned concurrently") from exc
+
+
+@router.patch("/users/{user_id}/email")
+def correct_student_email(user_id: UUID, payload: StudentEmailCorrection,
+                          user: m.UserAccount = Depends(current_user),
+                          session: Session = Depends(get_session)) -> dict:
+    target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
+    if target is None or target.base_role != "STUDENT":
+        raise HTTPException(404, "Student account not found")
+    student = _manageable_student(session, user, target, payload.round_id)
+    if student is None or student.student_code != payload.student_code.strip():
+        raise HTTPException(409, "Student code does not match the official roster entry")
+    if session.scalar(select(m.EligibilitySnapshot.id).where(m.EligibilitySnapshot.student_id == student.id,
+            m.EligibilitySnapshot.round_id == payload.round_id).limit(1)) is None:
+        raise HTTPException(409, "Student is not in the specified round")
+    email = payload.email.strip().lower()
+    if not EMAIL.fullmatch(email) or len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5:
+        raise HTTPException(422, "Valid email, official reference and reason are required")
+    if target.email == email:
+        raise HTTPException(409, "Email is unchanged")
+    if session.scalar(select(m.UserAccount.id).where(func.lower(m.UserAccount.email) == email,
+            m.UserAccount.id != target.id).limit(1)):
+        raise HTTPException(409, "Email is assigned to another account")
+    _replace_email(session, user, target, email, payload.basis_ref, payload.reason)
+    delivered = False
+    if target.status == "DISABLED" and _student_can_activate(session, student) and mail_delivery_ready():
+        try:
+            _mail_link(target, "activate")
+            delivered = True
+        except Exception:
+            pass
+    return {"user_id": str(target.id), "activation_required": True, "activation_sent": delivered}
+
+
+@router.patch("/users/{user_id}/contact-email")
+def correct_staff_email(user_id: UUID, payload: StaffEmailCorrection,
+                        user: m.UserAccount = Depends(current_user),
+                        session: Session = Depends(get_session)) -> dict:
+    """ADMIN corrects a lecturer/administrator email after checking the Faculty reference."""
+    _admin(user)
+    if user_id == user.id:
+        raise HTTPException(409, "Another administrator must correct your own email")
+    target = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
+    if target is None:
+        raise HTTPException(404, "Account not found")
+    if target.base_role == "STUDENT":
+        raise HTTPException(409, "Student email correction uses the official roster check")
+    email = payload.email.strip().lower()
+    if not EMAIL.fullmatch(email) or len(payload.reason.strip()) < 5:
+        raise HTTPException(422, "Valid email, official reference and reason are required")
+    if target.email == email:
+        raise HTTPException(409, "Email is unchanged")
+    if session.scalar(select(m.UserAccount.id).where(func.lower(m.UserAccount.email) == email,
+            m.UserAccount.id != target.id).limit(1)):
+        raise HTTPException(409, "Email is assigned to another account")
+    _replace_email(session, user, target, email, payload.basis_ref, payload.reason)
+    delivered = False
+    if target.status == "DISABLED" and mail_delivery_ready():
+        try:
+            _mail_link(target, "activate")
+            delivered = True
+        except Exception:
+            pass
+    return {"user_id": str(target.id), "activation_required": True, "activation_sent": delivered}

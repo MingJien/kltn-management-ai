@@ -42,8 +42,8 @@ def main() -> None:
         with engine.connect() as conn:
             actual_database = conn.execute(text("SELECT current_database()")).scalar_one()
             revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        if actual_database != "kltn_management" or revision != "20261015_0001_official":
-            parser.error("Bootstrap requires kltn_management at revision 20261015_0001_official")
+        if actual_database != "kltn_management" or revision != "20261020_0002":
+            parser.error("Bootstrap requires kltn_management at revision 20261020_0002")
         print(f"Target database: {actual_database}; Alembic revision: {revision}")
         if not args.execute:
             print("Ready: pass --execute to invite the first administrator")

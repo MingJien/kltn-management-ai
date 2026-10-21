@@ -7,20 +7,17 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.account import _mail_link, _student_can_activate
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
-from backend.services.account_mail import mail_delivery_ready
 from backend.services.roster import (
-    CODE, EMAIL, MAX_BYTES, assigned, import_roster, parse_roster, require_assignment, validate_rows,
+    CODE, MAX_BYTES, assigned, import_roster, parse_roster, require_assignment, validate_rows,
 )
-from backend.services.passwords import unusable_password
 
 router = APIRouter(prefix="/api/v1/rounds/{round_id}/roster", tags=["eligibility roster"])
 assignment_router = APIRouter(prefix="/api/v1/me", tags=["eligibility roster"])
@@ -33,7 +30,7 @@ def my_round_assignments(user: m.UserAccount = Depends(current_user),
     rows = session.execute(select(
         m.ResourceAssignment.round_id, m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.user_id == user.id,
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE",
         m.ResourceAssignment.effective_from <= now,
@@ -64,7 +61,6 @@ class SpecialDecision(BaseModel):
 class CorrectStudent(BaseModel):
     student_code: str = Field(min_length=1, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
-    email: str = Field(min_length=3, max_length=255)
     class_name: str = Field(min_length=1, max_length=100)
     major_code: str = Field(min_length=1, max_length=32)
     basis_ref: str = Field(min_length=3, max_length=500)
@@ -131,6 +127,7 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
             "student_code": student.student_code, "display_name": student.display_name,
             "class_name": student.class_name, "major_code": student.major_code,
             "email": account.email, "account_status": account.status,
+            "account_activated": account.email_verified_at is not None,
             "state": snapshot.state, "version": snapshot.version,
             "evidence_ref": snapshot.evidence_ref,
             "confirmed_at": snapshot.confirmed_at.isoformat() if snapshot.confirmed_at else None})
@@ -232,16 +229,14 @@ def revoke_eligibility(round_id: UUID, payload: RevokeStudent,
 
 @router.patch("/{student_id}")
 def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
-                    tasks: BackgroundTasks,
                     user: m.UserAccount = Depends(current_user),
                     session: Session = Depends(get_session)) -> dict:
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
     code = payload.student_code.strip()
     name = payload.display_name.strip()
-    email = payload.email.strip().lower()
     class_name = payload.class_name.strip()
     major_code = payload.major_code.strip()
-    if (not CODE.fullmatch(code) or not EMAIL.fullmatch(email) or not name
+    if (not CODE.fullmatch(code) or not name
             or not class_name or not CODE.fullmatch(major_code)
             or len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5):
         raise HTTPException(422, "Invalid correction or missing document reference/reason")
@@ -252,34 +247,25 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
         raise HTTPException(404, "Student is not in this round")
     student = session.scalar(select(m.StudentProfile).where(
         m.StudentProfile.id == student_id).with_for_update())
-    account = session.scalar(select(m.UserAccount).where(
-        m.UserAccount.id == student.user_id).with_for_update())
     department = session.get(m.Department, student.department_id)
+    if (code == student.student_code and name == student.display_name
+            and class_name == student.class_name and major_code == student.major_code):
+        raise HTTPException(422, "No student information has changed")
     if department.major_code and department.major_code != major_code:
         raise HTTPException(422, "Major does not match the department; review assignment separately")
     duplicate_code = session.scalar(select(m.StudentProfile.id).where(
         m.StudentProfile.student_code == code, m.StudentProfile.id != student.id))
-    duplicate_email = session.scalar(select(m.UserAccount.id).where(
-        func.lower(m.UserAccount.email) == email, m.UserAccount.id != account.id))
-    if duplicate_code or duplicate_email:
-        raise HTTPException(409, "Student code or email is already assigned")
+    if duplicate_code:
+        raise HTTPException(409, "Student code is already assigned")
     def fingerprint() -> str:
         fields = {"code": student.student_code, "name": student.display_name,
-                  "class": student.class_name, "major": student.major_code, "email": account.email}
+                  "class": student.class_name, "major": student.major_code}
         return hashlib.sha256(json.dumps(fields, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     before = fingerprint()
-    email_changed = account.email != email
     student.student_code = code
     student.display_name = name
     student.class_name = class_name
     student.major_code = major_code
-    if email_changed:
-        account.email = email
-        account.email_verified_at = None
-        account.password_hash = unusable_password()
-        if account.status == "ACTIVE":
-            account.status = "DISABLED"
-        account.row_version += 1
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROSTER_IDENTITY_CORRECTED",
         resource_type="student_profile", resource_id=student.id,
         before_hash=before, after_hash=fingerprint(),
@@ -290,9 +276,4 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(409, "Identity changed concurrently; reload and retry") from exc
-    activation_sent = bool(email_changed and account.status == "DISABLED"
-                           and _student_can_activate(session, student) and mail_delivery_ready())
-    if activation_sent:
-        tasks.add_task(_mail_link, account, "activate")
-    return {"student_id": str(student.id), "activation_required": email_changed,
-            "activation_sent": activation_sent}
+    return {"student_id": str(student.id)}

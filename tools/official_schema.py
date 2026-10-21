@@ -15,7 +15,7 @@ SELECTED_TABLES = frozenset(
         "registration_member", "resource_assignment", "reviewer_assignment",
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
-        "topic_requirement", "topic_title_version", "user_account",
+        "topic_requirement", "topic_title_version", "user_account", "user_notification",
     }
 )
 
@@ -82,4 +82,5 @@ TABLE_INFO = {
     "topic_requirement": ("Yêu cầu mong muốn của đề tài", "Thông tin để GV xét phù hợp, không thay điều kiện chính thức"),
     "topic_title_version": ("Lịch sử tên đề tài", "Tên ổn định theo phiên bản và audit"),
     "user_account": ("Tài khoản người dùng", "Đăng nhập, khóa tài khoản và vai trò nền"),
+    "user_notification": ("Thông báo người dùng", "Thông báo đề xuất và đăng ký theo người nhận"),
 }

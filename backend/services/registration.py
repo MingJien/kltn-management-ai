@@ -85,6 +85,13 @@ def may_upload_evidence(reg: m.TopicRegistration, member: m.RegistrationMember) 
         and member.responded_at > reg.submitted_at))
 
 
+def may_withdraw(reg: m.TopicRegistration, member: m.RegistrationMember,
+                 last_acceptance: datetime | None) -> bool:
+    return (member.active and reg.state in {"DRAFT", "RETURNED", "SUBMITTED"}
+            and (last_acceptance is None or
+                 (member.responded_at is not None and member.responded_at > last_acceptance)))
+
+
 def registrations_out(session: Session, registrations: list[m.TopicRegistration]) -> list[RegistrationOut]:
     if not registrations:
         return []
@@ -108,6 +115,11 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
         m.LecturerProfile.id.in_([t.receiving_lecturer_id for t in topics.values() if t.receiving_lecturer_id]))).all()}
     files = {f.id: f for f in session.scalars(select(m.StoredFile).where(
         m.StoredFile.id.in_([mem.evidence_file_id for mem in members if mem.evidence_file_id]))).all()}
+    acceptance_times = dict(session.execute(select(m.AuditEvent.resource_id, func.max(m.AuditEvent.occurred_at)).where(
+        m.AuditEvent.resource_type == "topic_registration",
+        m.AuditEvent.action == "REGISTRATION_ACCEPT",
+        m.AuditEvent.resource_id.in_(ids),
+    ).group_by(m.AuditEvent.resource_id)).all())
     result = []
     for reg in registrations:
         topic = topics[reg.topic_id]
@@ -127,6 +139,7 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
             consent_status=item.consent_status,
             evidence_file_name=files[item.evidence_file_id].original_name if item.evidence_file_id else None,
             can_upload_evidence=may_upload_evidence(reg, item),
+            can_withdraw=may_withdraw(reg, item, acceptance_times.get(reg.id)),
         ) for item in reg_members],
         lecturer_decided_at=reg.lecturer_decided_at,
         thesis_id=thesis.id if thesis else None,
@@ -171,7 +184,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         if len(active_regs) > 1:
             fail(409, "This topic has legacy competing groups; department review is required")
         reg = active_regs[0] if active_regs else None
-        if reg and reg.state == "FINALIZED":
+        if reg and reg.state in {"LECTURER_ACCEPTED", "FINALIZED"}:
             fail(409, "Group membership is locked after submission")
         if reg and topic.proposer_type == "STUDENT" and topic.state != "APPROVED":
             fail(409, "Student proposals start with one student; others join after department approval")
@@ -196,6 +209,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         if existing is not None:
             fail(409, "A member already has an active registration in this round")
         first_member = reg is None
+        notify_join = bool(reg and reg.state == "SUBMITTED" and topic.state == "APPROVED")
         before = _registration_hash(session, reg) if reg else None
         previous_decision = None
         if first_member:
@@ -208,7 +222,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         else:
             reg.row_version += 1
             reg.expected_member_count = expected
-            if reg.state in {"SUBMITTED", "LECTURER_ACCEPTED"}:
+            if reg.state == "SUBMITTED":
                 if reg.lecturer_decided_at:
                     previous_decision = f"Previous {reg.state}; lecturer {reg.lecturer_decided_by}; at {reg.lecturer_decided_at}; reason: {reg.lecturer_reason or '-'}"
                 reg.state = "SUBMITTED"
@@ -216,12 +230,36 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
                 reg.lecturer_decided_at = None
                 reg.lecturer_reason = None
         for member_id in members:
-            session.add(m.RegistrationMember(
-                id=uuid4(), registration_id=reg.id, round_id=topic.round_id,
-                student_id=member_id, is_coordinator=first_member, active=True,
-                consent_status="ACCEPTED", responded_by_user_id=user.id, responded_at=now,
-            ))
+            previous_member = session.scalar(select(m.RegistrationMember).where(
+                m.RegistrationMember.registration_id == reg.id,
+                m.RegistrationMember.student_id == member_id,
+                m.RegistrationMember.active.is_(False),
+            ).with_for_update()) if not first_member else None
+            if previous_member:
+                previous_member.active = True
+                previous_member.consent_status = "ACCEPTED"
+                previous_member.responded_by_user_id = user.id
+                previous_member.responded_at = now
+                if previous_member.evidence_file_id:
+                    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id,
+                        action="REGISTRATION_EVIDENCE_LINK_CLEARED", resource_type="registration",
+                        resource_id=reg.id,
+                        reason=f"previous_stored_file={previous_member.evidence_file_id}; member={member_id}",
+                        occurred_at=now, correlation_id=uuid4()))
+                previous_member.evidence_file_id = None
+            else:
+                session.add(m.RegistrationMember(
+                    id=uuid4(), registration_id=reg.id, round_id=topic.round_id,
+                    student_id=member_id, is_coordinator=first_member, active=True,
+                    consent_status="ACCEPTED", responded_by_user_id=user.id, responded_at=now,
+                ))
         session.flush()
+        if notify_join:
+            from backend.services.notifications import add_notice
+
+            add_notice(session, topic=topic,
+                       actor_user_id=user.id, registration_id=reg.id,
+                       kind="REGISTRATION_JOINED")
         _registration_audit(session, reg, user,
             "REGISTRATION_CREATED" if first_member else "REGISTRATION_MEMBER_JOINED", before, previous_decision)
         result = registration_out(session, reg)
@@ -317,6 +355,18 @@ def submit_registration(session: Session, user: m.UserAccount, registration_id: 
         reg.submitted_at = now
         reg.row_version += 1
         session.flush()
+        from backend.services.notifications import add_notice
+
+        if student_proposal:
+            add_notice(session, topic=topic,
+                       actor_user_id=user.id, registration_id=reg.id,
+                       kind="PROPOSAL_SUBMITTED")
+        else:
+            for member in members:
+                member_user = session.get(m.StudentProfile, member.student_id).user_id
+                add_notice(session, topic=topic,
+                           actor_user_id=member_user, registration_id=reg.id,
+                           kind="REGISTRATION_SUBMITTED")
         _registration_audit(session, reg, user, "REGISTRATION_SUBMITTED", before)
         result = registration_out(session, reg)
         session.commit()
@@ -352,6 +402,61 @@ def cancel_registration(session: Session, user: m.UserAccount, registration_id: 
             member.active = False
         session.flush()
         _registration_audit(session, reg, user, "REGISTRATION_CANCELLED", before)
+        result = registration_out(session, reg)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+
+
+def withdraw_registration(session: Session, user: m.UserAccount, registration_id: UUID) -> RegistrationOut:
+    """A student may release only their own place before lecturer acceptance."""
+    if user.base_role != "STUDENT":
+        fail(403, "Only a student can withdraw their own registration")
+    student = profile(session, user, "STUDENT")
+    try:
+        reg = _registration(session, registration_id, lock=True)
+        if reg.state not in {"DRAFT", "RETURNED", "SUBMITTED"}:
+            fail(409, "Withdrawal is closed after the lecturer's decision")
+        members = session.scalars(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.active.is_(True),
+        ).order_by(m.RegistrationMember.created_at, m.RegistrationMember.id).with_for_update()).all()
+        member = next((item for item in members if item.student_id == student.id), None)
+        if member is None:
+            fail(404, "Active registration membership not found")
+        last_acceptance = session.scalar(select(func.max(m.AuditEvent.occurred_at)).where(
+            m.AuditEvent.resource_type == "topic_registration",
+            m.AuditEvent.action == "REGISTRATION_ACCEPT",
+            m.AuditEvent.resource_id == reg.id,
+        ))
+        if not may_withdraw(reg, member, last_acceptance):
+            fail(409, "This student's registration was already accepted by the lecturer")
+        before = _registration_hash(session, reg)
+        member.active = False
+        from backend.services.notifications import revoke_actor_notices
+
+        revoke_actor_notices(session, registration_id=reg.id,
+                             actor_user_id=user.id, now=datetime.now(timezone.utc))
+        remaining = [item for item in members if item.id != member.id]
+        if not remaining:
+            reg.state = "CANCELLED"
+            topic = session.get(m.Topic, reg.topic_id)
+            if topic.proposer_type == "STUDENT" and topic.proposer_user_id == user.id and topic.state in {"SUBMITTED", "RETURNED"}:
+                from backend.services.topics import _audit, _fingerprint
+                topic_before = _fingerprint(topic, session)
+                topic.state = "DRAFT"
+                topic.row_version += 1
+                _audit(session, topic, user.id, "TOPIC_PROPOSAL_WITHDRAWN", topic_before)
+        elif member.is_coordinator:
+            member.is_coordinator = False
+            session.flush()  # Release the partial unique coordinator slot first.
+            remaining[0].is_coordinator = True
+        reg.row_version += 1
+        session.flush()
+        _registration_audit(session, reg, user, "REGISTRATION_MEMBER_WITHDREW", before,
+                            f"Student {student.id} withdrew before lecturer decision")
         result = registration_out(session, reg)
         session.commit()
         return result
@@ -418,6 +523,8 @@ def lecturer_decision(
         row_version(expected_version, reg.row_version)
         if reg.state != "SUBMITTED" or topic.state != "APPROVED":
             fail(409, "Department topic approval is required before the lecturer decision")
+        members = []
+        thesis = None
         if data.decision == "ACCEPT":
             members = session.scalars(select(m.RegistrationMember).where(
                 m.RegistrationMember.registration_id == reg.id, m.RegistrationMember.active.is_(True))).all()
@@ -430,12 +537,35 @@ def lecturer_decision(
             ).limit(1))
             if other is not None:
                 fail(409, "Another group has already been accepted for this topic")
+            lecturer_account = session.get(m.UserAccount, lecturer.user_id)
+            if lecturer.department_id != topic.department_id or lecturer_account is None or lecturer_account.status != "ACTIVE":
+                fail(409, "Receiving lecturer is no longer active in this department")
         if data.decision == "REJECT" and not (data.reason and data.reason.strip()):
             fail(422, "A rejection requires a reason")
         before = _registration_hash(session, reg)
-        reg.state = "LECTURER_ACCEPTED" if data.decision == "ACCEPT" else "LECTURER_REJECTED"
+        now = datetime.now(timezone.utc)
+        if data.decision == "ACCEPT":
+            thesis = m.Thesis(
+                id=uuid4(), round_id=reg.round_id, topic_id=topic.id, registration_id=reg.id,
+                department_id=topic.department_id, current_title=topic.current_title, state="ACTIVE",
+            )
+            session.add(thesis)
+            session.flush()
+            for member in members:
+                session.add(m.ThesisMember(
+                    id=uuid4(), thesis_id=thesis.id, student_id=member.student_id,
+                    is_coordinator=member.is_coordinator, active=True, joined_at=now,
+                ))
+            session.add(m.AdvisorAssignment(
+                id=uuid4(), thesis_id=thesis.id, lecturer_id=lecturer.id,
+                assignment_type="PRIMARY", assigned_by=user.id, effective_from=now, state="ACTIVE",
+            ))
+            reg.state = "FINALIZED"
+            topic.state = "LOCKED"
+        else:
+            reg.state = "LECTURER_REJECTED"
         reg.lecturer_decided_by = lecturer.id
-        reg.lecturer_decided_at = datetime.now(timezone.utc)
+        reg.lecturer_decided_at = now
         reg.lecturer_reason = data.reason
         reg.row_version += 1
         if data.decision == "REJECT":
@@ -445,9 +575,19 @@ def lecturer_decision(
                 member.active = False
         session.flush()
         _registration_audit(session, reg, user, "REGISTRATION_" + data.decision, before, data.reason)
+        if thesis is not None:
+            session.add(m.AuditEvent(
+                id=uuid4(), actor_id=user.id, action="THESIS_CREATED_FROM_REGISTRATION_ACCEPTANCE",
+                resource_type="thesis", resource_id=thesis.id,
+                reason=f"registration={reg.id}; primary_advisor={lecturer.lecturer_code}",
+                occurred_at=now, correlation_id=uuid4(),
+            ))
         result = registration_out(session, reg)
         session.commit()
         return result
+    except IntegrityError:
+        session.rollback()
+        fail(409, "Topic or registration was accepted concurrently; reload the registration")
     except Exception:
         session.rollback()
         raise
@@ -467,68 +607,3 @@ def _is_department_head(session: Session, lecturer_id: UUID, department_id: UUID
             m.OrganizationalPosition.code == "DEPARTMENT_HEAD",
         ).limit(1)
     ) is not None
-
-
-def finalize_registration(
-    session: Session, user: m.UserAccount, registration_id: UUID, expected_version: int,
-) -> RegistrationOut:
-    if user.base_role != "LECTURER":
-        fail(403, "Department head assignment required")
-    try:
-        reg = _registration(session, registration_id, lock=True)
-        topic = session.scalar(select(m.Topic).where(m.Topic.id == reg.topic_id).with_for_update())
-        head = profile(session, user, "LECTURER")
-        if not _is_department_head(session, head.id, topic.department_id):
-            fail(403, "Department head assignment is not active for this department")
-        if reg.state == "FINALIZED":
-            result = registration_out(session, reg)
-            session.rollback()
-            return result
-        row_version(expected_version, reg.row_version)
-        if reg.state != "LECTURER_ACCEPTED":
-            fail(409, "Lecturer acceptance is required")
-        proposer = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == topic.proposer_user_id))
-        if proposer is None:
-            fail(409, "Proposing lecturer profile is unavailable")
-        lecturer_account = session.get(m.UserAccount, proposer.user_id)
-        if proposer.department_id != topic.department_id or lecturer_account is None or lecturer_account.status != "ACTIVE":
-            fail(409, "Receiving lecturer is no longer active in this department")
-        members = session.scalars(select(m.RegistrationMember).where(
-            m.RegistrationMember.registration_id == reg.id,
-            m.RegistrationMember.active.is_(True),
-        )).all()
-        if not valid_group(session, topic, members):
-            fail(409, "Group membership or eligibility has changed; review before finalization")
-        before = _registration_hash(session, reg)
-        now = datetime.now(timezone.utc)
-        thesis = m.Thesis(
-            id=uuid4(), round_id=reg.round_id, topic_id=topic.id, registration_id=reg.id,
-            department_id=topic.department_id, current_title=topic.current_title, state="ACTIVE",
-        )
-        session.add(thesis)
-        session.flush()
-        for member in members:
-            session.add(m.ThesisMember(
-                id=uuid4(), thesis_id=thesis.id, student_id=member.student_id,
-                is_coordinator=member.is_coordinator, active=True, joined_at=now,
-            ))
-        session.add(m.AdvisorAssignment(
-            id=uuid4(), thesis_id=thesis.id, lecturer_id=proposer.id,
-            assignment_type="PRIMARY", assigned_by=user.id, effective_from=now, state="ACTIVE",
-        ))
-        reg.state = "FINALIZED"
-        topic.state = "LOCKED"
-        reg.department_finalized_by = user.id
-        reg.department_finalized_at = now
-        reg.row_version += 1
-        session.flush()
-        _registration_audit(session, reg, user, "REGISTRATION_FINALIZED", before)
-        result = registration_out(session, reg)
-        session.commit()
-        return result
-    except IntegrityError:
-        session.rollback()
-        fail(409, "Topic or registration was finalized concurrently")
-    except Exception:
-        session.rollback()
-        raise

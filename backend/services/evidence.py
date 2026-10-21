@@ -71,11 +71,21 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
             media_type=mime, byte_size=size, sha256=hashlib.sha256(content).hexdigest(), scan_state="QUARANTINED")
         session.add(file)
         session.flush()
+        previous_file_id = member.evidence_file_id
+        previous_file = session.get(m.StoredFile, previous_file_id) if previous_file_id else None
         member.evidence_file_id = file.id
         reg.row_version += 1
         session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="REGISTRATION_EVIDENCE_UPLOADED",
             resource_type="registration", resource_id=reg.id, after_hash=file.sha256,
             occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+        if previous_file:
+            # Replacing a link never deletes the old file or its metadata; the audit
+            # row keeps which stored file the member previously pointed at.
+            session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="REGISTRATION_EVIDENCE_REPLACED",
+                resource_type="registration", resource_id=reg.id,
+                reason=f"previous_stored_file={previous_file.id}; current_stored_file={file.id}",
+                before_hash=previous_file.sha256, after_hash=file.sha256,
+                occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
         session.flush()
         result = registration_out(session, reg)
         session.commit()
@@ -83,17 +93,32 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
     except Exception:
         session.rollback()
         if written_path and written_path.is_file():
-            written_path.unlink()
+            try:
+                written_path.unlink()
+            except OSError:
+                pass  # The integrity check reports the orphan instead of hiding the original error.
         raise
 
 
 def download_evidence(session: Session, user: m.UserAccount, registration_id: UUID, student_id: UUID):
     get_registration(session, user, registration_id)  # Authorize group/receiver/head before accessing file.
+    if user.base_role == "STUDENT":
+        student = profile(session, user, "STUDENT")
+        active_membership = session.scalar(select(m.RegistrationMember.id).where(
+            m.RegistrationMember.registration_id == registration_id,
+            m.RegistrationMember.student_id == student.id,
+            m.RegistrationMember.active.is_(True),
+        ))
+        if not active_membership and student_id != student.id:
+            raise HTTPException(404, "Evidence unavailable")
     member = session.scalar(select(m.RegistrationMember).where(m.RegistrationMember.registration_id == registration_id,
         m.RegistrationMember.student_id == student_id))
     file = session.get(m.StoredFile, member.evidence_file_id) if member and member.evidence_file_id else None
-    if not file or file.scan_state in {"INFECTED", "FAILED"} or not file.storage_key.startswith("registration/"):
+    if not file or not file.storage_key.startswith("registration/"):
         raise HTTPException(404, "Evidence unavailable")
+    if file.scan_state != "CLEAN":
+        raise HTTPException(409, "Tệp đang cách ly – chưa quét an toàn; chưa thể tải xuống "
+            "hoặc dùng làm minh chứng. Hệ thống không tự gán trạng thái an toàn.")
     root = storage_root()
     path = (root / file.storage_key.removeprefix("registration/")).resolve()
     if path.parent != root or not path.is_file():

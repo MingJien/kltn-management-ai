@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -24,6 +25,27 @@ MAX_BYTES = 2_000_000
 MAX_ROWS = 1000
 REQUIRED = ("student_code", "display_name", "email", "department_code", "class_name", "major_code")
 OPTIONAL: tuple[str, ...] = ()
+ROSTER_HEADERS_VI = ("MSSV", "Họ tên", "Email", "Mã bộ môn", "Lớp", "Mã ngành")
+
+
+def normalize_header(value: object) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "")).casefold().replace("đ", "d")
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(re.findall(r"[a-z0-9]+", text))
+
+
+HEADER_ALIASES = {
+    normalize_header(alias): key
+    for key, aliases in {
+        "student_code": ("student_code", "MSSV", "Mã SV", "Mã sinh viên", "Mã số sinh viên"),
+        "display_name": ("display_name", "Họ tên", "Họ và tên", "Tên sinh viên"),
+        "email": ("email", "E-mail", "Thư điện tử", "Địa chỉ email"),
+        "department_code": ("department_code", "Mã bộ môn", "Bộ môn"),
+        "class_name": ("class_name", "Lớp", "Tên lớp", "Mã lớp"),
+        "major_code": ("major_code", "Mã ngành", "Ngành", "Ngành học"),
+    }.items()
+    for alias in aliases
+}
 EMAIL = re.compile(r"^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$")
 CODE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 
@@ -63,7 +85,9 @@ def parse_roster(name: str, content: bytes) -> tuple[list[RosterRow], str]:
     try:
         if suffix == "csv":
             text = content.decode("utf-8-sig")
-            reader = csv.reader(io.StringIO(text, newline=""), strict=True)
+            first_line = text.splitlines()[0] if text.splitlines() else ""
+            delimiter = max((",", ";", "\t"), key=first_line.count)
+            reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True)
             raw = list(reader)
         elif suffix == "xlsx":
             if not content.startswith(b"PK"):
@@ -94,16 +118,20 @@ def parse_roster(name: str, content: bytes) -> tuple[list[RosterRow], str]:
         raise HTTPException(422, f"Invalid roster: {exc}") from exc
     if not raw or len(raw) < 2 or len(raw) > MAX_ROWS + 1:
         raise HTTPException(422, "Roster must have 1 to 1000 data rows")
-    header = [str(value or "").strip().lower() for value in raw[0]]
+    while raw[0] and not str(raw[0][-1] or "").strip():
+        raw[0].pop()
+    labels = [normalize_header(value) for value in raw[0]]
+    header = [HEADER_ALIASES.get(label) for label in labels]
+    if any(key is None for key in header):
+        raise HTTPException(422, "Cột không được hỗ trợ. Dùng đúng mẫu: " + ", ".join(ROSTER_HEADERS_VI))
     if len(header) != len(set(header)) or any(key not in header for key in REQUIRED):
-        raise HTTPException(422, "Required columns: " + ", ".join(REQUIRED))
-    if any(key not in REQUIRED + OPTIONAL for key in header):
-        raise HTTPException(422, "The roster contains an unsupported column")
+        raise HTTPException(422, "Thiếu hoặc trùng cột. Cần có: " + ", ".join(ROSTER_HEADERS_VI))
     rows: list[RosterRow] = []
     codes: set[str] = set()
     emails: set[str] = set()
     for line, cells in enumerate(raw[1:], start=2):
-        if len(cells) > len(header) or not any(value is not None and str(value).strip() for value in cells):
+        if (any(value is not None and str(value).strip() for value in cells[len(header):])
+                or not any(value is not None and str(value).strip() for value in cells)):
             raise HTTPException(422, f"Row {line} is empty or has extra cells")
         values = {key: str(cells[index] if index < len(cells) and cells[index] is not None else "").strip()
                   for index, key in enumerate(header)}

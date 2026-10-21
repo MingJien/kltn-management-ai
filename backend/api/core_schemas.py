@@ -12,13 +12,8 @@ LongText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=2000)]
 
 
-class AdvisorNomination(BaseModel):
+class LecturerAssignment(BaseModel):
     lecturer_id: UUID
-    reason: Reason
-
-
-class AdvisorResponse(BaseModel):
-    decision: Literal["ACCEPT", "DECLINE"]
     reason: Reason
 
 
@@ -30,6 +25,11 @@ class MilestoneCreate(BaseModel):
 
 
 class MilestoneClose(BaseModel):
+    reason: Reason
+
+
+class MilestoneExtend(BaseModel):
+    due_at: AwareDatetime
     reason: Reason
 
 
@@ -47,7 +47,7 @@ class ProgressDecision(BaseModel):
 
 class DocumentCreate(BaseModel):
     title: ShortText
-    document_type: Literal["PROPOSAL", "REPORT", "SUPPORTING"]
+    document_type: Literal["PROPOSAL", "PLAN", "REPORT", "SUPPORTING"]
 
 
 class DocumentDecision(BaseModel):
@@ -143,6 +143,7 @@ class ProposalVersionOut(BaseModel):
     sha256: str
     submitted_by_name: str
     submitted_at: datetime
+    scan_state: str
     reviews: list[ReviewOut]
 
 
@@ -168,6 +169,7 @@ class ProgressOut(BaseModel):
     reported_ratio: float | None
     submitted_by_name: str
     submitted_at: datetime
+    due_at_at_submission: datetime | None
     late: bool
     evidence_document_version_id: UUID | None
     reviews: list[ReviewOut]

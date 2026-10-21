@@ -52,6 +52,7 @@ export type RegistrationMember = {
   consent_status: "PENDING" | "ACCEPTED" | "DECLINED";
   evidence_file_name: string | null;
   can_upload_evidence: boolean;
+  can_withdraw: boolean;
 };
 export type Registration = {
   id: string;
@@ -92,7 +93,6 @@ export type SearchHit = {
 // A session cookie issued for one hostname is not sent to the other.
 const baseUrl = import.meta.env.VITE_API_URL
   || `${window.location.protocol}//${window.location.hostname}:8000`;
-let developmentAuthEnabled = false;
 let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {
@@ -107,10 +107,7 @@ export function uploadEvidence(registrationId: string, userId: string, file: Fil
 }
 
 export type AuthenticationMode = "development" | "university_oidc" | "local_email" | "unavailable";
-
-export function setDevelopmentAuthEnabled(enabled: boolean) {
-  developmentAuthEnabled = enabled;
-}
+export type DemoAccount = { key: string; email: string; role: string; label: string };
 
 export function setSessionCsrfToken(token: string | null) {
   sessionCsrfToken = token;
@@ -123,6 +120,16 @@ export function universityLoginUrl() {
 export async function emailLogin(email: string, password: string): Promise<void> {
   await request<void>("/auth/login", "", {
     method: "POST", body: JSON.stringify({ email, password }),
+  });
+}
+
+export function listDemoAccounts(): Promise<DemoAccount[]> {
+  return request<DemoAccount[]>("/auth/demo-accounts", "");
+}
+
+export async function demoLogin(key: string): Promise<void> {
+  await request<void>("/auth/demo-login", "", {
+    method: "POST", body: JSON.stringify({ key }),
   });
 }
 
@@ -143,7 +150,6 @@ export async function request<T>(
     signal: init.signal || abort.signal,
     headers: {
       "Content-Type": "application/json",
-      ...(developmentAuthEnabled && userId ? { "X-Dev-User-Id": userId } : {}),
       ...(sessionCsrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)
         ? { "X-CSRF-Token": sessionCsrfToken } : {}),
       ...(init.headers || {}),
@@ -181,9 +187,9 @@ export type Thesis = {
 };
 export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
 export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
-export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_at: string; late: boolean; evidence_document_version_id: string | null; reviews: Review[]};
+export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; evidence_document_version_id: string | null; reviews: Review[]};
 export type DocumentVersion = {id: string; version_no: number; row_version: number; state: string; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_at: string; submitted_by_name: string; reviews: Review[]};
-export type ThesisDocument = {id: string; title: string; document_type: "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
+export type ThesisDocument = {id: string; title: string; document_type: "PLAN" | "REPORT" | "PROPOSAL" | "SUPPORTING"; row_version: number; visibility: string; versions: DocumentVersion[]};
 export type WorkAssignment = {id: string; student_id: string; student_name: string; version_no: number; row_version: number; work_description: string; expected_output: string; state: string; review_comment: string | null; reviewed_by_name: string | null};
 export type AuditEvent = {action: string; actor_name: string; reason: string | null; occurred_at: string};
 export type Proposal = {
@@ -192,7 +198,7 @@ export type Proposal = {
   state: string;
   row_version: number;
   current_version_no: number | null;
-  versions: {id: string; version_no: number; file_name: string; byte_size: number; sha256: string; submitted_by_name: string; submitted_at: string; reviews: Review[]}[];
+  versions: {id: string; version_no: number; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_by_name: string; submitted_at: string; reviews: Review[]}[];
   reviewers: {lecturer_id: string; display_name: string}[];
   department_confirmed: boolean;
   dean_confirmed: boolean;
@@ -205,9 +211,10 @@ export function uploadProposal(thesisId: string, proposal: Proposal, userId: str
   });
 }
 
-export async function downloadProposal(thesisId: string, version: Proposal["versions"][number], userId: string) {
-  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/proposal/versions/${version.id}/download`, {
-    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+export async function downloadProposal(thesisId: string, version: Proposal["versions"][number], _userId: string, printCopy=false) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/proposal/versions/${version.id}/${printCopy ? "print-copy" : "download"}`, {
+    method: printCopy ? "POST" : "GET", credentials: "include",
+    headers: { ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -215,7 +222,9 @@ export async function downloadProposal(thesisId: string, version: Proposal["vers
   }
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
-  link.href = url; link.download = version.file_name; link.click();
+  link.href = url;
+  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `de-cuong-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
+  link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -226,9 +235,53 @@ export function uploadDocument(thesisId: string, doc: ThesisDocument, userId: st
   });
 }
 
-export async function downloadDocument(thesisId: string, doc: ThesisDocument, version: DocumentVersion, userId: string) {
-  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/download`, {
-    credentials: "include", headers: { ...(developmentAuthEnabled ? {"X-Dev-User-Id": userId} : {}), ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
+export type OfficialFormTemplate = {
+  id: string;
+  title: string;
+  filename: string;
+  byte_size: number;
+  extension: string;
+};
+
+export async function listFormTemplates(userId?: string): Promise<OfficialFormTemplate[]> {
+  return request<OfficialFormTemplate[]>("/form-templates", userId || "");
+}
+
+export async function downloadOfficialTemplate(templateId: string, filename: string) {
+  const response = await fetch(`${baseUrl}/api/v1/form-templates/${templateId}/download`, {credentials: "include"});
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function downloadFormTemplate(kind: "plan" | "proposal", name: string) {
+  const response = await fetch(`${baseUrl}/api/v1/form-templates/${kind}`, {credentials: "include"});
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || `HTTP ${response.status}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export const downloadPlanTemplate = () => downloadFormTemplate("plan", "mau-02-ke-hoach.docx");
+export const downloadProposalTemplate = () => downloadFormTemplate("proposal", "mau-03-de-cuong.docx");
+
+export async function downloadDocument(thesisId: string, doc: ThesisDocument, version: DocumentVersion, _userId: string, printCopy=false) {
+  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/${printCopy ? "print-copy" : "download"}`, {
+    method: printCopy ? "POST" : "GET", credentials: "include",
+    headers: { ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -237,7 +290,7 @@ export async function downloadDocument(thesisId: string, doc: ThesisDocument, ve
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = version.file_name;
+  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `ban-in-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

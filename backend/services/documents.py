@@ -26,6 +26,17 @@ def storage_root():
     return Path(os.getenv("KLTN_DOCUMENT_DIR", str(ROOT / "local" / "uploads" / "documents"))).resolve()
 
 
+def require_clean(file, action: str):
+    """Unscanned uploads stay quarantined: never downloadable, reviewed or cited as evidence."""
+    if file is None:
+        raise HTTPException(404, "Tệp không khả dụng")
+    if file.scan_state != "CLEAN":
+        raise HTTPException(409,
+            "Tệp đang cách ly – chưa quét an toàn; chưa thể " + action +
+            ". Cần máy quét tệp thật để chuyển trạng thái, hệ thống không tự gán an toàn.")
+    return file
+
+
 def valid_content(name, content):
     suffix = Path(name).suffix.lower()
     if suffix == ".pdf" and content.startswith(b"%PDF-"):
@@ -85,6 +96,10 @@ def create_document(session, user, thesis_id, data):
     thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
     if data.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải nộp tại luồng đề cương có xét duyệt riêng")
+    if data.document_type == "PLAN" and session.scalar(select(m.Document.id).where(
+            m.Document.thesis_id == thesis_id, m.Document.document_type == "PLAN",
+            m.Document.state == "ACTIVE").limit(1)):
+        raise HTTPException(409, "Kế hoạch đã có; hãy nộp phiên bản mới vào hồ sơ đó")
     item = m.Document(id=uuid4(), thesis_id=thesis_id, title=data.title, document_type=data.document_type,
         visibility="ASSIGNED", state="ACTIVE")
     session.add(item)
@@ -145,7 +160,12 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
     except Exception:
         session.rollback()
         if path and path.is_file():
-            path.unlink()
+            try:
+                path.unlink()
+            except OSError:
+                # A leftover file is reported by tools/check_file_integrity; never mask
+                # the original storage/database error or fabricate a clean rollback.
+                pass
         raise
 
 
@@ -163,8 +183,15 @@ def review_version(session, user, thesis_id, document_id, version_id, data, expe
     if version.version_no != latest or version.state != "SUBMITTED":
         raise HTTPException(409, "Chỉ duyệt phiên bản mới nhất đang chờ")
     file = session.get(m.StoredFile, version.stored_file_id)
-    if file.scan_state in {"INFECTED", "FAILED"}:
-        raise HTTPException(409, "Tệp không thể sử dụng")
+    require_clean(file, "duyệt tài liệu")
+    if data.decision == "ACCEPT":
+        prior = session.scalars(select(m.DocumentVersion).where(
+            m.DocumentVersion.document_id == item.id,
+            m.DocumentVersion.version_no < version.version_no,
+            m.DocumentVersion.state == "ACCEPTED").with_for_update()).all()
+        for old in prior:
+            old.state = "SUPERSEDED"
+            old.row_version += 1
     version.state = "ACCEPTED" if data.decision == "ACCEPT" else "REVISION_REQUESTED"
     version.row_version += 1
     item.row_version += 1
@@ -182,8 +209,9 @@ def download_version(session, user, thesis_id, document_id, version_id):
     version = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.id == version_id,
         m.DocumentVersion.document_id == document_id))
     file = session.get(m.StoredFile, version.stored_file_id) if version else None
-    if not file or file.scan_state in {"INFECTED", "FAILED"} or not file.storage_key.startswith("documents/"):
+    if not file or not file.storage_key.startswith("documents/"):
         raise HTTPException(404, "Tệp không khả dụng")
+    require_clean(file, "tải tệp")
     root = storage_root()
     path = (root / file.storage_key.removeprefix("documents/")).resolve()
     if path.parent != root or not path.is_file():

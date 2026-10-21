@@ -1,4 +1,4 @@
-"""Resource-scoped thesis access and consensual advisor replacement."""
+"""Resource-scoped thesis access and assigned review roles."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -74,7 +74,7 @@ def rights(session, user, thesis):
         if advisor and advisor.lecturer_id == lecturer.id:
             result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review", "proposal:view", "proposal:review"})
         if _is_department_head(session, lecturer.id, thesis.department_id):
-            result.update({"view", "document:view", "progress:view", "work:view", "advisor:nominate", "progress:assign_reviewer", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
+            result.update({"view", "document:view", "progress:view", "work:view", "progress:assign_reviewer", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
         if is_faculty_dean(session, lecturer.id, thesis.department_id):
             result.update({"view", "proposal:view", "proposal:dean_confirm"})
         proposal = session.scalar(select(m.Proposal).where(m.Proposal.thesis_id == thesis.id))
@@ -86,8 +86,6 @@ def rights(session, user, thesis):
             result.update({"view", "proposal:view", "proposal:comment"})
         if resource_role(session, user.id, "PROGRESS_REVIEWER", thesis_id=thesis.id):
             result.update({"view", "progress:view", "progress:comment"})
-        if resource_role(session, user.id, "ADVISOR_NOMINEE", thesis_id=thesis.id):
-            result.update({"view", "advisor:respond"})
         if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=thesis.round_id):
             result.update({"view", "milestone:manage"})
     return result
@@ -113,9 +111,6 @@ def workspace_out(session, user, thesis):
     history = session.scalars(select(m.AdvisorAssignment).where(m.AdvisorAssignment.thesis_id == thesis.id)
         .order_by(m.AdvisorAssignment.effective_from.desc())).all()
     current = primary_advisor(session, thesis.id)
-    nominee = session.scalar(select(m.ResourceAssignment).where(m.ResourceAssignment.thesis_id == thesis.id,
-        m.ResourceAssignment.assignment_type == "ADVISOR_NOMINEE", effective(m.ResourceAssignment)))
-    nominee_profile = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == nominee.user_id)) if nominee else None
     cross_reviewers = session.scalars(select(m.LecturerProfile).join(m.ResourceAssignment, m.ResourceAssignment.user_id == m.LecturerProfile.user_id)
         .where(m.ResourceAssignment.thesis_id == thesis.id, m.ResourceAssignment.assignment_type == "PROGRESS_REVIEWER", effective(m.ResourceAssignment))
         .order_by(m.LecturerProfile.display_name)).all()
@@ -128,7 +123,7 @@ def workspace_out(session, user, thesis):
     actions = rights(session, user, thesis)
     if thesis.state not in EDITABLE:
         actions.difference_update({"progress:submit", "document:submit", "work:submit", "progress:review", "document:review",
-            "work:review", "advisor:nominate", "advisor:respond", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
+            "work:review", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
     return ThesisWorkspaceOut(id=thesis.id, title=thesis.current_title, state=thesis.state,
         row_version=thesis.row_version, round_id=thesis.round_id, round_label=f"{year.code} / {round_.code}",
         member_student_ids=[member.student_id for member in members], members=[member_out(member) for member in members],
@@ -137,7 +132,7 @@ def workspace_out(session, user, thesis):
         advisor_history=[AdvisorOut(id=item.id, lecturer_id=item.lecturer_id,
             display_name=session.get(m.LecturerProfile, item.lecturer_id).display_name, state=item.state,
             effective_from=item.effective_from, effective_to=item.effective_to) for item in history],
-        pending_advisor=PendingAdvisorOut(lecturer_id=nominee_profile.id, display_name=nominee_profile.display_name) if nominee_profile else None,
+        pending_advisor=None,
         cross_reviewers=[PendingAdvisorOut(lecturer_id=lecturer.id, display_name=lecturer.display_name) for lecturer in cross_reviewers],
         actions=sorted(actions))
 
@@ -153,7 +148,7 @@ def list_theses(session, user):
         advisors = select(m.AdvisorAssignment.thesis_id).where(m.AdvisorAssignment.lecturer_id == lecturer.id,
             effective(m.AdvisorAssignment))
         resources = select(m.ResourceAssignment.thesis_id).where(m.ResourceAssignment.user_id == user.id,
-            m.ResourceAssignment.assignment_type.in_(["ADVISOR_NOMINEE", "PROGRESS_REVIEWER"]), effective(m.ResourceAssignment))
+            m.ResourceAssignment.assignment_type == "PROGRESS_REVIEWER", effective(m.ResourceAssignment))
         rounds = select(m.ResourceAssignment.round_id).where(m.ResourceAssignment.user_id == user.id,
             m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR", effective(m.ResourceAssignment))
         proposal_reviews = select(m.Proposal.thesis_id).join(m.ReviewerAssignment,
@@ -174,53 +169,3 @@ def eligible_lecturer(session, lecturer_id, department_id):
     if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE":
         raise HTTPException(422, "Chọn giảng viên đang hoạt động thuộc đúng bộ môn")
     return lecturer
-
-
-def nominate_advisor(session, user, thesis_id, data, expected_version):
-    thesis = thesis_access(session, user, thesis_id, action="advisor:nominate", lock=True, write=True)
-    row_version(expected_version, thesis.row_version)
-    lecturer = eligible_lecturer(session, data.lecturer_id, thesis.department_id)
-    current = primary_advisor(session, thesis.id)
-    if current and current.lecturer_id == lecturer.id:
-        raise HTTPException(409, "Giảng viên này đã là GVHD chính")
-    for pending in session.scalars(select(m.ResourceAssignment).where(m.ResourceAssignment.thesis_id == thesis.id,
-            m.ResourceAssignment.assignment_type == "ADVISOR_NOMINEE", m.ResourceAssignment.state == "ACTIVE")):
-        pending.state = "REVOKED"
-        pending.effective_to = now()
-    session.add(m.ResourceAssignment(id=uuid4(), thesis_id=thesis.id, user_id=lecturer.user_id,
-        assignment_type="ADVISOR_NOMINEE", effective_from=now(), state="ACTIVE"))
-    thesis.row_version += 1
-    audit(session, user, "ADVISOR_NOMINATED", "thesis", thesis.id, f"{lecturer.lecturer_code}: {data.reason}")
-    session.flush()
-    result = workspace_out(session, user, thesis)
-    session.commit()
-    return result
-
-
-def respond_advisor(session, user, thesis_id, data, expected_version):
-    thesis = thesis_access(session, user, thesis_id, action="advisor:respond", lock=True, write=True)
-    row_version(expected_version, thesis.row_version)
-    lecturer = profile(session, user, "LECTURER")
-    pending = resource_role(session, user.id, "ADVISOR_NOMINEE", thesis_id=thesis.id)
-    eligible_lecturer(session, lecturer.id, thesis.department_id)
-    if data.decision == "ACCEPT":
-        for current in session.scalars(select(m.AdvisorAssignment).where(m.AdvisorAssignment.thesis_id == thesis.id,
-                m.AdvisorAssignment.state == "ACTIVE")):
-            current.state = "ENDED"
-            current.effective_to = now()
-        cross = resource_role(session, user.id, "PROGRESS_REVIEWER", thesis_id=thesis.id)
-        if cross:
-            cross.state = "REVOKED"
-            cross.effective_to = now()
-        session.flush()  # Release the unique active-primary slot before creating its successor.
-        session.add(m.AdvisorAssignment(id=uuid4(), thesis_id=thesis.id, lecturer_id=lecturer.id,
-            assignment_type="PRIMARY", assigned_by=user.id, effective_from=now(), state="ACTIVE"))
-    pending.state = "REVOKED"
-    pending.effective_to = now()
-    thesis.row_version += 1
-    audit(session, user, "ADVISOR_" + data.decision, "thesis", thesis.id, data.reason)
-    session.flush()
-    # A declining nominee can see the response, but loses subsequent access.
-    result = workspace_out(session, user, thesis)
-    session.commit()
-    return result

@@ -1,19 +1,30 @@
-import { useState } from "react";
-import type { Thesis, ThesisDocument } from "../../api";
-import { downloadDocument, request, uploadDocument } from "../../api";
+import { useEffect, useState } from "react";
+import type { OfficialFormTemplate, Thesis, ThesisDocument } from "../../api";
+import { downloadDocument, downloadOfficialTemplate, downloadPlanTemplate, listFormTemplates, request, uploadDocument } from "../../api";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
 export type CoreRun = (action: () => Promise<unknown>, message: string) => Promise<boolean>;
+
+export function scanLabel(state: string) {
+  if (state === "CLEAN") return "Đã quét an toàn";
+  if (state === "QUARANTINED") return "Đang cách ly – chưa quét";
+  if (state === "INFECTED") return "Phát hiện mã độc – không sử dụng";
+  return "Quét lỗi – không sử dụng";
+}
 
 function DocumentCard({doc, thesis, userId, busy, run}: {
   doc: ThesisDocument; thesis: Thesis; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [downloadError, setDownloadError] = useState("");
+  const [printNotice, setPrintNotice] = useState("");
   const [downloading, setDownloading] = useState(false);
   const canSubmit = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
+  const latestAccepted = doc.versions.filter(version => ["ACCEPTED", "FINAL"].includes(version.state))
+    .sort((a, b) => b.version_no - a.version_no)[0];
   return <article className="card"><div className="card-body stack">
-    <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PROPOSAL" ? "Tệp đề cương" : doc.document_type === "REPORT" ? "Báo cáo" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
+    <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : doc.document_type === "REPORT" ? "Báo cáo" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
+    {doc.document_type === "PLAN" && <p className="text-body-sm text-muted">Điền nội dung vào Mẫu 2 chính thức của Khoa trên Word, nộp bản PDF/DOCX tại đây. Nếu GVHD yêu cầu sửa, nộp một phiên bản mới; bản đã tiếp nhận được dùng làm bản chính thức trong hồ sơ.</p>}
     {doc.document_type === "PROPOSAL" && <p className="text-body-sm">Lưu tệp đề cương ở đây. Quy trình GVHD → phản biện → TBM → Trưởng khoa sẽ được xử lý riêng.</p>}
     {canSubmit && doc.versions[0]?.state !== "FINAL" && <form className="core-form" onSubmit={async event => {
       event.preventDefault();
@@ -30,24 +41,41 @@ function DocumentCard({doc, thesis, userId, busy, run}: {
       {file && file.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
     </form>}
     {downloadError && <div role="alert" className="alert alert-danger">{downloadError}</div>}
+    {printNotice && <p role="status" className="alert alert-success">{printNotice}</p>}
     {doc.versions.length === 0 && <p className="text-muted">Chưa có tệp; hãy nộp phiên bản đầu tiên.</p>}
-    {doc.versions.map((version, index) => <section className="core-version stack" key={version.id}>
-      <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong><Status value={version.state} /></div>
-      <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
-      <details><summary>Mã kiểm tra SHA-256</summary><code className="core-hash">{version.sha256}</code></details>
-      <p className="text-body-sm text-muted">{version.scan_state === "QUARANTINED" ? "Chưa quét virus; chỉ tải tệp về máy." : `Trạng thái quét: ${version.scan_state}`}</p>
-      <button type="button" className="btn btn-secondary" disabled={downloading || ["INFECTED", "FAILED"].includes(version.scan_state)} onClick={async () => {
-        setDownloadError(""); setDownloading(true);
-        try {await downloadDocument(thesis.id, doc, version, userId);} catch (cause) {setDownloadError(String(cause));}
-        finally {setDownloading(false);}
-      }}>Tải phiên bản {version.version_no}</button>
-      <Reviews items={version.reviews} />
-      {index === 0 && version.state === "SUBMITTED" && thesis.actions.includes("document:review") && doc.document_type !== "PROPOSAL" && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) &&
-        <ReviewForm disabled={busy} choices={[{value: "ACCEPT", label: "Tiếp nhận bản này"}, {value: "REVISION_REQUIRED", label: "Yêu cầu chỉnh sửa"}]} onSubmit={(decision, comment) =>
-          run(() => request(`/theses/${thesis.id}/documents/${doc.id}/versions/${version.id}/review`, userId, {
-            method: "POST", headers: {"If-Match": String(version.row_version)}, body: JSON.stringify({decision, comment}),
-          }), "Đã lưu nhận xét tài liệu.")} />}
-    </section>)}
+    {doc.versions.map((version, index) => {
+      const clean = version.scan_state === "CLEAN";
+      const suffix = version.file_name.slice(version.file_name.lastIndexOf(".")).toLowerCase();
+      const canPrint = ["PLAN", "REPORT"].includes(doc.document_type) && version.id === latestAccepted?.id &&
+        clean && [".pdf", ".docx"].includes(suffix);
+      return <section className="core-version stack" key={version.id}>
+        <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong><Status value={version.state} /></div>
+        <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
+        <details><summary>Mã kiểm tra SHA-256</summary><code className="core-hash">{version.sha256}</code></details>
+        <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
+        <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
+          setDownloadError(""); setDownloading(true);
+          try {await downloadDocument(thesis.id, doc, version, userId);} catch (cause) {setDownloadError(String(cause));}
+          finally {setDownloading(false);}
+        }}>Tải phiên bản {version.version_no}</button>
+        {canPrint && <button type="button" className="btn btn-secondary" disabled={downloading || busy} onClick={async () => {
+          setDownloadError(""); setPrintNotice(""); setDownloading(true);
+          try {
+            await downloadDocument(thesis.id, doc, version, userId, true);
+            setPrintNotice("Đã tải bản in PDF/DOCX có footer 3 dòng góc dưới bên trái (Xuất từ, Mã hồ sơ ổn định, Thời điểm xuất). Bản nộp gốc được giữ nguyên.");
+          } catch (cause) {setDownloadError(String(cause));}
+          finally {setDownloading(false);}
+        }}>Xuất bản đã duyệt để ký ngoài (footer 3 dòng: nguồn · mã hồ sơ · giờ xuất)</button>}
+        <Reviews items={version.reviews} />
+        {index === 0 && version.state === "SUBMITTED" && thesis.actions.includes("document:review") && !clean &&
+          <p className="alert alert-warning">Chưa thể duyệt: tệp đang cách ly – chưa quét an toàn. Cần máy quét tệp thật để chuyển trạng thái.</p>}
+        {index === 0 && version.state === "SUBMITTED" && clean && thesis.actions.includes("document:review") && doc.document_type !== "PROPOSAL" && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) &&
+          <ReviewForm disabled={busy} choices={[{value: "ACCEPT", label: "Tiếp nhận bản này"}, {value: "REVISION_REQUIRED", label: "Yêu cầu chỉnh sửa"}]} onSubmit={(decision, comment) =>
+            run(() => request(`/theses/${thesis.id}/documents/${doc.id}/versions/${version.id}/review`, userId, {
+              method: "POST", headers: {"If-Match": String(version.row_version)}, body: JSON.stringify({decision, comment}),
+            }), "Đã lưu nhận xét tài liệu.")} />}
+      </section>;
+    })}
   </div></article>;
 }
 
@@ -56,7 +84,53 @@ export default function ThesisDocuments({thesis, docs, userId, busy, run}: {
 }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("REPORT");
+  const [templateError, setTemplateError] = useState("");
+  const [templates, setTemplates] = useState<OfficialFormTemplate[]>([]);
+  const [downloadingTmpl, setDownloadingTmpl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void listFormTemplates(userId).then(items => { if (alive) setTemplates(items); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [userId]);
+
   return <div className="stack">
+    <div className="card"><div className="card-body stack">
+      <h2>Biểu mẫu chính thức từ Khoa (docs/BieuMau)</h2>
+      <p className="text-body-sm text-muted">Tải biểu mẫu chính thức do Khoa ban hành, điền thông tin theo quy định rồi nộp vào hồ sơ tương ứng. Hệ thống sử dụng trực tiếp tệp gốc từ Khoa, không tự dựng mẫu thay thế.</p>
+      <div className="flex gap-2" style={{flexWrap: "wrap", marginTop: "var(--space-2)"}}>
+        <button type="button" className="btn btn-primary" onClick={async () => {
+          setTemplateError("");
+          try {await downloadPlanTemplate();} catch (cause) {setTemplateError(String(cause));}
+        }}>Tải nhanh Mẫu 2 (Kế hoạch)</button>
+      </div>
+      {templates.length > 0 && <details style={{marginTop: "var(--space-2)"}} open>
+        <summary style={{cursor: "pointer", fontWeight: 600}}>Xem toàn bộ biểu mẫu chính thức ({templates.length} biểu mẫu)</summary>
+        <div className="stack" style={{marginTop: "var(--space-2)", gap: "var(--space-2)"}}>
+          {templates.map(tmpl => (
+            <div key={tmpl.id} className="flex justify-between items-center" style={{padding: "var(--space-2)", background: "var(--surface-subtle, #f8fafc)", borderRadius: "var(--radius-sm)"}}>
+              <div>
+                <strong>{tmpl.title}</strong>
+                <span className="text-muted text-body-sm" style={{marginLeft: "var(--space-2)"}}>({tmpl.filename} · {(tmpl.byte_size / 1024).toFixed(1)} KB)</span>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={downloadingTmpl === tmpl.id} onClick={async () => {
+                setTemplateError("");
+                setDownloadingTmpl(tmpl.id);
+                try {
+                  await downloadOfficialTemplate(tmpl.id, tmpl.filename);
+                } catch (cause) {
+                  setTemplateError(String(cause));
+                } finally {
+                  setDownloadingTmpl(null);
+                }
+              }}>{downloadingTmpl === tmpl.id ? "Đang tải…" : "Tải mẫu"}</button>
+            </div>
+          ))}
+        </div>
+      </details>}
+      {templateError && <p role="alert" className="alert alert-danger">{templateError}</p>}
+
+    </div></div>
     {thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && <form className="card" onSubmit={async event => {
       event.preventDefault();
       if (await run(() => request(`/theses/${thesis.id}/documents`, userId, {method: "POST", body: JSON.stringify({title, document_type: type})}), "Đã tạo hồ sơ tài liệu; chọn tệp để nộp.")) setTitle("");
@@ -64,11 +138,18 @@ export default function ThesisDocuments({thesis, docs, userId, busy, run}: {
       <h3>Thêm tài liệu</h3>
       <div className="input-group"><label htmlFor="document-title">Tên tài liệu</label><input className="input" id="document-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="document-type">Loại tài liệu</label><select className="input" id="document-type" value={type} onChange={event => setType(event.target.value)} disabled={busy}>
-        <option value="REPORT">Báo cáo khóa luận</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>
+        <option value="PLAN">Kế hoạch thực hiện (Mẫu 2)</option><option value="REPORT">Báo cáo khóa luận</option><option value="SUPPORTING">Tài liệu hỗ trợ</option>
       </select></div>
       <button className="btn btn-primary" disabled={busy || !title.trim()}>Tạo hồ sơ tài liệu</button>
     </div></form>}
     {docs.map(doc => <DocumentCard key={doc.id} doc={doc} thesis={thesis} userId={userId} busy={busy} run={run} />)}
-    {docs.length === 0 && <p className="text-muted">Chưa có tài liệu được nộp.</p>}
+    {docs.length === 0 && <div className="card"><div className="card-body">
+      <h3>Chưa có tài liệu nào trong hồ sơ</h3>
+      <p className="text-muted">
+        {thesis.actions.includes("document:submit")
+          ? "Sinh viên trong nhóm hãy sử dụng form bên trên để tạo hồ sơ tài liệu (Kế hoạch thực hiện Mẫu 2, Báo cáo khóa luận hoặc Tài liệu hỗ trợ) và tải phiên bản đầu tiên lên."
+          : "Sinh viên trong nhóm phụ trách nộp Kế hoạch thực hiện (Mẫu 2) và Báo cáo. Sau khi sinh viên nộp và tệp được quét an toàn, GVHD sẽ xem xét và tiếp nhận."}
+      </p>
+    </div></div>}
   </div>;
 }

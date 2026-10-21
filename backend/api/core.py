@@ -2,21 +2,58 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from fastapi.responses import FileResponse
-from sqlalchemy import select
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from backend.api.core_schemas import (
-    AdvisorNomination, AdvisorResponse, AuditOut,
-    DocumentCreate, DocumentDecision, DocumentOut, MilestoneClose, MilestoneCreate, MilestoneOut,
+    AuditOut, LecturerAssignment,
+    DocumentCreate, DocumentDecision, DocumentOut, MilestoneClose, MilestoneCreate, MilestoneExtend, MilestoneOut,
     ProgressCreate, ProgressDecision, ProgressOut, ProposalFinalization, ProposalOut,
     ProposalReviewCreate, ProposalSignedCopy, ThesisWorkspaceOut, WorkCreate, WorkDecision, WorkOut,
 )
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
 from backend.services import documents, progress, proposals, theses
+from backend.services.proposal_export import export_document, export_proposal
+from backend.services.form_templates import list_official_templates, official_template, official_template_by_id
 
 router = APIRouter(prefix="/api/v1", tags=["NV5 core"])
+
+
+@router.get("/form-templates")
+def get_form_templates(user=Depends(current_user)):
+    return list_official_templates()
+
+
+@router.get("/form-templates/{template_id}/download")
+def download_official_template(template_id: str, user=Depends(current_user)):
+    content, filename, media_type = official_template_by_id(template_id)
+    return Response(
+        content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/form-templates/plan")
+def plan_template(user=Depends(current_user)):
+    return Response(official_template("plan"),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="mau-02-ke-hoach.docx"',
+                 "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/form-templates/proposal")
+def proposal_template(user=Depends(current_user)):
+    return Response(official_template("proposal"),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="mau-03-de-cuong.docx"',
+                 "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 def core_session(session: Session = Depends(get_session)):
@@ -25,6 +62,14 @@ def core_session(session: Session = Depends(get_session)):
     except Exception:
         session.rollback()
         raise
+
+
+def _actor_name(session, item):
+    for cls in (m.StudentProfile, m.LecturerProfile):
+        profile = session.scalar(select(cls).where(cls.user_id == item.actor_id))
+        if profile:
+            return profile.display_name
+    return "Hệ thống"
 
 
 @router.get("/theses", response_model=list[ThesisWorkspaceOut])
@@ -57,8 +102,16 @@ def proposal_download(thesis_id: UUID, version_id: UUID,
     return proposals.download_version(session, user, thesis_id, version_id)
 
 
+@router.post("/theses/{thesis_id}/proposal/versions/{version_id}/print-copy",
+    responses={200: {"content": {"application/pdf": {},
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}}}})
+def proposal_print_copy(thesis_id: UUID, version_id: UUID,
+        user=Depends(current_user), session=Depends(core_session)):
+    return export_proposal(session, user, thesis_id, version_id)
+
+
 @router.post("/theses/{thesis_id}/proposal/reviewers", response_model=ProposalOut)
-def proposal_reviewer(thesis_id: UUID, data: AdvisorNomination,
+def proposal_reviewer(thesis_id: UUID, data: LecturerAssignment,
         if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
     return proposals.assign_reviewer(session, user, thesis_id, data, if_match)
 
@@ -81,20 +134,8 @@ def proposal_dean_copy(thesis_id: UUID, data: ProposalSignedCopy,
     return proposals.record_dean_confirmation(session, user, thesis_id, data, if_match)
 
 
-@router.post("/theses/{thesis_id}/advisor-nomination", response_model=ThesisWorkspaceOut)
-def nominate(thesis_id: UUID, data: AdvisorNomination, if_match: int = Header(alias="If-Match", ge=1),
-        user=Depends(current_user), session=Depends(core_session)):
-    return theses.nominate_advisor(session, user, thesis_id, data, if_match)
-
-
-@router.post("/theses/{thesis_id}/advisor-response", response_model=ThesisWorkspaceOut)
-def advisor_response(thesis_id: UUID, data: AdvisorResponse, if_match: int = Header(alias="If-Match", ge=1),
-        user=Depends(current_user), session=Depends(core_session)):
-    return theses.respond_advisor(session, user, thesis_id, data, if_match)
-
-
 @router.post("/theses/{thesis_id}/progress-reviewers", status_code=204)
-def cross_reviewer(thesis_id: UUID, data: AdvisorNomination, if_match: int = Header(alias="If-Match", ge=1),
+def cross_reviewer(thesis_id: UUID, data: LecturerAssignment, if_match: int = Header(alias="If-Match", ge=1),
         user=Depends(current_user), session=Depends(core_session)):
     progress.assign_cross_reviewer(session, user, thesis_id, data, if_match)
 
@@ -120,6 +161,12 @@ def milestone_create(thesis_id: UUID, data: MilestoneCreate, user=Depends(curren
 def milestone_close(thesis_id: UUID, milestone_id: UUID, data: MilestoneClose,
         if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
     return progress.close_milestone(session, user, thesis_id, milestone_id, data, if_match)
+
+
+@router.post("/theses/{thesis_id}/milestones/{milestone_id}/extend", response_model=MilestoneOut)
+def milestone_extend(thesis_id: UUID, milestone_id: UUID, data: MilestoneExtend,
+        if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(core_session)):
+    return progress.extend_milestone(session, user, thesis_id, milestone_id, data, if_match)
 
 
 @router.get("/theses/{thesis_id}/progress-reports", response_model=list[ProgressOut])
@@ -194,16 +241,33 @@ def document_download(thesis_id: UUID, document_id: UUID, version_id: UUID,
     return documents.download_version(session, user, thesis_id, document_id, version_id)
 
 
+@router.post("/theses/{thesis_id}/documents/{document_id}/versions/{version_id}/print-copy",
+    responses={200: {"content": {"application/pdf": {},
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}}}})
+def document_print_copy(thesis_id: UUID, document_id: UUID, version_id: UUID,
+        user=Depends(current_user), session=Depends(core_session)):
+    return export_document(session, user, thesis_id, document_id, version_id)
+
+
+@router.get("/theses/{thesis_id}/milestone-history", response_model=list[AuditOut])
+def milestone_history(thesis_id: UUID, limit: int = Query(default=50, ge=1, le=100),
+        user=Depends(current_user), session=Depends(core_session)):
+    thesis = theses.thesis_access(session, user, thesis_id)
+    rows = session.scalars(select(m.AuditEvent).where(
+        m.AuditEvent.resource_type == "round", m.AuditEvent.resource_id == thesis.round_id,
+        m.AuditEvent.action.in_(["MILESTONE_OPENED", "MILESTONE_EXTENDED", "MILESTONE_CLOSED"]),
+    ).order_by(m.AuditEvent.occurred_at.desc()).limit(limit)).all()
+    return [AuditOut(action=item.action, actor_name=_actor_name(session, item), reason=item.reason,
+        occurred_at=item.occurred_at) for item in rows]
+
+
 @router.get("/theses/{thesis_id}/audit", response_model=list[AuditOut])
 def thesis_audit(thesis_id: UUID, limit: int = Query(default=50, ge=1, le=100),
         user=Depends(current_user), session=Depends(core_session)):
-    theses.thesis_access(session, user, thesis_id, action="audit:view")
-    rows = session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_type == "thesis", m.AuditEvent.resource_id == thesis_id)
-        .order_by(m.AuditEvent.occurred_at.desc()).limit(limit)).all()
-    def actor_name(item):
-        for cls in (m.StudentProfile, m.LecturerProfile):
-            profile = session.scalar(select(cls).where(cls.user_id == item.actor_id))
-            if profile:
-                return profile.display_name
-        return "Hệ thống"
-    return [AuditOut(action=item.action, actor_name=actor_name(item), reason=item.reason, occurred_at=item.occurred_at) for item in rows]
+    thesis = theses.thesis_access(session, user, thesis_id, action="audit:view")
+    rows = session.scalars(select(m.AuditEvent).where(or_(
+        and_(m.AuditEvent.resource_type == "thesis", m.AuditEvent.resource_id == thesis_id),
+        and_(m.AuditEvent.resource_type == "round", m.AuditEvent.resource_id == thesis.round_id,
+             m.AuditEvent.action.in_(["MILESTONE_OPENED", "MILESTONE_EXTENDED", "MILESTONE_CLOSED"])),
+    )).order_by(m.AuditEvent.occurred_at.desc()).limit(limit)).all()
+    return [AuditOut(action=item.action, actor_name=_actor_name(session, item), reason=item.reason, occurred_at=item.occurred_at) for item in rows]

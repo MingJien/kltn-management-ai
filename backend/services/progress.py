@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from backend.api.core_schemas import MilestoneOut, ProgressOut, ReviewOut, WorkOut
 from backend.db.models import entities as m
+from backend.services.documents import require_clean
 from backend.services.registration import profile, row_version
 from backend.services.theses import audit, eligible_lecturer, now, rights, thesis_access
 
@@ -59,8 +60,32 @@ def close_milestone(session, user, thesis_id, milestone_id, data, expected):
     return result
 
 
+def extend_milestone(session, user, thesis_id, milestone_id, data, expected):
+    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", write=True)
+    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    if round_.state == "ARCHIVED":
+        raise HTTPException(409, "Đợt đã lưu trữ")
+    item = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == milestone_id,
+        m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
+    if not item:
+        raise HTTPException(404, "Không tìm thấy mốc trong đợt này")
+    row_version(expected, item.row_version)
+    if item.state != "OPEN" or item.due_at is None:
+        raise HTTPException(409, "Chỉ gia hạn mốc đang mở và đã có hạn nộp")
+    if data.due_at <= item.due_at or data.due_at <= now():
+        raise HTTPException(422, "Hạn mới phải sau hạn cũ và sau thời điểm hiện tại")
+    old_due = item.due_at
+    item.due_at = data.due_at
+    item.row_version += 1
+    audit(session, user, "MILESTONE_EXTENDED", "round", thesis.round_id,
+        f"{item.code}: {old_due.isoformat()} -> {data.due_at.isoformat()}; {data.reason}")
+    session.flush()
+    result = milestone_out(item)
+    session.commit()
+    return result
+
+
 def progress_out(session, item):
-    milestone = session.get(m.ProgressMilestone, item.milestone_id)
     reviews = session.scalars(select(m.ProgressReview).where(m.ProgressReview.progress_report_id == item.id)
         .order_by(m.ProgressReview.created_at, m.ProgressReview.id)).all()
     version = session.scalar(select(m.DocumentVersion.id).join(m.Document, m.Document.id == m.DocumentVersion.document_id)
@@ -69,7 +94,8 @@ def progress_out(session, item):
     return ProgressOut(id=item.id, milestone_id=item.milestone_id, version_no=item.version_no,
         row_version=item.row_version, state=item.state, summary=item.summary, reported_ratio=item.reported_ratio,
         submitted_by_name=session.get(m.StudentProfile, item.submitted_by).display_name, submitted_at=item.created_at,
-        late=bool(milestone.due_at and item.created_at > milestone.due_at), evidence_document_version_id=version,
+        due_at_at_submission=item.due_at_at_submission,
+        late=bool(item.due_at_at_submission and item.created_at > item.due_at_at_submission), evidence_document_version_id=version,
         reviews=[ReviewOut(reviewer_name=session.get(m.LecturerProfile, review.reviewer_id).display_name,
             decision=review.decision, comment=review.comment, created_at=review.created_at) for review in reviews])
 
@@ -90,13 +116,15 @@ def create_progress(session, user, thesis_id, data):
             .where(m.DocumentVersion.id == data.document_version_id, m.Document.thesis_id == thesis.id,
                 m.Document.state == "ACTIVE", m.DocumentVersion.state != "DRAFT"))
         file = session.get(m.StoredFile, version.stored_file_id) if version else None
-        if not file or file.scan_state in {"INFECTED", "FAILED"}:
+        if not file:
             raise HTTPException(422, "Minh chứng phải là phiên bản tài liệu hợp lệ của khóa luận này")
+        require_clean(file, "dùng làm minh chứng")
         file_id = file.id
     student = profile(session, user, "STUDENT")
     item = m.ProgressReport(id=uuid4(), thesis_id=thesis.id, milestone_id=milestone.id,
         version_no=latest.version_no + 1 if latest else 1, summary=data.summary,
-        reported_ratio=data.reported_ratio, submitted_by=student.id, evidence_file_id=file_id, state="SUBMITTED")
+        reported_ratio=data.reported_ratio, submitted_by=student.id, evidence_file_id=file_id,
+        due_at_at_submission=milestone.due_at, created_at=now(), state="SUBMITTED")
     session.add(item)
     audit(session, user, "PROGRESS_SUBMITTED", "thesis", thesis.id, milestone.code)
     session.flush()

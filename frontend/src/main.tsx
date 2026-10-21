@@ -10,6 +10,7 @@ import "./styles/typography.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/content-polish.css";
+import "./styles/roster.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

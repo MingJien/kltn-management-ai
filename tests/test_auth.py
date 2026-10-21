@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from backend.api.auth import allowed_frontend_origins, authentication_mode, oidc_is_configured
-from backend.api import auth
+from backend.api import account, auth
 from backend.api.dependencies import current_user
 
 
@@ -115,3 +115,16 @@ def test_oidc_callback_refuses_unlinked_account(monkeypatch):
     response = asyncio.run(auth.callback(request, FakeSession(None)))
     assert response.status_code == 403
     assert request.session == {}
+
+
+def test_account_reset_link_preserves_configured_frontend_origin(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_FRONTEND_URL", "http://127.0.0.1:5173/")
+    monkeypatch.setattr(account, "make_token", lambda user, purpose: "test-token")
+    sent = []
+    monkeypatch.setattr(account, "send_account_link", lambda recipient, subject, body: sent.append(body))
+
+    account._mail_link(SimpleNamespace(email="student@example.test"), "reset")
+
+    assert sent
+    assert "http://127.0.0.1:5173/account/reset-password?token=test-token" in sent[0]

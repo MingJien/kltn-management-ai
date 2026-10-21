@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from backend.api.dependencies import get_session
 from backend.db.models.entities import UserAccount
+from backend.services.account_mail import frontend_origin
 from backend.services.passwords import needs_rehash, verify_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -29,7 +30,7 @@ class LocalLogin(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-DemoKey = Literal["sv1", "sv2", "sv3", "gv", "tbm"]
+DemoKey = Literal["sv1", "sv2", "sv3", "gv", "tbm", "gv2"]
 
 
 class DemoLogin(BaseModel):
@@ -42,6 +43,7 @@ _DEMO_ACCOUNTS = {
     "sv3": ("synthetic-demo-student-3", "sv3@demo.test", "STUDENT", "Sinh viên demo 3"),
     "gv": ("synthetic-demo-lecturer-1", "gv@demo.test", "LECTURER", "Giảng viên demo"),
     "tbm": ("synthetic-demo-lecturer-2", "tbm@demo.test", "LECTURER", "Trưởng bộ môn demo"),
+    "gv2": ("synthetic-demo-lecturer-3", "gv2@demo.test", "LECTURER", "Giảng viên demo 2"),
 }
 
 
@@ -251,7 +253,7 @@ async def callback(request: Request, session: Session = Depends(get_session)):
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
     request.session["csrf_token"] = secrets.token_urlsafe(32)
-    frontend_url = os.getenv("KLTN_FRONTEND_URL", "http://127.0.0.1:5173").rstrip("/")
+    frontend_url = frontend_origin()
     return RedirectResponse(f"{frontend_url}/?login=success", status_code=303)
 
 

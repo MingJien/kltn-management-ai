@@ -1,8 +1,12 @@
-"""Run real UI -> API -> PostgreSQL tests in an owned disposable schema.
+"""Run real UI -> API -> PostgreSQL tests in a dedicated test database.
 
-Command: python -m tools.run_e2e
+Command: python -m tools.run_e2e [playwright spec filter...]
 Requires frontend npm dependencies and `npx playwright install chromium`.
 Never reuses or stops a user's running API/Vite server.
+
+The run refuses kltn_management: that database is the working database and must
+not receive synthetic test rows, temporary schemas or cleanup operations. Point
+DATABASE_URL at a separate database created only for tests.
 """
 from __future__ import annotations
 
@@ -60,8 +64,10 @@ def main() -> int:
     if not npm:
         raise RuntimeError('Node.js/npm is required')
     url = make_url(os.environ['DATABASE_URL'])
-    if url.database != 'kltn_management':
-        raise RuntimeError('E2E requires an explicit kltn_management URL')
+    if not url.database or url.database == 'kltn_management':
+        raise RuntimeError('E2E BLOCKED: a dedicated test database is required. '
+            'DATABASE_URL must not point at kltn_management; no test rows, schema or '
+            'cleanup may touch the working database.')
     schema = 'e2e_' + uuid4().hex[:16]
     assert re.fullmatch(r'e2e_[0-9a-f]{16}', schema)
     directory = ROOT / 'tmp' / schema
@@ -148,8 +154,11 @@ def main() -> int:
                     if time.monotonic() >= deadline:
                         raise RuntimeError('Isolated API did not become ready')
                     time.sleep(.2)
-            print('PASS isolated fixture: kltn_management, owned schema, cookie auth, synthetic accounts',flush=True)
-            result = subprocess.run([npm,'run','test:e2e'],cwd=ROOT/'frontend',env=env)
+            print(f'PASS isolated fixture: database {url.database}, owned schema, cookie auth, synthetic accounts',flush=True)
+            command = [npm,'run','test:e2e']
+            if len(sys.argv) > 1:
+                command += ['--', *sys.argv[1:]]
+            result = subprocess.run(command,cwd=ROOT/'frontend',env=env)
             return result.returncode
     finally:
         if api and api.poll() is None:

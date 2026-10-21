@@ -61,8 +61,9 @@ export function apiMessage(status: number, detail: unknown, path = ""): string {
         if (row[2].includes("invalid required value")) return `${line}: thiếu hoặc sai MSSV, tên, email, bộ môn, lớp hoặc mã ngành.`;
         if (row[2].includes("empty or has extra cells")) return `${line}: dòng rỗng hoặc thừa ô.`;
       }
-      if (detail.startsWith("Required columns:")) return "Tệp thiếu cột bắt buộc: student_code, display_name, email, department_code, class_name, major_code.";
-      if (detail === "The roster contains an unsupported column") return "Tệp có cột ngoài sáu cột được hướng dẫn. Hãy dùng đúng tệp CSV mẫu.";
+      if (detail.startsWith("Required columns:") || detail === "The roster contains an unsupported column")
+        return "Backend đang chạy bộ đọc danh sách cũ. Hãy dừng và chạy lại terminal backend, tải lại trang rồi chọn tệp Excel/CSV với cột MSSV, Họ tên, Email, Mã bộ môn, Lớp, Mã ngành.";
+      if (detail.startsWith("Thiếu hoặc trùng cột.") || detail.startsWith("Cột không được hỗ trợ.")) return detail;
       if (detail.startsWith("Invalid roster:")) return "Không đọc được tệp CSV UTF-8 hoặc XLSX. Hãy chọn lại tệp mẫu, không đổi phần mở rộng bằng tay.";
       if (detail.startsWith("Roster must contain")) return "Tệp cần có dữ liệu và không vượt quá 2 MB.";
     }

@@ -131,7 +131,7 @@ function App() {
         }} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
-        <Route path="/rounds" element={context.actions.includes("account:manage") ?
+        <Route path="/rounds" element={context.base_role === "ADMIN" ?
           <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
           <RosterPage context={context} /> : <Navigate to="/" replace />} />

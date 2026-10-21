@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from backend.api.auth import _login_throttled, _record_failure, _same_app_origin
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
-from backend.services.account_mail import mail_delivery_ready, send_account_link
+from backend.services.account_mail import frontend_origin, mail_delivery_ready, send_account_link
 from backend.services.account_tokens import make_token, token_account
 from backend.services.passwords import hash_password, verify_password
 from backend.services.registration import confirmed_student_ids
@@ -55,7 +55,7 @@ def _request_guard(request: Request, identifier: str) -> None:
 
 
 def _mail_link(user: m.UserAccount, purpose: str) -> None:
-    frontend = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    frontend = frontend_origin()
     if os.getenv("KLTN_ENV") == "production" and not frontend.startswith("https://"):
         raise RuntimeError("Account links require an HTTPS frontend")
     token = make_token(user, purpose)

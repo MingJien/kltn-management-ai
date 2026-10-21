@@ -4,6 +4,7 @@ import { plannedPages, type PlannedPageId } from "../../plannedPages";
 import type { Context } from "../../api";
 import { roleLabel } from "./roleLabel";
 import { initialsOf } from "./initials";
+import NotificationsBell from "./NotificationsBell";
 
 /**
  * Route path → breadcrumb label mapping.
@@ -55,6 +56,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
           </nav>
         </div>
         <div className="header__right">
+          {context.base_role === "LECTURER" ? <NotificationsBell userId={context.user_id} /> : null}
           <Link to="/account" className="header__user" aria-label="Quản lý tài khoản" title="Quản lý tài khoản">
             <span className="header__avatar" aria-hidden="true">{initialsOf(context.display_name)}</span>
             <span className="header__user-info">

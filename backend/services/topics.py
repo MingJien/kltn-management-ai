@@ -102,7 +102,7 @@ def topics_out(session: Session, topics: list[m.Topic]) -> list[TopicOut]:
         state = "LEGACY_REVIEW" if len(regs) > 1 else regs[0].state if regs else None
         count = sum(counts.get(r.id, 0) for r in regs)
         remaining = max(0, topic.max_students - count)
-        available = topic.state == "APPROVED" and state not in {"FINALIZED", "LEGACY_REVIEW"} and remaining > 0
+        available = topic.state == "APPROVED" and state not in {"LECTURER_ACCEPTED", "FINALIZED", "LEGACY_REVIEW"} and remaining > 0
         available = available and round_.state == "OPEN" and round_.opens_at <= now <= round_.closes_at
         lecturer = lecturers.get(topic.receiving_lecturer_id)
         result.append(TopicOut(id=topic.id, round_id=topic.round_id, department_id=topic.department_id,
@@ -133,9 +133,11 @@ def round_out(session: Session, round_: m.ThesisRound) -> OpenRoundOut:
     rounds = session.scalars(select(m.ThesisRound).where(
         m.ThesisRound.academic_year_id == year.id,
     ).order_by(m.ThesisRound.opens_at, m.ThesisRound.created_at, m.ThesisRound.id)).all()
-    suffix = f" (đợt {next(i for i, row in enumerate(rounds, 1) if row.id == round_.id)})" if len(rounds) > 1 else ""
+    number = next(i for i, row in enumerate(rounds, 1) if row.id == round_.id)
+    kind = "Đợt chính" if round_.round_type == "MAIN" else "Đợt bổ sung"
+    suffix = f" · Đợt {number}" if len(rounds) > 1 else ""
     return OpenRoundOut(id=round_.id, code=round_.code, closes_at=round_.closes_at,
-                        academic_year=year_label, label=f"Năm học {year_label}{suffix}")
+                        academic_year=year_label, label=f"Năm học {year_label}{suffix} · {kind}")
 
 
 def visible_topics(session: Session, user: m.UserAccount,
@@ -152,12 +154,15 @@ def visible_topics(session: Session, user: m.UserAccount,
         head = _is_department_head(session, viewer.id, viewer.department_id)
         allowed = or_(
             m.Topic.state == "APPROVED", m.Topic.proposer_user_id == user.id,
+            and_(m.Topic.proposer_type == "STUDENT",
+                 m.Topic.state.in_(["SUBMITTED", "RETURNED", "REJECTED"]),
+                 m.Topic.receiving_lecturer_id == viewer.id),
             m.Topic.state == "SUBMITTED" if head else m.Topic.proposer_user_id == user.id,
         )
     else:
         return []
     query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
-    if user.base_role == "STUDENT" and view == "all":
+    if view == "all":
         query = query.where(m.Topic.state == "APPROVED")
     if round_id is not None:
         query = query.where(m.Topic.round_id == round_id)
@@ -170,6 +175,12 @@ def visible_topics(session: Session, user: m.UserAccount,
         query = query.where(m.Topic.state == "SUBMITTED")
     elif view == "mine":
         query = query.where(m.Topic.proposer_user_id == user.id)
+    elif view == "suggested":
+        if user.base_role != "LECTURER":
+            _fail(403, "Only lecturers can view proposals addressed to them")
+        query = query.where(m.Topic.proposer_type == "STUDENT",
+            m.Topic.receiving_lecturer_id == viewer.id,
+            m.Topic.state.in_(["SUBMITTED", "RETURNED", "REJECTED", "APPROVED"]))
     rows = session.scalars(query.order_by(m.Topic.created_at.desc(), m.Topic.id).offset(offset).limit(limit)).all()
     return topics_out(session, rows)
 
@@ -188,6 +199,9 @@ def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> 
         viewer = profile(session, user, "LECTURER")
         allowed = row.state == "APPROVED" or row.proposer_user_id == user.id or (
             row.state == "SUBMITTED" and _is_department_head(session, viewer.id, row.department_id)
+        ) or (
+            row.proposer_type == "STUDENT" and row.state in {"SUBMITTED", "RETURNED", "REJECTED"}
+            and row.receiving_lecturer_id == viewer.id
         )
     else:
         _fail(404, "Topic not found")
@@ -362,7 +376,20 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         before = _fingerprint(topic, session)
         if data.decision == "APPROVE":
             if topic.proposer_type == "STUDENT":
+                previous_receiver_id = topic.receiving_lecturer_id
                 topic.receiving_lecturer_id = receiving_lecturer(session, data.receiving_lecturer_id, topic.department_id).id
+                registration = session.scalar(select(m.TopicRegistration).where(
+                    m.TopicRegistration.topic_id == topic.id,
+                    m.TopicRegistration.state == "SUBMITTED").limit(1))
+                if registration is not None:
+                    from backend.services.notifications import add_notice, revoke_proposal_notice
+
+                    if previous_receiver_id and previous_receiver_id != topic.receiving_lecturer_id:
+                        revoke_proposal_notice(session, registration_id=registration.id,
+                                               lecturer_id=previous_receiver_id, now=datetime.now(timezone.utc))
+                    add_notice(session, topic=topic,
+                               actor_user_id=topic.proposer_user_id, registration_id=registration.id,
+                               kind="PROPOSAL_APPROVED")
             elif data.receiving_lecturer_id is not None and data.receiving_lecturer_id != topic.receiving_lecturer_id:
                 _fail(422, "Lecturer topics remain with the proposing lecturer")
         if data.revised_title:
@@ -379,6 +406,10 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         if topic.proposer_type == "STUDENT" and data.decision in {"RETURN", "REJECT"}:
             for reg in session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id == topic.id,
                 m.TopicRegistration.state == "SUBMITTED").with_for_update()).all():
+                from backend.services.notifications import revoke_proposal_notice
+
+                revoke_proposal_notice(session, registration_id=reg.id,
+                                       lecturer_id=None, now=datetime.now(timezone.utc))
                 reg.state = "RETURNED" if data.decision == "RETURN" else "CANCELLED"
                 reg.row_version += 1
                 if data.decision == "REJECT":

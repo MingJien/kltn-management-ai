@@ -67,7 +67,7 @@ export default function ThesisStatusBadge({
   return (
     <span className={`badge badge-${config.variant} ${className}`}>
       {showIcon && <Icon size={12} />}
-      {({DRAFT:"Bản nháp",SUBMITTED:"Đã gửi",APPROVED:"Đã duyệt",RETURNED:"Trả lại để sửa",REJECTED:"Từ chối",LOCKED:"Đã khóa",CANCELLED:"Đã hủy",LECTURER_ACCEPTED:"GV đã chấp nhận",LECTURER_REJECTED:"GV từ chối",FINALIZED:"Đã chốt",ACCEPTED:"Đã xác nhận",PENDING:"Chờ xác nhận",DECLINED:"Không tham gia"} as Record<string,string>)[state] || state}
+      {({DRAFT:"Bản nháp",SUBMITTED:"Đã gửi",APPROVED:"Đã duyệt",RETURNED:"Trả lại để sửa",REJECTED:"Từ chối",LOCKED:"Đã khóa",CANCELLED:"Đã hủy",LECTURER_ACCEPTED:"GV đã chấp nhận",LECTURER_REJECTED:"GV từ chối",FINALIZED:"Đã tiếp nhận chính thức",ACCEPTED:"Đã xác nhận",PENDING:"Chờ xác nhận",DECLINED:"Không tham gia"} as Record<string,string>)[state] || state}
     </span>
   );
 }

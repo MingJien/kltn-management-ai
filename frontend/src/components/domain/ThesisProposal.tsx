@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Lecturer, Proposal, Thesis } from "../../api";
-import { downloadProposal, request, uploadProposal } from "../../api";
+import { downloadProposal, downloadProposalTemplate, request, uploadProposal } from "../../api";
+import { scanLabel } from "./ThesisDocuments";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
@@ -12,6 +13,7 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
   const [reason, setReason] = useState("");
   const [officialRef, setOfficialRef] = useState("");
   const [downloadError, setDownloadError] = useState("");
+  const [printNotice, setPrintNotice] = useState("");
   const [downloading, setDownloading] = useState(false);
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
   const canSubmit = active && thesis.actions.includes("proposal:submit") && ["DRAFT", "REVISION_REQUIRED"].includes(proposal.state);
@@ -21,8 +23,16 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
   return <section className="stack">
     <div className="card"><div className="card-body stack">
       <h2>Đề cương khóa luận</h2>
-      <p className="text-body-sm text-muted">Mỗi lần nộp tạo một phiên bản riêng. GVHD chính nhận xét/xác nhận; giảng viên được phân công chỉ góp ý. Trưởng bộ môn chốt nội dung; Trưởng khoa ghi nhận bản giấy đã ký.</p>
+      <p className="text-body-sm text-muted">Soạn nội dung trên mẫu đề cương chính thức của Khoa, rồi nộp bản PDF/DOCX đã điền. Mỗi lần sửa và nộp lại tạo một phiên bản riêng. GVHD nhận xét, Trưởng bộ môn chốt. Hệ thống chỉ đọc mẫu gốc, không tự dựng mẫu thay thế.</p>
+      <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {
+        setDownloadError(""); setDownloading(true);
+        try {await downloadProposalTemplate();} catch (cause) {setDownloadError(String(cause));}
+        finally {setDownloading(false);}
+      }}>Tải mẫu chính thức Mẫu 3</button>
+      {downloadError && <p role="alert" className="alert alert-danger">{downloadError}</p>}
       <div><Status value={proposal.state} />{proposal.current_version_no && <span className="text-muted"> · Bản hiện hành v{proposal.current_version_no}</span>}</div>
+      <p className="text-body-sm text-muted">Sau khi Trưởng bộ môn chốt, có thể xuất đúng phiên bản PDF/DOCX hiện hành đã duyệt và quét sạch. Bản in ghi “Xuất tại”, địa chỉ hệ thống, mã số và thời gian ở góc dưới bên trái; tệp nộp gốc được giữ nguyên.</p>
+      {printNotice && <p role="status" className="alert alert-success">{printNotice}</p>}
       {canSubmit && <form className="core-form" onSubmit={async event => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -39,23 +49,40 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
       {proposal.versions.length === 0 && <p className="text-muted">Chưa có bản đề cương.</p>}
     </div></div>
 
-    {proposal.versions.map((version, index) => <article className="card" key={version.id}><div className="card-body stack">
+    {proposal.versions.map((version, index) => {
+      const clean = version.scan_state === "CLEAN";
+      const isCurrent = version.version_no === proposal.current_version_no;
+      const suffix = version.file_name.slice(version.file_name.lastIndexOf(".")).toLowerCase();
+      const canPrint = isCurrent && clean && [".pdf", ".docx"].includes(suffix) &&
+        ["DEPARTMENT_FINALIZED", "DEAN_CONFIRMED", "PRINT_READY"].includes(proposal.state);
+      return <article className="card" key={version.id}><div className="card-body stack">
       <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong>{index === 0 && <Status value={proposal.state} />}</div>
       <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
       <details><summary>SHA-256</summary><code className="core-hash">{version.sha256}</code></details>
-      {downloadError && <p role="alert" className="alert alert-danger">{downloadError}</p>}
-      <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {
+      <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
+      <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
         setDownloadError(""); setDownloading(true);
         try {await downloadProposal(thesis.id, version, userId);} catch (cause) {setDownloadError(String(cause));}
         finally {setDownloading(false);}
       }}>Tải phiên bản {version.version_no}</button>
+      {canPrint && <button type="button" className="btn btn-secondary" disabled={downloading || busy} onClick={async () => {
+        setDownloadError(""); setPrintNotice(""); setDownloading(true);
+        try {
+          await downloadProposal(thesis.id, version, userId, true);
+          setPrintNotice("Đã tải bản PDF/DOCX để ký ngoài. Bản in có địa chỉ hệ thống, mã số và thời gian ở góc dưới bên trái; mã cũng có trong tên tệp. Bản nộp gốc không đổi.");
+        } catch (cause) {setDownloadError(String(cause));}
+        finally {setDownloading(false);}
+      }}>Xuất bản để ký ngoài (địa chỉ + mã số + giờ xuất)</button>}
       <Reviews items={version.reviews} />
-      {index === 0 && (canReview || canComment) && <ReviewForm disabled={busy}
+      {index === 0 && (canReview || canComment) && !clean &&
+        <p className="alert alert-warning">Chưa thể nhận xét: tệp đang cách ly – chưa quét an toàn. Cần máy quét tệp thật để chuyển trạng thái.</p>}
+      {index === 0 && (canReview || canComment) && clean && <ReviewForm disabled={busy}
         choices={canReview ? [{value: "CONFIRM", label: "Xác nhận đề cương"}, {value: "REVISION_REQUIRED", label: "Yêu cầu chỉnh sửa"}] : [{value: "COMMENT", label: "Góp ý chéo"}]}
         onSubmit={(decision, comment) => run(() => request(`/theses/${thesis.id}/proposal/reviews`, userId, {
           method: "POST", headers: {"If-Match": String(proposal.row_version)}, body: JSON.stringify({decision, comment}),
         }), "Đã lưu nhận xét đề cương.")} />}
-    </div></article>)}
+    </div></article>;
+    })}
 
     {active && thesis.actions.includes("proposal:assign_reviewer") && proposal.id && !["DEPARTMENT_FINALIZED", "DEAN_CONFIRMED"].includes(proposal.state) && <div className="card"><div className="card-body stack">
       <h3>Phân công giảng viên góp ý</h3>

@@ -29,6 +29,19 @@ class LecturerOut(BaseModel):
     lecturer_code: str
 
 
+class NotificationOut(BaseModel):
+    id: UUID
+    message: str
+    created_at: datetime
+    read_at: datetime | None
+    url: str
+
+
+class NotificationSummaryOut(BaseModel):
+    unread_count: int
+    items: list[NotificationOut]
+
+
 class TitleVersionOut(BaseModel):
     version_no: int
     title: str
@@ -115,6 +128,7 @@ class RegistrationMemberOut(BaseModel):
     consent_status: str
     evidence_file_name: str | None = None
     can_upload_evidence: bool = False
+    can_withdraw: bool = False
 
 
 class MemberResponse(BaseModel):
@@ -141,6 +155,11 @@ class RegistrationOut(BaseModel):
     receiving_lecturer_user_id: UUID | None
     receiving_lecturer_name: str | None
     lecturer_reason: str | None
+
+
+class PendingRegistrationSummaryOut(BaseModel):
+    count: int
+    items: list[RegistrationOut]
 
 
 class LecturerDecision(BaseModel):

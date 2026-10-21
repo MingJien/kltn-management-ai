@@ -12,12 +12,18 @@
 }
 
 html {
+  /* Keep the app shell in the same horizontal position when routes need different heights. */
+  scrollbar-gutter: stable;
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  html { overflow-y: scroll; }
 }
 
 body {

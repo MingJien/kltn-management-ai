@@ -10,6 +10,14 @@ from pathlib import Path
 from uuid import uuid4
 
 
+
+def frontend_origin(configured: str | None = None) -> str:
+    """Return the configured public frontend URL for links sent by the system."""
+    value = configured if configured is not None else os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173")
+    value = value.strip().rstrip("/") or "http://localhost:5173"
+    return value
+
+
 def mail_delivery_ready() -> bool:
     """Accept a complete SMTP setup, or the explicit development outbox."""
     sender = os.getenv("KLTN_MAIL_FROM", "").strip()

@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from backend.api.core_schemas import PendingAdvisorOut, ProposalOut, ProposalVersionOut, ReviewOut
 from backend.db.models import entities as m
-from backend.services.documents import MAX_BYTES, valid_content
+from backend.services.documents import MAX_BYTES, require_clean, valid_content
 from backend.services.registration import profile, row_version
 from backend.services.theses import audit, eligible_lecturer, now, primary_advisor, rights, thesis_access
 
@@ -67,7 +67,7 @@ def proposal_out(session, thesis_id, proposal):
         return ProposalVersionOut(id=version.id, version_no=version.version_no,
             file_name=file.original_name, byte_size=file.byte_size, sha256=version.content_sha256,
             submitted_by_name=student.display_name, submitted_at=version.submitted_at,
-            reviews=reviews)
+            scan_state=file.scan_state, reviews=reviews)
 
     reviewers = []
     for assignment in assignments:
@@ -143,7 +143,10 @@ async def upload_version(session, user, thesis_id, request, expected):
     except Exception:
         session.rollback()
         if path and path.is_file():
-            path.unlink()
+            try:
+                path.unlink()
+            except OSError:
+                pass  # The integrity check reports the orphan instead of hiding the original error.
         raise
 
 
@@ -193,6 +196,7 @@ def review(session, user, thesis_id, data, expected):
     if data.decision != "COMMENT" and proposal.state == "ADVISOR_CONFIRMED":
         raise HTTPException(409, "GVHD đã xác nhận phiên bản này")
     version = _version(session, proposal)
+    require_clean(session.get(m.StoredFile, version.stored_file_id), "nhận xét đề cương")
     lecturer = profile(session, user, "LECTURER")
     assignment = session.scalar(select(m.ReviewerAssignment).where(
         m.ReviewerAssignment.proposal_id == proposal.id,
@@ -291,8 +295,9 @@ def download_version(session, user, thesis_id, version_id):
         m.ProposalVersion.proposal_id == proposal.id,
         m.ProposalVersion.id == version_id)) if proposal else None
     file = session.get(m.StoredFile, version.stored_file_id) if version else None
-    if not file or file.scan_state in {"INFECTED", "FAILED"} or not file.storage_key.startswith("proposals/"):
+    if not file or not file.storage_key.startswith("proposals/"):
         raise HTTPException(404, "Tệp không khả dụng")
+    require_clean(file, "tải tệp")
     root = storage_root()
     path = (root / file.storage_key.removeprefix("proposals/")).resolve()
     if path.parent != root or not path.is_file():
