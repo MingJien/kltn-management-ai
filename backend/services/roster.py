@@ -126,10 +126,14 @@ def parse_roster(name: str, content: bytes) -> tuple[list[RosterRow], str]:
         raise HTTPException(422, "Cột không được hỗ trợ. Dùng đúng mẫu: " + ", ".join(ROSTER_HEADERS_VI))
     if len(header) != len(set(header)) or any(key not in header for key in REQUIRED):
         raise HTTPException(422, "Thiếu hoặc trùng cột. Cần có: " + ", ".join(ROSTER_HEADERS_VI))
+    student_code_column = header.index("student_code")
     rows: list[RosterRow] = []
     codes: set[str] = set()
     emails: set[str] = set()
     for line, cells in enumerate(raw[1:], start=2):
+        if suffix == "xlsx" and student_code_column < len(cells) and isinstance(
+                cells[student_code_column], (int, float)):
+            raise HTTPException(422, f"Dòng {line}: MSSV đang là số Excel, có thể mất số 0 đầu. Hãy định dạng cột MSSV là Text rồi nhập lại.")
         if (any(value is not None and str(value).strip() for value in cells[len(header):])
                 or not any(value is not None and str(value).strip() for value in cells)):
             raise HTTPException(422, f"Row {line} is empty or has extra cells")
@@ -160,12 +164,16 @@ def validate_rows(session: Session, rows: list[RosterRow]) -> dict[str, m.Depart
             departments[item.code] = None  # Ambiguous department codes require correction.
         else:
             departments[item.code] = item
+    allowed = {(item.department_id, item.code) for item in session.scalars(
+        select(m.DepartmentMajor).where(m.DepartmentMajor.active.is_(True))).all()}
     for row in rows:
-        department = departments.get(row.department_code)
+        if row.department_code not in departments:
+            raise HTTPException(422, f"Dòng {row.line}: mã bộ môn '{row.department_code}' chưa có trong danh mục bộ môn đang hoạt động. Hãy đối chiếu danh mục trước khi nhập.")
+        department = departments[row.department_code]
         if department is None:
-            raise HTTPException(422, f"Row {row.line}: department code is missing or ambiguous")
-        if row.major_code and department.major_code and row.major_code != department.major_code:
-            raise HTTPException(422, f"Row {row.line}: major does not match department")
+            raise HTTPException(422, f"Dòng {row.line}: mã bộ môn '{row.department_code}' đang thuộc nhiều bộ môn; cần làm rõ mã trong danh mục trước khi nhập.")
+        if (department.id, row.major_code) not in allowed:
+            raise HTTPException(422, f"Dòng {row.line}: mã ngành '{row.major_code}' không thuộc bộ môn '{row.department_code}' trong danh mục đang hoạt động.")
         existing = session.scalar(select(m.StudentProfile).where(m.StudentProfile.student_code == row.student_code))
         email_account = session.scalar(select(m.UserAccount).where(func.lower(m.UserAccount.email) == row.email))
         if existing:

@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261021_0003.
--- 33 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261021_0004.
+-- 34 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -128,6 +128,19 @@ CREATE TABLE department (
 	CONSTRAINT fk_department_faculty_id_faculty FOREIGN KEY(faculty_id) REFERENCES faculty (id) ON DELETE RESTRICT
 );
 
+CREATE TABLE department_major (
+        department_id UUID NOT NULL,
+        code VARCHAR(32) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        active BOOLEAN DEFAULT true NOT NULL,
+        id UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        CONSTRAINT pk_department_major PRIMARY KEY (id),
+        CONSTRAINT uq_department_major_department_id_code UNIQUE (department_id, code),
+        CONSTRAINT fk_department_major_department_id_department FOREIGN KEY (department_id) REFERENCES department (id) ON DELETE RESTRICT
+    );
+
 CREATE TABLE thesis_round (
 	academic_year_id UUID NOT NULL,
 	code VARCHAR(32) NOT NULL,
@@ -198,7 +211,8 @@ CREATE TABLE student_profile (
 	CONSTRAINT uq_student_profile_user_id UNIQUE (user_id),
 	CONSTRAINT fk_student_profile_user_id_user_account FOREIGN KEY(user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
 	CONSTRAINT uq_student_profile_student_code UNIQUE (student_code),
-	CONSTRAINT fk_student_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT
+	CONSTRAINT fk_student_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_student_profile_department_major FOREIGN KEY (department_id, major_code) REFERENCES department_major (department_id, code) ON DELETE RESTRICT
 );
 
 CREATE TABLE eligibility_snapshot (

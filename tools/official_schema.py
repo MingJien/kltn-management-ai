@@ -7,8 +7,8 @@ instead of silently importing an old table into the official baseline.
 
 SELECTED_TABLES = frozenset(
     {
-        "academic_year", "advisor_assignment", "audit_event", "department",
-        "document", "document_version", "eligibility_snapshot", "faculty", "lecturer_profile",
+        "academic_year", "advisor_assignment", "audit_event", "department", "department_major",
+        "document", "document_deadline", "document_version", "eligibility_snapshot", "faculty", "lecturer_profile",
         "member_work_assignment", "organizational_position",
         "position_assignment", "progress_milestone", "progress_report",
         "progress_review", "proposal", "proposal_review", "proposal_version",
@@ -32,7 +32,9 @@ TABLE_INFO = {
     "defense_eligibility_check": ("Kiểm tra điều kiện bảo vệ", "Giai đoạn bảo vệ"),
     "defense_session": ("Phiên bảo vệ", "Giai đoạn bảo vệ"),
     "department": ("Bộ môn", "Phạm vi quyền và hồ sơ"),
+    "department_major": ("Ngành thuộc bộ môn", "Đối chiếu cặp mã bộ môn–ngành khi nhập sinh viên"),
     "document": ("Hồ sơ tài liệu KLTN", "Tài liệu và quyền truy cập"),
+    "document_deadline": ("Hạn nộp tài liệu theo đợt và loại", "Khoa đặt hạn cho đề cương, kế hoạch và tài liệu hỗ trợ; giữ audit gia hạn/đóng"),
     "document_version": ("Phiên bản tài liệu", "Nộp tài liệu bất biến"),
     "eligibility_exception": ("Ngoại lệ điều kiện đăng ký", "Nguồn quyết định đặc biệt đã lưu trong phiên bản eligibility_snapshot"),
     "eligibility_snapshot": ("Kết quả điều kiện đăng ký", "Xác nhận đủ điều kiện theo đợt"),

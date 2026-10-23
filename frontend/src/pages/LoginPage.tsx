@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
 import { listDemoAccounts, type DemoAccount } from "../api";
-import PasswordInput from "../components/ui/PasswordInput";
+import PasswordField from "../components/ui/PasswordField";
 import "../styles/login.css";
 
 interface LoginPageProps {
@@ -88,9 +88,15 @@ export default function LoginPage({
               </div>
               <div className="input-group">
                 <label htmlFor="login-password">Mật khẩu</label>
-                <PasswordInput id="login-password" label="Mật khẩu" className="input input--lg"
-                  required autoComplete="current-password" value={password}
-                  onChange={(event) => onPasswordChange(event.target.value)} placeholder="Nhập mật khẩu" />
+                <PasswordField
+                  id="login-password"
+                  className="input input--lg"
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => onPasswordChange(event.target.value)}
+                  placeholder="Nhập mật khẩu"
+                />
               </div>
               <button className="btn btn-primary login-card__submit"
                 disabled={loading || !email.trim() || !password}>

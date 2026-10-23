@@ -51,6 +51,7 @@ export function apiMessage(status: number, detail: unknown, path = ""): string {
       if (locations.includes("round_id")) return "Đợt KLTN chưa hợp lệ. Hãy chọn lại đợt rồi thử lại.";
     }
     if (typeof detail === "string") {
+      if (detail.startsWith("Dòng ") && detail.includes("mã bộ môn")) return detail;
       const row = /^Row (\d+)(.*)$/.exec(detail);
       if (row) {
         const line = `Dòng ${row[1]}`;

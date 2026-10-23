@@ -110,12 +110,22 @@ def create_progress(session, user, thesis_id, data):
     thesis = thesis_access(session, user, thesis_id, action="progress:submit", lock=True, write=True)
     milestone = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == data.milestone_id,
         m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
-    if not milestone or milestone.state != "OPEN":
-        raise HTTPException(409, "Mốc phải đang mở và thuộc đúng đợt khóa luận")
+    if not milestone:
+        raise HTTPException(409, "Mốc không thuộc đợt khóa luận này")
     latest = session.scalar(select(m.ProgressReport).where(m.ProgressReport.thesis_id == thesis.id,
         m.ProgressReport.milestone_id == milestone.id).order_by(m.ProgressReport.version_no.desc()).limit(1))
-    if latest and latest.state != "REVISION_REQUIRED":
-        raise HTTPException(409, "Chỉ nộp bản mới khi GVHD yêu cầu sửa báo cáo trước")
+    current_time = now()
+    revision_requested = latest is not None and latest.state == "REVISION_REQUIRED"
+    if not revision_requested and milestone.state != "OPEN":
+        raise HTTPException(409, "Mốc đã đóng; chỉ được nộp lại khi GVHD yêu cầu sửa")
+    if latest and not revision_requested:
+        reviewed = session.scalar(select(m.ProgressReview.id).where(
+            m.ProgressReview.progress_report_id == latest.id).limit(1)) is not None
+        student = profile(session, user, "STUDENT")
+        if (latest.state != "SUBMITTED" or reviewed or not milestone.due_at or
+                current_time > milestone.due_at or latest.submitted_by != student.id):
+            raise HTTPException(409, "Chỉ tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; sau đó cần yêu cầu sửa")
+        latest.row_version += 1
     file_id = None
     if data.document_version_id:
         version = session.scalar(select(m.DocumentVersion).join(m.Document, m.Document.id == m.DocumentVersion.document_id)
@@ -130,9 +140,10 @@ def create_progress(session, user, thesis_id, data):
     item = m.ProgressReport(id=uuid4(), thesis_id=thesis.id, milestone_id=milestone.id,
         version_no=latest.version_no + 1 if latest else 1, summary=data.summary,
         reported_ratio=data.reported_ratio, submitted_by=student.id, evidence_file_id=file_id,
-        due_at_at_submission=milestone.due_at, created_at=now(), state="SUBMITTED")
+        due_at_at_submission=milestone.due_at, created_at=current_time, state="SUBMITTED")
     session.add(item)
-    audit(session, user, "PROGRESS_SUBMITTED", "thesis", thesis.id, milestone.code)
+    audit(session, user, "PROGRESS_SELF_CORRECTED" if latest and not revision_requested else "PROGRESS_SUBMITTED",
+        "thesis", thesis.id, f"{milestone.code}; version={item.version_no}")
     session.flush()
     result = progress_out(session, item)
     session.commit()
@@ -160,9 +171,12 @@ async def attach_evidence(session, user, thesis_id, report_id, request, expected
             raise HTTPException(409, "Chỉ được thêm minh chứng cho phiên bản báo cáo mới nhất")
         if session.scalar(select(m.ProgressReview.id).where(m.ProgressReview.progress_report_id == report.id).limit(1)):
             raise HTTPException(409, "Báo cáo đã được nhận xét; không thể thêm minh chứng")
+        milestone = session.get(m.ProgressMilestone, report.milestone_id)
+        if not milestone or milestone.state != "OPEN" or not milestone.due_at or now() > milestone.due_at:
+            raise HTTPException(409, "Đã hết hạn thêm minh chứng; cần GVHD yêu cầu sửa để nộp phiên bản mới")
         name, content, mime = await documents.read_upload(request)
         file, digest, path = documents.persist_upload(session, name, content, mime)
-        milestone = session.get(m.ProgressMilestone, report.milestone_id)
+        documents.file_scanner.scan(file, path)
         item = m.Document(id=uuid4(), thesis_id=thesis.id,
             title=f"Minh chứng tiến độ {milestone.code} · lần {report.version_no}",
             document_type="SUPPORTING", visibility="ASSIGNED", state="ACTIVE")
@@ -170,7 +184,7 @@ async def attach_evidence(session, user, thesis_id, report_id, request, expected
         session.flush()
         version = m.DocumentVersion(id=uuid4(), document_id=item.id, version_no=1,
             stored_file_id=file.id, submitted_by=student.id, submitted_at=now(),
-            content_sha256=digest, state="SUBMITTED")
+            due_at_at_submission=milestone.due_at, content_sha256=digest, state="SUBMITTED")
         session.add(version)
         report.evidence_file_id = file.id
         report.row_version += 1

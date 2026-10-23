@@ -12,7 +12,7 @@ from tools.export_official_schema_sql import build_sql
 
 def test_official_metadata_excludes_later_phase_tables():
     assert set(target_metadata.tables) == SELECTED_TABLES
-    assert len(target_metadata.tables) == 33
+    assert len(target_metadata.tables) == 35
     assert "council" not in target_metadata.tables
     for table in target_metadata.tables.values():
         for foreign_key in table.foreign_keys:
@@ -38,7 +38,7 @@ def test_review_sql_matches_official_database_table_set():
     sql = build_sql()
     names = re.findall(r"^CREATE TABLE (\w+)", sql, re.MULTILINE)
     assert set(names) == SELECTED_TABLES | {"alembic_version"}
-    assert len(names) == 34
+    assert len(names) == 36
     assert "version_num VARCHAR(32) NOT NULL" in sql
     assert "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)" in sql
     assert not re.search(r"^\s*ALTER TABLE\b", sql, re.IGNORECASE | re.MULTILINE)

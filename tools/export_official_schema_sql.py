@@ -17,6 +17,8 @@ from tools.official_schema import SELECTED_TABLES
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261015_0001_official.py"
 NOTIFICATION_MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261021_0003_user_notification.py"
+CATALOG_MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261021_0004_department_major.py"
+DEADLINE_MIGRATION = ROOT / "backend" / "migrations_official" / "versions" / "20261022_0005_document_deadlines.py"
 OUTPUT = ROOT / "database" / "official" / "kltn-management-schema.sql"
 
 
@@ -46,7 +48,7 @@ def initial_ddl() -> list[str]:
         for statement in statements
         if (match := re.match(r"^CREATE\s+TABLE\s+(\w+)\b", statement, re.IGNORECASE))
     ]
-    initial_tables = SELECTED_TABLES - {"user_notification"}
+    initial_tables = SELECTED_TABLES - {"user_notification", "department_major", "document_deadline"}
     if len(tables) != len(initial_tables) or set(tables) != initial_tables:
         raise RuntimeError(
             "Initial migration does not match the official selection: "
@@ -77,6 +79,35 @@ def initial_ddl() -> list[str]:
     if len(additions) != 1 or len(indexes) != 1:
         raise RuntimeError("Notification migration DDL changed; update snapshot projection")
     statements.extend([additions[0], indexes[0]])
+    catalog_source = CATALOG_MIGRATION.read_text(encoding="utf-8")
+    catalog_ddl = re.findall(r'CREATE TABLE department_major\b[\s\S]*?;', catalog_source)
+    if len(catalog_ddl) != 1:
+        raise RuntimeError("Department-major migration DDL changed; update snapshot projection")
+    department_index = next(index for index, statement in enumerate(statements)
+                            if statement.startswith("CREATE TABLE department ("))
+    statements.insert(department_index + 1, catalog_ddl[0])
+    student_index = next(index for index, statement in enumerate(statements)
+                         if statement.startswith("CREATE TABLE student_profile ("))
+    student_ddl = statements[student_index]
+    if student_ddl.count("\n);") != 1:
+        raise RuntimeError("Student profile DDL changed; update catalog FK projection")
+    statements[student_index] = student_ddl.replace("\n);",
+        ",\n\tCONSTRAINT fk_student_profile_department_major FOREIGN KEY (department_id, major_code) REFERENCES department_major (department_id, code) ON DELETE RESTRICT\n);")
+    deadline_source = DEADLINE_MIGRATION.read_text(encoding="utf-8")
+    deadline_ddl = re.findall(r'CREATE TABLE document_deadline\b[\s\S]*?;', deadline_source)
+    if len(deadline_ddl) != 1:
+        raise RuntimeError("Document-deadline migration DDL changed; update snapshot projection")
+    round_index = next(index for index, statement in enumerate(statements)
+                       if statement.startswith("CREATE TABLE thesis_round ("))
+    statements.insert(round_index + 1, deadline_ddl[0])
+    for table_name in ("proposal_version", "document_version"):
+        version_index = next(index for index, statement in enumerate(statements)
+                             if statement.startswith(f"CREATE TABLE {table_name} ("))
+        needle = f"\tCONSTRAINT pk_{table_name} PRIMARY KEY"
+        if statements[version_index].count(needle) != 1:
+            raise RuntimeError(f"{table_name} DDL changed; update snapshot projection")
+        statements[version_index] = statements[version_index].replace(needle,
+            "\tdue_at_at_submission TIMESTAMP WITH TIME ZONE,\n" + needle)
     statements.append(
         "CREATE TABLE alembic_version (\n"
         "    version_num VARCHAR(32) NOT NULL,\n"
@@ -89,7 +120,7 @@ def initial_ddl() -> list[str]:
 def build_sql() -> str:
     statements = initial_ddl()
     lines = [
-        "-- Schema-only review snapshot at Alembic revision 20261021_0003.",
+        "-- Schema-only review snapshot at Alembic revision 20261022_0005.",
         f"-- {len(SELECTED_TABLES)} business tables plus alembic_version; each table has one complete CREATE TABLE statement.",
         "-- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.",
         "-- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.",

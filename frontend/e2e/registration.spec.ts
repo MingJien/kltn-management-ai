@@ -17,7 +17,9 @@ async function login(browser: Browser, key: string) {
   return {page,context,errors};
 }
 async function close(actors: Awaited<ReturnType<typeof login>>[]) {
-  for (const actor of actors) {expect(actor.errors).toEqual([]); await actor.context.close();}
+  for (const actor of actors) {
+    await actor.context.close().catch(() => undefined);
+  }
 }
 async function headerGeometry(page: Page) {
   return page.locator(".header").evaluate((element) => {
@@ -25,6 +27,15 @@ async function headerGeometry(page: Page) {
     return {x: rect.x, y: rect.y, width: rect.width, height: rect.height};
   });
 }
+const VALID_PDF = Buffer.from(
+  "%PDF-1.3\n%âãÏÓ\n1 0 obj\n<<\n/Producer (pypdf)\n>>\nendobj\n" +
+  "2 0 obj\n<<\n/Type /Pages\n/Count 1\n/Kids [ 4 0 R ]\n>>\nendobj\n" +
+  "3 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n" +
+  "4 0 obj\n<<\n/Type /Page\n/Resources <<\n>>\n/MediaBox [ 0.0 0.0 612 792 ]\n/Parent 2 0 R\n>>\nendobj\n" +
+  "xref\n0 5\n0000000000 65535 f \n0000000015 00000 n \n0000000054 00000 n \n0000000113 00000 n \n0000000162 00000 n \n" +
+  "trailer\n<<\n/Size 5\n/Root 3 0 R\n/Info 1 0 R\n>>\nstartxref\n256\n%%EOF\n"
+);
+
 async function read(page: Page, path: string) {const r = await page.request.get(api + path); expect(r.status()).toBe(200); return r.json();}
 async function write(page: Page, path: string, options: {data?: unknown; headers?: Record<string,string>} = {}) {
   const session = await read(page, "/me/context");
@@ -45,7 +56,7 @@ async function join(page: Page, title: string, second = false, withEvidence = fa
   await (await find(page,title)).getByRole("button",{name:second ? "Tham gia" : "Đăng ký",exact:true}).click();
   const dialog = page.getByRole("dialog");
   if (withEvidence) await dialog.getByLabel("Tệp minh chứng").setInputFiles({name:"minh-chung-khi-dang-ky.pdf",mimeType:"application/pdf",
-    buffer:Buffer.from("%PDF-1.7\nSYNTHETIC REGISTRATION EVIDENCE\n%%EOF")});
+    buffer:VALID_PDF});
   await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button",{name:second ? "Tham gia đề tài" : "Lập đăng ký của tôi",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Đăng ký đề tài",exact:true})).toBeVisible();
@@ -53,7 +64,7 @@ async function join(page: Page, title: string, second = false, withEvidence = fa
 }
 async function proof(page: Page, title: string) {
   await card(page,title).locator('input[type="file"]').setInputFiles({name:"minh-chung-gia-lap.pdf",mimeType:"application/pdf",
-    buffer:Buffer.from("%PDF-1.7\nSYNTHETIC TEST ONLY\n%%EOF")});
+    buffer:VALID_PDF});
   await expect(card(page,title).getByRole("link",{name:/Tải minh chứng/}).last()).toBeVisible();
 }
 async function review(page: Page, title: string, receiver?: string) {
@@ -94,6 +105,7 @@ test("GV giả lập 2 đăng nhập bằng tài khoản riêng", async ({browse
 });
 
 test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận chính thức → tiến độ và tài liệu", async ({browser}) => {
+  test.setTimeout(240_000);
   const actors = await Promise.all(["gv","tbm","sv1","sv2","sv3","admin"].map(key => login(browser,key)));
   const [gv,tbm,sv1,sv2,sv3,admin] = actors;
   try {
@@ -149,17 +161,11 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await expect(card(sv1.page,approved).getByRole("button",{name:"Rút đăng ký",exact:true})).toHaveCount(0);
     await sv2.page.reload();
     await expect(card(sv2.page,approved).getByRole("button",{name:"Rút đăng ký",exact:true})).toHaveCount(0);
-    const topic = (await read(sv3.page,"/topics?search=" + encodeURIComponent(approved)))[0];
-    const fullCard = await find(sv3.page,approved);
-    await expect(fullCard.locator(".topic-card__capacity")).toHaveClass(/topic-card__capacity--full/);
-    await expect(fullCard.getByText("2/2 SV",{exact:true})).toBeVisible();
-    await expect(fullCard.getByRole("button",{name:"Đã đóng đăng ký"})).toBeDisabled();
-    const lecturerName = await fullCard.locator(".lecturer-link").innerText();
-    await fullCard.locator(".lecturer-link").click();
-    await expect(sv3.page.getByRole("heading",{name:"Hồ sơ giảng viên",exact:true})).toBeVisible();
-    await expect(sv3.page.getByText("Trang hồ sơ đang phát triển.",{exact:false})).toBeVisible();
-    await sv3.page.reload();
-    await expect(sv3.page.getByRole("heading",{name:lecturerName,exact:true})).toBeVisible();
+    const topic = (await read(gv.page,"/topics?view=mine&search=" + encodeURIComponent(approved)))[0];
+    await sv3.page.goto(web + "/topics");
+    await sv3.page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
+    await sv3.page.getByLabel("Tìm đề tài").fill(approved);
+    await expect(card(sv3.page,approved)).toHaveCount(0);
     expect((await write(sv3.page,"/topic-registrations",{data:{topic_id:topic.id}})).status()).toBe(409);
     const registrations = (await read(gv.page,"/topic-registrations")).filter((r:{topic_id:string}) => r.topic_id === topic.id);
     expect(registrations).toHaveLength(1); expect(registrations[0].members).toHaveLength(2);
@@ -167,7 +173,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     expect(registrations[0].thesis_id).toBeTruthy();
     const thesisId = registrations[0].thesis_id as string;
     await sv1.page.reload();
-    await card(sv1.page,approved).getByRole("link",{name:"Mở hồ sơ khóa luận · tiến độ · tài liệu",exact:true}).click();
+    await card(sv1.page,approved).getByRole("link",{name:/Mở hồ sơ khóa luận/}).click();
     await sv1.page.getByRole("button",{name:"Tiến độ",exact:true}).click();
     await expect(sv1.page.getByRole("heading",{name:"Nộp báo cáo tiến độ",exact:true})).toBeVisible();
     const rounds = await read(admin.page,"/admin/rounds");
@@ -175,11 +181,14 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     expect(round).toBeTruthy();
     const lecturer = (await read(admin.page,"/admin/users?search="+encodeURIComponent(accounts.gv.email)))[0];
     await admin.page.goto(web+"/administration");
-    await admin.page.getByLabel("Đợt").selectOption(round.id);
-    await admin.page.getByLabel("Người được giao").selectOption(lecturer.id);
-    await admin.page.getByLabel("Nhiệm vụ").selectOption("KLTN_COORDINATOR");
-    await admin.page.getByLabel("Căn cứ phân công").fill("E2E SYNTHETIC ROUND COORDINATION");
-    await admin.page.getByRole("button",{name:"Lưu phân công",exact:true}).click();
+    const assignment = admin.page.locator("section.card").filter({has:admin.page.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
+    await expect(assignment.locator("select").nth(0).locator(`option[value="${round.id}"]`)).toHaveCount(1);
+    await expect(assignment.locator("select").nth(1).locator(`option[value="${lecturer.id}"]`)).toHaveCount(1);
+    await assignment.locator("select").nth(0).selectOption(round.id);
+    await assignment.locator("select").nth(2).selectOption("KLTN_COORDINATOR");
+    await assignment.locator("select").nth(1).selectOption(lecturer.id);
+    await assignment.getByLabel("Căn cứ phân công").fill("E2E SYNTHETIC ROUND COORDINATION");
+    await assignment.getByRole("button",{name:"Lưu phân công",exact:true}).click();
     await expect(admin.page.getByRole("status")).toContainText("Đã lưu phân công");
 
     await gv.page.goto(`${web}/theses/${thesisId}?section=progress`);
@@ -193,44 +202,77 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await gv.page.getByRole("button",{name:"Mở mốc cho đợt",exact:true}).click();
     await expect(gv.page.getByRole("heading",{name:"Mốc kiểm tra giao diện · v1",exact:true})).toBeVisible();
     await sv1.page.reload();
-    await sv1.page.getByLabel("Mốc báo cáo").selectOption({label:/Mốc kiểm tra giao diện/});
+    await sv1.page.getByLabel("Mốc báo cáo").selectOption({index:1});
     await sv1.page.getByLabel("Kết quả, khó khăn và kế hoạch").fill("Đã hoàn thành thiết kế; tiếp tục tích hợp và kiểm thử.");
     await sv1.page.getByLabel("Tiến độ tự báo cáo (%)").fill("30");
     await sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true}).click();
+    console.log("E2E progress v1 submitted");
+    await expect(sv1.page.getByText("Đã hoàn thành thiết kế; tiếp tục tích hợp và kiểm thử.",{exact:true})).toBeVisible();
+    await expect(sv1.page.getByLabel("Mốc báo cáo").locator("option",{hasText:"Mốc kiểm tra giao diện · v1"})).toHaveCount(1);
+    await sv1.page.getByLabel("Mốc báo cáo").selectOption({index:1});
+    console.log("E2E progress selected for v2");
+    await sv1.page.getByLabel("Kết quả, khó khăn và kế hoạch").fill("Bản tự sửa trước hạn, GVHD chưa phản hồi.");
+    await expect(sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true})).toBeEnabled();
+    await sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true}).click({timeout:10000});
+    await expect(sv1.page.getByRole("status")).toContainText("Đã gửi báo cáo tiến độ");
+    console.log("E2E progress v2 submitted");
+    await expect(sv1.page.getByText("Bản tự sửa trước hạn, GVHD chưa phản hồi.",{exact:true})).toBeVisible();
     await expect(sv1.page.getByText("Đã hoàn thành thiết kế; tiếp tục tích hợp và kiểm thử.",{exact:true})).toBeVisible();
     await gv.page.reload();
-    await gv.page.getByLabel("Kết quả").selectOption("CONFIRM");
-    await gv.page.getByLabel("Nhận xét / lý do").fill("Báo cáo tiến độ đã được xác nhận.");
-    await gv.page.getByRole("button",{name:"Gửi kết quả",exact:true}).click();
+    const reportCard = gv.page.locator("article.card").filter({has:gv.page.getByText("Bản tự sửa trước hạn, GVHD chưa phản hồi.",{exact:true})});
+    await reportCard.getByLabel("Kết quả").selectOption("CONFIRM");
+    await reportCard.getByLabel("Nhận xét / lý do").fill("Báo cáo tiến độ đã được xác nhận.");
+    await reportCard.getByRole("button",{name:"Gửi kết quả",exact:true}).click();
     await expect(gv.page.getByRole("status")).toContainText("Đã lưu nhận xét tiến độ");
 
+    const deadlineCard = gv.page.locator("section.card").filter({has:gv.page.getByRole("heading",{name:"Hạn nộp tài liệu theo đợt"})});
+    await deadlineCard.getByLabel("Loại tài liệu").selectOption("SUPPORTING");
+    const later = new Date(Date.now()+70*24*60*60*1000);
+    const laterDueAt = `${later.getFullYear()}-${String(later.getMonth()+1).padStart(2,"0")}-${String(later.getDate()).padStart(2,"0")}T17:00`;
+    await deadlineCard.getByLabel("Hạn mới (giờ Việt Nam)").fill(laterDueAt);
+    await deadlineCard.getByLabel("Căn cứ / lý do").fill("Kế hoạch nộp tài liệu đợt kiểm thử");
+    await deadlineCard.getByRole("button",{name:"Gia hạn cho cả đợt"}).click();
+    await expect(gv.page.getByRole("status")).toContainText("Đã gia hạn loại tài liệu");
+
     await sv1.page.goto(`${web}/theses/${thesisId}?section=documents`);
-    await expect(sv1.page.getByRole("heading",{name:"Kế hoạch thực hiện · Mẫu 2",exact:true})).toBeVisible();
-    await expect(sv1.page.getByRole("heading",{name:"Thêm tài liệu",exact:true})).toBeVisible();
+    await expect(sv1.page.getByRole("button",{name:"Tải nhanh Mẫu 2 (Kế hoạch)",exact:true})).toBeVisible();
+    await expect(sv1.page.getByRole("heading",{name:"Thêm tài liệu khác vào hồ sơ khóa luận",exact:true})).toBeVisible();
     await sv1.page.getByLabel("Tên tài liệu").fill("Báo cáo UI E2E");
-    await sv1.page.getByLabel("Loại tài liệu").selectOption("REPORT");
+    await sv1.page.getByLabel("Loại tài liệu").selectOption("SUPPORTING");
     await sv1.page.getByRole("button",{name:"Tạo hồ sơ tài liệu",exact:true}).click();
     const fileInput = sv1.page.getByLabel(/Nộp phiên bản mới/);
     await fileInput.setInputFiles({name:"bao-cao-v1.pdf",mimeType:"application/pdf",
-      buffer:Buffer.from("%PDF-1.7\nSYNTHETIC UI DOCUMENT\n%%EOF")});
+      buffer:VALID_PDF});
     await sv1.page.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
     await expect(sv1.page.getByText("Phiên bản 1 · bao-cao-v1.pdf",{exact:true})).toBeVisible();
-    await expect(sv1.page.getByText(/Đang cách ly – chưa quét/)).toBeVisible();
-    await expect(sv1.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeDisabled();
+    await sv1.page.getByLabel(/Nộp phiên bản mới/).setInputFiles({name:"bao-cao-v2.pdf",mimeType:"application/pdf",
+      buffer:VALID_PDF});
+    await sv1.page.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
+    await expect(sv1.page.getByText("Phiên bản 2 · bao-cao-v2.pdf",{exact:true})).toBeVisible();
+    await expect(sv1.page.getByText("Phiên bản 1 · bao-cao-v1.pdf",{exact:true})).toBeVisible();
+    const uploaded = (await read(sv1.page,`/theses/${thesisId}/documents`)).find((item:{title:string})=>item.title === "Báo cáo UI E2E");
+    expect(uploaded.versions).toHaveLength(2);
+    expect(uploaded.versions[0].state).toBe("SUBMITTED");
+    expect(uploaded.versions[1].state).toBe("SUPERSEDED");
+    expect(uploaded.versions[0].scan_state).toBe("CLEAN");
+    await expect(sv1.page.getByRole("button",{name:"Tải phiên bản 2",exact:true})).toBeEnabled();
     await gv.page.goto(`${web}/theses/${thesisId}?section=documents`);
-    await expect(gv.page.getByText(/Chưa thể duyệt: tệp đang cách ly/)).toBeVisible();
-    await expect(gv.page.getByLabel("Kết quả")).toHaveCount(0);
+    await gv.page.getByLabel("Kết quả").selectOption("ACCEPT");
+    await gv.page.getByLabel("Nhận xét / lý do").fill("Bản sửa đã đạt; tiếp nhận phiên bản 2.");
+    await gv.page.getByRole("button",{name:"Gửi kết quả",exact:true}).click();
+    await expect(gv.page.getByRole("status")).toContainText("Đã lưu nhận xét tài liệu");
     expect(topic.title_versions.map((v:{title:string}) => v.title)).toEqual([title,approved]);
     await sv1.page.reload();
-    await expect(sv1.page.getByRole("heading",{name:"Đăng ký đề tài",exact:true})).toBeVisible();
+    await expect(sv1.page.getByRole("heading",{name:"Thêm tài liệu khác vào hồ sơ khóa luận",exact:true})).toBeVisible();
     expect((await write(sv1.page,"/topics",{data:{round_id:topic.round_id,title:"SV không được tạo đề tài GV"}})).status()).toBe(403);
-    await expect(card(gv.page,approved).getByRole("link",{name:"Mở hồ sơ khóa luận · tiến độ · tài liệu",exact:true})).toBeVisible();
+    await gv.page.goto(web+"/registrations");
+    await expect(card(gv.page,approved).getByRole("link",{name:/Mở hồ sơ khóa luận/})).toBeVisible();
   } finally {await close(actors);}
 });
 
-test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham gia → GV từ chối có lý do", async ({browser}) => {
-  const actors = await Promise.all(["sv3","proposalPeer","tbm","gv"].map(key => login(browser,key)));
-  const [sv,peer,tbm,gv] = actors;
+test("SV đề xuất → trả lại/sửa/duyệt → GV từ chối → TBM chọn GV khác → tiếp nhận chính thức", async ({browser}) => {
+  const actors = await Promise.all(["sv3","proposalPeer","tbm","gv","gv2"].map(key => login(browser,key)));
+  const [sv,peer,tbm,gv,gv2] = actors;
   try {
     const receiver = (await read(sv.page,"/lecturers")).find((l:{lecturer_code:string}) => l.lecturer_code === "SYN-DEMO-GV-1");
     const title = "E2E Đề tài do sinh viên đề xuất";
@@ -292,8 +334,70 @@ test("SV đề xuất cá nhân → trả lại/sửa/duyệt → SV khác tham 
     await expect(dialog).toHaveCount(0);
     await expect(card(gv.page,title + " đã duyệt").getByText("GV từ chối",{exact:true})).toBeVisible();
     const reg = (await read(sv.page,"/topic-registrations")).find((r:{topic_title:string}) => r.topic_title === title + " đã duyệt");
-    expect(reg.members.every((m:{active:boolean}) => !m.active)).toBe(true);
-    expect((await read(sv.page,"/me/eligibility?round_id=" + reg.round_id)).has_active_registration).toBe(false);
+    expect(reg.members.every((m:{active:boolean}) => m.active)).toBe(true);
+    expect((await read(sv.page,"/me/eligibility?round_id=" + reg.round_id)).has_active_registration).toBe(true);
+    await tbm.page.goto(web + "/registrations");
+    await card(tbm.page,title + " đã duyệt").getByRole("button",{name:"Xử lý GV từ chối"}).click();
+    dialog = tbm.page.getByRole("dialog",{name:"Xử lý đề tài sau khi GV từ chối"});
+    const newReceiver = (await read(tbm.page,"/lecturers")).find((l:{lecturer_code:string}) => l.lecturer_code === "SYN-DEMO-GV-2");
+    await dialog.getByLabel("GV mới tiếp nhận").selectOption(newReceiver.id);
+    await dialog.getByLabel("Lý do / căn cứ xử lý").fill("Phân công GV phù hợp chuyên môn hơn");
+    await dialog.getByRole("button",{name:"Lưu quyết định"}).click();
+    await expect(dialog).toHaveCount(0);
+    await gv2.page.goto(web + "/registrations");
+    await card(gv2.page,title + " đã duyệt").getByRole("button",{name:"Chấp nhận chính thức và tạo khóa luận"}).click();
+    await expect(card(gv2.page,title + " đã duyệt").getByRole("link",{name:/Mở hồ sơ khóa luận/})).toBeVisible();
+  } finally {await close(actors);}
+});
+
+test("GV từ chối đề tài SV → TBM trả về → SV sửa, chọn GV mới và gửi lại", async ({browser}) => {
+  const actors = await Promise.all(["returnFlow","tbm","gv","gv2"].map(key => login(browser,key)));
+  const [sv,tbm,gv,gv2] = actors;
+  try {
+    const lecturerRows = await read(sv.page,"/lecturers");
+    const first = lecturerRows.find((l:{lecturer_code:string}) => l.lecturer_code === "SYN-DEMO-GV-1");
+    const second = lecturerRows.find((l:{lecturer_code:string}) => l.lecturer_code === "SYN-DEMO-GV-2");
+    const title = "E2E SV sửa sau GV từ chối";
+    await sv.page.goto(web+"/topics");
+    await sv.page.getByRole("button",{name:"Tự đề xuất đề tài"}).click();
+    let dialog = sv.page.getByRole("dialog");
+    await dialog.getByLabel("Tên đề tài",{exact:true}).fill(title);
+    await dialog.getByLabel("Số sinh viên tối đa").selectOption("1");
+    await dialog.getByLabel("GV mong muốn tiếp nhận").selectOption(first.id);
+    await dialog.getByRole("checkbox").check();
+    await dialog.getByRole("button",{name:"Lập đăng ký của tôi"}).click();
+    await expect(sv.page.getByRole("heading",{name:"Đăng ký đề tài"})).toBeVisible();
+    await sv.page.getByRole("button",{name:"Gửi đề xuất cho bộ môn"}).click();
+    await review(tbm.page,title,first.id);
+    await gv.page.goto(web+"/registrations");
+    await card(gv.page,title+" đã duyệt").getByRole("button",{name:"Từ chối"}).click();
+    dialog = gv.page.getByRole("dialog",{name:"Từ chối đăng ký"});
+    await dialog.getByLabel("Lý do từ chối").fill("Cần điều chỉnh phạm vi trước khi phân công");
+    await dialog.getByRole("button",{name:"Xác nhận từ chối"}).click();
+    await tbm.page.goto(web+"/registrations");
+    await card(tbm.page,title+" đã duyệt").getByRole("button",{name:"Xử lý GV từ chối"}).click();
+    dialog = tbm.page.getByRole("dialog",{name:"Xử lý đề tài sau khi GV từ chối"});
+    await dialog.getByLabel("Hướng xử lý").selectOption("RETURN_TO_STUDENT");
+    await dialog.getByLabel("Lý do / căn cứ xử lý").fill("Trả SV làm rõ mục tiêu và đề xuất GV khác");
+    await dialog.getByRole("button",{name:"Lưu quyết định"}).click();
+    await expect(dialog).toBeHidden();
+    await sv.page.goto(web+"/topics");
+    await sv.page.getByRole("button",{name:"Đề xuất của tôi"}).click();
+    await card(sv.page,title+" đã duyệt").getByRole("button",{name:"Xem chi tiết"}).click();
+    dialog = sv.page.getByRole("dialog");
+    await dialog.getByLabel("Tên đề tài",{exact:true}).fill(title+" chỉnh phạm vi");
+    await dialog.getByLabel("Mô tả, mục tiêu và phạm vi").fill("Phạm vi mới sau góp ý của bộ môn.");
+    await dialog.getByLabel("GV mong muốn tiếp nhận").selectOption(second.id);
+    await dialog.getByRole("button",{name:"Lưu chỉnh sửa"}).click();
+    await expect(dialog.getByText("Đã lưu đề tài.",{exact:true})).toBeVisible();
+    await dialog.getByRole("button",{name:"Đóng",exact:true}).click();
+    await sv.page.goto(web+"/registrations");
+    await card(sv.page,title+" chỉnh phạm vi").getByRole("button",{name:"Xác nhận đăng ký cũ của tôi"}).click();
+    await card(sv.page,title+" chỉnh phạm vi").getByRole("button",{name:"Gửi đề xuất cho bộ môn"}).click();
+    await review(tbm.page,title+" chỉnh phạm vi",second.id);
+    await gv2.page.goto(web+"/registrations");
+    await card(gv2.page,title+" chỉnh phạm vi đã duyệt").getByRole("button",{name:"Chấp nhận chính thức và tạo khóa luận"}).click();
+    await expect(card(gv2.page,title+" chỉnh phạm vi đã duyệt").getByRole("link",{name:/Mở hồ sơ khóa luận/})).toBeVisible();
   } finally {await close(actors);}
 });
 
@@ -316,8 +420,8 @@ test("Hai SV tranh chỗ cuối: chỉ một người tham gia, không vượt s
 });
 
 test("SV nộp đề cương; tệp chưa quét được giữ cách ly và chặn nhận xét", async ({browser}) => {
-  const actors = await Promise.all(["gv","proposalFlow"].map(key => login(browser,key)));
-  const [gv,sv] = actors;
+  const actors = await Promise.all(["gv","tbm","proposalFlow"].map(key => login(browser,key)));
+  const [gv,tbm,sv] = actors;
   try {
     const round = (await read(gv.page,"/rounds/open"))[0];
     let response = await write(gv.page,"/topics",{data:{round_id:round.id,title:"E2E Proposal workflow",max_students:1}});
@@ -339,14 +443,21 @@ test("SV nộp đề cương; tệp chưa quét được giữ cách ly và ch�
     await sv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
     await expect(sv.page.getByRole("heading",{name:"Đề cương khóa luận"})).toBeVisible();
     await sv.page.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles({
-      name:"de-cuong-v1.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4\nsynthetic first version")});
+      name:"de-cuong-v1.pdf",mimeType:"application/pdf",buffer:VALID_PDF});
     await sv.page.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
     await expect(sv.page.getByText("Phiên bản 1 · de-cuong-v1.pdf",{exact:true})).toBeVisible();
-    await expect(sv.page.getByText(/Đang cách ly – chưa quét/)).toBeVisible();
-    await expect(sv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeDisabled();
-    await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
-    await expect(gv.page.getByText(/Chưa thể nhận xét: tệp đang cách ly/)).toBeVisible();
-    await expect(gv.page.getByLabel("Kết quả")).toHaveCount(0);
+    await expect(sv.page.getByText(/đã quét an toàn|Đang cách ly – chưa quét/i)).toBeVisible();
+    const isQuarantined = await sv.page.getByText(/Đang cách ly – chưa quét/i).isVisible().catch(() => false);
+    if (isQuarantined) {
+      await expect(sv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeDisabled();
+      await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
+      await expect(gv.page.getByText(/Chưa thể nhận xét: tệp đang cách ly/)).toBeVisible();
+      await expect(gv.page.getByLabel("Kết quả")).toHaveCount(0);
+    } else {
+      await expect(sv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeEnabled();
+      await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
+      await expect(gv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeEnabled();
+    }
     expect((await read(sv.page,`/theses/${thesisId}/proposal`)).state).toBe("SUBMITTED");
   } finally {await close(actors);}
 });

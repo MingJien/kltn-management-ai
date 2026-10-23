@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import type { AuditEvent, Milestone, ProgressReport, Thesis, ThesisDocument } from "../../api";
 import { downloadDocument, request, uploadProgressEvidence } from "../../api";
 import type { CoreRun } from "./ThesisDocuments";
@@ -66,7 +67,14 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
   for (const report of reports) {
     if ((latest.get(report.milestone_id)?.version_no || 0) < report.version_no) latest.set(report.milestone_id, report);
   }
-  const available = milestones.filter(item => item.state === "OPEN" && (!latest.has(item.id) || latest.get(item.id)?.state === "REVISION_REQUIRED"));
+  const available = milestones.filter(item => {
+    const previous = latest.get(item.id);
+    if (previous?.state === "REVISION_REQUIRED") return true;
+    if (item.state !== "OPEN") return false;
+    if (!previous) return true; // An initial report may still be accepted late while the round milestone is open.
+    return previous.state === "SUBMITTED" && previous.reviews.length === 0 && !!item.due_at
+      && Date.now() <= new Date(item.due_at).getTime();
+  });
   const selected = available.some(item => item.id === milestoneId) ? milestoneId : "";
   const milestoneAudit = milestoneHistory;
   const milestoneAction: Record<string, string> = {MILESTONE_OPENED: "Mở mốc", MILESTONE_EXTENDED: "Gia hạn mốc", MILESTONE_CLOSED: "Đóng mốc"};
@@ -80,7 +88,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       <h3>Mở mốc theo kế hoạch đợt</h3>
       <p className="text-body-sm text-muted">Áp dụng cho mọi khóa luận trong {thesis.round_label}. Mốc đã mở giữ nguyên; đóng trước khi ban hành phiên bản mới cùng mã.</p>
       <div className="core-fields">
-        <div className="input-group"><label htmlFor="milestone-code">Mã mốc</label><input className="input" id="milestone-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} pattern="[A-Z0-9_-]{1,50}" maxLength={50} placeholder="NOI_BO_1" required disabled={busy} /></div>
+        <div className="input-group"><label htmlFor="milestone-code">Mã mốc</label><input className="input" id="milestone-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} pattern="(?:[A-Z0-9_]|-){1,50}" maxLength={50} placeholder="NOI_BO_1" required disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-title">Tên mốc</label><input className="input" id="milestone-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-due">Hạn nộp (giờ Việt Nam)</label><input className="input" id="milestone-due" type="datetime-local" value={dueAt} onChange={event => setDueAt(event.target.value)} required disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-ratio">Tiến độ dự kiến (%)</label><input className="input" id="milestone-ratio" type="number" min={0} max={100} step="0.01" value={expectedRatio} onChange={event => setExpectedRatio(event.target.value)} disabled={busy} /></div>
@@ -121,7 +129,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       <div className="card"><div className="card-body">
         <h3>Không có mốc nào đang mở nhận báo cáo</h3>
         <p className="text-muted">
-          Tất cả các mốc hiện tại đã đóng hoặc nhóm bạn đã được xác nhận tiến độ. Nếu cần nộp bổ sung hoặc gia hạn, liên hệ người điều phối đợt ({thesis.round_label}) để gia hạn hoặc mở mốc tiếp theo.
+          Các mốc đã đóng, báo cáo đã được phản hồi hoặc đã hết hạn tự sửa. Nếu GVHD yêu cầu sửa, bạn sẽ nộp được phiên bản mới kể cả sau khi mốc đóng. Gia hạn chung do người điều phối đợt ({thesis.round_label}) thực hiện.
         </p>
       </div></div>
     )}
@@ -147,23 +155,31 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         setSummary(""); setMilestoneId("");
         if (evidenceFile && created) {
           const uploaded = await run(() => uploadProgressEvidence(thesis.id, created!, userId, evidenceFile),
-            "Đã lưu minh chứng; tệp chờ quét an toàn trước khi GVHD xác nhận.");
-          setEvidenceNotice(uploaded ? "Minh chứng đã lưu cùng báo cáo tiến độ và đang chờ quét an toàn." :
+            "Đã lưu minh chứng; xem trạng thái quét ở thẻ báo cáo.");
+          setEvidenceNotice(uploaded ? "Minh chứng đã lưu cùng báo cáo tiến độ; xem trạng thái quét ở thẻ báo cáo." :
             "Báo cáo đã gửi nhưng tải minh chứng chưa thành công. Hãy tải lại tại thẻ báo cáo bên dưới.");
           if (uploaded) setEvidenceFile(null);
         }
       }
     }}><div className="card-body core-form">
       <h3>Nộp báo cáo tiến độ</h3>
-      <p className="text-body-sm text-muted">Nêu kết quả đã làm, phần còn thiếu và kế hoạch tiếp theo. Có thể nộp trễ khi mốc còn mở; hệ thống ghi rõ thời điểm.</p>
+      <p className="text-body-sm text-muted">Có thể nộp trễ lần đầu khi mốc còn mở. Trước hạn, bạn có thể tự nộp bản sửa nếu GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi mốc đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
       <div className="input-group"><label htmlFor="report-milestone">Mốc báo cáo</label><select className="input" id="report-milestone" value={selected} onChange={event => setMilestoneId(event.target.value)} required disabled={busy}>
-        <option value="">Chọn mốc đang mở / được yêu cầu sửa</option>{available.map(item => <option key={item.id} value={item.id}>{item.title} · v{item.version_no}</option>)}
+        <option value="">Chọn mốc có thể nộp</option>{available.map(item => <option key={item.id} value={item.id}>{item.title} · v{item.version_no}{latest.has(item.id) ? " · nộp phiên bản mới" : ""}</option>)}
       </select></div>
       <div className="input-group"><label htmlFor="report-summary">Kết quả, khó khăn và kế hoạch</label><textarea className="input" id="report-summary" value={summary} onChange={event => setSummary(event.target.value)} required maxLength={10000} disabled={busy} /></div>
       <div className="input-group"><label htmlFor="report-ratio">Tiến độ tự báo cáo (%)</label><input className="input" id="report-ratio" type="number" min={0} max={100} step="0.01" value={ratio} onChange={event => setRatio(Number(event.target.value))} required disabled={busy} /></div>
       <div className="input-group"><label htmlFor="report-evidence-file">Minh chứng tiến độ từ máy (không bắt buộc; PDF, DOCX, TXT; tối đa 10 MB)</label>
         <input className="input" id="report-evidence-file" type="file" accept=".pdf,.docx,.txt" disabled={busy}
           onChange={event => setEvidenceFile(event.target.files?.[0] || null)} />
+        {evidenceFile && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
+          <span className="text-body-sm font-semibold">{evidenceFile.name} ({(evidenceFile.size / 1024).toFixed(1)} KB)</span>
+          <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+            setEvidenceFile(null);
+            const el = document.getElementById("report-evidence-file") as HTMLInputElement | null;
+            if (el) el.value = "";
+          }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+        </div>}
         <p className="text-caption">Có thể để trống. Tệp gắn trực tiếp với báo cáo ở dưới. Khi còn cách ly, GVHD có thể yêu cầu nộp lại nhưng chưa thể tải hoặc xác nhận.</p>
         {evidenceFile && evidenceFile.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
       </div>
@@ -172,12 +188,12 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     </div></form>}
     <h2>Lịch sử báo cáo và nhận xét</h2>
     {reports.map(report => <article className="card" key={report.id}><div className="card-body stack">
-      <div className="flex justify-between gap-3"><h3>{milestones.find(item => item.id === report.milestone_id)?.title || "Báo cáo"} · lần nộp {report.version_no}</h3><Status value={report.state} /></div>
+      <div className="flex justify-between gap-3"><h3>{milestones.find(item => item.id === report.milestone_id)?.title || "Báo cáo"} · lần nộp {report.version_no}</h3>{latest.get(report.milestone_id)?.id === report.id ? <Status value={report.state} /> : <span className="badge">Đã có phiên bản mới</span>}</div>
       <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}</p>
       <p className="text-body-sm text-muted">Hạn áp dụng lúc nộp: {formatDate(report.due_at_at_submission)}</p>
       <p className="core-prewrap">{report.summary}</p>
       {report.evidence_document_version_id && <ProgressEvidence report={report} docs={docs} thesis={thesis} userId={userId} />}
-      {report.state === "SUBMITTED" && !report.evidence_document_version_id && report.submitted_by_student_id === studentId && report.reviews.length === 0 && latest.get(report.milestone_id)?.id === report.id &&
+      {report.state === "SUBMITTED" && !report.evidence_document_version_id && report.submitted_by_student_id === studentId && report.reviews.length === 0 && latest.get(report.milestone_id)?.id === report.id && milestones.some(item => item.id === report.milestone_id && item.state === "OPEN" && !!item.due_at && Date.now() <= new Date(item.due_at).getTime()) &&
         <div className="input-group"><label htmlFor={`retry-evidence-${report.id}`}>Bổ sung minh chứng từ máy cho báo cáo này (không bắt buộc)</label>
           <input className="input" id={`retry-evidence-${report.id}`} type="file" accept=".pdf,.docx,.txt" disabled={busy}
             onChange={async event => {

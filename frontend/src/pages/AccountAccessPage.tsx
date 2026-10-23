@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { errorMessage } from "../errors";
 import { request } from "../api";
-import PasswordInput from "../components/ui/PasswordInput";
+import PasswordField from "../components/ui/PasswordField";
 
 type Mode = "activation-request" | "forgot-password" | "activate" | "reset-password";
 
@@ -65,13 +65,29 @@ export default function AccountAccessPage({signedInAs, onPasswordUpdated}: {
         <input className="input" type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} />
       </label> : null}
       {settingPassword ? <>
-        <div className="input-group"><label htmlFor="account-access-password">Mật khẩu mới</label>
-          <PasswordInput id="account-access-password" label="Mật khẩu mới" minLength={12} required autoComplete="new-password"
-            value={password} onChange={e=>setPassword(e.target.value)} disabled={busy} />
+        <div className="input-group">
+          <label htmlFor="account-password">Mật khẩu mới</label>
+          <PasswordField
+            id="account-password"
+            minLength={12}
+            required
+            autoComplete="new-password"
+            value={password}
+            onChange={e=>setPassword(e.target.value)}
+            placeholder="Nhập mật khẩu mới (tối thiểu 12 ký tự)"
+          />
         </div>
-        <div className="input-group"><label htmlFor="account-access-confirm">Nhập lại mật khẩu</label>
-          <PasswordInput id="account-access-confirm" label="Nhập lại mật khẩu" minLength={12} required autoComplete="new-password"
-            value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy} />
+        <div className="input-group">
+          <label htmlFor="account-confirm">Nhập lại mật khẩu</label>
+          <PasswordField
+            id="account-confirm"
+            minLength={12}
+            required
+            autoComplete="new-password"
+            value={confirm}
+            onChange={e=>setConfirm(e.target.value)}
+            placeholder="Nhập lại mật khẩu mới"
+          />
         </div>
       </> : null}
       {settingPassword && !token ? <p role="alert" className="alert alert-danger">Liên kết không hợp lệ hoặc đã được sử dụng.</p> : null}

@@ -31,6 +31,10 @@ def workspace(scenario, monkeypatch, tmp_path):
     thesis_id = accepted["thesis_id"]
     session.add(m.ResourceAssignment(id=uuid4(), assignment_type="KLTN_COORDINATOR", user_id=users[4].id,
         round_id=topic.round_id, effective_from=now()-timedelta(days=1), state="ACTIVE"))
+    for doc_type in ("PROPOSAL", "PLAN", "SUPPORTING"):
+        session.add(m.DocumentDeadline(id=uuid4(), round_id=topic.round_id,
+            document_type=doc_type, due_at=now()+timedelta(days=30),
+            state="OPEN", set_by=users[4].id, reason="Initial deadline"))
     session.commit()
     return client, users, students, lecturers, session, f"/api/v1/theses/{thesis_id}"
 
@@ -128,59 +132,6 @@ def test_progress_revision_cross_comment_and_closed_milestone(workspace):
     assert client.post(path+"/progress-reports", headers=hdr(users[0]), json=payload).status_code == 409
 
 
-def test_progress_optional_local_evidence_is_versioned_scoped_and_quarantined(workspace):
-    client, users, students, _, session, path = workspace
-    milestone = open_milestone(client, users, path)
-    report = client.post(path+"/progress-reports", headers=hdr(users[0]), json={
-        "milestone_id": milestone["id"], "summary": "Completed prototype", "reported_ratio": 40})
-    assert report.status_code == 201, report.text
-    item = report.json()
-    assert item["evidence_document_version_id"] is None
-    evidence_path = path+f"/progress-reports/{item['id']}/evidence"
-    def attach(user, payload, name="proof.txt", row=item):
-        return client.post(evidence_path, headers={**version_headers(user, row),
-            "Content-Type": "application/octet-stream", "X-File-Name": name}, content=payload)
-    assert attach(users[1], b"Peer file").status_code == 403
-    assert attach(users[0], b"not pdf", "proof.pdf").status_code == 422
-    assert attach(users[0], b"Proof content").status_code == 200
-    attached = client.get(path+"/progress-reports", headers=hdr(users[0])).json()[0]
-    assert attached["evidence_scan_state"] == "QUARANTINED"
-    assert attached["evidence_file_name"] == "proof.txt"
-    assert attached["submitted_by_student_id"] == str(students[0].id)
-    assert attach(users[0], b"Second attachment", row=attached).status_code == 409
-    docs = client.get(path+"/documents", headers=hdr(users[0])).json()
-    assert len(docs) == 1 and docs[0]["versions"][0]["id"] == attached["evidence_document_version_id"]
-    assert client.post(path+f"/documents/{docs[0]['id']}/withdraw", headers=version_headers(users[0], docs[0]),
-        json={"reason": "Referenced by progress"}).status_code == 409
-    assert client.post(evidence_path.removesuffix("/evidence")+"/review", headers=version_headers(users[3], attached),
-        json={"decision": "CONFIRM", "comment": "Looks good"}).status_code == 409
-    stored = session.get(m.StoredFile, session.get(m.ProgressReport, item["id"]).evidence_file_id)
-    stored.scan_state = "CLEAN"  # Synthetic scanner result; production does not set this itself.
-    session.commit()
-    assert client.post(evidence_path.removesuffix("/evidence")+"/review", headers=version_headers(users[3], attached),
-        json={"decision": "CONFIRM", "comment": "Looks good"}).status_code == 200
-
-
-def test_progress_evidence_upload_rollback_removes_file_and_metadata(workspace, monkeypatch):
-    client, users, _, _, session, path = workspace
-    milestone = open_milestone(client, users, path)
-    report = client.post(path+"/progress-reports", headers=hdr(users[0]), json={
-        "milestone_id": milestone["id"], "summary": "Results", "reported_ratio": 30}).json()
-    from backend.services import documents
-    original_commit = session.commit
-    def fail_commit():
-        raise RuntimeError("Synthetic database commit failure")
-    monkeypatch.setattr(session, "commit", fail_commit)
-    with pytest.raises(RuntimeError, match="Synthetic database"):
-        client.post(path+f"/progress-reports/{report['id']}/evidence",
-            headers={**version_headers(users[0], report), "Content-Type": "application/octet-stream",
-                "X-File-Name": "proof.txt"}, content=b"Synthetic evidence")
-    monkeypatch.setattr(session, "commit", original_commit)
-    assert client.get(path+"/progress-reports", headers=hdr(users[0])).json()[0]["evidence_document_version_id"] is None
-    assert client.get(path+"/documents", headers=hdr(users[0])).json() == []
-    assert list(documents.storage_root().glob("*")) == []
-
-
 def test_late_submission_marked_not_faked_as_on_time(workspace):
     client, users, *_ , path = workspace
     milestone = open_milestone(client, users, path, due_at=(now()-timedelta(days=1)).isoformat())
@@ -240,6 +191,7 @@ def test_progress_report_cannot_be_created_as_standalone_document(workspace):
 
 
 def test_document_versions_review_download_and_corruption_detection(workspace, monkeypatch):
+    monkeypatch.setattr("backend.services.documents.file_scanner.scan", lambda file, path: file.scan_state)
     client, users, _, _, session, path = workspace
     doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "SUPPORTING"}).json()
     first = upload(client, users[0], path, doc)
@@ -250,7 +202,7 @@ def test_document_versions_review_download_and_corruption_detection(workspace, m
     assert upload(client, users[1], path, doc).status_code == 409
     download = path+f"/documents/{doc['id']}/versions/{v1['id']}/download"
     assert client.get(download, headers=hdr(users[2])).status_code == 404
-    # Unscanned uploads must not be downloadable or reviewed.
+    # Unscanned uploads must not be downloaded or accepted.
     assert client.get(download, headers=hdr(users[3])).status_code == 409
     assert client.post(path+f"/documents/{doc['id']}/versions/{v1['id']}/review", headers=version_headers(users[3], v1),
         json={"decision": "ACCEPT", "comment": "Cannot accept unscanned file"}).status_code == 409
@@ -296,7 +248,8 @@ def test_student_withdraws_mistaken_document_without_erasing_versions(workspace)
     assert session.scalar(select(m.AuditEvent.id).where(m.AuditEvent.action == "DOCUMENT_WITHDRAWN"))
 
 
-def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace):
+def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace, monkeypatch):
+    monkeypatch.setattr("backend.services.documents.file_scanner.scan", lambda file, path: file.scan_state)
     client, users, _, _, _, path = workspace
     created = client.post(path+"/documents", headers=hdr(users[0]),
         json={"title": "Report for advisor", "document_type": "SUPPORTING"}).json()

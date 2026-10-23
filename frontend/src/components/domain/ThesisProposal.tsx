@@ -1,12 +1,13 @@
 import { useState } from "react";
-import type { Lecturer, Proposal, Thesis } from "../../api";
+import { X } from "lucide-react";
+import type { DocumentDeadline, Lecturer, Proposal, Thesis } from "../../api";
 import { downloadProposal, downloadProposalTemplate, request, uploadProposal } from "../../api";
 import { scanLabel } from "./ThesisDocuments";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
-export default function ThesisProposal({thesis, proposal, lecturers, userId, busy, run}: {
-  thesis: Thesis; proposal: Proposal; lecturers: Lecturer[]; userId: string; busy: boolean; run: CoreRun;
+export default function ThesisProposal({thesis, proposal, deadline, lecturers, userId, busy, run}: {
+  thesis: Thesis; proposal: Proposal; deadline?: DocumentDeadline; lecturers: Lecturer[]; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [reviewerId, setReviewerId] = useState("");
@@ -16,7 +17,12 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
   const [printNotice, setPrintNotice] = useState("");
   const [downloading, setDownloading] = useState(false);
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
-  const canSubmit = active && thesis.actions.includes("proposal:submit") && ["DRAFT", "REVISION_REQUIRED"].includes(proposal.state);
+  const latest = proposal.versions[0];
+  const beforeDue = deadline?.state === "OPEN" && Date.now() <= new Date(deadline.due_at).getTime();
+  const canSubmit = active && thesis.actions.includes("proposal:submit") && !!deadline && (
+    proposal.state === "REVISION_REQUIRED" ||
+    (deadline.state === "OPEN" && !latest && proposal.state === "DRAFT") ||
+    (beforeDue && !!latest && ["SUBMITTED", "UNDER_REVIEW"].includes(proposal.state) && latest.reviews.length === 0));
   const canReview = active && thesis.actions.includes("proposal:review") && ["SUBMITTED", "UNDER_REVIEW"].includes(proposal.state);
   const canComment = active && !canReview && thesis.actions.includes("proposal:comment") && ["SUBMITTED", "UNDER_REVIEW", "ADVISOR_CONFIRMED"].includes(proposal.state);
 
@@ -24,6 +30,8 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
     <div className="card"><div className="card-body stack">
       <h2>Đề cương khóa luận</h2>
       <p className="text-body-sm text-muted">Soạn nội dung trên mẫu đề cương chính thức của Khoa, rồi nộp bản PDF/DOCX đã điền. Mỗi lần sửa và nộp lại tạo một phiên bản riêng. GVHD nhận xét, Trưởng bộ môn chốt. Hệ thống chỉ đọc mẫu gốc, không tự dựng mẫu thay thế.</p>
+      <p className="text-body-sm"><strong>Hạn đề cương:</strong> {deadline ? `${formatDate(deadline.due_at)} · ${deadline.state === "OPEN" ? "đang nhận" : "đã đóng"}` : "Khoa chưa thiết lập — chưa nhận tệp"}</p>
+      <p className="text-caption">Có thể tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
       <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {
         setDownloadError(""); setDownloading(true);
         try {await downloadProposalTemplate();} catch (cause) {setDownloadError(String(cause));}
@@ -43,7 +51,15 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
         <label htmlFor="proposal-file">Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)</label>
         <input className="input" id="proposal-file" type="file" accept=".pdf,.docx" required disabled={busy}
           onChange={event => setFile(event.target.files?.[0] || null)} />
-        <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>Nộp đề cương</button>
+        {file && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
+          <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+          <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+            setFile(null);
+            const el = document.getElementById("proposal-file") as HTMLInputElement | null;
+            if (el) el.value = "";
+          }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+        </div>}
+        <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>{busy ? "Đang tải lên và quét an toàn…" : "Nộp đề cương"}</button>
         {file && file.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
       </form>}
       {proposal.versions.length === 0 && <p className="text-muted">Chưa có bản đề cương.</p>}
@@ -58,7 +74,12 @@ export default function ThesisProposal({thesis, proposal, lecturers, userId, bus
       return <article className="card" key={version.id}><div className="card-body stack">
       <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong>{index === 0 && <Status value={proposal.state} />}</div>
       <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
+      {version.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+      {version.due_at_at_submission && <p className="text-caption">Hạn áp dụng lúc nộp: {formatDate(version.due_at_at_submission)}</p>}
       <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
+      {["QUARANTINED", "FAILED"].includes(version.scan_state) && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+        onClick={() => run(() => request(`/theses/${thesis.id}/proposal/versions/${version.id}/scan`, userId, {method:"POST"}),
+          "Đã quét lại đề cương bằng ClamAV; xem trạng thái mới của phiên bản.")}>Quét lại tệp bằng ClamAV</button>}
       <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
         setDownloadError(""); setDownloading(true);
         try {await downloadProposal(thesis.id, version, userId);} catch (cause) {setDownloadError(String(cause));}

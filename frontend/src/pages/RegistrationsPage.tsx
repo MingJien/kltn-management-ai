@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, Info } from "lucide-react";
-import type { Context, Registration } from "../api";
+import { ClipboardList, Info, X } from "lucide-react";
+import type { Context, Lecturer, Registration } from "../api";
 import { evidenceUrl, request, uploadEvidence } from "../api";
 import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
@@ -21,7 +21,13 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
   const [page, setPage] = useState(0);
   const [rejectTarget, setRejectTarget] = useState<Registration | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [resolutionTarget, setResolutionTarget] = useState<Registration | null>(null);
+  const [resolutionChoice, setResolutionChoice] = useState<"REASSIGN" | "RETURN_TO_STUDENT">("REASSIGN");
+  const [resolutionLecturerId, setResolutionLecturerId] = useState("");
+  const [resolutionReason, setResolutionReason] = useState("");
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [withdrawTarget, setWithdrawTarget] = useState<Registration | null>(null);
+  const [stagedFiles, setStagedFiles] = useState<Record<string, File | null>>({});
   useEffect(() => {
     const notice = (location.state as {notice?: string} | null)?.notice;
     if (!notice) return;
@@ -34,6 +40,10 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
       : await request<Registration[]>("/topic-registrations?limit=" + PAGE_SIZE + "&offset=" + page * PAGE_SIZE, userId);
     setRows(data);
   }, [userId,page,focusedRegistrationId]);
+  useEffect(() => {
+    if (!context.actions.includes("topic:department_decide")) return;
+    void request<Lecturer[]>("/lecturers", userId).then(setLecturers).catch(cause => setError(errorMessage(cause)));
+  }, [context.actions, userId]);
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -70,7 +80,16 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
   async function decide(row: Registration, decision: "ACCEPT" | "REJECT", reason?: string) {
     return operate(() => request<Registration>("/topic-registrations/" + row.id + "/lecturer-decision",userId,{
       method:"POST",headers:{"If-Match":String(row.row_version)},body:JSON.stringify({decision,reason}),
-    }),decision === "ACCEPT" ? "Đã chấp nhận chính thức; khóa luận và GVHD chính đã được tạo." : "Đã từ chối và lưu lý do. SV có thể đăng ký lại.");
+    }),decision === "ACCEPT" ? "Đã chấp nhận chính thức; khóa luận và GVHD chính đã được tạo." :
+      row.proposer_type === "STUDENT" ? "Đã lưu lý do. Chờ Trưởng bộ môn chọn GV khác hoặc trả về nhóm SV chỉnh sửa." : "Đã từ chối và lưu lý do. SV có thể đăng ký lại.");
+  }
+  async function resolveRejection(row: Registration) {
+    return operate(() => request<Registration>(`/topic-registrations/${row.id}/resolve-lecturer-rejection`, userId, {
+      method:"POST", headers:{"If-Match":String(row.row_version)},
+      body:JSON.stringify({decision:resolutionChoice, reason:resolutionReason.trim(),
+        receiving_lecturer_id:resolutionChoice === "REASSIGN" ? resolutionLecturerId : null}),
+    }), resolutionChoice === "REASSIGN" ? "Đã chuyển hồ sơ cho GV mới tiếp nhận; nhóm SV được giữ nguyên." :
+      "Đã trả hồ sơ về nhóm SV để sửa, chọn GV đề xuất và xác nhận lại trước khi gửi.");
   }
   return <>
     <PageHeader title="Đăng ký đề tài" description={context.base_role === "STUDENT"
@@ -124,16 +143,39 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
           {row.proposer_type === "STUDENT" && row.state === "SUBMITTED" && row.topic_state === "APPROVED" ?
             <p className="registration-card__stage" role="status"><strong>Bộ môn đã duyệt đề tài</strong>
               <span>Đăng ký đang chờ GV tiếp nhận chấp nhận hoặc từ chối. Chưa phân công GVHD chính thức.</span></p> : null}
+          {row.proposer_type === "STUDENT" && row.state === "LECTURER_REJECTED" ?
+            <p className="registration-card__stage" role="status"><strong>GV đã từ chối tiếp nhận</strong>
+              <span>Nhóm vẫn giữ đăng ký; Trưởng bộ môn sẽ chọn GV khác hoặc trả hồ sơ về SV để sửa và đề xuất lại.</span></p> : null}
           {(row.state === "FINALIZED" || row.state === "LECTURER_ACCEPTED") ? <p className="alert alert-success">GV đã chấp nhận chính thức. Khóa luận và phân công GVHD chính đã được tạo; nhóm có thể mở hồ sơ để nộp đề cương, tiến độ và tài liệu.</p> : null}
           {me?.active && activeCount < row.expected_member_count && row.topic_state === "APPROVED" && row.state !== "FINALIZED" && row.state !== "LECTURER_ACCEPTED" ?
             <p className="text-caption">Các SV khác có thể tự tham gia từ danh sách đề tài khi còn hạn đăng ký. Nếu thêm thành viên, nhóm sẽ chờ GV xét lại.</p> : null}
-          {me?.can_upload_evidence && context.base_role === "STUDENT" ? <label className="evidence-upload">
-            Minh chứng của tôi (tùy chọn) — PDF, PNG, JPEG, tối đa 5 MB
-            <input type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy}
-              onChange={(event) => {void upload(row,event.target.files?.[0]); event.target.value = "";}} />
+          {me?.can_upload_evidence && context.base_role === "STUDENT" ? <div className="evidence-upload stack" style={{gap: "var(--space-1)"}}>
+            <label htmlFor={`evidence-${row.id}`}>Minh chứng của tôi (tùy chọn) — PDF, PNG, JPEG, tối đa 5 MB</label>
+            <input id={`evidence-${row.id}`} type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy}
+              onChange={(event) => setStagedFiles(prev => ({...prev, [row.id]: event.target.files?.[0] || null}))} />
+            {stagedFiles[row.id] && <div className="flex items-center gap-2">
+              <span className="text-body-sm font-semibold">{stagedFiles[row.id]?.name} ({(stagedFiles[row.id]!.size / 1024).toFixed(1)} KB)</span>
+              <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+                setStagedFiles(prev => ({...prev, [row.id]: null}));
+                const el = document.getElementById(`evidence-${row.id}`) as HTMLInputElement | null;
+                if (el) el.value = "";
+              }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={async () => {
+                const f = stagedFiles[row.id];
+                if (f) {
+                  await upload(row, f);
+                  setStagedFiles(prev => ({...prev, [row.id]: null}));
+                  const el = document.getElementById(`evidence-${row.id}`) as HTMLInputElement | null;
+                  if (el) el.value = "";
+                }
+              }}>Tải lên</button>
+            </div>}
+
+
+
             <span className="text-caption">{draft ? "Tệp mới thay minh chứng đang gắn. Sau gửi hồ sơ, minh chứng được khóa."
               : "Bạn vừa tham gia nhóm đã gửi: có thể bổ sung minh chứng lần đầu trước khi GV xét."}</span>
-          </label> : null}
+          </div> : null}
           <div className="registration-card__actions">
             {draft && me?.active ? <>
               {me.consent_status === "PENDING" ? <button className="btn btn-secondary" disabled={busy}
@@ -147,6 +189,8 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
               <button className="btn btn-primary" disabled={busy} onClick={() => void decide(row,"ACCEPT")}>Chấp nhận chính thức và tạo khóa luận</button>
               <button className="btn btn-destructive" disabled={busy} onClick={() => {setRejectTarget(row); setRejectReason(""); setError("");}}>Từ chối</button>
             </> : null}
+            {row.state === "LECTURER_REJECTED" && row.proposer_type === "STUDENT" && context.actions.includes("topic:department_decide") ?
+              <button className="btn btn-secondary" disabled={busy} onClick={() => {setResolutionTarget(row); setResolutionChoice("REASSIGN"); setResolutionLecturerId(""); setResolutionReason(""); setError("");}}>Xử lý GV từ chối</button> : null}
             {row.thesis_id ? <Link className="btn btn-primary" to={"/theses/" + row.thesis_id}>Mở hồ sơ khóa luận · đề cương · tiến độ · tài liệu</Link> : null}
             {me?.can_withdraw ? <>
               <p className="registration-card__hint"><Info size={15} aria-hidden="true" />
@@ -170,6 +214,22 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
     </>}>
       <p>{rejectTarget?.topic_title}</p>
       <label>Lý do từ chối<textarea className="input" rows={3} maxLength={2000} required value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /></label>
+      {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    </Dialog>
+    <Dialog open={!!resolutionTarget} busy={busy} onClose={() => setResolutionTarget(null)} title="Xử lý đề tài sau khi GV từ chối" footer={<>
+      <button className="btn btn-secondary" disabled={busy} onClick={() => setResolutionTarget(null)}>Quay lại</button>
+      <button className="btn btn-primary" disabled={busy || resolutionReason.trim().length < 3 || (resolutionChoice === "REASSIGN" && !resolutionLecturerId)}
+        onClick={() => {if (resolutionTarget) void resolveRejection(resolutionTarget).then(ok => {if (ok) setResolutionTarget(null);});}}>Lưu quyết định</button>
+    </>}>
+      <p>{resolutionTarget?.topic_title}</p>
+      <label className="input-group">Hướng xử lý<select className="input" value={resolutionChoice} onChange={event => setResolutionChoice(event.target.value as "REASSIGN" | "RETURN_TO_STUDENT")}>
+        <option value="REASSIGN">Chọn GV khác tiếp nhận</option><option value="RETURN_TO_STUDENT">Trả về SV chỉnh sửa và đề xuất lại</option>
+      </select></label>
+      {resolutionChoice === "REASSIGN" ? <label className="input-group">GV mới tiếp nhận<select className="input" required value={resolutionLecturerId} onChange={event => setResolutionLecturerId(event.target.value)}>
+        <option value="">Chọn GV khác trong bộ môn</option>{lecturers.filter(item => item.id !== resolutionTarget?.receiving_lecturer_id).map(item =>
+          <option key={item.id} value={item.id}>{item.display_name} · {item.lecturer_code}</option>)}</select></label> :
+        <p className="text-caption">SV sẽ sửa đề tài, chọn GV đề xuất và từng thành viên xác nhận lại. Bản đề tài và quyết định cũ vẫn được lưu trong lịch sử.</p>}
+      <label className="input-group">Lý do / căn cứ xử lý<textarea className="input" rows={3} required minLength={3} maxLength={2000} value={resolutionReason} onChange={event => setResolutionReason(event.target.value)} /></label>
       {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
     </Dialog>
     <Dialog open={!!withdrawTarget} busy={busy} onClose={() => setWithdrawTarget(null)} title="Rút khỏi đăng ký" footer={<>

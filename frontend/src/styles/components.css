@@ -16,6 +16,36 @@
 .account-list {display:grid; gap:var(--space-2);}
 .account-list__row {display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border-color); border-radius:var(--radius-md);}
 .account-list__row span {overflow-wrap:anywhere;}
+.account-list__info {flex:1; min-width:0; overflow-wrap:anywhere;}
+.account-list__actions {
+  display: grid;
+  grid-template-columns: 88px 136px 136px 92px;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+}
+.account-list__action-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+}
+.account-list__action-slot .btn {
+  width: 100%;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
+@media (max-width: 820px) {
+  .account-list__row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .account-list__actions {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
 .table-scroll {overflow-x:auto; max-height:480px;}
 .account-table {width:100%; border-collapse:collapse; font:var(--text-body-sm);}
 .account-table th,.account-table td {padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border-color); text-align:left;}
@@ -1245,10 +1275,11 @@ textarea.input {
 .core-review { padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-md); }
 .core-prewrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 .core-version { padding: var(--space-3); border-left: 3px solid var(--primary-300); background: var(--neutral-50); }
+.core-hash { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-caption-size); }
 .core-thesis-link { color: var(--primary-700); text-decoration: none; }
 .core-thesis-link:hover { text-decoration: underline; }
-.login-password-field { position: relative; }
-.login-password-field .input { padding-right: 44px; }
+.login-password-field { position: relative; width: 100%; }
+.login-password-field .input { width: 100%; padding-right: 44px; }
 .login-password-toggle {
   position: absolute;
   top: 50%;
@@ -1264,7 +1295,7 @@ textarea.input {
   background: transparent;
   cursor: pointer;
 }
-.login-password-toggle:hover { background: var(--neutral-100); }
+.login-password-toggle:hover { background: var(--neutral-100); color: var(--primary-700); }
 .login-password-toggle:focus-visible { outline: 2px solid var(--primary-700); outline-offset: 2px; }
 @media (max-width: 1023px) {
   .app-shell__sidebar:not(.sidebar--open) { visibility: hidden; }

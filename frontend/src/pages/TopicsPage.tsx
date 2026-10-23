@@ -31,6 +31,8 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const [rounds, setRounds] = useState<OpenRound[]>([]);
   const [roundsLoaded, setRoundsLoaded] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [lecturersLoading, setLecturersLoading] = useState(true);
+  const [lecturersError, setLecturersError] = useState("");
   const [selected, setSelected] = useState<Topic | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -49,6 +51,20 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const head = context.actions.includes("topic:department_decide");
   const path = "/topics?" + new URLSearchParams({limit:String(PAGE_SIZE), offset:String(page * PAGE_SIZE), search, view});
   const reload = useCallback(async () => setTopics(await request<Topic[]>(path, userId)), [path, userId]);
+  const loadLecturers = useCallback(async (signal?: AbortSignal) => {
+    setLecturersLoading(true); setLecturersError("");
+    try {
+      const rows = await request<Lecturer[]>("/lecturers", userId, {signal});
+      if (!signal?.aborted) setLecturers(rows);
+    } catch (cause) {
+      if (!signal?.aborted) setLecturersError(errorMessage(cause));
+    } finally {if (!signal?.aborted) setLecturersLoading(false);}
+  }, [userId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadLecturers(controller.signal);
+    return () => controller.abort();
+  }, [loadLecturers]);
   useEffect(() => {
     const timer = window.setTimeout(() => {setSearch(filter.trim()); setPage(0);}, 250);
     return () => window.clearTimeout(timer);
@@ -63,8 +79,8 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   }, [path, userId]);
   useEffect(() => {
     let alive = true;
-    Promise.all([request<OpenRound[]>("/rounds/open", userId), request<Lecturer[]>("/lecturers", userId)])
-      .then(([r,l]) => {if (alive) {setRounds(r); setLecturers(l); setRoundsLoaded(true);}})
+    request<OpenRound[]>("/rounds/open", userId)
+      .then((r) => {if (alive) {setRounds(r); setRoundsLoaded(true);}})
       .catch((cause) => {if (alive) setMessage(errorMessage(cause));});
     return () => {alive = false;};
   }, [userId]);
@@ -118,6 +134,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     finally {setBusy(false);}
   }
   const editable = selected?.proposer_user_id === userId && ["DRAFT","RETURNED"].includes(selected.state);
+  const receiverReady = !lecturersLoading && !lecturersError && lecturers.some(item => item.id === receiver);
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
       description={student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
@@ -224,7 +241,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
             : <p>Chỉnh sửa xong, mở Đăng ký để gửi đề xuất cho bộ môn.</p>}
         </> : null}
         {head && selected.state === "SUBMITTED" && selected.proposer_user_id !== userId ?
-          <form className="review-panel" onSubmit={(event) => {event.preventDefault(); void mutate("/topics/" + selected.id + "/department-decision","POST",
+          <form className="review-panel" onSubmit={(event) => {event.preventDefault(); if (selected.proposer_type === "STUDENT" && !receiverReady) return; void mutate("/topics/" + selected.id + "/department-decision","POST",
             {decision:"APPROVE",revised_title:revisedTitle,reason:reason || null,
               ...(selected.proposer_type === "STUDENT" ? {receiving_lecturer_id:receiver} : {})},selected.row_version);}}>
             <div className="review-panel__head"><ClipboardCheck size={16} aria-hidden="true" /><h3>Bộ môn xét duyệt</h3></div>
@@ -235,18 +252,21 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
                   value={revisedTitle} onChange={(event) => setRevisedTitle(event.target.value)} />
                 <span className="review-field__hint">Tên cũ và tên mới được giữ trong lịch sử.</span>
               </label>
-              {selected.proposer_type === "STUDENT" ? <label className="review-field">
-                <span className="review-field__label">GV tiếp nhận (xác nhận hoặc chọn lại)</span>
-                <select className="input" required value={receiver} onChange={(event) => setReceiver(event.target.value)}>
+              {selected.proposer_type === "STUDENT" ? <div className="review-field">
+                <label htmlFor="topic-receiver" className="review-field__label">GV tiếp nhận (xác nhận hoặc chọn lại)</label>
+                <select id="topic-receiver" className="input" required disabled={busy || lecturersLoading || !!lecturersError} value={receiverReady ? receiver : ""} aria-describedby="receiver-hint" onChange={(event) => setReceiver(event.target.value)}>
                   <option value="">Chọn GV</option>{lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.display_name}</option>)}
-                </select></label> : null}
+                </select>
+                <span id="receiver-hint" className="review-field__hint" role="status">{lecturersLoading ? "Đang tải danh sách giảng viên…" : lecturersError ? `Chưa tải được danh sách: ${lecturersError}` : !lecturers.length ? "Chưa có giảng viên phù hợp trong phạm vi của bạn." : !receiverReady ? "Vui lòng chọn GV tiếp nhận hợp lệ trước khi duyệt. GV được đề xuất có thể không còn trong danh sách hiện hành." : "Đã chọn GV tiếp nhận. Bạn có thể giữ hoặc chọn lại."}</span>
+                {lecturersError && <button type="button" className="btn btn-secondary" disabled={busy || lecturersLoading} onClick={()=>void loadLecturers()}>Tải lại danh sách giảng viên</button>}
+                </div> : null}
               <label className="review-field">
                 <span className="review-field__label">Góp ý / lý do</span>
                 <textarea className="input" rows={3} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)} />
               </label>
             </div>
             <div className="review-panel__actions">
-              <button className="btn btn-primary" disabled={busy}>Duyệt đề tài</button>
+              <button className="btn btn-primary" disabled={busy || (selected.proposer_type === "STUDENT" && !receiverReady)}>Duyệt đề tài</button>
               {(["RETURN","REJECT"] as const).map((decision) => <button key={decision} type="button"
                 className={"btn " + (decision === "RETURN" ? "btn-secondary" : "btn-destructive")} disabled={busy || !reason.trim()}
                 onClick={() => void mutate("/topics/" + selected.id + "/department-decision","POST",{decision,reason},selected.row_version)}>

@@ -17,6 +17,7 @@ from backend.api.core_schemas import DocumentOut, DocumentVersionOut, ReviewOut
 from backend.db.models import entities as m
 from backend.services.registration import profile, row_version
 from backend.services.theses import audit, now, thesis_access
+from backend.services import deadlines, file_scanner
 
 MAX_BYTES = 10 * 1024 * 1024
 ROOT = Path(__file__).resolve().parents[2]
@@ -118,11 +119,34 @@ def document_out(session, item):
         return DocumentVersionOut(id=version.id, version_no=version.version_no, row_version=version.row_version,
             state=version.state, file_name=file.original_name, byte_size=file.byte_size,
             sha256=version.content_sha256, scan_state=file.scan_state, submitted_at=version.submitted_at,
+            due_at_at_submission=version.due_at_at_submission,
+            late=bool(version.due_at_at_submission and version.submitted_at > version.due_at_at_submission),
             submitted_by_name=session.get(m.StudentProfile, version.submitted_by).display_name,
             reviews=[ReviewOut(reviewer_name=reviewer_name(event), decision=event.action.removeprefix("DOCUMENT_"),
                 comment=event.reason or "", created_at=event.occurred_at) for event in decisions])
     return DocumentOut(id=item.id, title=item.title, document_type=item.document_type, row_version=item.row_version,
         visibility=item.visibility, versions=[version_out(version) for version in versions])
+
+
+def rescan_version(session, user, thesis_id, document_id, version_id):
+    thesis_access(session, user, thesis_id, action="document:view", lock=True, write=True)
+    item = document(session, thesis_id, document_id, lock=True)
+    version = session.scalar(select(m.DocumentVersion).where(
+        m.DocumentVersion.id == version_id, m.DocumentVersion.document_id == item.id).with_for_update())
+    if not version:
+        raise HTTPException(404, "Không tìm thấy phiên bản")
+    file = session.get(m.StoredFile, version.stored_file_id)
+    if file.scan_state == "CLEAN":
+        return document_out(session, item)
+    if file.scan_state == "INFECTED":
+        raise HTTPException(409, "Tệp nhiễm mã độc; hãy nộp phiên bản mới")
+    file_scanner.require_available()
+    state = file_scanner.scan(file, storage_root() / Path(file.storage_key).name)
+    audit(session, user, "DOCUMENT_FILE_SCANNED", "document_version", version.id, state)
+    session.flush()
+    result = document_out(session, item)
+    session.commit()
+    return result
 
 
 def create_document(session, user, thesis_id, data):
@@ -177,25 +201,35 @@ def withdraw_document(session, user, thesis_id, document_id, data, expected):
 async def upload_version(session, user, thesis_id, document_id, request, expected):
     path = None
     try:
-        thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
+        thesis = thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
         item = document(session, thesis_id, document_id, lock=True)
         row_version(expected, item.row_version)
         if item.document_type == "PROPOSAL":
             raise HTTPException(409, "Đề cương phải nộp tại mục Đề cương")
         if item.document_type == "REPORT":
             raise HTTPException(409, "Hồ sơ báo cáo cũ chỉ để đối chiếu; nộp tiến độ tại mục Tiến độ")
-        name, content, mime = await read_upload(request)
         latest = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == item.id)
             .order_by(m.DocumentVersion.version_no.desc()).limit(1))
-        if latest and latest.state == "FINAL":
-            raise HTTPException(409, "Bản cuối đã khóa")
+        deadline = deadlines.for_submission(session, thesis, item.document_type)
+        if latest and latest.state not in {"SUBMITTED", "REVISION_REQUESTED"}:
+            raise HTTPException(409, "Bản đã được duyệt hoặc khóa; chỉ nộp lại khi GVHD yêu cầu sửa")
+        deadlines.ensure_submission_allowed(deadline,
+            revision_requested=bool(latest and latest.state == "REVISION_REQUESTED"),
+            previous_submitted=bool(latest and latest.state == "SUBMITTED"))
+        name, content, mime = await read_upload(request)
         file, digest, path = persist_upload(session, name, content, mime)
+        file_scanner.scan(file, path)
+        if latest and latest.state == "SUBMITTED":
+            latest.state = "SUPERSEDED"
+            latest.row_version += 1
         version = m.DocumentVersion(id=uuid4(), document_id=item.id, version_no=latest.version_no + 1 if latest else 1,
             stored_file_id=file.id, submitted_by=profile(session, user, "STUDENT").id,
-            submitted_at=now(), content_sha256=digest, state="SUBMITTED")
+            submitted_at=now(), due_at_at_submission=deadline.due_at,
+            content_sha256=digest, state="SUBMITTED")
         session.add(version)
         item.row_version += 1
-        audit(session, user, "DOCUMENT_UPLOADED", "thesis", thesis_id, f"{item.title} v{version.version_no}", after_hash=digest)
+        audit(session, user, "DOCUMENT_SELF_CORRECTED" if latest and latest.state == "SUPERSEDED" else "DOCUMENT_UPLOADED",
+            "thesis", thesis_id, f"{item.title} v{version.version_no}", after_hash=digest)
         session.flush()
         result = document_out(session, item)
         session.commit()

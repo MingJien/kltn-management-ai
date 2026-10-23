@@ -1,0 +1,11 @@
+department_code,department_name,major_code,major_name
+BM-CNTT,Công nghệ thông tin,7480201,Công nghệ thông tin
+BM-KHMT,Khoa học máy tính,7480101,Khoa học máy tính
+BM-KHMT,Khoa học máy tính,7480208,An ninh mạng
+BM-KT,Kỹ thuật,7520215,"Kỹ thuật điện, điện tử"
+BM-KT,Kỹ thuật,7510205,Công nghệ kỹ thuật ô tô
+BM-KT,Kỹ thuật,7580201,Kỹ thuật xây dựng
+BM-KT,Kỹ thuật,7580205,Kỹ thuật xây dựng công trình giao thông
+BM-CNSTP,Công nghệ sinh học & Thực phẩm,7420201,Công nghệ sinh học
+BM-CNSTP,Công nghệ sinh học & Thực phẩm,7540101,Công nghệ thực phẩm
+BM-CNSTP,Công nghệ sinh học & Thực phẩm,7519002,Công nghệ nông nghiệp

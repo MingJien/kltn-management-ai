@@ -17,7 +17,7 @@ from backend.api.account_admin import router as account_admin_router
 from backend.api.core import router as thesis_workspace_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
-    ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
+    ContextOut, ErrorOut, HealthOut, LecturerDecision, RejectedProposalResolution, MemberResponse,
     RegistrationCreate, RegistrationOut, PendingRegistrationSummaryOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
     SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, StudentProposalCreate, LecturerOut, MyEligibilityOut,
     NotificationSummaryOut,
@@ -26,7 +26,7 @@ from backend.db.models import entities as m
 from backend.services.registration import (
     _is_department_head, cancel_registration, create_registration,
     withdraw_registration,
-    get_registration, lecturer_decision, profile, registration_out, registrations_out,
+    get_registration, lecturer_decision, resolve_rejected_student_proposal, profile, registration_out, registrations_out,
     respond_to_registration, submit_registration,
     confirmed_student_ids,
 )
@@ -159,16 +159,25 @@ def context(
             actions.append("registration:lecturer_decide")
         if _is_department_head(session, lecturer.id, lecturer.department_id):
             actions.append("topic:department_decide")
+    profile_department_id = student.department_id if student else lecturer.department_id if lecturer else None
+    profile_department = session.get(m.Department, profile_department_id) if profile_department_id else None
+    profile_major = session.scalar(select(m.DepartmentMajor).where(
+        m.DepartmentMajor.department_id == profile_department_id,
+        m.DepartmentMajor.code == student.major_code,
+        m.DepartmentMajor.active.is_(True))) if student and student.major_code else None
     return ContextOut(
         user_id=user.id, base_role=user.base_role,
         student_id=student.id if student else None,
         lecturer_id=lecturer.id if lecturer else None, actions=actions,
         display_name=(student.display_name if student else lecturer.display_name if lecturer else user.email or str(user.id)),
-        department_id=(student.department_id if student else lecturer.department_id if lecturer else None),
+        department_id=profile_department_id,
+        department_code=profile_department.code if profile_department else None,
+        department_name=profile_department.name if profile_department else None,
         email=user.email,
         student_code=student.student_code if student else None,
         class_name=student.class_name if student else None,
         major_code=student.major_code if student else None,
+        major_name=profile_major.name if profile_major else None,
         lecturer_code=lecturer.lecturer_code if lecturer else None,
         csrf_token=csrf_token,
         can_change_password=bool(user.email_verified_at and user.password_hash and user.password_hash.startswith("$argon2")),
@@ -374,6 +383,17 @@ def decide(
     session: Session = Depends(get_session),
 ) -> RegistrationOut:
     return lecturer_decision(session, user, registration_id, payload, if_match)
+
+
+@app.post("/api/v1/topic-registrations/{registration_id}/resolve-lecturer-rejection", response_model=RegistrationOut)
+def resolve_lecturer_rejection(
+    registration_id: UUID,
+    payload: RejectedProposalResolution,
+    if_match: int = Header(alias="If-Match"),
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return resolve_rejected_student_proposal(session, user, registration_id, payload, if_match)
 
 
 from functools import lru_cache

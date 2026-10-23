@@ -27,20 +27,20 @@ test("Danh sách tài khoản phân trang 20/trang và tìm kiếm về trang 1"
     await rosterLink.click();
     await page.getByRole("tab",{name:/Nhập danh sách/}).click();
     const csv = ["student_code,display_name,email,department_code,class_name,major_code"];
-    for (let i = 1; i <= 25; i++) csv.push(
+    for (let i = 1; i <= 26; i++) csv.push(
       `E2E-PAG-${String(i).padStart(3,"0")},SV phân trang,pag-student-${String(i).padStart(3,"0")}@e2e.test,SYN-DEMO-DEP,CNTT-E2E,7480201`);
     await page.locator('input[type="file"]').setInputFiles({name:"pag.csv",mimeType:"text/csv",buffer:Buffer.from(csv.join("\n"))});
     await page.getByLabel("Mã/số văn bản nguồn").fill("SYNTHETIC-PAG");
     await page.getByRole("button",{name:"Kiểm tra tệp"}).click();
-    await expect(page.getByRole("heading",{name:/Xem trước: 25 sinh viên/})).toBeVisible();
+    await expect(page.getByRole("heading",{name:/Xem trước: 26 sinh viên/})).toBeVisible();
     await page.getByRole("button",{name:"Nhập sau khi kiểm"}).click();
-    await expect(page.getByText(/Đã nhập 25 kết quả chờ xác nhận/)).toBeVisible();
+    await expect(page.getByText(/Đã nhập 26 kết quả chờ xác nhận/)).toBeVisible();
     await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
     await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill("E2E-PAG-");
     await page.getByLabel("Căn cứ đối chiếu danh sách").fill("SYNTHETIC-PAG-APPROVAL");
     await page.getByRole("button",{name:"Chọn tất cả chờ xác nhận"}).click();
     await page.getByRole("button",{name:"Xác nhận đã đối chiếu"}).click();
-    await expect(page.getByText(/Đã xác nhận 25 sinh viên/)).toBeVisible();
+    await expect(page.getByText(/Đã xác nhận 26 sinh viên/)).toBeVisible();
 
     await page.goto(web+"/administration");
     const card = page.locator("section.card").filter({has: page.getByRole("heading",{name:"Tài khoản",exact:true})});

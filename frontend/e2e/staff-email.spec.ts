@@ -34,6 +34,7 @@ test("ADMIN sửa email giảng viên trên tài khoản cũ, giữ UUID và c�
     await expect(rows).toHaveCount(1);
     await expect(rows.getByText(oldEmail)).toBeVisible();
     await rows.getByRole("button",{name:"Sửa email"}).click();
+    await page.getByLabel("Lý do sửa email",{exact:true}).fill("KHOA E2E xác minh mất hộp thư");
     await expect(card.getByRole("heading",{name:"Sửa email trên tài khoản hiện có",exact:true})).toBeVisible();
     await expect(card.getByText("Đợt đối chiếu")).toHaveCount(0);
     await card.getByLabel("Email mới").fill(newEmail);

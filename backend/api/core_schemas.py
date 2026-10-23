@@ -132,6 +132,25 @@ class MilestoneOut(BaseModel):
     expected_ratio: float | None
 
 
+class DocumentDeadlineOut(BaseModel):
+    id: UUID
+    document_type: str
+    due_at: datetime
+    state: str
+    row_version: int
+    reason: str
+
+
+class DocumentDeadlineSet(BaseModel):
+    document_type: Literal["PROPOSAL", "PLAN", "SUPPORTING"]
+    due_at: AwareDatetime
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+class DocumentDeadlineClose(BaseModel):
+    reason: str = Field(min_length=3, max_length=2000)
+
+
 class ReviewOut(BaseModel):
     reviewer_name: str
     decision: str
@@ -147,6 +166,8 @@ class ProposalVersionOut(BaseModel):
     sha256: str
     submitted_by_name: str
     submitted_at: datetime
+    due_at_at_submission: datetime | None
+    late: bool
     scan_state: str
     reviews: list[ReviewOut]
 
@@ -192,6 +213,8 @@ class DocumentVersionOut(BaseModel):
     sha256: str
     scan_state: str
     submitted_at: datetime
+    due_at_at_submission: datetime | None
+    late: bool
     submitted_by_name: str
     reviews: list[ReviewOut]
 

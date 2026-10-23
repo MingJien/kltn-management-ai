@@ -152,6 +152,7 @@ class RegistrationOut(BaseModel):
     topic_code: str
     topic_state: str
     proposer_type: str
+    receiving_lecturer_id: UUID | None
     receiving_lecturer_user_id: UUID | None
     receiving_lecturer_name: str | None
     lecturer_reason: str | None
@@ -167,6 +168,12 @@ class LecturerDecision(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
 
 
+class RejectedProposalResolution(BaseModel):
+    decision: Literal["REASSIGN", "RETURN_TO_STUDENT"]
+    reason: str = Field(min_length=3, max_length=2000)
+    receiving_lecturer_id: UUID | None = None
+
+
 class ContextOut(BaseModel):
     user_id: UUID
     base_role: str
@@ -175,10 +182,13 @@ class ContextOut(BaseModel):
     actions: list[str]
     display_name: str
     department_id: UUID | None = None
+    department_code: str | None = None
+    department_name: str | None = None
     email: str | None = None
     student_code: str | None = None
     class_name: str | None = None
     major_code: str | None = None
+    major_name: str | None = None
     lecturer_code: str | None = None
     csrf_token: str | None = None
     can_change_password: bool = False

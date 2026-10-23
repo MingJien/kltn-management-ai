@@ -1,22 +1,14 @@
 # Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
-Ứng dụng React, FastAPI và PostgreSQL quản lý tài khoản, đề tài, đăng ký khóa luận, GVHD, tiến độ và tài liệu. Chatbot AI hiện ở mức prototype, dùng dữ liệu giả.
+Ứng dụng React, FastAPI và PostgreSQL hỗ trợ tài khoản, phân quyền, danh sách sinh viên đủ điều kiện, tạo và duyệt đề tài, đăng ký cá nhân/nhóm, tiếp nhận của giảng viên, đề cương, tiến độ và tài liệu theo phiên bản. Mẫu 2 và 3 được tải nguyên bản từ tệp chính thức do Khoa cung cấp (chỉ đọc, không đưa bản sao lên Git); hệ thống không tự dựng mẫu thay thế. Tệp đã nộp được lưu theo phiên bản và giữ nguyên bản gốc; tệp mới ở trạng thái “Đang cách ly – chưa quét” nên chưa thể tải xuống hoặc dùng để duyệt cho đến khi có máy quét tệp thật. Bản in từ mẫu chính thức chưa xuất được vì chưa có bộ sinh bản in từ mẫu; hệ thống báo chưa xuất được thay vì tạo bản giả lập. AI hiện chỉ được thử trên dữ liệu giả; chưa kết nối Gemini.
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic head `20261021_0003`: **33 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) chỉ để xem hoặc dựng database trống tạm, không chạy trên database đang dùng. Nếu máy còn ở revision `20261015_0001_official`, chạy `.\.venv\Scripts\python.exe -m alembic upgrade head` trong PowerShell để áp dụng hai migration tiếp theo.
-
-## Tình hình hiện tại
-
-- UI/API có quản lý tài khoản và phân quyền, danh sách sinh viên đủ điều kiện; luồng tạo/duyệt đề tài, đăng ký cá nhân hoặc nhóm, xác nhận thành viên và giảng viên tiếp nhận/từ chối. Khi giảng viên chấp nhận, hệ thống tạo hồ sơ khóa luận, thành viên và GVHD chính trong cùng giao dịch.
-- Trong hồ sơ khóa luận có thông tin GVHD và lịch sử phân công; nộp đề cương theo phiên bản, nhận xét và chốt; tạo mốc tiến độ cho đợt, nộp báo cáo, GVHD xác nhận hoặc yêu cầu sửa. Nộp trễ vẫn được nhận khi mốc còn mở và được đánh dấu `!` màu đỏ; người điều phối có thể gia hạn cả đợt kèm lý do và lịch sử.
-- Tài liệu hỗ trợ nộp nhiều phiên bản, lưu mã kiểm tra, nhận xét/duyệt và tải theo quyền. Bản đề cương đủ điều kiện có thể xuất để ký ngoài với địa chỉ hệ thống, mã và thời gian; bản gốc được giữ nguyên.
-
-Hội đồng/lịch bảo vệ, chấm điểm và biên bản chưa hoàn thiện. Chatbot chưa kết nối Gemini.
+PostgreSQL `kltn_management`, Alembic revision `20261022_0005`: 34 bảng nghiệp vụ và `alembic_version`. Bảng `department_major` lưu 10 cặp mã ngành–bộ môn của Khoa CN&KT để kiểm tra khi nhập Excel; các hồ sơ demo cũ được giữ nguyên. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
 
 ## Chạy local
 
-Tạo `.env` từ `.env.example`, đặt `DATABASE_URL` trỏ đúng `kltn_management`, rồi cài dependencies. Ứng dụng và Alembic dùng cổng trong `DATABASE_URL`; `POSTGRES_PORT` chỉ là cổng xuất ra máy khi chạy PostgreSQL bằng Docker Compose. Nếu dùng PostgreSQL đã cài trên máy, không cần chạy container.
+Tạo `.env` từ `.env.example`, dùng database phát triển cục bộ và kiểm tra `DATABASE_URL` trước khi chạy migration. Ứng dụng và Alembic dùng cổng trong `DATABASE_URL`; `POSTGRES_PORT` chỉ là cổng xuất ra máy khi chạy PostgreSQL bằng Docker Compose. Nếu dùng PostgreSQL đã cài trên máy, không cần chạy container.
 
 ```powershell
 py -m venv .venv
@@ -35,7 +27,7 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Mở `http://127.0.0.1:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Mở `http://localhost:5173/` và dùng cùng hostname này cho các liên kết trong email để giữ cùng origin. Giữ cả API và frontend đang chạy trong hai terminal khi mở link. Nếu cổng 5173 đã bận, Vite sẽ báo lỗi thay vì chạy sang cổng khác. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
 Trên máy phát triển, `KLTN_DEMO_MODE=true` trong `.env` hiện lựa chọn SV/GV/TBM giả lập tại trang đăng nhập; tài khoản kích hoạt qua email vẫn đăng nhập bằng mật khẩu.
 
 ## Kiểm tra
@@ -47,12 +39,12 @@ npm run build --prefix frontend
 .\.venv\Scripts\python.exe -m tools.run_e2e
 ```
 
-`run_e2e` tạo schema kiểm thử ngẫu nhiên riêng trong `kltn_management`, không dùng hay xóa bảng nghiệp vụ hiện có.
+`run_e2e` chỉ chạy khi `DATABASE_URL` trỏ một database kiểm thử riêng; script từ chối `kltn_management` để không ghi dữ liệu thử, tạo schema hay dọn dữ liệu trên database đang dùng. Khi chưa có database kiểm thử riêng, kết quả E2E được ghi BLOCKED thay vì chạy trên database nghiệp vụ.
 
 ## Tài liệu chính
 
 - [API hiện hành](docs/design/api-design.md) · [OpenAPI sinh từ FastAPI](docs/design/openapi.yaml)
-- [ERD hiện hành](docs/design/erd-kltn-management.md) · [ERD theo cụm](docs/design/erd-clusters/README.md)
+- [ERD hiện hành](docs/design/erd-kltn-management.md)
 - [Từ điển dữ liệu](docs/design/database-dictionary.md)
 - [Quy trình đăng ký](docs/design/registration-workflow.md)
 - [Minh chứng cấu trúc CSDL](docs/evidence/official-db-validation.md)

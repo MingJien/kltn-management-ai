@@ -23,6 +23,30 @@ router = APIRouter(prefix="/api/v1/rounds/{round_id}/roster", tags=["eligibility
 assignment_router = APIRouter(prefix="/api/v1/me", tags=["eligibility roster"])
 
 
+@assignment_router.get("/roster-catalog")
+def roster_catalog(user: m.UserAccount = Depends(current_user),
+                   session: Session = Depends(get_session)) -> list[dict]:
+    """The same active catalog is used by the import preview and correction UI."""
+    now = datetime.now(timezone.utc)
+    scope = session.scalar(select(m.ResourceAssignment.id).where(
+        m.ResourceAssignment.user_id == user.id,
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER"]),
+        m.ResourceAssignment.state == "ACTIVE",
+        m.ResourceAssignment.effective_from <= now,
+        (m.ResourceAssignment.effective_to.is_(None) | (m.ResourceAssignment.effective_to > now)),
+    ).limit(1))
+    if scope is None:
+        raise HTTPException(403, "Round assignment required")
+    departments = {row.id: row for row in session.scalars(select(m.Department).where(
+        m.Department.active.is_(True))).all()}
+    return [{"department_code": departments[row.department_id].code,
+             "department_name": departments[row.department_id].name,
+             "major_code": row.code, "major_name": row.name}
+            for row in session.scalars(select(m.DepartmentMajor).where(
+                m.DepartmentMajor.active.is_(True)).order_by(m.DepartmentMajor.code)).all()
+            if row.department_id in departments]
+
+
 @assignment_router.get("/round-assignments")
 def my_round_assignments(user: m.UserAccount = Depends(current_user),
                          session: Session = Depends(get_session)) -> list[dict]:
@@ -126,6 +150,7 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
         rows.append({"snapshot_id": str(snapshot.id), "student_id": str(student.id),
             "student_code": student.student_code, "display_name": student.display_name,
             "class_name": student.class_name, "major_code": student.major_code,
+            "department_code": session.get(m.Department, student.department_id).code,
             "email": account.email, "account_status": account.status,
             "account_activated": account.email_verified_at is not None,
             "state": snapshot.state, "version": snapshot.version,
@@ -251,8 +276,12 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
     if (code == student.student_code and name == student.display_name
             and class_name == student.class_name and major_code == student.major_code):
         raise HTTPException(422, "No student information has changed")
-    if department.major_code and department.major_code != major_code:
-        raise HTTPException(422, "Major does not match the department; review assignment separately")
+    allowed = session.scalar(select(m.DepartmentMajor.id).where(
+        m.DepartmentMajor.department_id == department.id,
+        m.DepartmentMajor.code == major_code,
+        m.DepartmentMajor.active.is_(True)))
+    if major_code != student.major_code and allowed is None:
+        raise HTTPException(422, "Mã ngành không thuộc bộ môn quản lý của sinh viên trong danh mục đang hoạt động")
     duplicate_code = session.scalar(select(m.StudentProfile.id).where(
         m.StudentProfile.student_code == code, m.StudentProfile.id != student.id))
     if duplicate_code:

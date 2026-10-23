@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.schemas import MemberResponse, RegistrationCreate, RegistrationMemberOut, RegistrationOut, LecturerDecision
+from backend.api.schemas import MemberResponse, RegistrationCreate, RegistrationMemberOut, RegistrationOut, LecturerDecision, RejectedProposalResolution
 from backend.db.models import entities as m
 
 
@@ -146,6 +146,7 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
         topic_title=topic.current_title,
         topic_proposer_user_id=topic.proposer_user_id,
         topic_code=topic.code, topic_state=topic.state, proposer_type=topic.proposer_type,
+        receiving_lecturer_id=receiver.id if receiver else None,
         receiving_lecturer_user_id=receiver.user_id if receiver else (topic.proposer_user_id if topic.proposer_type == "LECTURER" else None),
         receiving_lecturer_name=receiver.display_name if receiver else None,
         lecturer_reason=reg.lecturer_reason,
@@ -279,8 +280,8 @@ def respond_to_registration(session: Session, user: m.UserAccount, registration_
     student = profile(session, user, "STUDENT")
     try:
         reg = _registration(session, registration_id, lock=True)
-        if reg.state != "DRAFT":
-            fail(409, "Member confirmation is closed after the draft is submitted")
+        if reg.state not in {"DRAFT", "RETURNED"}:
+            fail(409, "Member confirmation is only available for a draft or returned proposal")
         member = session.scalar(select(m.RegistrationMember).where(
             m.RegistrationMember.registration_id == reg.id,
             m.RegistrationMember.student_id == student.id,
@@ -568,7 +569,7 @@ def lecturer_decision(
         reg.lecturer_decided_at = now
         reg.lecturer_reason = data.reason
         reg.row_version += 1
-        if data.decision == "REJECT":
+        if data.decision == "REJECT" and topic.proposer_type != "STUDENT":
             for member in session.scalars(select(m.RegistrationMember).where(
                 m.RegistrationMember.registration_id == reg.id
             )).all():
@@ -588,6 +589,79 @@ def lecturer_decision(
     except IntegrityError:
         session.rollback()
         fail(409, "Topic or registration was accepted concurrently; reload the registration")
+    except Exception:
+        session.rollback()
+        raise
+
+
+def resolve_rejected_student_proposal(
+    session: Session, user: m.UserAccount, registration_id: UUID,
+    data: RejectedProposalResolution, expected_version: int,
+) -> RegistrationOut:
+    """TBM chooses another receiving lecturer or returns the same proposal to its student group."""
+    if user.base_role != "LECTURER":
+        fail(403, "Only the department head can resolve a rejected student proposal")
+    head = profile(session, user, "LECTURER")
+    try:
+        reg = _registration(session, registration_id, lock=True)
+        topic = session.get(m.Topic, reg.topic_id)
+        if head.department_id != topic.department_id or not _is_department_head(session, head.id, topic.department_id):
+            fail(403, "Department head assignment is required for this department")
+        row_version(expected_version, reg.row_version)
+        if topic.proposer_type != "STUDENT" or topic.state != "APPROVED" or reg.state != "LECTURER_REJECTED":
+            fail(409, "Only a rejected student proposal awaits this decision")
+        reason = data.reason.strip()
+        if len(reason) < 3:
+            fail(422, "A reason is required")
+        before = _registration_hash(session, reg)
+        from backend.services.topics import _audit, _fingerprint, receiving_lecturer
+        topic_before = _fingerprint(topic, session)
+        from backend.services.notifications import revoke_proposal_notice
+        revoke_proposal_notice(session, registration_id=reg.id,
+                               lecturer_id=topic.receiving_lecturer_id, now=datetime.now(timezone.utc))
+        members = session.scalars(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id).with_for_update()).all()
+        if not members:
+            fail(409, "Registration has no members")
+        for member in members:
+            member.active = True
+        session.flush()  # Existing active enrollment in the same round must block restoration.
+        if data.decision == "REASSIGN":
+            if data.receiving_lecturer_id is None or data.receiving_lecturer_id == reg.lecturer_decided_by:
+                fail(422, "Choose a different receiving lecturer")
+            lecturer = receiving_lecturer(session, data.receiving_lecturer_id, topic.department_id)
+            if not valid_group(session, topic, members):
+                fail(409, "Group consent or eligibility changed; return the proposal to students instead")
+            topic.receiving_lecturer_id = lecturer.id
+            reg.state = "SUBMITTED"
+            from backend.services.notifications import add_notice
+            add_notice(session, topic=topic, actor_user_id=topic.proposer_user_id,
+                       registration_id=reg.id, kind="PROPOSAL_APPROVED")
+            action = "PROPOSAL_REASSIGNED_AFTER_LECTURER_REJECTION"
+        else:
+            if data.receiving_lecturer_id is not None:
+                fail(422, "Returning to students must not assign a receiving lecturer")
+            topic.state = "RETURNED"
+            topic.receiving_lecturer_id = None
+            reg.state = "RETURNED"
+            for member in members:
+                member.consent_status = "PENDING"
+                member.responded_by_user_id = None
+                member.responded_at = None
+            action = "PROPOSAL_RETURNED_AFTER_LECTURER_REJECTION"
+        topic.decided_by = user.id
+        topic.decided_at = datetime.now(timezone.utc)
+        topic.row_version += 1
+        reg.row_version += 1
+        _audit(session, topic, user.id, action, topic_before, reason)
+        session.flush()
+        _registration_audit(session, reg, user, action, before, reason)
+        result = registration_out(session, reg)
+        session.commit()
+        return result
+    except IntegrityError:
+        session.rollback()
+        fail(409, "A student has another active registration in this round; cannot restore this group")
     except Exception:
         session.rollback()
         raise

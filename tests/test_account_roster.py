@@ -23,7 +23,7 @@ from backend.db.models import entities as m
 from backend.services.account_tokens import make_token
 from backend.services.passwords import hash_password, verify_password
 from backend.services.registration import confirmed_student_ids
-from backend.services.roster import import_roster, parse_roster, require_assignment
+from backend.services.roster import import_roster, parse_roster, require_assignment, validate_rows
 
 
 def post_request() -> Request:
@@ -50,9 +50,9 @@ def test_vietnamese_roster_template_imports_and_word_is_rejected():
     template = (Path(__file__).resolve().parents[1] / "frontend" / "public" / "templates"
                 / "danh-sach-sinh-vien-kltn-mau.xlsx")
     rows, _ = parse_roster(template.name, template.read_bytes())
-    assert len(rows) == 3
-    assert rows[0].student_code == "SYN-DEMO-SV-4"
-    assert rows[0].department_code == "SYN-DEMO-DEP"
+    assert len(rows) == 4
+    assert rows[0].student_code == "002344444441"
+    assert rows[0].department_code == "BM-CNTT"
     csv_data = ("MSSV,Họ tên,Email,Mã bộ môn,Lớp,Mã ngành\n"
                 "SYN-004,Sinh viên mẫu,sv-mau@example.test,SYN-DEMO-DEP,CNTT-01,7480201\n").encode("utf-8-sig")
     parsed, _ = parse_roster("danh-sach.csv", csv_data)
@@ -156,6 +156,13 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
             round_type="MAIN", opens_at=now-timedelta(days=1),
             closes_at=now+timedelta(days=7), state="OPEN")
         session.add_all([department, round_]); session.flush()
+        session.add_all([
+            m.DepartmentMajor(id=uuid4(), department_id=department.id,
+                code="7480201", name="Công nghệ thông tin", active=True),
+            m.DepartmentMajor(id=uuid4(), department_id=department.id,
+                code="7480101", name="Khoa học máy tính", active=True),
+        ])
+        session.flush()
         with pytest.raises(HTTPException) as no_implicit_permission:
             require_assignment(session, staff, round_.id, "ELIGIBILITY_VERIFIER")
         assert no_implicit_permission.value.status_code == 403
@@ -168,6 +175,12 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
         content = ("student_code,display_name,email,department_code,class_name,major_code\n"
                    f"{student_code},Synthetic student,{email},{department.code},CS-01,7480201\n").encode()
         rows, _ = parse_roster("roster.csv", content)
+        second_major, _ = parse_roster("roster.csv", content.replace(b"7480201", b"7480101"))
+        assert validate_rows(session, second_major)[department.code].id == department.id
+        wrong_major, _ = parse_roster("roster.csv", content.replace(b"7480201", b"7540101"))
+        with pytest.raises(HTTPException) as mismatched:
+            validate_rows(session, wrong_major)
+        assert mismatched.value.status_code == 422
         result = import_roster(session, staff, round_.id, rows, "KHOA-2026-TEST")
         assert result["new_accounts"] == 1 and result["submitted"] == 1
         student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.student_code == student_code))

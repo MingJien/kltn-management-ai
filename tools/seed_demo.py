@@ -85,8 +85,8 @@ def add_gv2_only(engine, now: datetime) -> None:
                              "mat_khau_demo": password, "database": "kltn_management"})
     with Session(engine) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261021_0003":
-            raise ValueError("Upgrade the isolated official DB to 20261021_0003 first")
+        if version != "20261022_0005":
+            raise ValueError("Upgrade the isolated official DB to 20261022_0005 first")
         head = session.get(m.LecturerProfile, uid("lecturer-2"))
         if head is None:
             raise ValueError("Seed the existing demo accounts before adding GV2")
@@ -149,11 +149,13 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261021_0003":
-            parser.error("Upgrade the isolated official DB to 20261021_0003 first")
+        if version != "20261022_0005":
+            parser.error("Upgrade the isolated official DB to 20261022_0005 first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")
+        ensure(session, m.DepartmentMajor, "department-major-cntt", department_id=department.id,
+               code="7480201", name="Công nghệ thông tin", active=True)
         year = ensure(session, m.AcademicYear, "year", code="SYN-DEMO-2026",
                       starts_on=date(2026, 9, 1), ends_on=date(2027, 8, 31), state="ACTIVE")
         round_ = ensure(session, m.ThesisRound, "round", academic_year_id=year.id,
@@ -172,6 +174,12 @@ def main() -> None:
                    external_subject=f"synthetic-demo-lecturer-{i}", base_role="LECTURER", status="ACTIVE")
             for i in range(1, 4)
         ]
+        for kind in ("PROPOSAL", "PLAN", "SUPPORTING"):
+            deadline = ensure(session, m.DocumentDeadline, f"document-deadline-{kind.lower()}",
+                round_id=round_.id, document_type=kind, due_at=now+timedelta(days=60),
+                state="OPEN", set_by=lecturer_users[1].id, reason="SYNTHETIC E2E SCHEDULE")
+            deadline.due_at = now+timedelta(days=60)
+            deadline.state = "OPEN"
         for user, (email, password) in zip([*student_users, *lecturer_users], demo_credentials):
             user.email = email
             user.password_hash = hash_password(password)

@@ -18,6 +18,7 @@ from sqlalchemy import select
 from backend.api.core_schemas import PendingAdvisorOut, ProposalOut, ProposalVersionOut, ReviewOut
 from backend.db.models import entities as m
 from backend.services.documents import MAX_BYTES, require_clean, valid_content
+from backend.services import deadlines, file_scanner
 from backend.services.registration import profile, row_version
 from backend.services.theses import audit, eligible_lecturer, now, primary_advisor, rights, thesis_access
 
@@ -67,6 +68,8 @@ def proposal_out(session, thesis_id, proposal):
         return ProposalVersionOut(id=version.id, version_no=version.version_no,
             file_name=file.original_name, byte_size=file.byte_size, sha256=version.content_sha256,
             submitted_by_name=student.display_name, submitted_at=version.submitted_at,
+            due_at_at_submission=version.due_at_at_submission,
+            late=bool(version.due_at_at_submission and version.submitted_at > version.due_at_at_submission),
             scan_state=file.scan_state, reviews=reviews)
 
     reviewers = []
@@ -78,6 +81,28 @@ def proposal_out(session, thesis_id, proposal):
         versions=[version_out(v) for v in versions], reviewers=reviewers,
         department_confirmed="DEPARTMENT_FINALIZATION" in signed,
         dean_confirmed="DEAN_CONFIRMATION" in signed)
+
+
+def rescan_version(session, user, thesis_id, version_id):
+    thesis_access(session, user, thesis_id, action="proposal:view", lock=True, write=True)
+    proposal = _proposal(session, thesis_id, lock=True)
+    version = session.scalar(select(m.ProposalVersion).where(
+        m.ProposalVersion.proposal_id == proposal.id,
+        m.ProposalVersion.id == version_id).with_for_update()) if proposal else None
+    if not version:
+        raise HTTPException(404, "Không tìm thấy phiên bản")
+    file = session.get(m.StoredFile, version.stored_file_id)
+    if file.scan_state == "CLEAN":
+        return proposal_out(session, thesis_id, proposal)
+    if file.scan_state == "INFECTED":
+        raise HTTPException(409, "Tệp nhiễm mã độc; hãy nộp phiên bản mới")
+    file_scanner.require_available()
+    state = file_scanner.scan(file, storage_root() / Path(file.storage_key).name)
+    audit(session, user, "PROPOSAL_FILE_SCANNED", "proposal_version", version.id, state)
+    session.flush()
+    result = proposal_out(session, thesis_id, proposal)
+    session.commit()
+    return result
 
 
 def get_proposal(session, user, thesis_id):
@@ -92,11 +117,22 @@ async def upload_version(session, user, thesis_id, request, expected):
         raise HTTPException(403, "Nguồn yêu cầu không được phép")
     path = None
     try:
-        thesis_access(session, user, thesis_id, action="proposal:submit", lock=True, write=True)
+        thesis = thesis_access(session, user, thesis_id, action="proposal:submit", lock=True, write=True)
         proposal = _proposal(session, thesis_id, lock=True)
         row_version(expected, proposal.row_version if proposal else 0)
-        if proposal and proposal.state not in {"DRAFT", "REVISION_REQUIRED"}:
-            raise HTTPException(409, "Chỉ nộp bản mới sau khi GVHD yêu cầu chỉnh sửa")
+        deadline = deadlines.for_submission(session, thesis, "PROPOSAL")
+        if proposal and proposal.state not in {"DRAFT", "SUBMITTED", "UNDER_REVIEW", "REVISION_REQUIRED"}:
+            raise HTTPException(409, "Đề cương đã được xác nhận hoặc chốt; không thể tự nộp bản mới")
+        previous = _version(session, proposal)
+        reviewed = bool(previous and session.scalar(select(m.ProposalReview.id).where(
+            m.ProposalReview.proposal_version_id == previous.id).limit(1)))
+        if proposal and proposal.state == "UNDER_REVIEW" and reviewed:
+            raise HTTPException(409, "GV đã góp ý phiên bản này; cần GVHD yêu cầu sửa")
+        revision_requested = bool(proposal and proposal.state == "REVISION_REQUIRED")
+        deadlines.ensure_submission_allowed(deadline,
+            revision_requested=revision_requested,
+            previous_submitted=bool(previous and proposal.state in {"SUBMITTED", "UNDER_REVIEW"}),
+            reviewed=reviewed)
         name = unquote(request.headers.get("X-File-Name", "")).replace("\\", "/").split("/")[-1].strip()
         if not name or len(name) > 180 or any(ord(ch) < 32 for ch in name):
             raise HTTPException(422, "Tên tệp không hợp lệ")
@@ -124,17 +160,18 @@ async def upload_version(session, user, thesis_id, request, expected):
         file = m.StoredFile(id=uuid4(), storage_key="proposals/" + key,
             original_name=name, media_type=media_type, byte_size=size, sha256=digest,
             scan_state="QUARANTINED")
+        file_scanner.scan(file, path)
         session.add(file)
         session.flush()
         next_version = (proposal.current_version_no or 0) + 1
         session.add(m.ProposalVersion(id=uuid4(), proposal_id=proposal.id,
             version_no=next_version, stored_file_id=file.id,
             submitted_by=profile(session, user, "STUDENT").id,
-            submitted_at=now(), content_sha256=digest))
+            submitted_at=now(), due_at_at_submission=deadline.due_at, content_sha256=digest))
         proposal.current_version_no = next_version
         proposal.state = "SUBMITTED"
         proposal.row_version += 1
-        audit(session, user, "PROPOSAL_SUBMITTED", "thesis", thesis_id,
+        audit(session, user, "PROPOSAL_SELF_CORRECTED" if previous and not revision_requested else "PROPOSAL_SUBMITTED", "thesis", thesis_id,
             f"Đề cương v{next_version}", after_hash=digest)
         session.flush()
         result = proposal_out(session, thesis_id, proposal)

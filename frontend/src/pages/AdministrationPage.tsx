@@ -27,6 +27,8 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
   const [basis, setBasis] = useState("");
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("");
+  const [emailReason, setEmailReason] = useState("");
+  const [assignmentHint, setAssignmentHint] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailRoundId, setEmailRoundId] = useState("");
@@ -38,6 +40,15 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const isAdmin = context.base_role === "ADMIN";
+  const eligibleStaff = (a: Account, task: string) => a.status === "ACTIVE" &&
+    (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
+  function changeKind(next: string) {
+    setKind(next);
+    if (userId && !staffAccounts.some(a => a.id === userId && eligibleStaff(a, next))) {
+      setUserId("");
+      setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
+    } else setAssignmentHint("");
+  }
   const PAGE_SIZE = 20;
   const refresh = useCallback(async (q: string, atPage: number) => {
     setBusy(true);
@@ -75,7 +86,6 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
   }
   return <><PageHeader title="Quản trị tài khoản" description="Cấp tài khoản và ghi nhận phân công theo đợt" />
     <div className="stack">
-      <p className="alert">Quản trị tài khoản không đồng nghĩa quyền xác nhận đủ điều kiện. Người được Khoa giao nhiệm vụ phải có phân công theo đợt và căn cứ tương ứng.</p>
       {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
       {notice ? <p role="status" className="alert alert-success">{notice}</p> : null}
       {isAdmin && <div className="grid grid-auto">
@@ -95,15 +105,16 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
           </form>
         </div></section>
         <section className="card"><div className="card-body stack"><h2>Phân công theo đợt</h2>
-          <form className="stack" onSubmit={e=>{e.preventDefault();void run(()=>request("/admin/round-assignments",context.user_id,
+          <form className="stack" onInvalidCapture={()=>setAssignmentHint("Vui lòng chọn đợt, người được giao và nhập căn cứ phân công ít nhất 3 ký tự.")} onSubmit={e=>{e.preventDefault();setAssignmentHint("");void run(()=>request("/admin/round-assignments",context.user_id,
             {method:"POST",body:JSON.stringify({round_id:roundId,user_id:userId,assignment_type:kind,basis_ref:basis})}),"Đã lưu phân công.",true);}}>
             <label className="input-group">Đợt<select className="input" required value={roundId} onChange={e=>setRoundId(e.target.value)}>
               <option value="">Chọn đợt</option>{rounds.filter(r=>r.state==="DRAFT"||r.state==="OPEN").map(r=><option key={r.id} value={r.id}>{r.code} · {r.state}</option>)}</select></label>
-            <label className="input-group">Người được giao<select className="input" required value={userId} onChange={e=>setUserId(e.target.value)}>
-              <option value="">Chọn giảng viên đang hoạt động</option>{staffAccounts.filter(a=>a.status==="ACTIVE" && (kind === "KLTN_COORDINATOR" || kind === "ACCOUNT_MANAGER" ? a.base_role === "LECTURER" : a.base_role!=="STUDENT")).map(a=><option key={a.id} value={a.id}>{a.email}</option>)}</select></label>
-            <label className="input-group">Nhiệm vụ<select className="input" value={kind} onChange={e=>setKind(e.target.value)}>
+            <label className="input-group">Người được giao<select className="input" required value={userId} aria-describedby="assignment-hint" onChange={e=>{setUserId(e.target.value);setAssignmentHint("");}}>
+              <option value="">Chọn người đang hoạt động phù hợp nhiệm vụ</option>{staffAccounts.filter(a=>eligibleStaff(a, kind)).map(a=><option key={a.id} value={a.id}>{a.email}</option>)}</select></label>
+            <label className="input-group">Nhiệm vụ<select className="input" value={kind} onChange={e=>changeKind(e.target.value)}>
               <option value="ELIGIBILITY_IMPORTER">Nhập danh sách SV</option><option value="ELIGIBILITY_VERIFIER">Xác nhận điều kiện</option><option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option><option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option></select></label>
             <p className="text-caption">Quyền điều phối mốc chỉ cho phép mở, gia hạn và đóng mốc chung của đợt; không thay GVHD nhận xét hoặc xác nhận báo cáo.</p>
+            <p id="assignment-hint" role="status" className="text-caption">{assignmentHint || "Đổi nhiệm vụ sẽ giữ người đã chọn nếu vẫn phù hợp; nếu không, hãy chọn lại."}</p>
             <label className="input-group">Căn cứ phân công<input className="input" required minLength={3} value={basis} onChange={e=>setBasis(e.target.value)} placeholder="Số văn bản hoặc quyết định của Khoa" /></label>
             <button className="btn btn-primary" disabled={busy}>Lưu phân công</button>
           </form>
@@ -126,22 +137,57 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
         <label className="input-group">Lý do thao tác tài khoản<input className="input" minLength={5} value={reason} onChange={e=>setReason(e.target.value)} /></label>
         <p className="text-muted">Khóa hoặc vô hiệu hóa giữ nguyên đề tài, tài liệu và lịch sử. Cấp lại liên kết qua email đang lưu.</p>
         <div className="account-list">{accounts.map(a=><div className="account-list__row" key={a.id}>
-          <span>{a.student_code ? `${a.student_code} · ` : ""}{a.email} · {a.base_role} · {a.status}{!a.verified ? " · chưa kích hoạt" : ""}</span>
-          {a.id!==context.user_id && a.status!=="DISABLED" ? <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
-            onClick={()=>void run(()=>request(`/admin/users/${a.id}/lock`,context.user_id,
-              {method:"POST",body:JSON.stringify({locked:a.status!=="LOCKED",reason})}),
-              a.status==="LOCKED"?"Đã mở khóa.":"Đã khóa tài khoản.")}>
-            {a.status==="LOCKED"?"Mở khóa":"Khóa"}</button> : null}
-          {a.id!==context.user_id && a.status!=="DISABLED" ? <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
-            onClick={()=>void run(()=>request(`/admin/users/${a.id}/disable`,context.user_id,
-              {method:"POST",body:JSON.stringify({reason})}),"Đã vô hiệu hóa tài khoản; hồ sơ vẫn được giữ.")}>Vô hiệu hóa</button> : null}
-          {a.id!==context.user_id && a.status==="DISABLED" && a.verified ? <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
-            onClick={()=>void run(()=>request(`/admin/users/${a.id}/restore`,context.user_id,
-              {method:"POST",body:JSON.stringify({reason})}),"Đã mở lại tài khoản cũ.")}>Mở lại tài khoản</button> : null}
-          {a.id!==context.user_id && a.status!=="LOCKED" ? <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
-            onClick={()=>void run(async()=>{const result=await request<{link_sent:boolean}>(`/admin/users/${a.id}/reissue-link`,context.user_id,
-              {method:"POST",body:JSON.stringify({reason})});return result.link_sent?"Đã gửi liên kết mới.":"Chưa gửi được email; kiểm tra cấu hình thư.";},"Đã cấp lại liên kết.")}>Cấp lại liên kết</button> : null}
-          {a.id!==context.user_id ? <button className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>{setSelectedAccount(a.id);setNewEmail(a.email);}}>Sửa email</button> : null}
+          <span className="account-list__info">{a.student_code ? `${a.student_code} · ` : ""}{a.email} · {a.base_role} · {a.status}{!a.verified ? " · chưa kích hoạt" : ""}</span>
+          <div className="account-list__actions">
+            {a.id === context.user_id ? (
+              <span className="text-muted text-caption" style={{gridColumn: "1 / -1", textAlign: "right"}}>Tài khoản hiện tại</span>
+            ) : (
+              <>
+                <div className="account-list__action-slot">
+                  {a.status !== "DISABLED" ? (
+                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
+                      onClick={() => void run(() => request(`/admin/users/${a.id}/lock`, context.user_id,
+                        {method: "POST", body: JSON.stringify({locked: a.status !== "LOCKED", reason})}),
+                        a.status === "LOCKED" ? "Đã mở khóa." : "Đã khóa tài khoản.")}>
+                      {a.status === "LOCKED" ? "Mở khóa" : "Khóa"}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="account-list__action-slot">
+                  {a.status !== "DISABLED" ? (
+                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
+                      onClick={() => void run(() => request(`/admin/users/${a.id}/disable`, context.user_id,
+                        {method: "POST", body: JSON.stringify({reason})}), "Đã vô hiệu hóa tài khoản; hồ sơ vẫn được giữ.")}>
+                      Vô hiệu hóa
+                    </button>
+                  ) : a.status === "DISABLED" && a.verified ? (
+                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
+                      onClick={() => void run(() => request(`/admin/users/${a.id}/restore`, context.user_id,
+                        {method: "POST", body: JSON.stringify({reason})}), "Đã mở lại tài khoản cũ.")}>
+                      Mở lại tài khoản
+                    </button>
+                  ) : null}
+                </div>
+                <div className="account-list__action-slot">
+                  {a.status !== "LOCKED" ? (
+                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
+                      onClick={() => void run(async () => {
+                        const result = await request<{link_sent: boolean}>(`/admin/users/${a.id}/reissue-link`, context.user_id,
+                          {method: "POST", body: JSON.stringify({reason})});
+                        return result.link_sent ? "Đã gửi liên kết mới." : "Chưa gửi được email; kiểm tra cấu hình thư.";
+                      }, "Đã cấp lại liên kết.")}>
+                      Cấp lại liên kết
+                    </button>
+                  ) : null}
+                </div>
+                <div className="account-list__action-slot">
+                  <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => {setSelectedAccount(a.id); setNewEmail(a.email); setEmailReason(""); setOfficialRef(""); setEmailRoundId("");}}>
+                    Sửa email
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>)}</div>
         {accounts.length ? <nav className="pagination" aria-label="Phân trang tài khoản">
           <button className="btn btn-secondary" disabled={busy || page === 0} onClick={() => setPage(page - 1)}>Trang trước</button>
@@ -156,9 +202,9 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
             void run(async()=>{
               const result = isStudent
                 ? await request<{activation_sent:boolean}>(`/admin/users/${selectedAccount}/email`,context.user_id,
-                    {method:"PATCH",body:JSON.stringify({round_id:emailRoundId,student_code:account.student_code,email:newEmail,basis_ref:officialRef,reason})})
+                    {method:"PATCH",body:JSON.stringify({round_id:emailRoundId,student_code:account.student_code,email:newEmail,basis_ref:officialRef,reason:emailReason.trim()})})
                 : await request<{activation_sent:boolean}>(`/admin/users/${selectedAccount}/contact-email`,context.user_id,
-                    {method:"PATCH",body:JSON.stringify({email:newEmail,basis_ref:officialRef,reason})});
+                    {method:"PATCH",body:JSON.stringify({email:newEmail,basis_ref:officialRef,reason:emailReason.trim()})});
               setSelectedAccount("");
               return result.activation_sent
                 ? "Đã sửa email trên tài khoản cũ và gửi liên kết kích hoạt."
@@ -173,7 +219,10 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
               <option value="">Chọn đợt</option>{rounds.map(r=><option key={r.id} value={r.id}>{r.code}</option>)}</select></label>}
             <label className="input-group">Email mới<input className="input" type="email" required value={newEmail} onChange={e=>setNewEmail(e.target.value)} /></label>
             <label className="input-group">{isStudent ? "Căn cứ danh sách chính thức" : "Căn cứ xác minh của Khoa"}<input className="input" required minLength={3} value={officialRef} onChange={e=>setOfficialRef(e.target.value)} /></label>
-            <button className="btn btn-primary" disabled={busy || !newEmail || reason.trim().length<5 || officialRef.trim().length<3 || (isStudent && !emailRoundId)}>Lưu email mới</button>
+            <label className="input-group">Lý do sửa email<input className="input" required minLength={5} value={emailReason} aria-describedby="email-reason-hint" onChange={e=>setEmailReason(e.target.value)} /></label>
+            <p id="email-reason-hint" role="status" className="text-caption">{emailReason.trim().length < 5 ? "Nhập lý do sửa email ít nhất 5 ký tự để lưu." : "Đã đủ lý do sửa email."}</p>
+            <button className="btn btn-primary" disabled={busy || !newEmail || emailReason.trim().length<5 || officialRef.trim().length<3 || (isStudent && !emailRoundId)}>Lưu email mới</button>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>setSelectedAccount("")}>Hủy sửa email</button>
           </form>;
         })()}
       </div></section>

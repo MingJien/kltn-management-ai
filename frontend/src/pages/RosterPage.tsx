@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import type { Context } from "../api";
 import { request } from "../api";
@@ -8,7 +9,8 @@ import PageHeader from "../components/layout/PageHeader";
 type Assignment = {round_id:string; round_code:string; assignment_type:string};
 type PreviewRow = {line:number; student_code:string; display_name:string; email:string; department_code:string; class_name:string; major_code:string};
 type Preview = {sha256:string; count:number; rows:PreviewRow[]};
-type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null};
+type CatalogEntry = {department_code:string; department_name:string; major_code:string; major_name:string};
+type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null};
 type ImportResult = {new_accounts:number; submitted:number; unchanged:number; snapshot_ids:string[]};
 
 function normalized(value:string) {
@@ -49,6 +51,8 @@ export default function RosterPage({context}: {context:Context}) {
   const [roundId, setRoundId] = useState("");
   const [file, setFile] = useState<File|null>(null);
   const [preview, setPreview] = useState<Preview|null>(null);
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [departmentError, setDepartmentError] = useState("");
   const [reference, setReference] = useState("");
   const [basis, setBasis] = useState("");
   const [revokeBasis, setRevokeBasis] = useState("");
@@ -85,6 +89,11 @@ export default function RosterPage({context}: {context:Context}) {
   useEffect(()=>{void request<Assignment[]>("/me/round-assignments",context.user_id)
     .then(rows=>{setAssignments(rows); if(rows.length) setRoundId(rows[0].round_id);})
     .catch(cause=>setError(errorMessage(cause)));},[context.user_id]);
+  useEffect(()=>{
+    void request<CatalogEntry[]>("/me/roster-catalog",context.user_id)
+      .then(rows=>{setCatalog(rows);setDepartmentError("");})
+      .catch(()=>setDepartmentError("Chưa tải được danh mục bộ môn–ngành. Hãy làm mới trang rồi thử lại."));
+  },[context.user_id]);
   useEffect(()=>{
     setPreview(null);setSelected([]);setRevokeStudent("");setSpecialStudent("");setCorrectionStudent("");
     void refreshRoster(roundId).catch(cause=>setError(errorMessage(cause)));
@@ -139,8 +148,8 @@ export default function RosterPage({context}: {context:Context}) {
 
   return <><PageHeader title="Danh sách đủ điều kiện" description="Nhập, xác nhận và quản lý kết quả sinh viên theo từng đợt" />
     <div className="stack roster-page">
-      <p className="alert roster-privacy-note">Chỉ nhập MSSV, họ tên, email, bộ môn, lớp và mã ngành. Không nhập điểm, GPA, bảng điểm hay tình trạng kỷ luật. Tệp gốc không được lưu trên máy chủ.</p>
-      {error?<p role="alert" className="alert alert-danger">{error}</p>:null}
+
+      {error&&selectedPanel!=="import"?<p role="alert" className="alert alert-danger">{error}</p>:null}
       {notice?<p role="status" className="alert alert-success">{notice}</p>:null}
 
       {assignments.length?<section className="roster-context card" aria-label="Phạm vi danh sách">
@@ -188,10 +197,13 @@ export default function RosterPage({context}: {context:Context}) {
                       {method:"POST",body:JSON.stringify({snapshot_ids:selected,basis_ref:basis})});setSelected([]);},
                       `Đã xác nhận ${selected.length} sinh viên.`)}>Xác nhận đã đối chiếu</button></div>
               </div>
-              <div className="table-scroll"><table className="account-table"><thead><tr><th>Chọn</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Trạng thái</th><th>Tài khoản</th></tr></thead>
+              <div className="table-scroll"><table className="account-table"><thead><tr><th>Chọn</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Trạng thái</th><th>Tài khoản</th></tr></thead>
                 <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}><td>{row.state==="SUBMITTED"?<input type="checkbox" aria-label={`Chọn ${row.student_code}`}
                   checked={selected.includes(row.snapshot_id)} onChange={e=>setSelected(current=>e.target.checked?[...current,row.snapshot_id]:current.filter(x=>x!==row.snapshot_id))}/>:null}</td>
-                  <td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td><td>{row.state}</td><td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td></tr>)}</tbody></table></div>
+                  <td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
+                  <td>{row.department_code}</td><td>{row.major_code||"—"}{catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name
+                    ? ` · ${catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name}`:""}</td>
+                  <td>{row.state}</td><td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td></tr>)}</tbody></table></div>
               {!filteredRoster.length?<p className="text-muted">Không có sinh viên khớp bộ lọc.</p>:null}
               <details className="roster-accordion roster-accordion--danger">
                 <summary><span><strong>Thu hồi kết quả đã xác nhận</strong><small>Chỉ dùng khi có căn cứ cần thu hồi; hồ sơ cũ vẫn được giữ.</small></span><span className="badge badge-danger">Thao tác cần thận trọng</span></summary>
@@ -216,25 +228,52 @@ export default function RosterPage({context}: {context:Context}) {
               <p>Kiểm tra tệp và xem trước dữ liệu trước khi nhập vào đợt đã chọn.</p></div><span className="badge badge-primary">CSV · XLSX</span></div>
             <div className="card-body stack">
               <div className="roster-form-grid">
-                <label className="input-group">Tệp danh sách<input className="input" type="file" accept=".csv,.xlsx" onChange={e=>{setFile(e.target.files?.[0]||null);setPreview(null);}} /></label>
-                <label className="input-group">Mã/số văn bản nguồn<input className="input" required minLength={3} maxLength={500} value={reference} onChange={e=>setReference(e.target.value)} placeholder="Demo: DEMO-DS-SV-DOT-1-2026" /></label>
+                <label className="input-group">Tệp danh sách<input id="roster-file-input" className="input" type="file" accept=".csv,.xlsx" onChange={e=>{setFile(e.target.files?.[0]||null);setPreview(null);setError("");setNotice("");}} /></label>
+                {file && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
+                  <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                  <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+                    setFile(null); setPreview(null);
+                    const el = document.getElementById("roster-file-input") as HTMLInputElement | null;
+                    if (el) el.value = "";
+                  }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+                </div>}
+                <label className="input-group">Mã/số văn bản nguồn<input id="roster-reference" className="input" required minLength={3} maxLength={500} value={reference} onChange={e=>{setReference(e.target.value);setError("");}} placeholder="Demo: DEMO-DS-SV-DOT-1-2026" /></label>
+              </div>
+              <div className="roster-help-note"><strong>Mã bộ môn trong Excel</strong>
+                <p>Cột này xác định bộ môn quản lý sinh viên và phạm vi đề tài, GVHD; hãy điền đúng mã đã có trong hệ thống. Không dùng mã giả lập cho danh sách thật.</p>
+                <p>{departmentError||(!catalog.length?"Chưa có cặp bộ môn–ngành đang hoạt động; chưa thể nhập.":
+                  `Đã có ${new Set(catalog.map(item=>item.department_code)).size} bộ môn và ${catalog.length} ngành để đối chiếu.`)}</p>
+                <p>Mã BM-* là mã nội bộ trong danh mục Khoa, không phải mã bộ môn chính thức của Trường. Mỗi dòng Excel cần đủ MSSV, họ tên, email, mã bộ môn, lớp, mã ngành; cặp mã phải đúng danh mục.</p>
+                <details><summary>Xem mã bộ môn và ngành được chấp nhận</summary><div className="table-scroll"><table className="account-table"><thead><tr><th>Mã bộ môn</th><th>Tên bộ môn</th><th>Mã ngành</th><th>Tên ngành</th></tr></thead><tbody>
+                  {catalog.map(item=><tr key={`${item.department_code}-${item.major_code}`}><td>{item.department_code}</td><td>{item.department_name}</td><td>{item.major_code}</td><td>{item.major_name}</td></tr>)}
+                </tbody></table></div></details>
+                <a href="/templates/danh-sach-sinh-vien-kltn-mau.xlsx" download>Tải Excel mẫu (dữ liệu giả lập, mã hợp lệ)</a>
               </div>
               <div className="roster-help-note"><strong>Căn cứ nhập danh sách</strong><p>Với dữ liệu giả lập, dùng <strong>DEMO-DS-SV-DOT-1-2026</strong>. Khi dùng dữ liệu thật, ghi số văn bản; nếu không có số, ghi tên văn bản, đơn vị và ngày ban hành.</p></div>
-              <div className="account-actions"><button className="btn btn-secondary" disabled={!file||busy} onClick={()=>{if(!file)return;void run(async()=>{
+              <div className="account-actions"><button className="btn btn-secondary" disabled={!file||!catalog.length||busy} onClick={()=>{if(!file)return;void run(async()=>{
                 const data=await request<Preview>(`/rounds/${roundId}/roster/preview`,context.user_id,
                   {method:"POST",body:file,headers:fileHeaders(file)});setPreview(data);
               },"Đã kiểm định dạng và đối chiếu dữ liệu hiện có. Hãy kiểm tra trước khi nhập.");}}>Kiểm tra tệp</button>
-                <button className="btn btn-primary" disabled={!file||!preview||reference.trim().length<3||busy}
-                  onClick={()=>{if(!file||!preview)return;void run(async()=>{
+                <button className="btn btn-primary" disabled={!file||!preview||busy}
+                  onClick={()=>{if(!file||!preview)return;
+                    if(reference.trim().length<3){setError("Nhập mã/số văn bản nguồn (ít nhất 3 ký tự) trước khi nhập danh sách.");document.getElementById("roster-reference")?.focus();return;}
+                    void run(async()=>{
                     const result=await request<ImportResult>(`/rounds/${roundId}/roster?reference=${encodeURIComponent(reference.trim())}`,context.user_id,
                       {method:"POST",body:file,headers:{...fileHeaders(file),"X-Preview-SHA256":preview.sha256}});
                     setPreview(null);setFile(null);setSelected(result.snapshot_ids);
+                    if(canConfirm)setActivePanel("review");
                     return `Đã nhập ${result.submitted} kết quả chờ xác nhận, tạo ${result.new_accounts} tài khoản; ${result.unchanged} dòng đã có.`;
                   },"Đã nhập danh sách.");}}>Nhập sau khi kiểm</button></div>
+              <p role="status" className="text-caption">{!file?"Chọn tệp CSV UTF-8 hoặc Excel .xlsx (tối đa 2 MB).":
+                !preview?"Nhấn “Kiểm tra tệp” và chờ bảng xem trước; chỉ khi kiểm tra thành công mới có thể nhập.":
+                reference.trim().length<3?"Đã xem trước tệp. Nhập mã/số văn bản nguồn (ít nhất 3 ký tự) để hoàn tất.":
+                `Đã xem trước ${preview.count} sinh viên. Kiểm tra các dòng rồi nhấn “Nhập sau khi kiểm”.`}</p>
+              {error?<p role="alert" className="alert alert-danger">{error}</p>:null}
               {preview?<div className="roster-preview stack"><div><span className="roster-eyebrow">ĐÃ KIỂM TRA · CHƯA NHẬP</span><h3>Xem trước: {preview.count} sinh viên</h3></div>
                 <div className="table-scroll"><table className="account-table"><thead><tr><th>Dòng</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Mã bộ môn</th><th>Lớp</th><th>Mã ngành</th></tr></thead>
                   <tbody>{preview.rows.map(row=><tr key={row.line}><td>{row.line}</td><td>{row.student_code}</td><td>{row.display_name}</td>
-                    <td>{row.email}</td><td>{row.department_code}</td><td>{row.class_name}</td><td>{row.major_code}</td></tr>)}</tbody></table></div>
+                    <td>{row.email}</td><td>{row.department_code} · {catalog.find(item=>item.department_code===row.department_code)?.department_name||"?"}</td><td>{row.class_name}</td>
+                    <td>{row.major_code} · {catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name||"?"}</td></tr>)}</tbody></table></div>
               </div>:null}
             </div>
           </section>:null}
@@ -274,7 +313,14 @@ export default function RosterPage({context}: {context:Context}) {
                 <label className="input-group">MSSV<input className="input" value={correctionCode} onChange={e=>setCorrectionCode(e.target.value)} /></label>
                 <label className="input-group">Họ tên<input className="input" value={correctionName} onChange={e=>setCorrectionName(e.target.value)} /></label>
                 <label className="input-group">Lớp<input className="input" value={correctionClass} onChange={e=>setCorrectionClass(e.target.value)} /></label>
-                <label className="input-group">Mã ngành<input className="input" value={correctionMajor} onChange={e=>setCorrectionMajor(e.target.value)} /></label>
+                <label className="input-group">Ngành ({roster.find(row=>row.student_id===correctionStudent)?.department_code})
+                  <select className="input" value={correctionMajor} onChange={e=>setCorrectionMajor(e.target.value)}>
+                    {!correctionMajor?<option value="">Chọn ngành</option>:null}
+                    {!catalog.some(item=>item.department_code===roster.find(row=>row.student_id===correctionStudent)?.department_code&&item.major_code===correctionMajor)
+                      && correctionMajor?<option value={correctionMajor}>{correctionMajor} · Mã cũ chưa xác minh</option>:null}
+                    {catalog.filter(item=>item.department_code===roster.find(row=>row.student_id===correctionStudent)?.department_code)
+                      .map(item=><option key={item.major_code} value={item.major_code}>{item.major_code} · {item.major_name}</option>)}
+                  </select></label>
               </div>:<p className="text-caption">Chọn sinh viên để hiện các thông tin được phép đính chính.</p>}
               <div className="roster-form-grid">
                 <label className="input-group">Văn bản Khoa làm căn cứ<input className="input" minLength={3} maxLength={500} value={correctionRef} onChange={e=>setCorrectionRef(e.target.value)} placeholder="Demo: DEMO-DINH-CHINH-001" /></label>

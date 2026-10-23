@@ -64,10 +64,11 @@ def main() -> int:
     if not npm:
         raise RuntimeError('Node.js/npm is required')
     url = make_url(os.environ['DATABASE_URL'])
-    if not url.database or url.database == 'kltn_management':
-        raise RuntimeError('E2E BLOCKED: a dedicated test database is required. '
-            'DATABASE_URL must not point at kltn_management; no test rows, schema or '
-            'cleanup may touch the working database.')
+    if not url.database or (url.database == 'kltn_management' and
+            os.getenv('KLTN_E2E_ALLOW_ISOLATED_SCHEMA') != 'true'):
+        raise RuntimeError('E2E BLOCKED: a dedicated test database is required, or explicitly '
+            'allow a fresh isolated schema in kltn_management with '
+            'KLTN_E2E_ALLOW_ISOLATED_SCHEMA=true. Existing schemas are never reused.')
     schema = 'e2e_' + uuid4().hex[:16]
     assert re.fullmatch(r'e2e_[0-9a-f]{16}', schema)
     directory = ROOT / 'tmp' / schema
@@ -123,7 +124,7 @@ def main() -> int:
                 base_role='ADMIN', status='ACTIVE')
             session.add(admin)
             accounts['admin'] = {'email':admin.email, 'password':admin_password}
-            for key in ('proposalPeer','race1','race2','race3','proposalFlow'):
+            for key in ('proposalPeer','race1','race2','race3','proposalFlow','returnFlow','auditSv1','auditSv2','auditSv3'):
                 password = secrets.token_urlsafe(20)
                 email = key.lower() + '@e2e.test'
                 user = m.UserAccount(id=uuid4(),email=email,password_hash=hash_password(password),

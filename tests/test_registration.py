@@ -631,7 +631,7 @@ def test_student_proposal_review_and_receiving_lecturer(scenario):
     rejected = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
         headers={**hdr(users[5]),"If-Match":str(received["row_version"])},json={"decision":"REJECT","reason":"Outside current capacity"})
     assert rejected.status_code == 200, rejected.text
-    assert all(not m["active"] for m in rejected.json()["members"])
+    assert rejected.json()["state"] == "LECTURER_REJECTED"
 
 
 def test_student_proposal_return_edit_resubmit(scenario):

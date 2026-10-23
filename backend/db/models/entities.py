@@ -51,6 +51,17 @@ class Department(UuidPrimaryKeyMixin, TimestampMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
 
 
+class DepartmentMajor(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """Allowed major codes for a department; one department may offer many majors."""
+
+    __tablename__ = "department_major"
+    __table_args__ = (UniqueConstraint("department_id", "code"),)
+    department_id: Mapped[uuid.UUID] = fk("department.id")
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+
 class UserAccount(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "user_account"
     __table_args__ = (
@@ -71,6 +82,13 @@ class UserAccount(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
 
 class StudentProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "student_profile"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["department_id", "major_code"],
+            ["department_major.department_id", "department_major.code"],
+            ondelete="RESTRICT",
+        ),
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.id", ondelete="RESTRICT"), nullable=False, unique=True
     )
@@ -454,6 +472,7 @@ class ProposalVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
     stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
@@ -507,6 +526,21 @@ class ProgressMilestone(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     expected_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     source_type: Mapped[str] = mapped_column(String(20), nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+
+
+class DocumentDeadline(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "document_deadline"
+    __table_args__ = (
+        UniqueConstraint("round_id", "document_type"),
+        CheckConstraint("document_type IN ('PROPOSAL','PLAN','SUPPORTING')", name="document_type"),
+        CheckConstraint("state IN ('OPEN','CLOSED')", name="state"),
+    )
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    document_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN", server_default="OPEN")
+    set_by: Mapped[uuid.UUID] = fk("user_account.id")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class ProgressReport(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
@@ -568,6 +602,7 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 

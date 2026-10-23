@@ -2,20 +2,20 @@
 from uuid import UUID
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from backend.api.core_schemas import (
     AuditOut, LecturerAssignment,
-    DocumentCreate, DocumentDecision, DocumentOut, DocumentWithdraw, MilestoneClose, MilestoneCreate, MilestoneExtend, MilestoneOut,
+    DocumentCreate, DocumentDecision, DocumentOut, DocumentWithdraw, DocumentDeadlineOut, DocumentDeadlineSet, DocumentDeadlineClose, MilestoneClose, MilestoneCreate, MilestoneExtend, MilestoneOut,
     ProgressCreate, ProgressDecision, ProgressOut, ProposalFinalization, ProposalOut,
     ProposalReviewCreate, ProposalSignedCopy, ThesisWorkspaceOut, WorkCreate, WorkDecision, WorkOut,
 )
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
-from backend.services import documents, progress, proposals, theses
+from backend.services import deadlines, documents, progress, proposals, theses
 from backend.services.proposal_export import export_document, export_proposal
 from backend.services.form_templates import list_official_templates, official_template, official_template_by_id, allowed_form
 
@@ -98,6 +98,12 @@ async def proposal_upload(thesis_id: UUID, request: Request,
     return await proposals.upload_version(session, user, thesis_id, request, if_match)
 
 
+@router.post("/theses/{thesis_id}/proposal/versions/{version_id}/scan", response_model=ProposalOut)
+def proposal_scan(thesis_id: UUID, version_id: UUID,
+        user=Depends(current_user), session=Depends(core_session)):
+    return proposals.rescan_version(session, user, thesis_id, version_id)
+
+
 @router.get("/theses/{thesis_id}/proposal/versions/{version_id}/download", response_class=FileResponse,
     responses={200: {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
 def proposal_download(thesis_id: UUID, version_id: UUID,
@@ -147,6 +153,27 @@ def cross_reviewer(thesis_id: UUID, data: LecturerAssignment, if_match: int = He
 def milestones(thesis_id: UUID, user=Depends(current_user), session=Depends(core_session)):
     thesis = theses.thesis_access(session, user, thesis_id)
     return [progress.milestone_out(item) for item in progress.milestones(session, thesis)]
+
+
+@router.get("/theses/{thesis_id}/document-deadlines", response_model=list[DocumentDeadlineOut])
+def document_deadlines(thesis_id: UUID, user=Depends(current_user), session=Depends(core_session)):
+    return deadlines.list_for_thesis(session, user, thesis_id)
+
+
+@router.post("/theses/{thesis_id}/document-deadlines", response_model=DocumentDeadlineOut)
+def document_deadline_set(thesis_id: UUID, data: DocumentDeadlineSet,
+        if_match: int | None = Header(default=None, alias="If-Match", ge=1),
+        user=Depends(current_user), session=Depends(core_session)):
+    return deadlines.set_deadline(session, user, thesis_id, data, if_match)
+
+
+@router.post("/theses/{thesis_id}/document-deadlines/{document_type}/close", response_model=DocumentDeadlineOut)
+def document_deadline_close(thesis_id: UUID, document_type: str, data: DocumentDeadlineClose,
+        if_match: int = Header(alias="If-Match", ge=1),
+        user=Depends(current_user), session=Depends(core_session)):
+    if document_type not in {"PROPOSAL", "PLAN", "SUPPORTING"}:
+        raise HTTPException(422, "Loại tài liệu không hợp lệ")
+    return deadlines.close_deadline(session, user, thesis_id, document_type, data.reason, if_match)
 
 
 @router.post("/theses/{thesis_id}/progress-reviewers/{lecturer_id}/revoke", status_code=204)
@@ -243,6 +270,12 @@ async def document_upload(thesis_id: UUID, document_id: UUID, request: Request,
         if_match: int = Header(alias="If-Match", ge=1), x_file_name: str = Header(alias="X-File-Name"),
         user=Depends(current_user), session=Depends(core_session)):
     return await documents.upload_version(session, user, thesis_id, document_id, request, if_match)
+
+
+@router.post("/theses/{thesis_id}/documents/{document_id}/versions/{version_id}/scan", response_model=DocumentOut)
+def document_scan(thesis_id: UUID, document_id: UUID, version_id: UUID,
+        user=Depends(current_user), session=Depends(core_session)):
+    return documents.rescan_version(session, user, thesis_id, document_id, version_id)
 
 
 @router.post("/theses/{thesis_id}/documents/{document_id}/versions/{version_id}/review", response_model=DocumentOut)

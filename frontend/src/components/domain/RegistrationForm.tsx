@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import type { Context } from "../../api";
 import { request } from "../../api";
 import { errorMessage } from "../../errors";
@@ -59,7 +60,9 @@ export default function RegistrationForm({ context, userId, roundId, busy, disab
           disabled={busy} onChange={(event) => {chooseEvidence(event.target.files?.[0]); event.target.value = "";}} />
       </label>
       {evidence ? <div className="registration-evidence__selected"><span>{evidence.name}</span>
-        <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => {setEvidence(null); setEvidenceError("");}}>Bỏ tệp</button></div> : null}
+        <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => {setEvidence(null); setEvidenceError("");}}>
+          <X size={14} aria-hidden="true" style={{marginRight: 4, verticalAlign: "middle"}} /> Xóa tệp đã chọn
+        </button></div> : null}
       {evidenceError ? <p className="alert alert-danger" role="alert">{evidenceError}</p> : null}
       <p className="text-caption text-muted">PDF, PNG hoặc JPEG, tối đa 5 MB. Nếu có nhiều giấy tờ, gộp thành một tệp PDF.</p>
     </section>

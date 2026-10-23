@@ -35,7 +35,7 @@ COLUMN_VI = {
     "department_finalized_by": "Mã người chốt tại Bộ môn", "department_id": "Mã bộ môn",
     "description": "Mô tả", "display_name": "Họ tên hiển thị",
     "document_id": "Mã tài liệu", "document_type": "Loại tài liệu",
-    "due_at": "Hạn hoàn thành", "effective_from": "Bắt đầu hiệu lực",
+    "due_at": "Hạn hoàn thành", "due_at_at_submission": "Hạn áp dụng lúc nộp", "effective_from": "Bắt đầu hiệu lực",
     "effective_to": "Kết thúc hiệu lực", "email": "Địa chỉ email",
     "email_verified_at": "Thời điểm xác minh email", "ends_on": "Ngày kết thúc",
     "enforcement": "Tính chất yêu cầu", "evidence_file_id": "Mã tệp minh chứng",
@@ -58,6 +58,8 @@ COLUMN_VI = {
     "proposal_version_no": "Số phiên bản đề cương", "proposer_type": "Loại người đề xuất",
     "proposer_user_id": "Mã tài khoản đề xuất", "reason": "Lý do hoặc căn cứ",
     "receiving_lecturer_id": "Mã GV tiếp nhận", "registration_id": "Mã đăng ký",
+    "recipient_user_id": "Mã tài khoản nhận thông báo", "actor_user_id": "Mã tài khoản sinh viên thực hiện",
+    "kind": "Loại thông báo", "read_at": "Thời điểm đã xem", "revoked_at": "Thời điểm thu hồi",
     "reported_ratio": "Tỷ lệ tiến độ báo cáo", "requirement_type": "Loại yêu cầu",
     "resource_id": "Mã đối tượng nghiệp vụ", "resource_type": "Loại đối tượng nghiệp vụ",
     "responded_at": "Thời điểm phản hồi", "responded_by_user_id": "Mã tài khoản tự phản hồi",
@@ -86,6 +88,7 @@ EXAMPLES = {
     "advisor_assignment": "Sau khi Bộ môn chốt nhóm DEMO, một GV được ghi là GVHD chính từ ngày bắt đầu; khi thay GV lưu thêm bản phân công mới.",
     "audit_event": "Ghi actor, thời điểm và lý do khi TBM chốt đăng ký DEMO.",
     "department": "Bộ môn CNTT-DEMO thuộc Khoa CNKT-DEMO.",
+    "department_major": "BM-KHMT chấp nhận ngành 7480101 và 7480208; mã ngành khác bị chặn khi nhập Excel.",
     "document": "Nhóm DEMO tạo hồ sơ báo cáo KLTN chỉ thành viên và GVHD được xem.",
     "document_version": "Lần nộp báo cáo thứ hai là v2, giữ nguyên v1 và SHA-256.",
     "eligibility_snapshot": "Khoa xác nhận SV-DEMO đủ điều kiện đợt chính theo danh sách nguồn; quyết định đặc biệt tạo snapshot v2 có số quyết định Hiệu trưởng.",
@@ -114,6 +117,7 @@ EXAMPLES = {
     "topic_requirement": "GV nêu kỹ năng Python là mong muốn; không tự chặn SV đủ điều kiện.",
     "topic_title_version": "TBM đổi tên TOP-DEMO ở v2, mã đề tài giữ nguyên.",
     "user_account": "Tài khoản demo SV-DEMO đăng nhập bằng email đã xác minh và bị chặn khi LOCKED.",
+    "user_notification": "SV-DEMO gửi đăng ký; GV nhận thông báo, xem hồ sơ rồi số chưa xem giảm.",
 }
 
 SEPARATION = {
@@ -121,6 +125,7 @@ SEPARATION = {
     "advisor_assignment": "GV tiếp nhận đăng ký chưa phải GVHD chính thức; bảng này chỉ phát sinh sau khi TBM chốt và giữ lịch sử thay GV.",
     "audit_event": "Nhật ký nhiều sự kiện trên nhiều đối tượng; không thể thay bằng trạng thái cuối của từng bảng.",
     "document": "Một hồ sơ tài liệu có nhiều phiên bản; tách thông tin chung và bản nộp.",
+    "department_major": "Một bộ môn quản lý nhiều ngành; cặp mã cần quan hệ và ràng buộc riêng, không thể dùng một cột department.major_code.",
     "document_version": "Tách khỏi document để không ghi đè bản đã nộp.",
     "eligibility_snapshot": "Theo từng SV/đợt/phiên bản; không nhét điều kiện biến đổi vào hồ sơ SV cố định.",
     "member_work_assignment": "Phần việc riêng từng SV có phiên bản/nhận xét, không phải nội dung chung của KLTN.",
@@ -146,6 +151,7 @@ ROLE_GROUPS = {
     "advisor_assignment": "Trưởng bộ môn chốt GVHD; GV được đề cử có quyền nhận/từ chối thay đổi; SV và GVHD xem trong phạm vi khóa luận.",
     "audit_event": "Service ghi khi có thao tác; Trưởng bộ môn đúng phạm vi xem lịch sử khóa luận.",
     "department": "Admin kỹ thuật quản lý dữ liệu tổ chức; quyền nghiệp vụ chỉ áp dụng cho bộ môn tương ứng.",
+    "department_major": "Admin kỹ thuật nạp danh mục đã đối chiếu; người nhập danh sách xem và chỉ dùng cặp mã đang hoạt động.",
     "document_version": "SV thành viên nộp bản mới; GVHD nhận xét; chỉ actor có quyền trên khóa luận được tải.",
     "faculty": "Admin kỹ thuật quản lý dữ liệu Khoa; Trưởng khoa chỉ có quyền theo phân công chức vụ còn hiệu lực.",
     "lecturer_profile": "GV xem/cập nhật hồ sơ của mình theo API; Admin quản lý tài khoản, không thay GV duyệt đề tài.",
@@ -180,7 +186,7 @@ ROLE_GROUPS = {
 def make_dictionary() -> None:
     assert set(target_metadata.tables) == SELECTED_TABLES
     lines = ["# Từ điển dữ liệu CSDL chính thức `kltn_management`", "",
-        "Sinh từ metadata SQLAlchemy của revision Alembic `20261015_0001_official`; 32 bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.",
+        f"Sinh từ metadata SQLAlchemy của revision Alembic `20261021_0004`; {len(SELECTED_TABLES)} bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.",
         "", "`NULL` ở đây là ràng buộc vật lý. Mọi hành động quan trọng còn chịu kiểm tra quyền/trạng thái trong service và audit. Ví dụ đều là dữ liệu giả.", ""]
     for number, table in enumerate(sorted(target_metadata.tables.values(), key=lambda item: item.name), 1):
         title, function = TABLE_INFO[table.name]
@@ -197,7 +203,9 @@ def make_dictionary() -> None:
             "|---|---|---|---|---|---|",
         ]
         for column in table.columns:
-            label = COLUMN_VI[column.name]
+            label = "Mã ngành" if table.name == "department_major" and column.name == "code" else COLUMN_VI[column.name]
+            if table.name == "department_major" and column.name == "name":
+                label = "Tên ngành"
             dtype = str(column.type.compile(dialect=postgresql.dialect()))
             default = str(column.server_default.arg) if column.server_default is not None else ("Ứng dụng sinh UUID" if column.primary_key else "Ứng dụng" if column.default is not None else "—")
             default = default.replace("|", "\\|")
@@ -206,6 +214,8 @@ def make_dictionary() -> None:
             elif column.foreign_keys:
                 targets = ", ".join(sorted(f"`{fk.column.table.name}.{fk.column.name}`" for fk in column.foreign_keys))
                 purpose = f"{label}; liên kết tới {targets}, giữ toàn vẹn tham chiếu."
+            elif column.name == "due_at_at_submission":
+                purpose = "Hạn hiệu lực tại lúc gửi; giữ nguyên kết quả đúng hạn/trễ khi Khoa gia hạn mốc sau đó. Bản cũ trước migration chỉ được khôi phục theo hạn tại lúc chuyển đổi."
             elif column.name in {"created_at", "updated_at", "occurred_at", "submitted_at", "confirmed_at", "decided_at"}:
                 purpose = f"{label}; dùng đối chiếu trình tự và audit."
             elif column.name in {"state", "status", "decision", "consent_status"}:
@@ -232,7 +242,7 @@ def make_dictionary() -> None:
 def make_erd() -> None:
     assert set(target_metadata.tables) == SELECTED_TABLES
     lines = ["# ERD CSDL chính thức `kltn_management`", "",
-        "Sơ đồ chỉ chứa 32 bảng nghiệp vụ của revision `20261015_0001_official`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).",
+        f"Sơ đồ chứa {len(SELECTED_TABLES)} bảng nghiệp vụ của revision `20261021_0004`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).",
         "", "```mermaid", "erDiagram"]
     for table in sorted(target_metadata.tables.values(), key=lambda item: item.name):
         lines.append(f"    {table.name} {{")

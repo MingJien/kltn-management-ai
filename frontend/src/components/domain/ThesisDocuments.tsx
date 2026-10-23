@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { OfficialFormTemplate, ProgressReport, Thesis, ThesisDocument } from "../../api";
+import { X } from "lucide-react";
+import type { DocumentDeadline, OfficialFormTemplate, ProgressReport, Thesis, ThesisDocument } from "../../api";
 import { downloadDocument, downloadOfficialTemplate, downloadPlanTemplate, listFormTemplates, request, uploadDocument } from "../../api";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
@@ -12,22 +13,37 @@ export function scanLabel(state: string) {
   return "Quét lỗi – không sử dụng";
 }
 
-function DocumentCard({doc, thesis, progressEvidenceIds, userId, busy, run}: {
-  doc: ThesisDocument; thesis: Thesis; progressEvidenceIds: Set<string>; userId: string; busy: boolean; run: CoreRun;
+function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy, run}: {
+  doc: ThesisDocument; thesis: Thesis; deadline?: DocumentDeadline; progressEvidenceIds: Set<string>; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [downloadError, setDownloadError] = useState("");
   const [printNotice, setPrintNotice] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const canSubmit = !["REPORT", "PROPOSAL"].includes(doc.document_type) && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
+  const latest = doc.versions[0];
+  const beforeDue = deadline?.state === "OPEN" && Date.now() <= new Date(deadline.due_at).getTime();
+  const canSubmit = !["REPORT", "PROPOSAL"].includes(doc.document_type) && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && !!deadline && (
+    latest?.state === "REVISION_REQUESTED" ||
+    (deadline.state === "OPEN" && !latest) ||
+    (beforeDue && latest?.state === "SUBMITTED" && latest.reviews.length === 0));
   const canWithdraw = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && doc.document_type !== "PROPOSAL" && doc.versions.every(version =>
     version.state === "SUBMITTED" && version.reviews.length === 0 && !progressEvidenceIds.has(version.id));
   const latestAccepted = doc.versions.filter(version => ["ACCEPTED", "FINAL"].includes(version.state))
     .sort((a, b) => b.version_no - a.version_no)[0];
   return <article className="card"><div className="card-body stack">
-    <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : doc.document_type === "REPORT" ? "Báo cáo khóa luận đã tạo trước đây" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
+    <div className="flex justify-between items-start gap-2">
+      <div><h3>{doc.title}</h3><p className="text-muted">{doc.document_type === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : doc.document_type === "REPORT" ? "Báo cáo khóa luận đã tạo trước đây" : "Tài liệu hỗ trợ"} · Chia sẻ trong phạm vi được phân công</p></div>
+      {canWithdraw && <button type="button" className="btn btn-secondary btn-sm" disabled={busy} title="Thu hồi hồ sơ nộp nhầm" onClick={async () => {
+        const reason = doc.versions.length === 0 ? "Tạo nhầm hồ sơ chưa có tệp" : window.prompt("Lý do thu hồi hồ sơ:", "Nộp nhầm tài liệu");
+        if (!reason || reason.trim().length < 3) return;
+        await run(() => request(`/theses/${thesis.id}/documents/${doc.id}/withdraw`, userId, {
+          method: "POST", headers: {"If-Match": String(doc.row_version)}, body: JSON.stringify({reason: reason.trim()}),
+        }), "Đã thu hồi hồ sơ nộp nhầm khỏi danh sách.");
+      }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Thu hồi tài liệu</button>}
+    </div>
     {doc.document_type === "PLAN" && <p className="text-body-sm text-muted">Điền nội dung vào Mẫu 2 chính thức của Khoa trên Word, nộp bản PDF/DOCX tại đây. Nếu GVHD yêu cầu sửa, nộp một phiên bản mới; bản đã tiếp nhận được dùng làm bản chính thức trong hồ sơ.</p>}
+    {!["REPORT", "PROPOSAL"].includes(doc.document_type) && <p className="text-body-sm"><strong>Hạn nộp:</strong> {deadline ? `${formatDate(deadline.due_at)} · ${deadline.state === "OPEN" ? "đang nhận" : "đã đóng"}` : "Khoa chưa thiết lập — chưa nhận tệp"}. Trước hạn được nộp bản mới nếu GVHD chưa phản hồi; sau hạn chỉ nộp lại khi GVHD yêu cầu sửa.</p>}
     {doc.document_type === "PROPOSAL" && <p className="text-body-sm">Lưu tệp đề cương ở đây. Quy trình GVHD → phản biện → TBM → Trưởng khoa sẽ được xử lý riêng.</p>}
     {canWithdraw && <details><summary>Rút hồ sơ tài liệu nộp nhầm</summary><form className="core-form" onSubmit={async event => {
       event.preventDefault();
@@ -53,7 +69,15 @@ function DocumentCard({doc, thesis, progressEvidenceIds, userId, busy, run}: {
       <label htmlFor={`file-${doc.id}`}>Nộp phiên bản mới (PDF, DOCX, TXT; tối đa 10 MB)</label>
       <input className="input" id={`file-${doc.id}`} type="file" accept=".pdf,.docx,.txt" required disabled={busy}
         onChange={event => setFile(event.target.files?.[0] || null)} />
-      <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>Nộp tài liệu</button>
+      {file && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
+        <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+        <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+          setFile(null);
+          const el = document.getElementById(`file-${doc.id}`) as HTMLInputElement | null;
+          if (el) el.value = "";
+        }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+      </div>}
+      <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>{busy ? "Đang tải lên và quét an toàn…" : "Nộp tài liệu"}</button>
       {file && file.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
     </form>}
     {downloadError && <div role="alert" className="alert alert-danger">{downloadError}</div>}
@@ -67,7 +91,12 @@ function DocumentCard({doc, thesis, progressEvidenceIds, userId, busy, run}: {
       return <section className="core-version stack" key={version.id}>
         <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong><Status value={version.state} /></div>
         <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
+        {version.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+        {version.due_at_at_submission && <p className="text-caption">Hạn áp dụng lúc nộp: {formatDate(version.due_at_at_submission)}</p>}
         <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
+        {["QUARANTINED", "FAILED"].includes(version.scan_state) && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+          onClick={() => run(() => request(`/theses/${thesis.id}/documents/${doc.id}/versions/${version.id}/scan`, userId, {method:"POST"}),
+            "Đã quét lại tệp bằng ClamAV; xem trạng thái mới của phiên bản.")}>Quét lại tệp bằng ClamAV</button>}
         <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
           setDownloadError(""); setDownloading(true);
           try {await downloadDocument(thesis.id, doc, version, userId);} catch (cause) {setDownloadError(String(cause));}
@@ -96,8 +125,8 @@ function DocumentCard({doc, thesis, progressEvidenceIds, userId, busy, run}: {
   </div></article>;
 }
 
-export default function ThesisDocuments({thesis, docs, reports, userId, busy, run}: {
-  thesis: Thesis; docs: ThesisDocument[]; reports: ProgressReport[]; userId: string; busy: boolean; run: CoreRun;
+export default function ThesisDocuments({thesis, docs, deadlines, reports, userId, busy, run}: {
+  thesis: Thesis; docs: ThesisDocument[]; deadlines: DocumentDeadline[]; reports: ProgressReport[]; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("PLAN");
@@ -161,9 +190,10 @@ export default function ThesisDocuments({thesis, docs, reports, userId, busy, ru
       <div className="input-group"><label htmlFor="document-type">Loại tài liệu</label><select className="input" id="document-type" value={type} onChange={event => setType(event.target.value)} disabled={busy}>
         <option value="PLAN">Kế hoạch thực hiện (Mẫu 2)</option><option value="SUPPORTING">Tài liệu hỗ trợ khóa luận</option>
       </select></div>
+      <p className="text-body-sm text-muted">Hạn {type === "PLAN" ? "kế hoạch" : "tài liệu hỗ trợ"}: {(() => {const item = deadlines.find(deadline => deadline.document_type === type); return item ? `${formatDate(item.due_at)} · ${item.state === "OPEN" ? "đang nhận" : "đã đóng"}` : "Khoa chưa thiết lập";})()}</p>
       <button className="btn btn-primary" disabled={busy || !title.trim()}>Tạo hồ sơ tài liệu</button>
     </div></form>}
-    {visibleDocs.map(doc => <DocumentCard key={doc.id} doc={doc} thesis={thesis} progressEvidenceIds={progressEvidenceIds} userId={userId} busy={busy} run={run} />)}
+    {visibleDocs.map(doc => <DocumentCard key={doc.id} doc={doc} thesis={thesis} deadline={deadlines.find(item => item.document_type === doc.document_type)} progressEvidenceIds={progressEvidenceIds} userId={userId} busy={busy} run={run} />)}
     {visibleDocs.length === 0 && <div className="card"><div className="card-body">
       <h3>Chưa có tài liệu nào trong hồ sơ</h3>
       <p className="text-muted">
