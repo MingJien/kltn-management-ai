@@ -624,7 +624,7 @@ class UserNotification(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "user_notification"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED')",
+            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED')",
             name="kind",
         ),
         Index("ix_user_notification_recipient_created", "recipient_user_id", "created_at"),

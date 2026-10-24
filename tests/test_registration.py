@@ -96,6 +96,69 @@ def test_registration_notice_is_private_and_read_per_account(scenario):
     assert client.post(path, headers=hdr(users[3])).status_code == 204
     seen = client.get("/api/v1/notifications", headers=hdr(users[3])).json()
     assert seen["unread_count"] == 0 and seen["items"][0]["read_at"]
+    quick = client.get("/api/v1/notifications?unread_only=true&limit=5", headers=hdr(users[3])).json()
+    assert quick == {"unread_count": 0, "items": []}
+    history = client.get("/api/v1/notifications?limit=21&offset=0", headers=hdr(users[3])).json()
+    assert len(history["items"]) == 1 and history["items"][0]["id"] == notice["id"]
+    assert client.get("/api/v1/notifications?limit=21&offset=1", headers=hdr(users[3])).json()["items"] == []
+
+
+def test_group_member_receives_submitted_registration_notice(scenario):
+    client, users, _, _, topic, _ = scenario
+    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
+                          json={"topic_id": str(topic.id)}).json()
+    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]),
+                         json={"topic_id": str(topic.id)})
+    assert joined.status_code == 201, joined.text
+    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
+                       headers={**hdr(users[0]), "If-Match": str(joined.json()["row_version"])})
+    assert sent.status_code == 200, sent.text
+    member_inbox = client.get("/api/v1/notifications?unread_only=true", headers=hdr(users[1])).json()
+    assert member_inbox["unread_count"] == 1
+    assert "Đang chờ GV xét" in member_inbox["items"][0]["message"]
+    assert client.get("/api/v1/notifications", headers=hdr(users[2])).json()["items"] == []
+
+
+@pytest.mark.parametrize("decision, expected_text", [
+    ("ACCEPT", "đã chấp nhận"),
+    ("REJECT", "đã từ chối"),
+])
+def test_group_members_receive_lecturer_decision(scenario, decision, expected_text):
+    client, users, _, _, topic, _ = scenario
+    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
+                          json={"topic_id": str(topic.id)}).json()
+    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]),
+                         json={"topic_id": str(topic.id)})
+    assert joined.status_code == 201, joined.text
+    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
+                       headers={**hdr(users[0]), "If-Match": str(joined.json()["row_version"])})
+    assert sent.status_code == 200, sent.text
+    decided = client.post(f"/api/v1/topic-registrations/{created['id']}/lecturer-decision",
+        headers={**hdr(users[3]), "If-Match": str(sent.json()["row_version"])},
+        json={"decision": decision, **({"reason": "Chưa phù hợp"} if decision == "REJECT" else {})})
+    assert decided.status_code == 200, decided.text
+    for student in users[:2]:
+        inbox = client.get("/api/v1/notifications", headers=hdr(student)).json()
+        assert any(expected_text in item["message"] and
+                   item["url"] == f"/registrations?focus={created['id']}" for item in inbox["items"])
+
+
+def test_admin_receives_registration_activity_without_access_to_private_registration(scenario):
+    client, users, _, _, topic, session = scenario
+    admin = m.UserAccount(id=uuid4(), external_subject="test-" + uuid4().hex,
+                          base_role="ADMIN", status="ACTIVE")
+    session.add(admin)
+    session.flush()
+    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
+                          json={"topic_id": str(topic.id)}).json()
+    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
+                       headers={**hdr(users[0]), "If-Match": str(created["row_version"])})
+    assert sent.status_code == 200, sent.text
+    inbox = client.get("/api/v1/notifications", headers=hdr(admin)).json()
+    assert inbox["unread_count"] == 1
+    assert topic.current_title in inbox["items"][0]["message"]
+    assert inbox["items"][0]["url"] == "/notifications"
+    assert client.get(f"/api/v1/topic-registrations/{created['id']}", headers=hdr(admin)).status_code == 404
 
 
 def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
@@ -117,6 +180,9 @@ def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
     assert client.get("/api/v1/topics?view=suggested", headers=hdr(users[0])).status_code == 403
     first = client.get("/api/v1/notifications", headers=hdr(users[3])).json()
     assert first["unread_count"] == 1 and "chờ bộ môn duyệt" in first["items"][0]["message"]
+    head_inbox = client.get("/api/v1/notifications", headers=hdr(users[4])).json()
+    assert head_inbox["unread_count"] == 1
+    assert head_inbox["items"][0]["url"] == f"/topics?focus={reg['topic_id']}"
     proposed = client.get(f"/api/v1/topics/{reg['topic_id']}", headers=hdr(users[4])).json()
     approved = client.post(f"/api/v1/topics/{reg['topic_id']}/department-decision",
         headers={**hdr(users[4]), "If-Match": str(proposed["row_version"])},
@@ -127,6 +193,10 @@ def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
     assert any(row["id"] == reg["topic_id"] for row in
         client.get("/api/v1/topics?view=suggested", headers=hdr(users[5])).json())
     assert client.get("/api/v1/notifications", headers=hdr(users[3])).json()["items"] == []
+    assert client.get("/api/v1/notifications", headers=hdr(users[4])).json()["items"] == []
+    student_inbox = client.get("/api/v1/notifications", headers=hdr(users[0])).json()
+    assert student_inbox["unread_count"] == 1
+    assert "Bộ môn đã duyệt" in student_inbox["items"][0]["message"]
     replacement = client.get("/api/v1/notifications", headers=hdr(users[5])).json()
     assert replacement["unread_count"] == 1
     assert "Mời bạn xét đăng ký" in replacement["items"][0]["message"]

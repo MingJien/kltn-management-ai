@@ -9,6 +9,7 @@ import RegistrationsPage from "./pages/RegistrationsPage";
 import ThesisViewPage from "./pages/ThesisViewPage";
 import AccountAccessPage from "./pages/AccountAccessPage";
 import AccountPage from "./pages/AccountPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import AdministrationPage from "./pages/AdministrationPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
@@ -29,7 +30,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(true);
   useEffect(() => {
-    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm"};
+    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
     const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
     const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
       : plannedId && Object.hasOwn(plannedPages, plannedId) ? plannedPages[plannedId as PlannedPageId].title
@@ -129,6 +130,7 @@ function App() {
         <Route path="/account" element={<AccountPage context={context} onPasswordChanged={() => {
           setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
         }} />} />
+        <Route path="/notifications" element={<NotificationsPage userId={context.user_id} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
         <Route path="/rounds" element={context.base_role === "ADMIN" ?

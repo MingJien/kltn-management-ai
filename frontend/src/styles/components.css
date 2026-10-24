@@ -917,6 +917,27 @@ textarea.input {
 .notifications__item--unread { background: #eef8f9; font-weight: 600; }
 .notifications__empty { padding: 18px 16px; margin: 0; color: var(--neutral-500); }
 .notifications__panel .alert { margin: 12px; }
+.notifications__all {
+  display: block; padding: 12px 16px; border-top: 1px solid var(--neutral-200);
+  color: var(--primary-700); font: var(--text-body-sm); font-weight: 700; text-align: center;
+}
+.notifications__all:hover, .notifications__all:focus-visible { background: var(--primary-50); }
+
+.notification-history { max-width: 900px; }
+.notification-history__day { margin-bottom: var(--space-6); }
+.notification-history__day h2 { margin: 0 0 var(--space-3); color: var(--neutral-600); font: var(--text-body-sm); font-weight: 700; text-transform: capitalize; }
+.notification-history__day ul { margin: 0; padding: 0; list-style: none; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #fff; overflow: hidden; }
+.notification-history__day li + li { border-top: 1px solid var(--neutral-100); }
+.notification-history__item { display: flex; align-items: flex-start; gap: var(--space-4); width: 100%; padding: var(--space-4); text-align: left; color: var(--neutral-700); cursor: pointer; }
+.notification-history__item:hover, .notification-history__item:focus-visible { background: var(--neutral-50); }
+.notification-history__item--unread { background: var(--primary-50); color: var(--neutral-900); font-weight: 600; }
+.notification-history__item:disabled { opacity: .65; cursor: wait; }
+.notification-history__icon { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: var(--radius-full); background: var(--neutral-100); color: var(--neutral-500); }
+.notification-history__item--unread .notification-history__icon { background: var(--primary-100); color: var(--primary-700); }
+.notification-history__content { display: grid; gap: var(--space-2); min-width: 0; }
+.notification-history__meta { display: flex; gap: var(--space-2); color: var(--neutral-500); font: var(--text-caption); font-weight: 500; }
+.notification-history__empty { display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-10); color: var(--neutral-500); }
+.notification-history__empty p { margin: 0; }
 
 .header__user {
   display: flex;

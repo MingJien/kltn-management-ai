@@ -4,7 +4,7 @@
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic revision `20261022_0005`: 34 bảng nghiệp vụ và `alembic_version`. Bảng `department_major` lưu 10 cặp mã ngành–bộ môn của Khoa CN&KT để kiểm tra khi nhập Excel; các hồ sơ demo cũ được giữ nguyên. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
+PostgreSQL `kltn_management`, Alembic revision `20261024_0006`: 34 bảng nghiệp vụ và `alembic_version`. Bảng `department_major` lưu 10 cặp mã ngành–bộ môn của Khoa CN&KT để kiểm tra khi nhập Excel; các hồ sơ demo cũ được giữ nguyên. Cấu trúc đang dùng được quản lý bằng `backend/migrations_official/`; chỉ cập nhật database qua Alembic. [SQL schema-only](database/official/kltn-management-schema.sql) là bản cấu trúc để xem hoặc dùng trong database trống tạm thời, không chạy trên database đang dùng.
 
 ## Chạy local
 

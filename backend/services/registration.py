@@ -261,6 +261,11 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
             add_notice(session, topic=topic,
                        actor_user_id=user.id, registration_id=reg.id,
                        kind="REGISTRATION_JOINED")
+            coordinator = session.get(m.StudentProfile, reg.created_by)
+            if coordinator and coordinator.user_id != user.id:
+                add_notice(session, topic=topic, actor_user_id=user.id,
+                           registration_id=reg.id, kind="REGISTRATION_JOINED",
+                           recipient_user_id=coordinator.user_id)
         _registration_audit(session, reg, user,
             "REGISTRATION_CREATED" if first_member else "REGISTRATION_MEMBER_JOINED", before, previous_decision)
         result = registration_out(session, reg)
@@ -356,18 +361,28 @@ def submit_registration(session: Session, user: m.UserAccount, registration_id: 
         reg.submitted_at = now
         reg.row_version += 1
         session.flush()
-        from backend.services.notifications import add_notice
+        from backend.services.notifications import add_notice, notify_admins, notify_department_heads
 
         if student_proposal:
             add_notice(session, topic=topic,
                        actor_user_id=user.id, registration_id=reg.id,
                        kind="PROPOSAL_SUBMITTED")
+            notify_department_heads(session, topic=topic, actor_user_id=user.id,
+                                    registration_id=reg.id)
+            notify_admins(session, topic=topic, actor_user_id=user.id,
+                          registration_id=reg.id, kind="PROPOSAL_SUBMITTED")
         else:
             for member in members:
                 member_user = session.get(m.StudentProfile, member.student_id).user_id
                 add_notice(session, topic=topic,
                            actor_user_id=member_user, registration_id=reg.id,
                            kind="REGISTRATION_SUBMITTED")
+                if member_user != user.id:
+                    add_notice(session, topic=topic, actor_user_id=user.id,
+                               registration_id=reg.id, kind="REGISTRATION_SUBMITTED",
+                               recipient_user_id=member_user)
+            notify_admins(session, topic=topic, actor_user_id=user.id,
+                          registration_id=reg.id, kind="REGISTRATION_SUBMITTED")
         _registration_audit(session, reg, user, "REGISTRATION_SUBMITTED", before)
         result = registration_out(session, reg)
         session.commit()
@@ -543,6 +558,10 @@ def lecturer_decision(
                 fail(409, "Receiving lecturer is no longer active in this department")
         if data.decision == "REJECT" and not (data.reason and data.reason.strip()):
             fail(422, "A rejection requires a reason")
+        notification_members = session.scalars(select(m.RegistrationMember).where(
+            m.RegistrationMember.registration_id == reg.id,
+            m.RegistrationMember.active.is_(True),
+        )).all()
         before = _registration_hash(session, reg)
         now = datetime.now(timezone.utc)
         if data.decision == "ACCEPT":
@@ -575,6 +594,13 @@ def lecturer_decision(
             )).all():
                 member.active = False
         session.flush()
+        from backend.services.notifications import add_notice
+
+        for member in notification_members:
+            student = session.get(m.StudentProfile, member.student_id)
+            add_notice(session, topic=topic, actor_user_id=user.id, registration_id=reg.id,
+                       kind="REGISTRATION_ACCEPTED" if data.decision == "ACCEPT" else "REGISTRATION_REJECTED",
+                       recipient_user_id=student.user_id)
         _registration_audit(session, reg, user, "REGISTRATION_" + data.decision, before, data.reason)
         if thesis is not None:
             session.add(m.AuditEvent(

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { request } from "../../api";
 import { errorMessage } from "../../errors";
-
-type Notice = {id: string; message: string; created_at: string; read_at: string | null; url: string};
-type NoticeSummary = {unread_count: number; items: Notice[]};
+import type { Notice, NoticeSummary } from "../../notifications";
 
 export default function NotificationsBell({userId}: {userId: string}) {
   const navigate = useNavigate();
@@ -15,7 +13,7 @@ export default function NotificationsBell({userId}: {userId: string}) {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
   const refresh = useCallback(async () => {
-    setSummary(await request<NoticeSummary>("/notifications", userId));
+    setSummary(await request<NoticeSummary>("/notifications?unread_only=true&limit=5", userId));
   }, [userId]);
 
   useEffect(() => {
@@ -23,7 +21,9 @@ export default function NotificationsBell({userId}: {userId: string}) {
     const timer = window.setInterval(() => void refresh().catch(() => undefined), 30000);
     const onFocus = () => void refresh().catch(() => undefined);
     window.addEventListener("focus", onFocus);
-    return () => {window.clearInterval(timer); window.removeEventListener("focus", onFocus);};
+    window.addEventListener("kltn:notifications-changed", onFocus);
+    return () => {window.clearInterval(timer); window.removeEventListener("focus", onFocus);
+      window.removeEventListener("kltn:notifications-changed", onFocus);};
   }, [refresh]);
   useEffect(() => {
     if (!open) return;
@@ -43,7 +43,8 @@ export default function NotificationsBell({userId}: {userId: string}) {
       if (!notice.read_at) {
         await request<void>(`/notifications/${notice.id}/read`, userId, {method:"POST"});
         setSummary((current) => ({unread_count:Math.max(0,current.unread_count-1),
-          items:current.items.map((item) => item.id === notice.id ? {...item,read_at:new Date().toISOString()} : item)}));
+          items:current.items.filter((item) => item.id !== notice.id)}));
+        window.dispatchEvent(new Event("kltn:notifications-changed"));
       }
       setOpen(false);
       navigate(notice.url);
@@ -63,11 +64,12 @@ export default function NotificationsBell({userId}: {userId: string}) {
       <div className="notifications__header"><strong>Thông báo</strong><span>{summary.unread_count} chưa xem</span></div>
       {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
       {summary.items.length ? <ul className="notifications__list">{summary.items.map((item) =>
-        <li key={item.id}><button type="button" className={"notifications__item" + (!item.read_at ? " notifications__item--unread" : "")}
+        <li key={item.id}><button type="button" className="notifications__item notifications__item--unread"
           disabled={!!busyId} onClick={() => void view(item)}>
           <span>{item.message}</span>
           <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("vi-VN")}</time>
-        </button></li>)}</ul> : <p className="notifications__empty">Chưa có thông báo.</p>}
+        </button></li>)}</ul> : <p className="notifications__empty">Không có thông báo chưa xem.</p>}
+      <Link className="notifications__all" to="/notifications" onClick={() => setOpen(false)}>Xem tất cả</Link>
     </section> : null}
   </div>;
 }

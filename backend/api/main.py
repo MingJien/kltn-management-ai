@@ -68,11 +68,14 @@ app.include_router(thesis_workspace_router)
 
 
 @app.get("/api/v1/notifications", response_model=NotificationSummaryOut)
-def notifications(user: m.UserAccount = Depends(current_user),
+def notifications(limit: int = Query(default=20, ge=1, le=100),
+                  offset: int = Query(default=0, ge=0),
+                  unread_only: bool = False,
+                  user: m.UserAccount = Depends(current_user),
                   session: Session = Depends(get_session)) -> NotificationSummaryOut:
     from backend.services.notifications import list_notices
 
-    return list_notices(session, user.id)
+    return list_notices(session, user.id, limit=limit, offset=offset, unread_only=unread_only)
 
 
 @app.post("/api/v1/notifications/{notification_id}/read", status_code=204)

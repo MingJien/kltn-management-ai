@@ -23,6 +23,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/rounds": "Đợt KLTN",
   "/roster": "Danh sách sinh viên",
   "/ai": "Tra cứu thử nghiệm",
+  "/notifications": "Thông báo",
 };
 
 interface HeaderProps {
@@ -56,7 +57,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
           </nav>
         </div>
         <div className="header__right">
-          {context.base_role === "LECTURER" ? <NotificationsBell userId={context.user_id} /> : null}
+          <NotificationsBell userId={context.user_id} />
           <Link to="/account" className="header__user" aria-label="Quản lý tài khoản" title="Quản lý tài khoản">
             <span className="header__avatar" aria-hidden="true">{initialsOf(context.display_name)}</span>
             <span className="header__user-info">

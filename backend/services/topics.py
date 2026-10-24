@@ -376,7 +376,6 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         before = _fingerprint(topic, session)
         if data.decision == "APPROVE":
             if topic.proposer_type == "STUDENT":
-                previous_receiver_id = topic.receiving_lecturer_id
                 topic.receiving_lecturer_id = receiving_lecturer(session, data.receiving_lecturer_id, topic.department_id).id
                 registration = session.scalar(select(m.TopicRegistration).where(
                     m.TopicRegistration.topic_id == topic.id,
@@ -384,12 +383,14 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
                 if registration is not None:
                     from backend.services.notifications import add_notice, revoke_proposal_notice
 
-                    if previous_receiver_id and previous_receiver_id != topic.receiving_lecturer_id:
-                        revoke_proposal_notice(session, registration_id=registration.id,
-                                               lecturer_id=previous_receiver_id, now=datetime.now(timezone.utc))
+                    revoke_proposal_notice(session, registration_id=registration.id,
+                                           lecturer_id=None, now=datetime.now(timezone.utc))
                     add_notice(session, topic=topic,
                                actor_user_id=topic.proposer_user_id, registration_id=registration.id,
                                kind="PROPOSAL_APPROVED")
+                    add_notice(session, topic=topic, actor_user_id=user.id,
+                               registration_id=registration.id, kind="PROPOSAL_APPROVED",
+                               recipient_user_id=topic.proposer_user_id)
             elif data.receiving_lecturer_id is not None and data.receiving_lecturer_id != topic.receiving_lecturer_id:
                 _fail(422, "Lecturer topics remain with the proposing lecturer")
         if data.revised_title:
