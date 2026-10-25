@@ -16,6 +16,7 @@ export type Context = {
   major_code: string | null;
   major_name: string | null;
   lecturer_code: string | null;
+  lecturer_duties: {code: string; label: string; scope: string | null}[];
   csrf_token: string | null;
   can_change_password: boolean;
 };

@@ -19,6 +19,7 @@ from backend.db.models import entities as m
 from backend.services.passwords import unusable_password
 from backend.services.roster import EMAIL
 from backend.services.account_mail import mail_delivery_ready
+from backend.services.account_directory import build_account_directory
 
 router = APIRouter(prefix="/api/v1/admin", tags=["account administration"])
 AccountReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
@@ -281,6 +282,24 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
         correlation_id=uuid4()))
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
+
+
+@router.get("/users/directory")
+def users_directory(search: str = "", category: Literal[
+        "ALL", "STUDENT", "LECTURER", "ADMIN", "LECTURER_WITH_DUTIES"] = "ALL",
+        additional_role: str = "", offset: int = 0, limit: int = 20,
+        user: m.UserAccount = Depends(current_user),
+        session: Session = Depends(get_session)) -> dict:
+    """Admin account directory with real, currently effective lecturer duties."""
+    _admin(user)
+    if len(search) > 100 or len(additional_role) > 50:
+        raise HTTPException(422, "Search or role filter is too long")
+    if not 0 <= offset <= 100_000 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Invalid paging range")
+    return build_account_directory(
+        session, search=search, category=category, additional_role=additional_role,
+        offset=offset, limit=limit,
+    )
 
 
 @router.get("/users")

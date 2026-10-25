@@ -29,7 +29,14 @@ import {
 
 type Department = { id: string; code: string; name: string; major_code: string | null };
 type Round = { id: string; code: string; state: string };
-type Account = { id: string; email: string; base_role: string; status: string; verified: boolean; student_code: string | null; display_name?: string | null; lecturer_code?: string | null };
+type AccountRole = { code: string; label: string; scope: string | null };
+type Account = { id: string; email: string; base_role: string; status: string; verified: boolean; student_code: string | null; display_name?: string | null; lecturer_code?: string | null; additional_roles?: AccountRole[] };
+type AccountDirectory = {
+  items: Account[];
+  total: number;
+  counts: Record<string, number>;
+  role_catalog: { code: string; label: string; count: number }[];
+};
 type Assignment = { id: string; round_id: string; round_code: string; user_id: string; email: string; assignment_type: string };
 
 export default function AdministrationPage({
@@ -42,6 +49,10 @@ export default function AdministrationPage({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountCategory, setAccountCategory] = useState("ALL");
+  const [additionalRole, setAdditionalRole] = useState("");
+  const [directoryCounts, setDirectoryCounts] = useState<Record<string, number>>({});
+  const [roleCatalog, setRoleCatalog] = useState<AccountDirectory["role_catalog"]>([]);
   const [staffAccounts, setStaffAccounts] = useState<Account[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [lecturerCode, setLecturerCode] = useState("");
@@ -71,9 +82,9 @@ export default function AdministrationPage({
 
   const assignmentDescriptions: Record<string, string> = {
     ELIGIBILITY_IMPORTER:
-      "Được nhập danh sách sinh viên đủ điều kiện theo căn cứ của Khoa. Hồ sơ sau khi nhập chờ người có quyền xác nhận.",
+      "Được nhập danh sách chính thức của Khoa; sinh viên được ghi nhận đủ điều kiện ngay. Sinh viên vẫn phải kích hoạt tài khoản trước khi gửi đăng ký.",
     ELIGIBILITY_VERIFIER:
-      "Được rà soát, xác nhận, điều chỉnh hoặc thu hồi tình trạng đủ điều kiện của sinh viên trong đợt.",
+      "Được đính chính hoặc thu hồi kết quả đủ điều kiện khi có căn cứ; không còn bước xác nhận riêng sau khi nhập danh sách.",
     ACCOUNT_MANAGER:
       "Được quản lý tài khoản sinh viên trong phạm vi đợt được giao, gồm khóa, mở hoặc hỗ trợ kích hoạt tài khoản.",
     KLTN_COORDINATOR:
@@ -113,7 +124,14 @@ export default function AdministrationPage({
     async (q: string, atPage: number) => {
       setBusy(true);
       try {
-        const [d, r, u, staff, a] = await Promise.all([
+        const accountUrl = isAdmin
+          ? "/admin/users/directory?search=" + encodeURIComponent(q)
+            + "&category=" + encodeURIComponent(accountCategory)
+            + "&additional_role=" + encodeURIComponent(additionalRole)
+            + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE
+          : "/admin/users?search=" + encodeURIComponent(q)
+            + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE;
+        const [d, r, usersResult, staff, a] = await Promise.all([
           isAdmin ? request<Department[]>("/admin/departments", context.user_id) : Promise.resolve([]),
           isAdmin
             ? request<Round[]>("/admin/rounds", context.user_id)
@@ -122,24 +140,27 @@ export default function AdministrationPage({
                   .filter((row) => row.assignment_type === "ACCOUNT_MANAGER")
                   .map((row) => ({ id: row.round_id, code: row.round_code, state: "OPEN" })),
               ),
-          request<Account[]>(
-            "/admin/users?search=" + encodeURIComponent(q) + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE,
-            context.user_id,
-          ),
+          isAdmin
+            ? request<AccountDirectory>(accountUrl, context.user_id)
+            : request<Account[]>(accountUrl, context.user_id),
           isAdmin ? request<Account[]>("/admin/staff", context.user_id) : Promise.resolve<Account[]>([]),
           isAdmin ? request<Assignment[]>("/admin/round-assignments", context.user_id) : Promise.resolve([]),
         ]);
+        const directory = Array.isArray(usersResult) ? null : usersResult as AccountDirectory;
+        const u = directory ? directory.items : usersResult as Account[];
         setDepartments(d);
         setRounds(r);
         setAccounts(u);
+        setDirectoryCounts(directory?.counts ?? {});
+        setRoleCatalog(directory?.role_catalog ?? []);
         setStaffAccounts(staff);
         setAssignments(a);
-        setHasNext(u.length === PAGE_SIZE);
+        setHasNext(directory ? directory.total > (atPage + 1) * PAGE_SIZE : u.length === PAGE_SIZE);
       } finally {
         setBusy(false);
       }
     },
-    [context.user_id, isAdmin, PAGE_SIZE],
+    [accountCategory, additionalRole, context.user_id, isAdmin, PAGE_SIZE],
   );
 
   useEffect(() => {
@@ -388,7 +409,7 @@ export default function AdministrationPage({
                     <select className="input" required value={kind} onChange={(e) => changeKind(e.target.value)}>
                       <option value="">Chọn nhiệm vụ</option>
                       <option value="ELIGIBILITY_IMPORTER">Nhập danh sách SV</option>
-                      <option value="ELIGIBILITY_VERIFIER">Xác nhận điều kiện</option>
+                      <option value="ELIGIBILITY_VERIFIER">Điều chỉnh/thu hồi điều kiện</option>
                       <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
                       <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
                     </select>
@@ -467,7 +488,7 @@ export default function AdministrationPage({
                       <span className="badge badge-primary assignment-item__duty">
                         <Briefcase size={12} aria-hidden="true" />
                         {a.assignment_type === "ELIGIBILITY_VERIFIER"
-                          ? "Xác nhận điều kiện"
+                          ? "Điều chỉnh/thu hồi điều kiện"
                           : a.assignment_type === "ACCOUNT_MANAGER"
                           ? "Quản lý tài khoản SV"
                           : a.assignment_type === "KLTN_COORDINATOR"
@@ -549,6 +570,52 @@ export default function AdministrationPage({
               )}
             </div>
 
+            {isAdmin ? (
+              <div className="account-category-tabs" role="tablist" aria-label="Lọc tài khoản theo vai trò">
+                {[
+                  { code: "ALL", label: "Tất cả", count: directoryCounts.ALL ?? 0 },
+                  { code: "STUDENT", label: "Sinh viên", count: directoryCounts.STUDENT ?? 0 },
+                  { code: "LECTURER", label: "Giảng viên", count: directoryCounts.LECTURER ?? 0 },
+                  { code: "ADMIN", label: "Quản trị", count: directoryCounts.ADMIN ?? 0 },
+                  { code: "LECTURER_WITH_DUTIES", label: "Giảng viên có quyền bổ sung", count: directoryCounts.LECTURER_WITH_DUTIES ?? 0 },
+                ].map((tab) => (
+                  <button
+                    key={tab.code}
+                    type="button"
+                    role="tab"
+                    aria-selected={accountCategory === tab.code}
+                    className={"account-category-tab" + (accountCategory === tab.code ? " account-category-tab--active" : "")}
+                    onClick={() => {
+                      setAccountCategory(tab.code);
+                      setAdditionalRole("");
+                      setPage(0);
+                    }}
+                  >
+                    <span>{tab.label}</span><small>{tab.count}</small>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {isAdmin && accountCategory === "LECTURER_WITH_DUTIES" ? (
+              <label className="input-group account-role-filter">
+                Lọc theo quyền/phân công
+                <select
+                  className="input"
+                  value={additionalRole}
+                  onChange={(event) => {
+                    setAdditionalRole(event.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <option value="">Tất cả quyền bổ sung</option>
+                  {roleCatalog.map((role) => (
+                    <option key={role.code} value={role.code}>{role.label} ({role.count})</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             {/* Toolbar: Search & Action Reason */}
             <div className="admin-toolbar">
               <div className="admin-toolbar__row">
@@ -563,8 +630,8 @@ export default function AdministrationPage({
                   <Search size={16} className="admin-search-wrap__icon" aria-hidden="true" />
                   <input
                     className="input"
-                    aria-label="Tìm theo email hoặc MSSV"
-                    placeholder="Tìm theo email hoặc MSSV..."
+                    aria-label="Tìm theo mã, tên hoặc email tài khoản"
+                    placeholder="Tìm email, MSSV, mã hoặc tên giảng viên..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -667,12 +734,21 @@ export default function AdministrationPage({
                         <div className="account-item__main">
                           <div className="account-item__header">
                             <span className="account-item__email">{a.email}</span>
-                            {a.student_code && (
+                            {a.student_code ? (
                               <span className="account-item__code" title="Mã số sinh viên">
                                 <span className="account-item__code-label">MSSV</span>
                                 <strong>{a.student_code}</strong>
                               </span>
-                            )}
+                            ) : null}
+                            {isLecturer && a.lecturer_code ? (
+                              <span className="account-item__code" title="Mã giảng viên">
+                                <span className="account-item__code-label">Mã GV</span>
+                                <strong>{a.lecturer_code}</strong>
+                              </span>
+                            ) : null}
+                            {isLecturer && a.display_name ? (
+                              <span className="account-item__display-name">{a.display_name}</span>
+                            ) : null}
                           </div>
 
                           <div className="account-item__meta">
@@ -730,6 +806,19 @@ export default function AdministrationPage({
                               </span>
                             )}
                           </div>
+                          {isLecturer && a.additional_roles?.length ? (
+                            <div className="account-item__duties" aria-label={"Quyền bổ sung của " + (a.display_name || a.email)}>
+                              {a.additional_roles.map((role) => (
+                                <span
+                                  key={role.code + "-" + (role.scope || "")}
+                                  className="badge badge-neutral account-badge--extra"
+                                  title={role.scope ? role.label + " · " + role.scope : role.label}
+                                >
+                                  {role.label}{role.scope ? " · " + role.scope : ""}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>

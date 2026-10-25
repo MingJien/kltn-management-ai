@@ -10,8 +10,8 @@ type Assignment = {round_id:string; round_code:string; assignment_type:string};
 type PreviewRow = {line:number; student_code:string; display_name:string; email:string; department_code:string; class_name:string; major_code:string};
 type Preview = {sha256:string; count:number; rows:PreviewRow[]};
 type CatalogEntry = {department_code:string; department_name:string; major_code:string; major_name:string};
-type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null};
-type ImportResult = {new_accounts:number; submitted:number; unchanged:number; snapshot_ids:string[]};
+type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null; registration_submitted:boolean; registration_submitted_at:string|null};
+type ImportResult = {new_accounts:number; confirmed:number; unchanged:number; snapshot_ids:string[]};
 
 function normalized(value:string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
@@ -54,10 +54,8 @@ export default function RosterPage({context}: {context:Context}) {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [departmentError, setDepartmentError] = useState("");
   const [reference, setReference] = useState("");
-  const [basis, setBasis] = useState("");
   const [revokeBasis, setRevokeBasis] = useState("");
   const [roster, setRoster] = useState<RosterEntry[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
   const [stateFilter, setStateFilter] = useState("all");
   const [rosterQuery,setRosterQuery] = useState("");
   const [activationFilter,setActivationFilter] = useState("all");
@@ -77,11 +75,11 @@ export default function RosterPage({context}: {context:Context}) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [activePanel, setActivePanel] = useState("review");
+  const [activePanel, setActivePanel] = useState("list");
 
   const permissions = useMemo(()=>assignments.filter(a=>a.round_id===roundId).map(a=>a.assignment_type),[assignments,roundId]);
   const canImport = permissions.includes("ELIGIBILITY_IMPORTER");
-  const canConfirm = permissions.includes("ELIGIBILITY_VERIFIER");
+  const canManage = permissions.includes("ELIGIBILITY_VERIFIER");
   const refreshRoster = useCallback(async (id:string)=>{
     if (id) setRoster(await request<RosterEntry[]>(`/rounds/${id}/roster`,context.user_id));
     else setRoster([]);
@@ -96,7 +94,7 @@ export default function RosterPage({context}: {context:Context}) {
       .catch(()=>setDepartmentError("Chưa tải được danh mục bộ môn–ngành. Hãy làm mới trang rồi thử lại."));
   },[context.user_id]);
   useEffect(()=>{
-    setPreview(null);setSelected([]);setRevokeStudent("");setSpecialStudent("");setCorrectionStudent("");
+    setPreview(null);setRevokeStudent("");setSpecialStudent("");setCorrectionStudent("");
     void refreshRoster(roundId).catch(cause=>setError(errorMessage(cause)));
   },[roundId,refreshRoster]);
 
@@ -120,20 +118,20 @@ export default function RosterPage({context}: {context:Context}) {
     (stateFilter === "all" || row.state === stateFilter)
     && (activationFilter==="all" || (activationFilter==="activated")===accountActivated(row))
     && normalized(`${row.student_code} ${row.display_name} ${row.email}`).includes(normalized(rosterQuery.trim())));
-  const pending = filteredRoster.filter(row=>row.state==="SUBMITTED");
-  const allPendingSelected = pending.length > 0 && pending.every(row=>selected.includes(row.snapshot_id));
-  const pendingCount = roster.filter(row=>row.state==="SUBMITTED").length;
-  const confirmedCount = roster.filter(row=>row.state==="CONFIRMED").length;
+  const legacyPendingCount = roster.filter(row=>row.state==="SUBMITTED").length;
+  const confirmedRows = roster.filter(row=>row.state==="CONFIRMED");
+  const confirmedCount = confirmedRows.length;
+  const activatedCount = confirmedRows.filter(accountActivated).length;
+  const registrationSubmittedCount = confirmedRows.filter(row=>row.registration_submitted).length;
   const revokedCount = roster.filter(row=>row.state==="REJECTED").length;
   const specialIsDemo = roster.some(row=>row.student_id===specialStudent && /^(SYN-|E2E-)/.test(row.student_code));
   const panels = [
-    {id:"review",label:"Danh sách & xác nhận",detail:`${pendingCount} chờ xác nhận`,visible:canConfirm},
-    {id:"import",label:"Nhập danh sách",detail:"CSV hoặc Excel",visible:canImport},
-    {id:"special",label:"Ngoại lệ Hiệu trưởng",detail:"Theo quyết định cá biệt",visible:canConfirm},
-    {id:"correction",label:"Đính chính hồ sơ",detail:"Theo văn bản Khoa",visible:canConfirm},
+    {id:"list",label:"Danh sách sinh viên",detail:confirmedCount+" đủ điều kiện",visible:canImport||canManage},
+    {id:"import",label:"Nhập danh sách",detail:"Ghi nhận đủ điều kiện ngay",visible:canImport},
+    {id:"special",label:"Ngoại lệ Hiệu trưởng",detail:"Theo quyết định cá biệt",visible:canManage},
+    {id:"correction",label:"Đính chính hồ sơ",detail:"Theo văn bản Khoa",visible:canManage},
   ].filter(panel=>panel.visible);
   const selectedPanel = panels.some(panel=>panel.id===activePanel)?activePanel:(panels[0]?.id||"");
-  useEffect(()=>{setSelected([]);},[roundId,stateFilter,activationFilter,rosterQuery]);
 
   function handlePanelKeyDown(event:KeyboardEvent<HTMLDivElement>) {
     if (!panels.length) return;
@@ -150,7 +148,7 @@ export default function RosterPage({context}: {context:Context}) {
     document.getElementById(`roster-tab-${nextPanel.id}`)?.focus();
   }
 
-  return <><PageHeader title="Danh sách đủ điều kiện" description="Nhập, xác nhận và quản lý kết quả sinh viên theo từng đợt" />
+  return <><PageHeader title="Danh sách đủ điều kiện" description="Nhập danh sách chính thức, theo dõi kích hoạt tài khoản và đăng ký đề tài theo từng đợt" />
     <div className="stack roster-page">
 
       {error&&selectedPanel!=="import"?<p role="alert" className="alert alert-danger">{error}</p>:null}
@@ -163,9 +161,10 @@ export default function RosterPage({context}: {context:Context}) {
           {[...new Map(assignments.map(a=>[a.round_id,a])).values()].map(a=><option key={a.round_id} value={a.round_id}>{a.round_code}</option>)}
         </select></label>
         <div className={`roster-metrics${revokedCount ? " roster-metrics--with-revoked" : ""}`} aria-label="Tình trạng danh sách">
-          <div><span>Tổng sinh viên</span><strong>{roster.length}</strong></div>
-          <div><span>Chờ xác nhận</span><strong>{pendingCount}</strong></div>
-          <div><span>Đã xác nhận</span><strong>{confirmedCount}</strong></div>
+          <div><span>Đủ điều kiện</span><strong>{confirmedCount}</strong></div>
+          <div><span>Đã kích hoạt</span><strong>{activatedCount}/{confirmedCount}</strong></div>
+          <div><span>Đã gửi đăng ký</span><strong>{registrationSubmittedCount}/{confirmedCount}</strong></div>
+          {legacyPendingCount > 0 ? <div><span>Cần nhập lại DS</span><strong>{legacyPendingCount}</strong></div> : null}
           {revokedCount > 0 ? (
             <div className="roster-metric--revoked">
               <span>Bị thu hồi</span>
@@ -174,7 +173,7 @@ export default function RosterPage({context}: {context:Context}) {
           ) : null}
         </div>
       </section>:null}
-      {!assignments.length?<section className="card"><div className="card-body">Bạn chưa được Khoa phân công nhập hoặc xác nhận danh sách cho đợt nào.</div></section>:null}
+      {!assignments.length?<section className="card"><div className="card-body">Bạn chưa được Khoa phân công nhập hoặc quản lý danh sách cho đợt nào.</div></section>:null}
 
       {panels.length?<>
         <div className="roster-tabs-wrap"><div className="roster-tabs" role="tablist" aria-label="Thao tác danh sách sinh viên" onKeyDown={handlePanelKeyDown}>
@@ -186,22 +185,23 @@ export default function RosterPage({context}: {context:Context}) {
         </div></div>
 
         <div id={`roster-panel-${selectedPanel}`} className="roster-tabpanel" role="tabpanel" aria-labelledby={`roster-tab-${selectedPanel}`} tabIndex={0}>
-          {selectedPanel==="review"?<section className="card roster-section-card">
-            <div className="roster-section-heading"><div><span className="roster-eyebrow">QUY TRÌNH THƯỜNG XUYÊN</span><h2>Danh sách và xác nhận</h2>
-              <p>Đối chiếu căn cứ, xác nhận kết quả theo đợt và theo dõi trạng thái tài khoản.</p></div>
+          {selectedPanel==="list"?<section className="card roster-section-card">
+            <div className="roster-section-heading"><div><span className="roster-eyebrow">QUY TRÌNH THƯỜNG XUYÊN</span><h2>Sinh viên đủ điều kiện</h2>
+              <p>Danh sách chính thức được ghi nhận đủ điều kiện ngay sau khi nhập. Sinh viên kích hoạt tài khoản rồi mới gửi đăng ký đề tài.</p></div>
               <div className="roster-section-badges">
-                <span className="badge badge-info">{pendingCount} chờ xác nhận</span>
-                <span className="badge badge-success">{confirmedCount} đã xác nhận</span>
+                <span className="badge badge-success">{confirmedCount} đủ điều kiện</span>
+                <span className="badge badge-info">{activatedCount}/{confirmedCount} đã kích hoạt</span>
+                <span className="badge badge-primary">{registrationSubmittedCount}/{confirmedCount} đã gửi đăng ký</span>
                 {revokedCount > 0 ? <span className="badge badge-danger">{revokedCount} bị thu hồi</span> : null}
               </div>
             </div>
             <div className="card-body stack">
               <div className="roster-filter-grid">
-                <label className="input-group">Trạng thái duyệt<select className="input" aria-label="Trạng thái duyệt" value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
-                  <option value="all">Tất cả trạng thái ({roster.length})</option>
-                  <option value="SUBMITTED">Chờ xác nhận ({pendingCount})</option>
-                  <option value="CONFIRMED">Đã xác nhận ({confirmedCount})</option>
-                  {revokedCount > 0 ? <option value="REJECTED">Bị thu hồi ({revokedCount})</option> : null}
+                <label className="input-group">Trạng thái đủ điều kiện<select className="input" aria-label="Trạng thái đủ điều kiện" value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
+                  <option value="all">Tất cả hồ sơ ({roster.length})</option>
+                  <option value="CONFIRMED">Đủ điều kiện ({confirmedCount})</option>
+                  {legacyPendingCount > 0 ? <option value="SUBMITTED">Cần nhập lại danh sách ({legacyPendingCount})</option> : null}
+                  {revokedCount > 0 ? <option value="REJECTED">Đã thu hồi ({revokedCount})</option> : null}
                 </select></label>
                 <label className="input-group">Kích hoạt tài khoản<select className="input" aria-label="Kích hoạt tài khoản" value={activationFilter} onChange={e=>setActivationFilter(e.target.value)}>
                   <option value="all">Tất cả tài khoản</option><option value="activated">Đã kích hoạt</option><option value="not-activated">Chưa kích hoạt</option>
@@ -209,30 +209,26 @@ export default function RosterPage({context}: {context:Context}) {
                 <label className="input-group">Tìm sinh viên<input className="input" type="search" aria-label="Tìm sinh viên" value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)} placeholder="MSSV, họ tên hoặc email" /></label>
               </div>
               <p className="text-caption">Đang hiện {filteredRoster.length}/{roster.length} sinh viên thuộc đợt đã chọn{stateFilter !== "all" || activationFilter !== "all" || rosterQuery.trim() ? ` (đang lọc: ${[
-                stateFilter !== "all" ? (stateFilter === "SUBMITTED" ? "Chờ xác nhận" : stateFilter === "CONFIRMED" ? "Đã xác nhận" : "Bị thu hồi") : "",
+                stateFilter !== "all" ? (stateFilter === "SUBMITTED" ? "Cần nhập lại danh sách" : stateFilter === "CONFIRMED" ? "Đủ điều kiện" : "Đã thu hồi") : "",
                 activationFilter !== "all" ? (activationFilter === "activated" ? "Đã kích hoạt" : "Chưa kích hoạt") : "",
                 rosterQuery.trim() ? `“${rosterQuery.trim()}”` : ""
-              ].filter(Boolean).join(" · ")})` : ""}. “Chọn tất cả” chỉ áp dụng cho kết quả đang hiện.</p>
-              <label className="input-group roster-basis-field">Căn cứ đối chiếu danh sách<input className="input" minLength={3} value={basis} onChange={e=>setBasis(e.target.value)} placeholder="Demo: DEMO-XAC-NHAN-DOT-1-2026" /></label>
-              <div className="roster-selection-toolbar"><span>{selected.length?`Đã chọn ${selected.length} kết quả`:"Chọn các kết quả đã đối chiếu trước khi xác nhận."}</span>
-                <div className="account-actions"><button className="btn btn-secondary" disabled={!pending.length||busy}
-                  onClick={()=>setSelected(allPendingSelected?[]:pending.map(row=>row.snapshot_id))}>{allPendingSelected?"Bỏ chọn tất cả":"Chọn tất cả chờ xác nhận"}</button>
-                  <button className="btn btn-primary" disabled={!selected.length||basis.trim().length<3||busy}
-                    onClick={()=>void run(async()=>{await request(`/rounds/${roundId}/roster/confirm`,context.user_id,
-                      {method:"POST",body:JSON.stringify({snapshot_ids:selected,basis_ref:basis})});setSelected([]);},
-                      `Đã xác nhận ${selected.length} sinh viên.`)}>Xác nhận đã đối chiếu</button></div>
-              </div>
-              <div className="table-scroll"><table className="account-table"><thead><tr><th>Chọn</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Trạng thái</th><th>Tài khoản</th></tr></thead>
-                <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}><td>{row.state==="SUBMITTED"?<input type="checkbox" aria-label={`Chọn ${row.student_code}`}
-                  checked={selected.includes(row.snapshot_id)} onChange={e=>setSelected(current=>e.target.checked?[...current,row.snapshot_id]:current.filter(x=>x!==row.snapshot_id))}/>:null}</td>
-                  <td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
+              ].filter(Boolean).join(" · ")})` : ""}.</p>
+              {legacyPendingCount > 0 ? (
+                <div className="roster-help-note">
+                  <strong>Có hồ sơ từ quy trình cũ cần cập nhật</strong>
+                  <p>Nhập lại danh sách chính thức của đợt để các hồ sơ này được ghi nhận đủ điều kiện ngay; không cần thao tác xác nhận riêng.</p>
+                </div>
+              ) : null}
+              <div className="table-scroll"><table className="account-table"><thead><tr><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Đủ điều kiện</th><th>Kích hoạt</th><th>Đăng ký đề tài</th></tr></thead>
+                <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}><td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
                   <td>{row.department_code}</td><td>{row.major_code||"—"}{catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name
                     ? ` · ${catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name}`:""}</td>
-                  <td>{row.state === "SUBMITTED" ? <span className="badge badge-warning">Chờ xác nhận</span> :
-                       row.state === "CONFIRMED" ? <span className="badge badge-success">Đã xác nhận</span> :
-                       row.state === "REJECTED" ? <span className="badge badge-danger">Bị thu hồi</span> :
+                  <td>{row.state === "SUBMITTED" ? <span className="badge badge-warning">Cần nhập lại danh sách</span> :
+                       row.state === "CONFIRMED" ? <span className="badge badge-success">Đủ điều kiện</span> :
+                       row.state === "REJECTED" ? <span className="badge badge-danger">Đã thu hồi</span> :
                        <span className="badge badge-neutral">{row.state}</span>}</td>
-                  <td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td></tr>)}</tbody></table></div>
+                  <td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td>
+                  <td>{row.registration_submitted ? <>Đã gửi{row.registration_submitted_at ? <small className="text-caption"> · {new Date(row.registration_submitted_at).toLocaleString("vi-VN")}</small> : null}</> : "Chưa gửi"}</td></tr>)}</tbody></table></div>
               {!filteredRoster.length?<p className="text-muted">Không có sinh viên khớp bộ lọc.</p>:null}
               <details className="roster-accordion roster-accordion--danger">
                 <summary><span><strong>Thu hồi kết quả đã xác nhận</strong><small>Chỉ dùng khi có căn cứ cần thu hồi; hồ sơ cũ vẫn được giữ.</small></span><span className="badge badge-danger">Thao tác cần thận trọng</span></summary>
@@ -253,8 +249,8 @@ export default function RosterPage({context}: {context:Context}) {
           </section>:null}
 
           {selectedPanel==="import"?<section className="card roster-section-card">
-            <div className="roster-section-heading"><div><span className="roster-eyebrow">BƯỚC 1 · ĐƯA DANH SÁCH VÀO HỆ THỐNG</span><h2>Nhập danh sách đã được Khoa chấp thuận</h2>
-              <p>Kiểm tra tệp và xem trước dữ liệu trước khi nhập vào đợt đã chọn.</p></div><span className="badge badge-primary">CSV · XLSX</span></div>
+            <div className="roster-section-heading"><div><span className="roster-eyebrow">NHẬP DANH SÁCH CHÍNH THỨC</span><h2>Ghi nhận sinh viên đủ điều kiện</h2>
+              <p>Kiểm tra tệp, xem trước dữ liệu; khi nhập, sinh viên được ghi nhận đủ điều kiện ngay và có thể kích hoạt tài khoản.</p></div><span className="badge badge-primary">CSV · XLSX</span></div>
             <div className="card-body stack">
               <div className="roster-form-grid">
                 <label className="input-group">Tệp danh sách<input id="roster-file-input" className="input" type="file" accept=".csv,.xlsx" onChange={e=>{setFile(e.target.files?.[0]||null);setPreview(null);setError("");setNotice("");}} /></label>
@@ -289,9 +285,9 @@ export default function RosterPage({context}: {context:Context}) {
                     void run(async()=>{
                     const result=await request<ImportResult>(`/rounds/${roundId}/roster?reference=${encodeURIComponent(reference.trim())}`,context.user_id,
                       {method:"POST",body:file,headers:{...fileHeaders(file),"X-Preview-SHA256":preview.sha256}});
-                    setPreview(null);setFile(null);setSelected(result.snapshot_ids);
-                    if(canConfirm)setActivePanel("review");
-                    return `Đã nhập ${result.submitted} kết quả chờ xác nhận, tạo ${result.new_accounts} tài khoản; ${result.unchanged} dòng đã có.`;
+                    setPreview(null);setFile(null);
+                    setActivePanel("list");
+                    return "Đã ghi nhận " + result.confirmed + " sinh viên đủ điều kiện; tạo " + result.new_accounts + " tài khoản chờ kích hoạt; " + result.unchanged + " hồ sơ đã có.";
                   },"Đã nhập danh sách.");}}>Nhập sau khi kiểm</button></div>
               <p role="status" className="text-caption">{!file?"Chọn tệp CSV UTF-8 hoặc Excel .xlsx (tối đa 2 MB).":
                 !preview?"Nhấn “Kiểm tra tệp” và chờ bảng xem trước; chỉ khi kiểm tra thành công mới có thể nhập.":
@@ -312,7 +308,7 @@ export default function RosterPage({context}: {context:Context}) {
               <p>Ghi nhận ngoại lệ ngưỡng tín chỉ/GPA theo quyết định cá biệt đã ký.</p></div><span className="badge badge-warning">Trường hợp hiếm</span></div>
             <div className="card-body stack">
               <div className="roster-policy-note"><strong>Phạm vi ngoại lệ</strong><p>QĐ5964 chỉ cho phép ngoại lệ đối với ngưỡng tín chỉ/GPA ở khoản 2 Điều 2. Hồ sơ thật cần quyết định cá biệt đã ký và phải đối chiếu khoản 1; không nhập chi tiết kỷ luật hoặc án tích.</p></div>
-              <StudentPicker label="Sinh viên được xét ngoại lệ" rows={roster.filter(r=>r.state!=="CONFIRMED")} value={specialStudent} onChange={setSpecialStudent} placeholder="Chọn sinh viên chưa được xác nhận" disabled={busy} />
+              <StudentPicker label="Sinh viên được xét ngoại lệ" rows={roster.filter(r=>r.state!=="CONFIRMED")} value={specialStudent} onChange={setSpecialStudent} placeholder="Chọn sinh viên chưa đủ điều kiện" disabled={busy} />
               <div className="roster-form-grid">
                 <label className="input-group">Số quyết định của Hiệu trưởng<input className="input" value={specialRef} onChange={e=>setSpecialRef(e.target.value)} maxLength={500} placeholder="Demo: DEMO-QD-HT-001" disabled={busy} /></label>
                 <label className="input-group">Lý do đối chiếu<input className="input" value={specialReason} onChange={e=>setSpecialReason(e.target.value)} maxLength={2000} placeholder="Demo: Ngoại lệ ngưỡng GPA theo quyết định mô phỏng" disabled={busy} /></label>
@@ -369,8 +365,6 @@ export default function RosterPage({context}: {context:Context}) {
         </div>
       </>:null}
 
-      {!canConfirm&&roundId?<section className="card"><div className="card-body stack"><h2>Trạng thái danh sách</h2>
-        <p>{roster.length} sinh viên; {pending.length} kết quả đang chờ người được giao xác nhận.</p></div></section>:null}
     </div>
   </>;
 }

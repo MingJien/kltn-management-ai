@@ -199,6 +199,7 @@ def import_roster(session: Session, user: m.UserAccount, round_id: UUID,
     added = 0
     skipped = 0
     snapshot_ids = []
+    now = datetime.now(timezone.utc)
     try:
         for row in rows:
             student = session.scalar(select(m.StudentProfile).where(
@@ -225,22 +226,22 @@ def import_roster(session: Session, user: m.UserAccount, round_id: UUID,
                 m.EligibilitySnapshot.student_id == student.id,
                 m.EligibilitySnapshot.round_id == round_id,
             ).order_by(m.EligibilitySnapshot.version.desc()).limit(1).with_for_update())
-            if latest and latest.state in {"SUBMITTED", "CONFIRMED"}:
+            if latest and latest.state == "CONFIRMED":
                 skipped += 1
                 continue
             snapshot = m.EligibilitySnapshot(id=uuid4(), student_id=student.id, round_id=round_id,
                 version=latest.version + 1 if latest else 1, evidence_ref=reference,
-                captured_at=datetime.now(timezone.utc), state="SUBMITTED")
+                captured_at=now, confirmed_by=user.id, confirmed_at=now, state="CONFIRMED")
             session.add(snapshot)
             snapshot_ids.append(str(snapshot.id))
             added += 1
         session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_ROSTER_IMPORTED",
             resource_type="thesis_round", resource_id=round_id,
-            reason=f"reference={reference}; new_accounts={created}; submitted={added}; skipped={skipped}",
-            occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+            reason=f"reference={reference}; new_accounts={created}; confirmed={added}; skipped={skipped}",
+            occurred_at=now, correlation_id=uuid4()))
         session.commit()
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(409, "A concurrent import changed the roster; preview and retry") from exc
-    return {"new_accounts": created, "submitted": added, "unchanged": skipped,
+    return {"new_accounts": created, "confirmed": added, "unchanged": skipped,
             "snapshot_ids": snapshot_ids}

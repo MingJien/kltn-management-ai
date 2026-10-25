@@ -35,6 +35,20 @@ export default function AccountPage({context, onPasswordChanged}: {context:Conte
         {context.department_code ? <p><strong>Bộ môn:</strong> {context.department_code} · {context.department_name}</p> : null}
         {context.major_code ? <p><strong>Ngành:</strong> {context.major_code}{context.major_name ? ` · ${context.major_name}` : " · Chưa đối chiếu danh mục"}</p> : null}
         <p className="text-muted">Thông tin định danh do Khoa cung cấp; nếu sai, liên hệ người quản lý danh sách.</p>
+        {context.base_role === "LECTURER" ? (
+          <div className="stack">
+            <h3>Vai trò và phân công hiện tại</h3>
+            {context.lecturer_duties.length ? (
+              <div className="account-item__duties">
+                {context.lecturer_duties.map((duty) => (
+                  <span className="badge badge-neutral account-badge--extra" key={duty.code + "-" + (duty.scope || "")}>
+                    {duty.label}{duty.scope ? " · " + duty.scope : ""}
+                  </span>
+                ))}
+              </div>
+            ) : <p className="text-muted">Chưa có quyền bổ sung hoặc phân công KLTN đang hiệu lực.</p>}
+          </div>
+        ) : null}
       </div></section>
       {context.can_change_password ? <section className="card"><div className="card-body stack"><h2>Đổi mật khẩu</h2>
         <form onSubmit={(event)=>void change(event)} className="stack">

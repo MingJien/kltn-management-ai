@@ -627,3 +627,96 @@
     align-self: flex-end;
   }
 }
+
+/* Account directory role filters */
+.account-category-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.account-category-tab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--neutral-700);
+  cursor: pointer;
+  font: inherit;
+}
+
+.account-category-tab:hover {
+  border-color: var(--primary-600);
+  color: var(--primary-700);
+}
+
+.account-category-tab--active {
+  border-color: var(--primary-600);
+  background: var(--primary-100);
+  color: var(--primary-800);
+  font-weight: 700;
+}
+
+.account-category-tab small {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--neutral-100);
+  color: var(--neutral-700);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.account-category-tab--active small {
+  background: #fff;
+  color: var(--primary-800);
+}
+
+.account-role-filter {
+  max-width: 520px;
+}
+
+.account-item__display-name {
+  color: var(--neutral-800);
+  font-weight: 600;
+}
+
+.account-item__duties {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.account-badge--extra {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  text-align: left;
+}
+
+@media (max-width: 639px) {
+  .account-category-tabs {
+    margin-inline: -2px;
+  }
+
+  .account-category-tab {
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+
+  .account-role-filter {
+    max-width: none;
+  }
+}

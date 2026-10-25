@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -137,6 +137,21 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
     if not (assigned(session, user, round_id, "ELIGIBILITY_IMPORTER")
             or assigned(session, user, round_id, "ELIGIBILITY_VERIFIER")):
         raise HTTPException(403, "Round assignment required")
+    submitted_rows = session.execute(
+        select(
+            m.RegistrationMember.student_id,
+            func.max(m.TopicRegistration.submitted_at).label("submitted_at"),
+        )
+        .join(m.TopicRegistration, m.TopicRegistration.id == m.RegistrationMember.registration_id)
+        .where(
+            m.RegistrationMember.round_id == round_id,
+            m.RegistrationMember.active.is_(True),
+            m.TopicRegistration.state.in_(("SUBMITTED", "RETURNED", "LECTURER_ACCEPTED", "FINALIZED")),
+            m.TopicRegistration.submitted_at.is_not(None),
+        )
+        .group_by(m.RegistrationMember.student_id)
+    ).all()
+    registration_by_student = {row.student_id: row.submitted_at for row in submitted_rows}
     snapshots = session.scalars(select(m.EligibilitySnapshot).where(
         m.EligibilitySnapshot.round_id == round_id).order_by(
             m.EligibilitySnapshot.student_id, m.EligibilitySnapshot.version.desc())).all()
@@ -155,7 +170,12 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
             "account_activated": account.email_verified_at is not None,
             "state": snapshot.state, "version": snapshot.version,
             "evidence_ref": snapshot.evidence_ref,
-            "confirmed_at": snapshot.confirmed_at.isoformat() if snapshot.confirmed_at else None})
+            "confirmed_at": snapshot.confirmed_at.isoformat() if snapshot.confirmed_at else None,
+            "registration_submitted": student.id in registration_by_student,
+            "registration_submitted_at": (
+                registration_by_student[student.id].isoformat()
+                if student.id in registration_by_student else None
+            )})
     return sorted(rows, key=lambda row: row["student_code"])
 
 
@@ -164,33 +184,10 @@ def confirm_roster(round_id: UUID, payload: ConfirmRows,
                    user: m.UserAccount = Depends(current_user),
                    session: Session = Depends(get_session)) -> dict:
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
-    if len(set(payload.snapshot_ids)) != len(payload.snapshot_ids):
-        raise HTTPException(422, "Duplicate snapshot IDs")
-    if len(payload.basis_ref.strip()) < 3:
-        raise HTTPException(422, "A confirmation reference is required")
-    snapshots = session.scalars(select(m.EligibilitySnapshot).where(
-        m.EligibilitySnapshot.id.in_(payload.snapshot_ids)).with_for_update()).all()
-    if len(snapshots) != len(payload.snapshot_ids) or any(
-            row.round_id != round_id or row.state != "SUBMITTED" for row in snapshots):
-        raise HTTPException(409, "Selection changed; reload the roster")
-    now = datetime.now(timezone.utc)
-    for row in snapshots:
-        latest = session.scalar(select(m.EligibilitySnapshot.version).where(
-            m.EligibilitySnapshot.student_id == row.student_id,
-            m.EligibilitySnapshot.round_id == round_id).order_by(
-                m.EligibilitySnapshot.version.desc()).limit(1))
-        if row.version != latest:
-            raise HTTPException(409, "A newer eligibility decision exists")
-        row.state = "CONFIRMED"
-        row.confirmed_by = user.id
-        row.confirmed_at = now
-    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_ROSTER_CONFIRMED",
-        resource_type="thesis_round", resource_id=round_id,
-        reason=f"basis={payload.basis_ref.strip()}; count={len(snapshots)}",
-        occurred_at=now, correlation_id=uuid4()))
-    session.commit()
-    return {"confirmed": len(snapshots)}
-
+    raise HTTPException(
+        410,
+        "Danh sách chính thức được ghi nhận đủ điều kiện ngay khi nhập. Hãy nhập lại danh sách để cập nhật hồ sơ chờ từ quy trình cũ.",
+    )
 
 @router.post("/special-decision")
 def record_special_decision(round_id: UUID, payload: SpecialDecision,

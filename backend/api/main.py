@@ -30,6 +30,7 @@ from backend.services.registration import (
     respond_to_registration, submit_registration,
     confirmed_student_ids,
 )
+from backend.services.account_directory import lecturer_duties_for_user
 from backend.services.topics import (
     create_topic, department_decision, get_visible_topic, open_rounds,
     submit_topic, update_topic, visible_topics, round_out,
@@ -151,7 +152,7 @@ def context(
     if "ELIGIBILITY_IMPORTER" in assignment_types:
         actions.append("eligibility:import")
     if "ELIGIBILITY_VERIFIER" in assignment_types:
-        actions.append("eligibility:confirm")
+        actions.append("eligibility:manage")
     if "ACCOUNT_MANAGER" in assignment_types:
         actions.append("account:manage")
     if lecturer and user.base_role == "LECTURER":
@@ -182,6 +183,7 @@ def context(
         major_code=student.major_code if student else None,
         major_name=profile_major.name if profile_major else None,
         lecturer_code=lecturer.lecturer_code if lecturer else None,
+        lecturer_duties=lecturer_duties_for_user(session, user.id) if lecturer else [],
         csrf_token=csrf_token,
         can_change_password=bool(user.email_verified_at and user.password_hash and user.password_hash.startswith("$argon2")),
     )

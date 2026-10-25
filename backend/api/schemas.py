@@ -174,6 +174,12 @@ class RejectedProposalResolution(BaseModel):
     receiving_lecturer_id: UUID | None = None
 
 
+class LecturerDutyOut(BaseModel):
+    code: str
+    label: str
+    scope: str | None = None
+
+
 class ContextOut(BaseModel):
     user_id: UUID
     base_role: str
@@ -190,6 +196,7 @@ class ContextOut(BaseModel):
     major_code: str | None = None
     major_name: str | None = None
     lecturer_code: str | None = None
+    lecturer_duties: list[LecturerDutyOut] = Field(default_factory=list)
     csrf_token: str | None = None
     can_change_password: bool = False
 
