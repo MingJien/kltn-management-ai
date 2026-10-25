@@ -96,7 +96,7 @@ export default function RoundsPage({context}: {context: Context}) {
           </div>
           <div className="grid grid-auto">
             <label className="input-group">Mã đợt
-              <input className="input" required maxLength={32} placeholder="2026-2027-D1" value={code} onChange={e => setCode(e.target.value)} /></label>
+              <input className="input" required maxLength={32} placeholder="KLTN-26-27-D01" value={code} onChange={e => setCode(e.target.value)} /></label>
             <label className="input-group">Loại đợt
               <select className="input" value={roundType} onChange={e => setRoundType(e.target.value as typeof roundType)}>
                 <option value="MAIN">Đợt chính</option><option value="SUPPLEMENTARY">Đợt bổ sung</option>

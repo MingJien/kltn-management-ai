@@ -3,14 +3,41 @@ import type { Context } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import {
+  AlertTriangle,
+  Ban,
+  BookOpen,
+  Briefcase,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Clock,
+  GraduationCap,
+  Info,
+  Lock,
+  Mail,
+  RotateCcw,
+  Search,
+  Send,
+  Shield,
+  Unlock,
+  UserCog,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 
-type Department = {id:string; code:string; name:string; major_code:string|null};
-type Round = {id:string; code:string; state:string};
-type Account = {id:string; email:string; base_role:string; status:string; verified:boolean; student_code:string|null};
-type Assignment = {id:string; round_id:string; round_code:string; user_id:string; email:string; assignment_type:string};
+type Department = { id: string; code: string; name: string; major_code: string | null };
+type Round = { id: string; code: string; state: string };
+type Account = { id: string; email: string; base_role: string; status: string; verified: boolean; student_code: string | null; display_name?: string | null; lecturer_code?: string | null };
+type Assignment = { id: string; round_id: string; round_code: string; user_id: string; email: string; assignment_type: string };
 
-export default function AdministrationPage({context,onPermissionsChanged}: {
-  context:Context; onPermissionsChanged:()=>Promise<void>;
+export default function AdministrationPage({
+  context,
+  onPermissionsChanged,
+}: {
+  context: Context;
+  onPermissionsChanged: () => Promise<void>;
 }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -23,7 +50,8 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
   const [departmentId, setDepartmentId] = useState("");
   const [roundId, setRoundId] = useState("");
   const [userId, setUserId] = useState("");
-  const [kind, setKind] = useState("ELIGIBILITY_IMPORTER");
+  const [staffSearch, setStaffSearch] = useState("");
+  const [kind, setKind] = useState("");
   const [basis, setBasis] = useState("");
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("");
@@ -40,192 +68,1003 @@ export default function AdministrationPage({context,onPermissionsChanged}: {
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const isAdmin = context.base_role === "ADMIN";
-  const eligibleStaff = (a: Account, task: string) => a.status === "ACTIVE" &&
+
+  const assignmentDescriptions: Record<string, string> = {
+    ELIGIBILITY_IMPORTER:
+      "Được nhập danh sách sinh viên đủ điều kiện theo căn cứ của Khoa. Hồ sơ sau khi nhập chờ người có quyền xác nhận.",
+    ELIGIBILITY_VERIFIER:
+      "Được rà soát, xác nhận, điều chỉnh hoặc thu hồi tình trạng đủ điều kiện của sinh viên trong đợt.",
+    ACCOUNT_MANAGER:
+      "Được quản lý tài khoản sinh viên trong phạm vi đợt được giao, gồm khóa, mở hoặc hỗ trợ kích hoạt tài khoản.",
+    KLTN_COORDINATOR:
+      "Được mở, gia hạn và đóng các mốc tiến độ chung của đợt; không thay giảng viên hướng dẫn nhận xét hoặc xác nhận báo cáo.",
+  };
+
+  const eligibleStaff = (a: Account, task: string) =>
+    a.status === "ACTIVE" &&
     (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
+
   function changeKind(next: string) {
     setKind(next);
-    if (userId && !staffAccounts.some(a => a.id === userId && eligibleStaff(a, next))) {
+    if (userId && !staffAccounts.some((a) => a.id === userId && eligibleStaff(a, next))) {
       setUserId("");
       setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
-    } else setAssignmentHint("");
+    } else {
+      setAssignmentHint("");
+    }
   }
+
+  const foldStaffSearch = (value: string) =>
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d").toLowerCase().replace(/\s+/g, " ").trim();
+  const staffQuery = foldStaffSearch(staffSearch);
+  const matchingStaff = staffAccounts.filter((account) =>
+    eligibleStaff(account, kind) &&
+    foldStaffSearch([account.lecturer_code, account.display_name, account.email].filter(Boolean).join(" ")).includes(staffQuery),
+  );
+  const selectedStaff = matchingStaff.find((account) => account.id === userId);
+  useEffect(() => {
+    if (userId && !staffAccounts.some((account) => account.id === userId && eligibleStaff(account, kind))) {
+      setUserId("");
+    }
+  }, [staffAccounts, userId, kind]);
+
   const PAGE_SIZE = 20;
-  const refresh = useCallback(async (q: string, atPage: number) => {
-    setBusy(true);
-    try {
-      const [d,r,u,staff,a] = await Promise.all([
-        isAdmin ? request<Department[]>("/admin/departments", context.user_id) : Promise.resolve([]),
-        isAdmin ? request<Round[]>("/admin/rounds", context.user_id) :
-          request<{round_id:string;round_code:string;assignment_type:string}[]>("/me/round-assignments", context.user_id)
-            .then(rows => rows.filter(row => row.assignment_type === "ACCOUNT_MANAGER")
-              .map(row => ({id:row.round_id,code:row.round_code,state:"OPEN"}))),
-        request<Account[]>("/admin/users?search="+encodeURIComponent(q)+"&offset="+(atPage*PAGE_SIZE)+"&limit="+PAGE_SIZE, context.user_id),
-        isAdmin ? request<Account[]>("/admin/users?limit=100", context.user_id) : Promise.resolve<Account[]>([]),
-        isAdmin ? request<Assignment[]>("/admin/round-assignments", context.user_id) : Promise.resolve([]),
-      ]);
-      setDepartments(d); setRounds(r); setAccounts(u); setStaffAccounts(staff); setAssignments(a);
-      setHasNext(u.length === PAGE_SIZE);
-    } finally { setBusy(false); }
-  }, [context.user_id, isAdmin, PAGE_SIZE]);
+  const refresh = useCallback(
+    async (q: string, atPage: number) => {
+      setBusy(true);
+      try {
+        const [d, r, u, staff, a] = await Promise.all([
+          isAdmin ? request<Department[]>("/admin/departments", context.user_id) : Promise.resolve([]),
+          isAdmin
+            ? request<Round[]>("/admin/rounds", context.user_id)
+            : request<{ round_id: string; round_code: string; assignment_type: string }[]>("/me/round-assignments", context.user_id).then((rows) =>
+                rows
+                  .filter((row) => row.assignment_type === "ACCOUNT_MANAGER")
+                  .map((row) => ({ id: row.round_id, code: row.round_code, state: "OPEN" })),
+              ),
+          request<Account[]>(
+            "/admin/users?search=" + encodeURIComponent(q) + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE,
+            context.user_id,
+          ),
+          isAdmin ? request<Account[]>("/admin/staff", context.user_id) : Promise.resolve<Account[]>([]),
+          isAdmin ? request<Assignment[]>("/admin/round-assignments", context.user_id) : Promise.resolve([]),
+        ]);
+        setDepartments(d);
+        setRounds(r);
+        setAccounts(u);
+        setStaffAccounts(staff);
+        setAssignments(a);
+        setHasNext(u.length === PAGE_SIZE);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [context.user_id, isAdmin, PAGE_SIZE],
+  );
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const next = search.trim();
-      if (next !== term) {setTerm(next); setPage(0);}
+      if (next !== term) {
+        setTerm(next);
+        setPage(0);
+      }
     }, 250);
     return () => window.clearTimeout(timer);
   }, [search, term]);
-  useEffect(() => {void refresh(term, page).catch(cause=>setError(errorMessage(cause)));}, [refresh, term, page]);
-  const accountById = useCallback((id: string) =>
-    accounts.find(a => a.id === id) ?? staffAccounts.find(a => a.id === id), [accounts, staffAccounts]);
-  async function run(action:()=>Promise<unknown>, message:string, permissionsChanged=false) {
-    setBusy(true); setError(""); setNotice("");
-    try {const result=await action(); await refresh(search.trim() || term, page);
+
+  useEffect(() => {
+    void refresh(term, page).catch((cause) => setError(errorMessage(cause)));
+  }, [refresh, term, page]);
+
+  const accountById = useCallback(
+    (id: string) => accounts.find((a) => a.id === id) ?? staffAccounts.find((a) => a.id === id),
+    [accounts, staffAccounts],
+  );
+
+  async function run(action: () => Promise<unknown>, message: string, permissionsChanged = false) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await action();
+      await refresh(search.trim() || term, page);
       if (permissionsChanged) await onPermissionsChanged();
-      setNotice(typeof result==="string"?result:message);} catch(cause) {setError(errorMessage(cause));}
-    finally {setBusy(false);}
+      setNotice(typeof result === "string" ? result : message);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
   }
-  return <><PageHeader title="Quản trị tài khoản" description="Cấp tài khoản và ghi nhận phân công theo đợt" />
-    <div className="stack">
-      {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
-      {notice ? <p role="status" className="alert alert-success">{notice}</p> : null}
-      {isAdmin && <div className="grid grid-auto">
-        <section className="card"><div className="card-body stack"><h2>Mời giảng viên</h2>
-          <form className="stack" onSubmit={e=>{e.preventDefault(); void run(async()=>{
-            const result=await request<{invitation_sent:boolean}>("/admin/lecturers", context.user_id,
-              {method:"POST", body:JSON.stringify({lecturer_code:lecturerCode,display_name:lecturerName,email:lecturerEmail,department_id:departmentId})});
-            return result.invitation_sent ? "Đã tạo tài khoản và gửi liên kết kích hoạt." :
-              "Đã tạo tài khoản nhưng chưa gửi được email; giảng viên có thể yêu cầu lại liên kết kích hoạt.";
-          },"Đã tạo tài khoản.");}}>
-            <label className="input-group">Mã giảng viên<input className="input" required value={lecturerCode} onChange={e=>setLecturerCode(e.target.value)} /></label>
-            <label className="input-group">Họ tên<input className="input" required value={lecturerName} onChange={e=>setLecturerName(e.target.value)} /></label>
-            <label className="input-group">Email<input className="input" type="email" required value={lecturerEmail} onChange={e=>setLecturerEmail(e.target.value)} /></label>
-            <label className="input-group">Bộ môn<select className="input" required value={departmentId} onChange={e=>setDepartmentId(e.target.value)}>
-              <option value="">Chọn bộ môn</option>{departments.map(d=><option key={d.id} value={d.id}>{d.code} · {d.name}</option>)}</select></label>
-            <button className="btn btn-primary" disabled={busy}>Tạo và gửi lời mời</button>
-          </form>
-        </div></section>
-        <section className="card"><div className="card-body stack"><h2>Phân công theo đợt</h2>
-          <form className="stack" onInvalidCapture={()=>setAssignmentHint("Vui lòng chọn đợt, người được giao và nhập căn cứ phân công ít nhất 3 ký tự.")} onSubmit={e=>{e.preventDefault();setAssignmentHint("");void run(()=>request("/admin/round-assignments",context.user_id,
-            {method:"POST",body:JSON.stringify({round_id:roundId,user_id:userId,assignment_type:kind,basis_ref:basis})}),"Đã lưu phân công.",true);}}>
-            <label className="input-group">Đợt<select className="input" required value={roundId} onChange={e=>setRoundId(e.target.value)}>
-              <option value="">Chọn đợt</option>{rounds.filter(r=>r.state==="DRAFT"||r.state==="OPEN").map(r=><option key={r.id} value={r.id}>{r.code} · {r.state}</option>)}</select></label>
-            <label className="input-group">Người được giao<select className="input" required value={userId} aria-describedby="assignment-hint" onChange={e=>{setUserId(e.target.value);setAssignmentHint("");}}>
-              <option value="">Chọn người đang hoạt động phù hợp nhiệm vụ</option>{staffAccounts.filter(a=>eligibleStaff(a, kind)).map(a=><option key={a.id} value={a.id}>{a.email}</option>)}</select></label>
-            <label className="input-group">Nhiệm vụ<select className="input" value={kind} onChange={e=>changeKind(e.target.value)}>
-              <option value="ELIGIBILITY_IMPORTER">Nhập danh sách SV</option><option value="ELIGIBILITY_VERIFIER">Xác nhận điều kiện</option><option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option><option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option></select></label>
-            <p className="text-caption">Quyền điều phối mốc chỉ cho phép mở, gia hạn và đóng mốc chung của đợt; không thay GVHD nhận xét hoặc xác nhận báo cáo.</p>
-            <p id="assignment-hint" role="status" className="text-caption">{assignmentHint || "Đổi nhiệm vụ sẽ giữ người đã chọn nếu vẫn phù hợp; nếu không, hãy chọn lại."}</p>
-            <label className="input-group">Căn cứ phân công<input className="input" required minLength={3} value={basis} onChange={e=>setBasis(e.target.value)} placeholder="Số văn bản hoặc quyết định của Khoa" /></label>
-            <button className="btn btn-primary" disabled={busy}>Lưu phân công</button>
-          </form>
-        </div></section>
-      </div>}
-      {isAdmin && <section className="card"><div className="card-body stack"><h2>Phân công đang hiệu lực</h2>
-        <label className="input-group">Lý do thu hồi (nếu cần)<input className="input" minLength={5} value={reason} onChange={e=>setReason(e.target.value)} /></label>
-        <div className="account-list">{assignments.map(a=><div className="account-list__row" key={a.id}>
-          <span>{a.round_code} · {a.email} · {a.assignment_type === "ELIGIBILITY_VERIFIER" ? "Xác nhận điều kiện" : a.assignment_type === "ACCOUNT_MANAGER" ? "Quản lý tài khoản SV" : a.assignment_type === "KLTN_COORDINATOR" ? "Quản lý mốc tiến độ toàn đợt" : "Nhập danh sách SV"}</span>
-          <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length<5}
-            onClick={()=>void run(()=>request(`/admin/round-assignments/${a.id}/revoke`,context.user_id,
-              {method:"POST",body:JSON.stringify({reason})}),"Đã thu hồi phân công.",true)}>Thu hồi</button>
-        </div>)}{!assignments.length ? <p>Chưa có phân công.</p> : null}</div>
-      </div></section>}
-      <section className="card"><div className="card-body stack"><h2>Tài khoản</h2>
-        <form className="account-search" onSubmit={e=>{e.preventDefault(); setTerm(search.trim()); setPage(0);}}>
-          <input className="input" aria-label="Tìm theo email hoặc MSSV" placeholder="Tìm theo email hoặc MSSV" value={search} onChange={e=>setSearch(e.target.value)} />
-          <button className="btn btn-secondary">Tìm</button>
-        </form>
-        <label className="input-group">Lý do thao tác tài khoản<input className="input" minLength={5} value={reason} onChange={e=>setReason(e.target.value)} /></label>
-        <p className="text-muted">Khóa hoặc vô hiệu hóa giữ nguyên đề tài, tài liệu và lịch sử. Cấp lại liên kết qua email đang lưu.</p>
-        <div className="account-list">{accounts.map(a=><div className="account-list__row" key={a.id}>
-          <span className="account-list__info">{a.student_code ? `${a.student_code} · ` : ""}{a.email} · {a.base_role} · {a.status}{!a.verified ? " · chưa kích hoạt" : ""}</span>
-          <div className="account-list__actions">
-            {a.id === context.user_id ? (
-              <span className="text-muted text-caption" style={{gridColumn: "1 / -1", textAlign: "right"}}>Tài khoản hiện tại</span>
-            ) : (
-              <>
-                <div className="account-list__action-slot">
-                  {a.status !== "DISABLED" ? (
-                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
-                      onClick={() => void run(() => request(`/admin/users/${a.id}/lock`, context.user_id,
-                        {method: "POST", body: JSON.stringify({locked: a.status !== "LOCKED", reason})}),
-                        a.status === "LOCKED" ? "Đã mở khóa." : "Đã khóa tài khoản.")}>
-                      {a.status === "LOCKED" ? "Mở khóa" : "Khóa"}
-                    </button>
-                  ) : null}
+
+  // Statistics for quick glance
+  const totalAccounts = accounts.length;
+  const studentCount = accounts.filter((a) => a.base_role === "STUDENT").length;
+  const lecturerCount = accounts.filter((a) => a.base_role === "LECTURER").length;
+  const unverifiedCount = accounts.filter((a) => !a.verified).length;
+  const lockedOrDisabledCount = accounts.filter((a) => a.status !== "ACTIVE").length;
+
+  return (
+    <div className="admin-page">
+      <PageHeader
+        title="Quản trị tài khoản & Phân công"
+        description="Cấp quyền truy cập, kiểm soát trạng thái tài khoản và phân công nhiệm vụ theo đợt khóa luận"
+      />
+
+      <div className="stack">
+        {error ? (
+          <p role="alert" className="alert alert-danger" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <AlertTriangle size={18} aria-hidden="true" /> {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p role="status" className="alert alert-success" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <CheckCircle2 size={18} aria-hidden="true" /> {notice}
+          </p>
+        ) : null}
+
+        {isAdmin && (
+          <div className="grid grid-auto">
+            {/* CARD 1: MỜI GIẢNG VIÊN */}
+            <section className="card admin-card">
+              <div className="admin-card__header">
+                <div className="admin-card__title-group">
+                  <div className="admin-card__icon">
+                    <UserPlus size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h2 className="admin-card__title">Mời giảng viên</h2>
+                    <p className="admin-card__subtitle">Tạo tài khoản và gửi liên kết kích hoạt qua email</p>
+                  </div>
                 </div>
-                <div className="account-list__action-slot">
-                  {a.status !== "DISABLED" ? (
-                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
-                      onClick={() => void run(() => request(`/admin/users/${a.id}/disable`, context.user_id,
-                        {method: "POST", body: JSON.stringify({reason})}), "Đã vô hiệu hóa tài khoản; hồ sơ vẫn được giữ.")}>
-                      Vô hiệu hóa
-                    </button>
-                  ) : a.status === "DISABLED" && a.verified ? (
-                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
-                      onClick={() => void run(() => request(`/admin/users/${a.id}/restore`, context.user_id,
-                        {method: "POST", body: JSON.stringify({reason})}), "Đã mở lại tài khoản cũ.")}>
-                      Mở lại tài khoản
-                    </button>
-                  ) : null}
-                </div>
-                <div className="account-list__action-slot">
-                  {a.status !== "LOCKED" ? (
-                    <button className="btn btn-secondary btn-sm" disabled={busy || reason.trim().length < 5}
-                      onClick={() => void run(async () => {
-                        const result = await request<{link_sent: boolean}>(`/admin/users/${a.id}/reissue-link`, context.user_id,
-                          {method: "POST", body: JSON.stringify({reason})});
-                        return result.link_sent ? "Đã gửi liên kết mới." : "Chưa gửi được email; kiểm tra cấu hình thư.";
-                      }, "Đã cấp lại liên kết.")}>
-                      Cấp lại liên kết
-                    </button>
-                  ) : null}
-                </div>
-                <div className="account-list__action-slot">
-                  <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => {setSelectedAccount(a.id); setNewEmail(a.email); setEmailReason(""); setOfficialRef(""); setEmailRoundId("");}}>
-                    Sửa email
+              </div>
+              <div className="card-body stack">
+                <form
+                  className="stack"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void run(async () => {
+                      const result = await request<{ invitation_sent: boolean }>("/admin/lecturers", context.user_id, {
+                        method: "POST",
+                        body: JSON.stringify({
+                          lecturer_code: lecturerCode,
+                          display_name: lecturerName,
+                          email: lecturerEmail,
+                          department_id: departmentId,
+                        }),
+                      });
+                      return result.invitation_sent
+                        ? "Đã tạo tài khoản và gửi liên kết kích hoạt."
+                        : "Đã tạo tài khoản nhưng chưa gửi được email; giảng viên có thể yêu cầu lại liên kết kích hoạt.";
+                    }, "Đã tạo tài khoản.");
+                  }}
+                >
+                  <label className="input-group">
+                    Mã giảng viên
+                    <input
+                      className="input"
+                      required
+                      placeholder="VD: GV001"
+                      value={lecturerCode}
+                      onChange={(e) => setLecturerCode(e.target.value)}
+                    />
+                  </label>
+                  <label className="input-group">
+                    Họ tên
+                    <input
+                      className="input"
+                      required
+                      placeholder="VD: TS. Nguyễn Văn A"
+                      value={lecturerName}
+                      onChange={(e) => setLecturerName(e.target.value)}
+                    />
+                  </label>
+                  <label className="input-group">
+                    Email
+                    <input
+                      className="input"
+                      type="email"
+                      required
+                      placeholder="email@truong.edu.vn"
+                      value={lecturerEmail}
+                      onChange={(e) => setLecturerEmail(e.target.value)}
+                    />
+                  </label>
+                  <label className="input-group">
+                    Bộ môn
+                    <select className="input" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                      <option value="">Chọn bộ môn trực thuộc</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.code} · {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="btn btn-primary" disabled={busy}>
+                    <UserPlus size={16} aria-hidden="true" /> Tạo và gửi lời mời
                   </button>
+                </form>
+              </div>
+            </section>
+
+            {/* CARD 2: PHÂN CÔNG THEO ĐỢT */}
+            <section className="card admin-card">
+              <div className="admin-card__header">
+                <div className="admin-card__title-group">
+                  <div className="admin-card__icon admin-card__icon--info">
+                    <Shield size={18} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h2 className="admin-card__title">Phân công theo đợt</h2>
+                    <p className="admin-card__subtitle">Gán trách nhiệm quản trị đợt khóa luận cho cán bộ/GV</p>
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+              <div className="card-body stack">
+                <form
+                  className="stack"
+                  onInvalidCapture={() =>
+                    setAssignmentHint("Vui lòng chọn đợt, nhiệm vụ, người được giao và nhập căn cứ phân công ít nhất 3 ký tự.")
+                  }
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!selectedStaff) {
+                      setAssignmentHint("Hãy chọn email của người được giao trong danh sách phù hợp.");
+                      return;
+                    }
+                    setAssignmentHint("");
+                    void run(
+                      () =>
+                        request("/admin/round-assignments", context.user_id, {
+                          method: "POST",
+                          body: JSON.stringify({
+                            round_id: roundId,
+                            user_id: selectedStaff.id,
+                            assignment_type: kind,
+                            basis_ref: basis,
+                          }),
+                        }),
+                      "Đã lưu phân công.",
+                      true,
+                    );
+                  }}
+                >
+                  <label className="input-group">
+                    Đợt
+                    <select className="input" required value={roundId} onChange={(e) => setRoundId(e.target.value)}>
+                      <option value="">Chọn đợt khóa luận áp dụng</option>
+                      {rounds
+                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN")
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.code} · {r.state}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <div className="input-group">
+                    <span id="assignment-person-label">Người được giao</span>
+                    <div className="roster-student-picker__controls staff-picker" role="group" aria-labelledby="assignment-person-label">
+                      <input
+                        className="input"
+                        aria-label="Tìm người được giao theo mã hoặc tên"
+                        placeholder="Mã GV hoặc tên"
+                        maxLength={100}
+                        value={staffSearch}
+                        disabled={busy}
+                        onChange={(e) => {
+                          setStaffSearch(e.target.value);
+                          setUserId("");
+                          setAssignmentHint("");
+                        }}
+                      />
+                      <select
+                        className="input"
+                        aria-label="Người được giao"
+                        required
+                        value={userId}
+                        disabled={busy || !matchingStaff.length}
+                        aria-describedby={assignmentHint ? "assignment-hint" : undefined}
+                        onChange={(e) => {
+                          setUserId(e.target.value);
+                          setAssignmentHint("");
+                        }}
+                      >
+                        <option value="">{matchingStaff.length ? "Chọn email phù hợp" : "Không có tài khoản phù hợp"}</option>
+                        {matchingStaff.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.email || "Chưa có email"}{account.lecturer_code ? " · " + account.lecturer_code : ""}{account.display_name && account.display_name !== account.email ? " · " + account.display_name : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <span className="text-caption">{matchingStaff.length} tài khoản phù hợp. Tìm bằng mã/tên, rồi chọn email bên phải.</span>
+                    {selectedStaff ? <p role="status" className="text-caption">Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
+                  </div>
+                  <label className="input-group">
+                    Nhiệm vụ
+                    <select className="input" required value={kind} onChange={(e) => changeKind(e.target.value)}>
+                      <option value="">Chọn nhiệm vụ</option>
+                      <option value="ELIGIBILITY_IMPORTER">Nhập danh sách SV</option>
+                      <option value="ELIGIBILITY_VERIFIER">Xác nhận điều kiện</option>
+                      <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
+                      <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
+                    </select>
+                  </label>
+                  {assignmentDescriptions[kind] ? (
+                    <div className="admin-callout" role="status" aria-live="polite">
+                      <Info size={16} aria-hidden="true" />
+                      <span>{assignmentDescriptions[kind]}</span>
+                    </div>
+                  ) : null}
+                  {assignmentHint ? (
+                    <p id="assignment-hint" role="status" className="text-caption" style={{ color: "var(--neutral-600)" }}>
+                      {assignmentHint}
+                    </p>
+                  ) : null}
+                  <label className="input-group">
+                    Căn cứ phân công
+                    <input
+                      className="input"
+                      required
+                      minLength={3}
+                      value={basis}
+                      onChange={(e) => setBasis(e.target.value)}
+                      placeholder="Số văn bản hoặc quyết định của Khoa"
+                    />
+                  </label>
+                  <button className="btn btn-primary" disabled={busy || !kind || !selectedStaff}>
+                    <Shield size={16} aria-hidden="true" /> Lưu phân công
+                  </button>
+                </form>
+              </div>
+            </section>
           </div>
-        </div>)}</div>
-        {accounts.length ? <nav className="pagination" aria-label="Phân trang tài khoản">
-          <button className="btn btn-secondary" disabled={busy || page === 0} onClick={() => setPage(page - 1)}>Trang trước</button>
-          <span>Trang {page + 1}</span>
-          <button className="btn btn-secondary" disabled={busy || !hasNext} onClick={() => setPage(page + 1)}>Trang sau</button>
-        </nav> : <p>Không có tài khoản khớp tìm kiếm.</p>}
-        {selectedAccount && (() => {
-          const account = accountById(selectedAccount);
-          if (!account) return null;
-          const isStudent = account.base_role === "STUDENT";
-          return <form className="core-form" onSubmit={e=>{e.preventDefault();
-            void run(async()=>{
-              const result = isStudent
-                ? await request<{activation_sent:boolean}>(`/admin/users/${selectedAccount}/email`,context.user_id,
-                    {method:"PATCH",body:JSON.stringify({round_id:emailRoundId,student_code:account.student_code,email:newEmail,basis_ref:officialRef,reason:emailReason.trim()})})
-                : await request<{activation_sent:boolean}>(`/admin/users/${selectedAccount}/contact-email`,context.user_id,
-                    {method:"PATCH",body:JSON.stringify({email:newEmail,basis_ref:officialRef,reason:emailReason.trim()})});
-              setSelectedAccount("");
-              return result.activation_sent
-                ? "Đã sửa email trên tài khoản cũ và gửi liên kết kích hoạt."
-                : "Đã sửa email trên tài khoản cũ; cần cấp lại liên kết khi email hoạt động.";
-            },"Đã sửa email.");}}>
-            <h3>{isStudent ? "Sửa email sinh viên trên tài khoản hiện có" : "Sửa email trên tài khoản hiện có"}</h3>
-            <p className="text-muted">{isStudent
-              ? "Đối chiếu MSSV và danh sách chính thức trước khi lưu. Mật khẩu, phiên đăng nhập và liên kết cũ sẽ mất hiệu lực."
-              : "Chỉ ADMIN sửa sau khi đối chiếu căn cứ của Khoa. Giữ nguyên UUID và hồ sơ; mật khẩu, phiên đăng nhập và liên kết cũ mất hiệu lực."}</p>
-            <p>{account.student_code ? `${account.student_code} · ` : ""}{account.email}</p>
-            {isStudent && <label className="input-group">Đợt đối chiếu<select className="input" required value={emailRoundId} onChange={e=>setEmailRoundId(e.target.value)}>
-              <option value="">Chọn đợt</option>{rounds.map(r=><option key={r.id} value={r.id}>{r.code}</option>)}</select></label>}
-            <label className="input-group">Email mới<input className="input" type="email" required value={newEmail} onChange={e=>setNewEmail(e.target.value)} /></label>
-            <label className="input-group">{isStudent ? "Căn cứ danh sách chính thức" : "Căn cứ xác minh của Khoa"}<input className="input" required minLength={3} value={officialRef} onChange={e=>setOfficialRef(e.target.value)} /></label>
-            <label className="input-group">Lý do sửa email<input className="input" required minLength={5} value={emailReason} aria-describedby="email-reason-hint" onChange={e=>setEmailReason(e.target.value)} /></label>
-            <p id="email-reason-hint" role="status" className="text-caption">{emailReason.trim().length < 5 ? "Nhập lý do sửa email ít nhất 5 ký tự để lưu." : "Đã đủ lý do sửa email."}</p>
-            <button className="btn btn-primary" disabled={busy || !newEmail || emailReason.trim().length<5 || officialRef.trim().length<3 || (isStudent && !emailRoundId)}>Lưu email mới</button>
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>setSelectedAccount("")}>Hủy sửa email</button>
-          </form>;
-        })()}
-      </div></section>
+        )}
+
+        {/* CARD 3: PHÂN CÔNG ĐANG HIỆU LỰC */}
+        {isAdmin && (
+          <section className="card admin-card">
+            <div className="admin-card__header">
+              <div className="admin-card__title-group">
+                <div className="admin-card__icon">
+                  <Briefcase size={18} aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="admin-card__title">Phân công đang hiệu lực</h2>
+                  <p className="admin-card__subtitle">Các quyền hạn bổ nhiệm đang hoạt động trong các đợt khóa luận</p>
+                </div>
+              </div>
+            </div>
+            <div className="card-body stack">
+              <label className="input-group">
+                <span>
+                  Lý do thu hồi (nếu cần){" "}
+                  <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để kích hoạt nút Thu hồi)</small>
+                </span>
+                <input
+                  className="input"
+                  minLength={5}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Nhập lý do thu hồi nhiệm vụ..."
+                />
+              </label>
+
+              <div className="account-list">
+                {assignments.map((a) => (
+                  <div className="account-list__row assignment-item" key={a.id}>
+                    <div className="assignment-item__info">
+                      <span className="assignment-item__round">
+                        <Calendar size={13} aria-hidden="true" /> {a.round_code}
+                      </span>
+                      <span className="assignment-item__email">
+                        <Mail size={13} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px", color: "var(--neutral-400)" }} />
+                        {a.email}
+                      </span>
+                      <span className="badge badge-primary assignment-item__duty">
+                        <Briefcase size={12} aria-hidden="true" />
+                        {a.assignment_type === "ELIGIBILITY_VERIFIER"
+                          ? "Xác nhận điều kiện"
+                          : a.assignment_type === "ACCOUNT_MANAGER"
+                          ? "Quản lý tài khoản SV"
+                          : a.assignment_type === "KLTN_COORDINATOR"
+                          ? "Quản lý mốc tiến độ toàn đợt"
+                          : "Nhập danh sách SV"}
+                      </span>
+                    </div>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={busy || reason.trim().length < 5}
+                      title={reason.trim().length < 5 ? "Cần nhập lý do thu hồi (ít nhất 5 ký tự)" : ""}
+                      onClick={() =>
+                        void run(
+                          () =>
+                            request(`/admin/round-assignments/${a.id}/revoke`, context.user_id, {
+                              method: "POST",
+                              body: JSON.stringify({ reason }),
+                            }),
+                          "Đã thu hồi phân công.",
+                          true,
+                        )
+                      }
+                    >
+                      Thu hồi
+                    </button>
+                  </div>
+                ))}
+                {!assignments.length ? (
+                  <div className="admin-empty-state">
+                    <Briefcase size={28} aria-hidden="true" />
+                    <p>Chưa có phân công nào đang hiệu lực.</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* CARD 4: DANH SÁCH TÀI KHOẢN */}
+        <section className="card admin-card">
+          <div className="admin-card__header">
+            <div className="admin-card__title-group">
+              <div className="admin-card__icon">
+                <Users size={18} aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="admin-card__title">Tài khoản</h2>
+                <p className="admin-card__subtitle">Quản lý trạng thái, cấp lại mật khẩu/liên kết và hiệu chỉnh email</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-body stack">
+            {/* Overview Metric Bar */}
+            <div className="admin-metrics" role="region" aria-label="Thống kê tài khoản trang hiện tại">
+              <div className="admin-metric-card">
+                <span className="admin-metric-card__label">Tổng trên trang</span>
+                <span className="admin-metric-card__value">{totalAccounts}</span>
+              </div>
+              <div className="admin-metric-card admin-metric-card--student">
+                <span className="admin-metric-card__label">Sinh viên</span>
+                <span className="admin-metric-card__value">{studentCount}</span>
+              </div>
+              <div className="admin-metric-card admin-metric-card--lecturer">
+                <span className="admin-metric-card__label">Giảng viên</span>
+                <span className="admin-metric-card__value">{lecturerCount}</span>
+              </div>
+              <div className="admin-metric-card admin-metric-card--warning">
+                <span className="admin-metric-card__label">Chưa kích hoạt</span>
+                <span className="admin-metric-card__value">{unverifiedCount}</span>
+              </div>
+              {lockedOrDisabledCount > 0 && (
+                <div className="admin-metric-card">
+                  <span className="admin-metric-card__label">Bị khóa / Vô hiệu</span>
+                  <span className="admin-metric-card__value" style={{ color: "var(--danger-text)" }}>
+                    {lockedOrDisabledCount}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Toolbar: Search & Action Reason */}
+            <div className="admin-toolbar">
+              <div className="admin-toolbar__row">
+                <form
+                  className="account-search admin-search-wrap"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setTerm(search.trim());
+                    setPage(0);
+                  }}
+                >
+                  <Search size={16} className="admin-search-wrap__icon" aria-hidden="true" />
+                  <input
+                    className="input"
+                    aria-label="Tìm theo email hoặc MSSV"
+                    placeholder="Tìm theo email hoặc MSSV..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      className="admin-search-wrap__clear"
+                      onClick={() => {
+                        setSearch("");
+                        setTerm("");
+                        setPage(0);
+                      }}
+                      aria-label="Xóa nội dung tìm kiếm"
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  )}
+                  <button className="btn btn-secondary">Tìm</button>
+                </form>
+              </div>
+
+              <div className="admin-reason-field">
+                <label className="input-group">
+                  <span>
+                    Lý do thao tác tài khoản{" "}
+                    <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để Khóa, Vô hiệu hóa hoặc Cấp lại)</small>
+                  </span>
+                  <input
+                    className="input"
+                    minLength={5}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Nhập lý do thao tác (vd: Tiếp nhận yêu cầu hỗ trợ sinh viên / Căn cứ công văn Khoa...)"
+                  />
+                </label>
+                <div
+                  className={`admin-reason-status ${
+                    reason.trim().length >= 5 ? "admin-reason-status--valid" : "admin-reason-status--hint"
+                  }`}
+                >
+                  {reason.trim().length >= 5 ? (
+                    <>
+                      <CheckCircle2 size={13} aria-hidden="true" /> Đã đủ điều kiện thao tác ({reason.trim().length} ký tự)
+                    </>
+                  ) : (
+                    <>
+                      <Info size={13} aria-hidden="true" />{" "}
+                      {reason.trim().length === 0
+                        ? "Chưa nhập lý do thao tác — các nút tác vụ tạm vô hiệu để đảm bảo an toàn"
+                        : `Cần thêm ${5 - reason.trim().length} ký tự để kích hoạt các nút tác vụ (${reason.trim().length}/5)`}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="admin-callout admin-callout--neutral">
+                <Info size={16} aria-hidden="true" />
+                <span>
+                  Khóa hoặc vô hiệu hóa giữ nguyên đề tài, tài liệu và lịch sử. Cấp lại liên kết kích hoạt qua email đang lưu trong hệ thống.
+                </span>
+              </div>
+            </div>
+
+            {/* Account List */}
+            <div className="account-list">
+              {accounts.map((a) => {
+                const isSelf = a.id === context.user_id;
+                const isStudent = a.base_role === "STUDENT";
+                const isLecturer = a.base_role === "LECTURER";
+                const roleTitle = isStudent ? "Sinh viên" : isLecturer ? "Giảng viên" : "Quản trị";
+
+                return (
+                  <div
+                    className={`account-list__row ${isSelf ? "account-list__row--current" : ""}`}
+                    key={a.id}
+                  >
+                    <div className="account-list__info">
+                      <div className="account-item">
+                        {/* Avatar / Role icon */}
+                        <div
+                          className={`account-item__avatar ${
+                            isStudent
+                              ? "account-item__avatar--student"
+                              : isLecturer
+                              ? "account-item__avatar--lecturer"
+                              : "account-item__avatar--admin"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {isStudent ? (
+                            <GraduationCap size={18} />
+                          ) : isLecturer ? (
+                            <BookOpen size={18} />
+                          ) : (
+                            <UserCog size={18} />
+                          )}
+                        </div>
+
+                        {/* Details */}
+                        <div className="account-item__main">
+                          <div className="account-item__header">
+                            <span className="account-item__email">{a.email}</span>
+                            {a.student_code && (
+                              <span className="account-item__code" title="Mã số sinh viên">
+                                <span className="account-item__code-label">MSSV</span>
+                                <strong>{a.student_code}</strong>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="account-item__meta">
+                            {/* Role Badge */}
+                            <span
+                              className={`badge ${
+                                isStudent ? "badge-info" : isLecturer ? "badge-primary" : "badge-neutral"
+                              } account-badge--role`}
+                              title={`Vai trò gốc: ${a.base_role}`}
+                            >
+                              {isStudent ? (
+                                <GraduationCap size={12} aria-hidden="true" />
+                              ) : isLecturer ? (
+                                <BookOpen size={12} aria-hidden="true" />
+                              ) : (
+                                <UserCog size={12} aria-hidden="true" />
+                              )}
+                              {roleTitle}
+                              <span className="account-badge__sub">({a.base_role})</span>
+                            </span>
+
+                            {/* Account Status Badge */}
+                            <span
+                              className={`badge ${
+                                a.status === "ACTIVE"
+                                  ? "badge-success"
+                                  : a.status === "LOCKED"
+                                  ? "badge-warning"
+                                  : "badge-danger"
+                              } account-badge--status`}
+                            >
+                              {a.status === "ACTIVE" ? (
+                                <>
+                                  <CheckCircle2 size={12} aria-hidden="true" /> Hoạt động
+                                </>
+                              ) : a.status === "LOCKED" ? (
+                                <>
+                                  <Lock size={12} aria-hidden="true" /> Bị khóa
+                                </>
+                              ) : (
+                                <>
+                                  <Ban size={12} aria-hidden="true" /> Vô hiệu hóa
+                                </>
+                              )}
+                            </span>
+
+                            {/* Verification Badge */}
+                            {!a.verified ? (
+                              <span className="badge badge-warning badge-outline account-badge--verification">
+                                <Clock size={12} aria-hidden="true" /> chưa kích hoạt
+                              </span>
+                            ) : (
+                              <span className="badge badge-success badge-subtle account-badge--verification">
+                                <Check size={12} aria-hidden="true" /> Đã kích hoạt
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions Toolbar */}
+                    <div className="account-list__actions">
+                      {isSelf ? (
+                        <span
+                          className="account-current-badge text-caption"
+                          style={{ gridColumn: "1 / -1", textAlign: "right" }}
+                        >
+                          <CheckCircle2 size={13} aria-hidden="true" /> Tài khoản hiện tại
+                        </span>
+                      ) : (
+                        <>
+                          <div className="account-list__action-slot">
+                            {a.status !== "DISABLED" ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy || reason.trim().length < 5}
+                                title={reason.trim().length < 5 ? "Cần nhập lý do thao tác ít nhất 5 ký tự" : ""}
+                                onClick={() =>
+                                  void run(
+                                    () =>
+                                      request(`/admin/users/${a.id}/lock`, context.user_id, {
+                                        method: "POST",
+                                        body: JSON.stringify({ locked: a.status !== "LOCKED", reason }),
+                                      }),
+                                    a.status === "LOCKED" ? "Đã mở khóa." : "Đã khóa tài khoản.",
+                                  )
+                                }
+                              >
+                                {a.status === "LOCKED" ? (
+                                  <>
+                                    <Unlock size={13} aria-hidden="true" /> Mở khóa
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lock size={13} aria-hidden="true" /> Khóa
+                                  </>
+                                )}
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <div className="account-list__action-slot">
+                            {a.status !== "DISABLED" ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy || reason.trim().length < 5}
+                                title={reason.trim().length < 5 ? "Cần nhập lý do thao tác ít nhất 5 ký tự" : ""}
+                                onClick={() =>
+                                  void run(
+                                    () =>
+                                      request(`/admin/users/${a.id}/disable`, context.user_id, {
+                                        method: "POST",
+                                        body: JSON.stringify({ reason }),
+                                      }),
+                                    "Đã vô hiệu hóa tài khoản; hồ sơ vẫn được giữ.",
+                                  )
+                                }
+                              >
+                                <Ban size={13} aria-hidden="true" /> Vô hiệu hóa
+                              </button>
+                            ) : a.status === "DISABLED" && a.verified ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy || reason.trim().length < 5}
+                                title={reason.trim().length < 5 ? "Cần nhập lý do thao tác ít nhất 5 ký tự" : ""}
+                                onClick={() =>
+                                  void run(
+                                    () =>
+                                      request(`/admin/users/${a.id}/restore`, context.user_id, {
+                                        method: "POST",
+                                        body: JSON.stringify({ reason }),
+                                      }),
+                                    "Đã mở lại tài khoản cũ.",
+                                  )
+                                }
+                              >
+                                <RotateCcw size={13} aria-hidden="true" /> Mở lại tài khoản
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <div className="account-list__action-slot">
+                            {a.status !== "LOCKED" ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy || reason.trim().length < 5}
+                                title={reason.trim().length < 5 ? "Cần nhập lý do thao tác ít nhất 5 ký tự" : ""}
+                                onClick={() =>
+                                  void run(async () => {
+                                    const result = await request<{ link_sent: boolean }>(
+                                      `/admin/users/${a.id}/reissue-link`,
+                                      context.user_id,
+                                      { method: "POST", body: JSON.stringify({ reason }) },
+                                    );
+                                    return result.link_sent
+                                      ? "Đã gửi liên kết mới."
+                                      : "Chưa gửi được email; kiểm tra cấu hình thư.";
+                                  }, "Đã cấp lại liên kết.")
+                                }
+                              >
+                                <Send size={13} aria-hidden="true" /> Cấp lại liên kết
+                              </button>
+                            ) : null}
+                          </div>
+
+                          <div className="account-list__action-slot">
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              disabled={busy}
+                              onClick={() => {
+                                setSelectedAccount(a.id);
+                                setNewEmail(a.email);
+                                setEmailReason("");
+                                setOfficialRef("");
+                                setEmailRoundId("");
+                              }}
+                            >
+                              <Mail size={13} aria-hidden="true" /> Sửa email
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Empty State */}
+            {!accounts.length ? (
+              <div className="admin-empty-state">
+                <Users size={32} aria-hidden="true" />
+                <p>Không có tài khoản khớp tìm kiếm.</p>
+                {search && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setSearch("");
+                      setTerm("");
+                      setPage(0);
+                    }}
+                  >
+                    Xóa bộ lọc tìm kiếm
+                  </button>
+                )}
+              </div>
+            ) : null}
+
+            {/* Pagination Controls */}
+            {accounts.length ? (
+              <nav className="pagination" aria-label="Phân trang tài khoản">
+                <button
+                  className="btn btn-secondary"
+                  disabled={busy || page === 0}
+                  onClick={() => setPage(page - 1)}
+                >
+                  Trang trước
+                </button>
+                <span>Trang {page + 1}</span>
+                <button
+                  className="btn btn-secondary"
+                  disabled={busy || !hasNext}
+                  onClick={() => setPage(page + 1)}
+                >
+                  Trang sau
+                </button>
+              </nav>
+            ) : null}
+
+            {/* Inline / Modal Email Update Form */}
+            {selectedAccount &&
+              (() => {
+                const account = accountById(selectedAccount);
+                if (!account) return null;
+                const isStudent = account.base_role === "STUDENT";
+                return (
+                  <div className="admin-edit-panel">
+                    <form
+                      className="core-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void run(async () => {
+                          const result = isStudent
+                            ? await request<{ activation_sent: boolean }>(
+                                `/admin/users/${selectedAccount}/email`,
+                                context.user_id,
+                                {
+                                  method: "PATCH",
+                                  body: JSON.stringify({
+                                    round_id: emailRoundId,
+                                    student_code: account.student_code,
+                                    email: newEmail,
+                                    basis_ref: officialRef,
+                                    reason: emailReason.trim(),
+                                  }),
+                                },
+                              )
+                            : await request<{ activation_sent: boolean }>(
+                                `/admin/users/${selectedAccount}/contact-email`,
+                                context.user_id,
+                                {
+                                  method: "PATCH",
+                                  body: JSON.stringify({
+                                    email: newEmail,
+                                    basis_ref: officialRef,
+                                    reason: emailReason.trim(),
+                                  }),
+                                },
+                              );
+                          setSelectedAccount("");
+                          return result.activation_sent
+                            ? "Đã sửa email trên tài khoản cũ và gửi liên kết kích hoạt."
+                            : "Đã sửa email trên tài khoản cũ; cần cấp lại liên kết khi email hoạt động.";
+                        }, "Đã sửa email.");
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                        <h3>{isStudent ? "Sửa email sinh viên trên tài khoản hiện có" : "Sửa email trên tài khoản hiện có"}</h3>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setSelectedAccount("")}
+                          aria-label="Đóng biểu mẫu sửa email"
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+
+                      <p className="text-muted">
+                        {isStudent
+                          ? "Đối chiếu MSSV và danh sách chính thức trước khi lưu. Mật khẩu, phiên đăng nhập và liên kết cũ sẽ mất hiệu lực."
+                          : "Chỉ ADMIN sửa sau khi đối chiếu căn cứ của Khoa. Giữ nguyên UUID và hồ sơ; mật khẩu, phiên đăng nhập và liên kết cũ mất hiệu lực."}
+                      </p>
+
+                      <div className="target-user-chip">
+                        <Mail size={14} aria-hidden="true" />
+                        <span>
+                          {account.student_code ? `${account.student_code} · ` : ""}
+                          {account.email}
+                        </span>
+                      </div>
+
+                      {isStudent && (
+                        <label className="input-group">
+                          Đợt đối chiếu
+                          <select
+                            className="input"
+                            required
+                            value={emailRoundId}
+                            onChange={(e) => setEmailRoundId(e.target.value)}
+                          >
+                            <option value="">Chọn đợt</option>
+                            {rounds.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.code}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+
+                      <label className="input-group">
+                        Email mới
+                        <input
+                          className="input"
+                          type="email"
+                          required
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                        />
+                      </label>
+
+                      <label className="input-group">
+                        {isStudent ? "Căn cứ danh sách chính thức" : "Căn cứ xác minh của Khoa"}
+                        <input
+                          className="input"
+                          required
+                          minLength={3}
+                          value={officialRef}
+                          onChange={(e) => setOfficialRef(e.target.value)}
+                        />
+                      </label>
+
+                      <label className="input-group">
+                        Lý do sửa email
+                        <input
+                          className="input"
+                          required
+                          minLength={5}
+                          value={emailReason}
+                          aria-describedby="email-reason-hint"
+                          onChange={(e) => setEmailReason(e.target.value)}
+                        />
+                      </label>
+
+                      <p id="email-reason-hint" role="status" className="text-caption">
+                        {emailReason.trim().length < 5
+                          ? "Nhập lý do sửa email ít nhất 5 ký tự để lưu."
+                          : "Đã đủ lý do sửa email."}
+                      </p>
+
+                      <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                        <button
+                          className="btn btn-primary"
+                          disabled={
+                            busy ||
+                            !newEmail ||
+                            emailReason.trim().length < 5 ||
+                            officialRef.trim().length < 3 ||
+                            (isStudent && !emailRoundId)
+                          }
+                        >
+                          Lưu email mới
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={busy}
+                          onClick={() => setSelectedAccount("")}
+                        >
+                          Hủy sửa email
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                );
+              })()}
+          </div>
+        </section>
+      </div>
     </div>
-  </>;
+  );
 }

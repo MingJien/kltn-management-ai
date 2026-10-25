@@ -62,6 +62,8 @@ postgres-data/
 /BC tuần/
 /database/tai-khoan-demo.local.csv
 /database/kltn-schema-consolidated.sql
+/database/kltn-db-baseline.sql
+/database/core/kltn-core-schema.sql
 # Phiếu góp ý gốc và tài liệu giao diện nhận riêng, chỉ lưu trên máy
 /docs/30092026_Chien-KLTN.pdf
 /docs/ThamKhao_UI.docx

@@ -313,6 +313,26 @@ def users(search: str = "", offset: int = 0, limit: int = 100,
     return result
 
 
+@router.get("/staff")
+def staff_accounts(user: m.UserAccount = Depends(current_user),
+                   session: Session = Depends(get_session)) -> list[dict]:
+    """Active assignment candidates with identity; never return credentials."""
+    _admin(user)
+    rows = session.execute(select(
+        m.UserAccount.id, m.UserAccount.email, m.UserAccount.base_role,
+        m.UserAccount.status, m.UserAccount.email_verified_at,
+        m.LecturerProfile.display_name, m.LecturerProfile.lecturer_code,
+    ).select_from(m.UserAccount).outerjoin(m.LecturerProfile,
+        m.LecturerProfile.user_id == m.UserAccount.id).where(
+        m.UserAccount.status == "ACTIVE",
+        m.UserAccount.base_role.in_(["ADMIN", "LECTURER"]),
+    ).order_by(m.LecturerProfile.display_name, m.UserAccount.email, m.UserAccount.id)).all()
+    return [{"id": str(row.id), "email": row.email, "base_role": row.base_role,
+             "status": row.status, "verified": row.email_verified_at is not None,
+             "student_code": None, "display_name": row.display_name or row.email,
+             "lecturer_code": row.lecturer_code} for row in rows]
+
+
 @router.post("/lecturers", status_code=201)
 def invite_lecturer(payload: LecturerInvite, user: m.UserAccount = Depends(current_user),
                     session: Session = Depends(get_session)) -> dict:

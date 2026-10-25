@@ -58,6 +58,7 @@ export default function RosterPage({context}: {context:Context}) {
   const [revokeBasis, setRevokeBasis] = useState("");
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [stateFilter, setStateFilter] = useState("all");
   const [rosterQuery,setRosterQuery] = useState("");
   const [activationFilter,setActivationFilter] = useState("all");
   const [revokeStudent, setRevokeStudent] = useState("");
@@ -115,12 +116,15 @@ export default function RosterPage({context}: {context:Context}) {
       "X-File-Name":name.endsWith(".xlsx")?"roster.xlsx":"roster.csv"};
   }
 
-  const filteredRoster = roster.filter(row=>(activationFilter==="all" || (activationFilter==="activated")===accountActivated(row))
+  const filteredRoster = roster.filter(row=>
+    (stateFilter === "all" || row.state === stateFilter)
+    && (activationFilter==="all" || (activationFilter==="activated")===accountActivated(row))
     && normalized(`${row.student_code} ${row.display_name} ${row.email}`).includes(normalized(rosterQuery.trim())));
   const pending = filteredRoster.filter(row=>row.state==="SUBMITTED");
   const allPendingSelected = pending.length > 0 && pending.every(row=>selected.includes(row.snapshot_id));
   const pendingCount = roster.filter(row=>row.state==="SUBMITTED").length;
   const confirmedCount = roster.filter(row=>row.state==="CONFIRMED").length;
+  const revokedCount = roster.filter(row=>row.state==="REJECTED").length;
   const specialIsDemo = roster.some(row=>row.student_id===specialStudent && /^(SYN-|E2E-)/.test(row.student_code));
   const panels = [
     {id:"review",label:"Danh sách & xác nhận",detail:`${pendingCount} chờ xác nhận`,visible:canConfirm},
@@ -129,7 +133,7 @@ export default function RosterPage({context}: {context:Context}) {
     {id:"correction",label:"Đính chính hồ sơ",detail:"Theo văn bản Khoa",visible:canConfirm},
   ].filter(panel=>panel.visible);
   const selectedPanel = panels.some(panel=>panel.id===activePanel)?activePanel:(panels[0]?.id||"");
-  useEffect(()=>{setSelected([]);},[roundId,activationFilter,rosterQuery]);
+  useEffect(()=>{setSelected([]);},[roundId,stateFilter,activationFilter,rosterQuery]);
 
   function handlePanelKeyDown(event:KeyboardEvent<HTMLDivElement>) {
     if (!panels.length) return;
@@ -158,10 +162,16 @@ export default function RosterPage({context}: {context:Context}) {
         <label className="input-group roster-context__select">Đợt KLTN<select className="input" value={roundId} onChange={e=>setRoundId(e.target.value)}>
           {[...new Map(assignments.map(a=>[a.round_id,a])).values()].map(a=><option key={a.round_id} value={a.round_id}>{a.round_code}</option>)}
         </select></label>
-        <div className="roster-metrics" aria-label="Tình trạng danh sách">
+        <div className={`roster-metrics${revokedCount ? " roster-metrics--with-revoked" : ""}`} aria-label="Tình trạng danh sách">
           <div><span>Tổng sinh viên</span><strong>{roster.length}</strong></div>
           <div><span>Chờ xác nhận</span><strong>{pendingCount}</strong></div>
           <div><span>Đã xác nhận</span><strong>{confirmedCount}</strong></div>
+          {revokedCount > 0 ? (
+            <div className="roster-metric--revoked">
+              <span>Bị thu hồi</span>
+              <strong>{revokedCount}</strong>
+            </div>
+          ) : null}
         </div>
       </section>:null}
       {!assignments.length?<section className="card"><div className="card-body">Bạn chưa được Khoa phân công nhập hoặc xác nhận danh sách cho đợt nào.</div></section>:null}
@@ -179,15 +189,30 @@ export default function RosterPage({context}: {context:Context}) {
           {selectedPanel==="review"?<section className="card roster-section-card">
             <div className="roster-section-heading"><div><span className="roster-eyebrow">QUY TRÌNH THƯỜNG XUYÊN</span><h2>Danh sách và xác nhận</h2>
               <p>Đối chiếu căn cứ, xác nhận kết quả theo đợt và theo dõi trạng thái tài khoản.</p></div>
-              <span className="badge badge-info">{pendingCount} chờ xác nhận</span></div>
-            <div className="card-body stack">
-              <div className="grid grid-auto roster-filter-grid">
-                <label className="input-group">Kích hoạt tài khoản<select className="input" value={activationFilter} onChange={e=>setActivationFilter(e.target.value)}>
-                  <option value="all">Tất cả</option><option value="activated">Đã kích hoạt</option><option value="not-activated">Chưa kích hoạt</option>
-                </select></label>
-                <label className="input-group">Tìm sinh viên<input className="input" type="search" value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)} placeholder="MSSV, họ tên hoặc email" /></label>
+              <div className="roster-section-badges">
+                <span className="badge badge-info">{pendingCount} chờ xác nhận</span>
+                <span className="badge badge-success">{confirmedCount} đã xác nhận</span>
+                {revokedCount > 0 ? <span className="badge badge-danger">{revokedCount} bị thu hồi</span> : null}
               </div>
-              <p className="text-caption">Đang hiện {filteredRoster.length}/{roster.length} sinh viên thuộc đợt đã chọn. “Chọn tất cả” chỉ áp dụng cho kết quả đang hiện.</p>
+            </div>
+            <div className="card-body stack">
+              <div className="roster-filter-grid">
+                <label className="input-group">Trạng thái duyệt<select className="input" aria-label="Trạng thái duyệt" value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
+                  <option value="all">Tất cả trạng thái ({roster.length})</option>
+                  <option value="SUBMITTED">Chờ xác nhận ({pendingCount})</option>
+                  <option value="CONFIRMED">Đã xác nhận ({confirmedCount})</option>
+                  {revokedCount > 0 ? <option value="REJECTED">Bị thu hồi ({revokedCount})</option> : null}
+                </select></label>
+                <label className="input-group">Kích hoạt tài khoản<select className="input" aria-label="Kích hoạt tài khoản" value={activationFilter} onChange={e=>setActivationFilter(e.target.value)}>
+                  <option value="all">Tất cả tài khoản</option><option value="activated">Đã kích hoạt</option><option value="not-activated">Chưa kích hoạt</option>
+                </select></label>
+                <label className="input-group">Tìm sinh viên<input className="input" type="search" aria-label="Tìm sinh viên" value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)} placeholder="MSSV, họ tên hoặc email" /></label>
+              </div>
+              <p className="text-caption">Đang hiện {filteredRoster.length}/{roster.length} sinh viên thuộc đợt đã chọn{stateFilter !== "all" || activationFilter !== "all" || rosterQuery.trim() ? ` (đang lọc: ${[
+                stateFilter !== "all" ? (stateFilter === "SUBMITTED" ? "Chờ xác nhận" : stateFilter === "CONFIRMED" ? "Đã xác nhận" : "Bị thu hồi") : "",
+                activationFilter !== "all" ? (activationFilter === "activated" ? "Đã kích hoạt" : "Chưa kích hoạt") : "",
+                rosterQuery.trim() ? `“${rosterQuery.trim()}”` : ""
+              ].filter(Boolean).join(" · ")})` : ""}. “Chọn tất cả” chỉ áp dụng cho kết quả đang hiện.</p>
               <label className="input-group roster-basis-field">Căn cứ đối chiếu danh sách<input className="input" minLength={3} value={basis} onChange={e=>setBasis(e.target.value)} placeholder="Demo: DEMO-XAC-NHAN-DOT-1-2026" /></label>
               <div className="roster-selection-toolbar"><span>{selected.length?`Đã chọn ${selected.length} kết quả`:"Chọn các kết quả đã đối chiếu trước khi xác nhận."}</span>
                 <div className="account-actions"><button className="btn btn-secondary" disabled={!pending.length||busy}
@@ -203,7 +228,11 @@ export default function RosterPage({context}: {context:Context}) {
                   <td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
                   <td>{row.department_code}</td><td>{row.major_code||"—"}{catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name
                     ? ` · ${catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name}`:""}</td>
-                  <td>{row.state}</td><td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td></tr>)}</tbody></table></div>
+                  <td>{row.state === "SUBMITTED" ? <span className="badge badge-warning">Chờ xác nhận</span> :
+                       row.state === "CONFIRMED" ? <span className="badge badge-success">Đã xác nhận</span> :
+                       row.state === "REJECTED" ? <span className="badge badge-danger">Bị thu hồi</span> :
+                       <span className="badge badge-neutral">{row.state}</span>}</td>
+                  <td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td></tr>)}</tbody></table></div>
               {!filteredRoster.length?<p className="text-muted">Không có sinh viên khớp bộ lọc.</p>:null}
               <details className="roster-accordion roster-accordion--danger">
                 <summary><span><strong>Thu hồi kết quả đã xác nhận</strong><small>Chỉ dùng khi có căn cứ cần thu hồi; hồ sơ cũ vẫn được giữ.</small></span><span className="badge badge-danger">Thao tác cần thận trọng</span></summary>
