@@ -1,4 +1,4 @@
-# Hệ thống quản lý khóa luận tốt nghiệp
+# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
 Prototype React, FastAPI và PostgreSQL cho quy trình quản lý khóa luận của Khoa CN&KT.
 
