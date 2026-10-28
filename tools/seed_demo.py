@@ -21,6 +21,7 @@ from backend.api.dependencies import load_local_env
 from backend.db.models import entities as m
 from backend.services.passwords import hash_password
 from backend.services.topics import allocate_topic_code
+from tools.validate_official_database import HEAD
 
 ROOT = Path(__file__).resolve().parents[1]
 CREDENTIALS_PATH = ROOT / "database" / "tai-khoan-demo.local.csv"
@@ -85,8 +86,8 @@ def add_gv2_only(engine, now: datetime) -> None:
                              "mat_khau_demo": password, "database": "kltn_management"})
     with Session(engine) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261022_0005":
-            raise ValueError("Upgrade the isolated official DB to 20261022_0005 first")
+        if version != HEAD:
+            raise ValueError(f"Upgrade the isolated official DB to {HEAD} first")
         head = session.get(m.LecturerProfile, uid("lecturer-2"))
         if head is None:
             raise ValueError("Seed the existing demo accounts before adding GV2")
@@ -149,8 +150,8 @@ def main() -> None:
     now = datetime.now(timezone.utc)
     with Session(engine, expire_on_commit=False) as session, session.begin():
         version = session.execute(text("select version_num from alembic_version")).scalar_one()
-        if version != "20261022_0005":
-            parser.error("Upgrade the isolated official DB to 20261022_0005 first")
+        if version != HEAD:
+            parser.error(f"Upgrade the isolated official DB to {HEAD} first")
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")

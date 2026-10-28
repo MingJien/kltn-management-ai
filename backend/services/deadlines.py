@@ -46,7 +46,9 @@ def ensure_submission_allowed(item: m.DocumentDeadline, *, revision_requested: b
 
 def set_deadline(session, user, thesis_id, data, expected: int | None):
     thesis = thesis_access(session, user, thesis_id, action="milestone:manage", lock=True, write=True)
-    session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    if round_.state == "ARCHIVED":
+        raise HTTPException(409, "Đợt đã lưu trữ; không thể thay đổi hạn tài liệu")
     item = session.scalar(select(m.DocumentDeadline).where(
         m.DocumentDeadline.round_id == thesis.round_id,
         m.DocumentDeadline.document_type == data.document_type).with_for_update())
@@ -57,12 +59,16 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
         if expected is None:
             raise HTTPException(428, "Cần If-Match để đổi hạn đã ban hành")
         row_version(expected, item.row_version)
-        if item.state != "OPEN" or data.due_at <= item.due_at:
-            raise HTTPException(409, "Chỉ gia hạn về thời điểm muộn hơn khi hạn còn mở")
+        if data.due_at <= item.due_at:
+            raise HTTPException(409, "Hạn mới phải muộn hơn hạn cũ")
+        if data.due_at <= now():
+            raise HTTPException(422, "Hạn gia hạn phải sau thời điểm hiện tại")
         old_due = item.due_at
+        reopening = item.state == "CLOSED"
         item.due_at = data.due_at
+        item.state = "OPEN"
         item.row_version += 1
-        action = "DOCUMENT_DEADLINE_EXTENDED"
+        action = "DOCUMENT_DEADLINE_REOPENED" if reopening else "DOCUMENT_DEADLINE_EXTENDED"
         detail = f"{data.document_type}: {old_due.isoformat()} -> {data.due_at.isoformat()}; {reason}"
     else:
         if expected is not None:
@@ -78,6 +84,21 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
     try:
         session.flush()
         audit(session, user, action, "document_deadline", item.id, detail)
+        from backend.services.notifications import (DOCUMENT_TYPE_LABELS, format_due,
+                                                    notify_round_participants)
+
+        label = DOCUMENT_TYPE_LABELS.get(data.document_type, data.document_type)
+        notice_kind = {"DOCUMENT_DEADLINE_SET": "DOCUMENT_DEADLINE_SET",
+                       "DOCUMENT_DEADLINE_EXTENDED": "DOCUMENT_DEADLINE_EXTENDED",
+                       "DOCUMENT_DEADLINE_REOPENED": "DOCUMENT_DEADLINE_REOPENED"}.get(action, action)
+        if action == "DOCUMENT_DEADLINE_SET":
+            message = f"Khoa đã thiết lập hạn nộp {label} cho đợt {round_.code}: {format_due(data.due_at)}."
+        elif action == "DOCUMENT_DEADLINE_REOPENED":
+            message = f"Khoa đã gia hạn và mở nhận lại {label} cho đợt {round_.code} đến {format_due(data.due_at)}."
+        else:
+            message = f"Khoa đã gia hạn {label} cho đợt {round_.code} đến {format_due(data.due_at)}."
+        notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
+                                  kind=notice_kind, message=message, section="documents")
         result = output(item)
         session.commit()
     except IntegrityError:
@@ -88,6 +109,9 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
 
 def close_deadline(session, user, thesis_id, document_type: str, reason: str, expected: int):
     thesis = thesis_access(session, user, thesis_id, action="milestone:manage", lock=True, write=True)
+    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    if round_.state == "ARCHIVED":
+        raise HTTPException(409, "Đợt đã lưu trữ; không thể đóng hạn tài liệu")
     item = for_submission(session, thesis, document_type)
     row_version(expected, item.row_version)
     if item.state != "OPEN":
@@ -102,6 +126,13 @@ def close_deadline(session, user, thesis_id, document_type: str, reason: str, ex
     audit(session, user, "DOCUMENT_DEADLINE_CLOSED", "document_deadline", item.id,
         f"{document_type}: {reason}")
     session.flush()
+    from backend.services.notifications import (DOCUMENT_TYPE_LABELS, notify_round_participants)
+
+    label = DOCUMENT_TYPE_LABELS.get(document_type, document_type)
+    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
+        kind="DOCUMENT_DEADLINE_CLOSED",
+        message=f"Khoa đã đóng nhận {label} cho đợt {round_.code}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
+        section="documents")
     result = output(item)
     session.commit()
     return result

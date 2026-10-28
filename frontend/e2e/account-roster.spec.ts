@@ -5,7 +5,7 @@ import path from "node:path";
 const accounts: Record<string,{email:string;password:string}> = JSON.parse(process.env.KLTN_E2E_ACCOUNTS_JSON || "{}");
 const web = `http://127.0.0.1:${process.env.KLTN_E2E_WEB_PORT || "5174"}`;
 
-test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạt", async ({browser}) => {
+test("Khoa phân quyền, nhập danh sách chính thức, thu hồi và SV tự kích hoạt", async ({browser}) => {
   const admin = await browser.newContext();
   const page = await admin.newPage();
   const errors: string[] = [];
@@ -42,7 +42,8 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
     await expect(newRound).toContainText("Đã đóng");
     await page.getByRole("link",{name:"Tài khoản và phân công"}).click();
     await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption({label:"SYN-DEMO · OPEN"});
-    await page.getByLabel("Người được giao").selectOption({label:accounts.admin.email});
+    await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_IMPORTER");
+    await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption({label:accounts.admin.email});
     await page.getByLabel("Căn cứ phân công").fill("SYNTHETIC-E2E");
     await page.getByRole("button",{name:"Lưu phân công"}).click();
     await expect(page.getByRole("link",{name:"Danh sách sinh viên"})).toBeVisible();
@@ -63,8 +64,8 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
     await page.getByRole("button",{name:"Kiểm tra tệp"}).click();
     await expect(page.getByRole("heading",{name:/Xem trước: 2 sinh viên/})).toBeVisible();
     await page.getByRole("button",{name:"Nhập sau khi kiểm"}).click();
-    await expect(page.getByText(/Đã nhập 2 kết quả chờ xác nhận/)).toBeVisible();
-    await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
+    await expect(page.getByText(/Đã ghi nhận 2 sinh viên đủ điều kiện/)).toBeVisible();
+    await page.getByRole("tab",{name:/Danh sách sinh viên/}).click();
     // Simulate a backend process that has not yet restarted after adding account_activated.
     await page.route("**/api/v1/rounds/*/roster",async route=>{
       if(route.request().method()!=="GET") return route.continue();
@@ -84,14 +85,11 @@ test("Khoa phân quyền, nhập và xác nhận danh sách; SV tự kích hoạ
     await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill(code);
     await page.getByRole("tab",{name:/Ngoại lệ Hiệu trưởng/}).click();
     await page.getByRole("searchbox",{name:"Tìm sinh viên được xét ngoại lệ"}).fill(code);
-    await expect(page.getByRole("combobox",{name:"Sinh viên được xét ngoại lệ"}).locator("option")).toHaveCount(2);
-    await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
+    // Officially imported students are already eligible, so they must not appear in the exception selector.
+    await expect(page.getByRole("combobox",{name:"Sinh viên được xét ngoại lệ"}).locator("option")).toHaveCount(1);
+    await page.getByRole("tab",{name:/Danh sách sinh viên/}).click();
     await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill("");
-    await page.getByLabel("Căn cứ đối chiếu danh sách").fill("SYNTHETIC-E2E-APPROVAL");
-    await page.getByRole("button",{name:"Chọn tất cả chờ xác nhận"}).click();
-    await page.getByRole("button",{name:"Xác nhận đã đối chiếu"}).click();
-    await expect(page.getByText(/Đã xác nhận 2 sinh viên/)).toBeVisible();
-    await page.getByText("Thu hồi kết quả đã xác nhận",{exact:false}).click();
+    await page.getByText(/Thu hồi kết quả/).click();
     await page.getByRole("searchbox",{name:"Tìm sinh viên cần thu hồi"}).fill(code2);
     await expect(page.getByRole("combobox",{name:"Sinh viên cần thu hồi"}).locator("option")).toHaveCount(2);
     await page.getByRole("combobox",{name:"Sinh viên cần thu hồi"}).selectOption({label:`${code2} · Sinh viên giả lập 2`});

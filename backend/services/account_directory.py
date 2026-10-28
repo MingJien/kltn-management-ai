@@ -14,6 +14,7 @@ from backend.db.models import entities as m
 
 
 RESOURCE_ROLE_LABELS = {
+    "FORM_MANAGER": "Quản lý biểu mẫu và tài liệu Khoa",
     "ELIGIBILITY_IMPORTER": "Nhập danh sách đủ điều kiện",
     "ELIGIBILITY_VERIFIER": "Điều chỉnh/thu hồi danh sách",
     "ACCOUNT_MANAGER": "Quản lý tài khoản sinh viên",
@@ -251,7 +252,7 @@ def build_account_directory(
             "student_code": row.student_code,
             "lecturer_code": row.lecturer_code,
             "display_name": display_name,
-            "additional_roles": roles_by_user.get(row.id, []) if row.base_role == "LECTURER" else [],
+            "additional_roles": roles_by_user.get(row.id, []) if row.base_role in {"LECTURER", "ADMIN"} else [],
         })
     return {
         "items": items,

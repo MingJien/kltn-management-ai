@@ -189,7 +189,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await assignment.locator("select").nth(1).selectOption(lecturer.id);
     await assignment.getByLabel("Căn cứ phân công").fill("E2E SYNTHETIC ROUND COORDINATION");
     await assignment.getByRole("button",{name:"Lưu phân công",exact:true}).click();
-    await expect(admin.page.getByRole("status")).toContainText("Đã lưu phân công");
+    await expect(admin.page.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
 
     await gv.page.goto(`${web}/theses/${thesisId}?section=progress`);
     await expect(gv.page.getByRole("heading",{name:"Mở mốc theo kế hoạch đợt",exact:true})).toBeVisible();
@@ -255,7 +255,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     expect(uploaded.versions[0].state).toBe("SUBMITTED");
     expect(uploaded.versions[1].state).toBe("SUPERSEDED");
     expect(uploaded.versions[0].scan_state).toBe("CLEAN");
-    await expect(sv1.page.getByRole("button",{name:"Tải phiên bản 2",exact:true})).toBeEnabled();
+    await expect(sv1.page.getByRole("button",{name:"Tải bản nộp gốc v2",exact:true})).toBeEnabled();
     await gv.page.goto(`${web}/theses/${thesisId}?section=documents`);
     await gv.page.getByLabel("Kết quả").selectOption("ACCEPT");
     await gv.page.getByLabel("Nhận xét / lý do").fill("Bản sửa đã đạt; tiếp nhận phiên bản 2.");
@@ -449,14 +449,14 @@ test("SV nộp đề cương; tệp chưa quét được giữ cách ly và ch�
     await expect(sv.page.getByText(/đã quét an toàn|Đang cách ly – chưa quét/i)).toBeVisible();
     const isQuarantined = await sv.page.getByText(/Đang cách ly – chưa quét/i).isVisible().catch(() => false);
     if (isQuarantined) {
-      await expect(sv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeDisabled();
+      await expect(sv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeDisabled();
       await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
       await expect(gv.page.getByText(/Chưa thể nhận xét: tệp đang cách ly/)).toBeVisible();
       await expect(gv.page.getByLabel("Kết quả")).toHaveCount(0);
     } else {
-      await expect(sv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeEnabled();
+      await expect(sv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled();
       await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
-      await expect(gv.page.getByRole("button",{name:"Tải phiên bản 1",exact:true})).toBeEnabled();
+      await expect(gv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled();
     }
     expect((await read(sv.page,`/theses/${thesisId}/proposal`)).state).toBe("SUBMITTED");
   } finally {await close(actors);}

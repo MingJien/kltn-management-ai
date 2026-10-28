@@ -164,9 +164,10 @@ async def upload_version(session, user, thesis_id, request, expected):
         session.add(file)
         session.flush()
         next_version = (proposal.current_version_no or 0) + 1
+        student = profile(session, user, "STUDENT")
         session.add(m.ProposalVersion(id=uuid4(), proposal_id=proposal.id,
             version_no=next_version, stored_file_id=file.id,
-            submitted_by=profile(session, user, "STUDENT").id,
+            submitted_by=student.id,
             submitted_at=now(), due_at_at_submission=deadline.due_at, content_sha256=digest))
         proposal.current_version_no = next_version
         proposal.state = "SUBMITTED"
@@ -174,6 +175,12 @@ async def upload_version(session, user, thesis_id, request, expected):
         audit(session, user, "PROPOSAL_SELF_CORRECTED" if previous and not revision_requested else "PROPOSAL_SUBMITTED", "thesis", thesis_id,
             f"Đề cương v{next_version}", after_hash=digest)
         session.flush()
+        from backend.services.notifications import notify_thesis_advisor
+
+        notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id, kind="PROPOSAL_SUBMITTED",
+            message=(f"{student.display_name} đã nộp đề cương lần {next_version} cho khóa luận "
+                     f"{thesis.current_title}. Mời bạn góp ý hoặc xác nhận."),
+            section="proposal")
         result = proposal_out(session, thesis_id, proposal)
         session.commit()
         return result
@@ -211,6 +218,13 @@ def assign_reviewer(session, user, thesis_id, data, expected):
     audit(session, user, "PROPOSAL_REVIEWER_ASSIGNED", "thesis", thesis_id,
         f"{lecturer.lecturer_code}: {data.reason}")
     session.flush()
+    from backend.services.notifications import notify_user
+
+    notify_user(session, recipient_user_id=lecturer.user_id, actor_user_id=user.id,
+        kind="PROPOSAL_REVIEWER_ASSIGNED",
+        message=(f"Bạn được phân công góp ý đề cương khóa luận {thesis.current_title}. "
+                 f"Lý do: {data.reason[:200]}"),
+        url=f"/theses/{thesis_id}?section=proposal")
     result = proposal_out(session, thesis_id, proposal)
     session.commit()
     return result
@@ -253,6 +267,8 @@ def review(session, user, thesis_id, data, expected):
         m.ProposalReview.proposal_version_id == version.id,
         m.ProposalReview.reviewer_assignment_id == assignment.id)):
         raise HTTPException(409, "Bạn đã nhận xét phiên bản này hoặc phân công không còn hiệu lực")
+    from backend.services.progress_annotations import publish_annotations
+    publish_annotations(session, version, lecturer, kind="proposal", summary_comment=data.comment)
     session.add(m.ProposalReview(id=uuid4(), proposal_version_id=version.id,
         reviewer_assignment_id=assignment.id, reviewer_user_id=user.id,
         decision=data.decision, comment=data.comment))
@@ -266,13 +282,25 @@ def review(session, user, thesis_id, data, expected):
     audit(session, user, "PROPOSAL_" + data.decision, "thesis", thesis_id,
         f"v{version.version_no}: {data.comment}", after_hash=version.content_sha256)
     session.flush()
+    from backend.services.notifications import (notify_department_heads_of,
+                                                notify_thesis_advisor, notify_thesis_students)
+
+    decision_label = {"COMMENT": "góp ý", "CONFIRM": "xác nhận", "REVISION_REQUIRED": "yêu cầu sửa"}[data.decision]
+    message = (f"{lecturer.display_name} đã {decision_label} đề cương {thesis.current_title} "
+               f"(phiên bản {version.version_no}): {data.comment[:200]}")
+    notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+        kind="PROPOSAL_REVIEWED", message=message, section="proposal")
+    notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id,
+        kind="PROPOSAL_REVIEWED", message=message, section="proposal")
+    notify_department_heads_of(session, department_id=thesis.department_id, actor_user_id=user.id,
+        kind="PROPOSAL_REVIEWED", thesis=thesis, message=message)
     result = proposal_out(session, thesis_id, proposal)
     session.commit()
     return result
 
 
 def finalize(session, user, thesis_id, data, expected):
-    thesis_access(session, user, thesis_id, action="proposal:finalize", lock=True, write=True)
+    thesis = thesis_access(session, user, thesis_id, action="proposal:finalize", lock=True, write=True)
     proposal = _proposal(session, thesis_id, lock=True)
     if not proposal:
         raise HTTPException(404, "Chưa có đề cương")
@@ -298,13 +326,19 @@ def finalize(session, user, thesis_id, data, expected):
     audit(session, user, "PROPOSAL_DEPARTMENT_FINALIZED", "thesis", thesis_id,
         f"v{version.version_no}: {data.reason}", after_hash=version.content_sha256)
     session.flush()
+    from backend.services.notifications import notify_thesis_students
+
+    notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+        kind="PROPOSAL_FINALIZED",
+        message=f"Bộ môn đã chốt đề cương {thesis.current_title} (phiên bản {version.version_no}).",
+        section="proposal", include_advisor=True)
     result = proposal_out(session, thesis_id, proposal)
     session.commit()
     return result
 
 
 def record_dean_confirmation(session, user, thesis_id, data, expected):
-    thesis_access(session, user, thesis_id, action="proposal:dean_confirm", lock=True, write=True)
+    thesis = thesis_access(session, user, thesis_id, action="proposal:dean_confirm", lock=True, write=True)
     proposal = _proposal(session, thesis_id, lock=True)
     if not proposal:
         raise HTTPException(404, "Chưa có đề cương")
@@ -320,6 +354,16 @@ def record_dean_confirmation(session, user, thesis_id, data, expected):
     audit(session, user, "PROPOSAL_DEAN_COPY_RECORDED", "thesis", thesis_id,
         data.official_ref, after_hash=version.content_sha256)
     session.flush()
+    from backend.services.notifications import notify_department_heads_of, notify_thesis_students
+
+    message = (f"Trưởng khoa đã ghi nhận bản đề cương {thesis.current_title} "
+               f"(phiên bản {version.version_no}, căn cứ {data.official_ref}).")
+    notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+        kind="PROPOSAL_DEAN_CONFIRMED", message=message, section="proposal",
+        include_advisor=True)
+    notify_department_heads_of(session, department_id=thesis.department_id,
+        actor_user_id=user.id, kind="PROPOSAL_DEAN_CONFIRMED", thesis=thesis,
+        message=message)
     result = proposal_out(session, thesis_id, proposal)
     session.commit()
     return result

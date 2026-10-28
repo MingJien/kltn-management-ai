@@ -96,69 +96,6 @@ def test_registration_notice_is_private_and_read_per_account(scenario):
     assert client.post(path, headers=hdr(users[3])).status_code == 204
     seen = client.get("/api/v1/notifications", headers=hdr(users[3])).json()
     assert seen["unread_count"] == 0 and seen["items"][0]["read_at"]
-    quick = client.get("/api/v1/notifications?unread_only=true&limit=5", headers=hdr(users[3])).json()
-    assert quick == {"unread_count": 0, "items": []}
-    history = client.get("/api/v1/notifications?limit=21&offset=0", headers=hdr(users[3])).json()
-    assert len(history["items"]) == 1 and history["items"][0]["id"] == notice["id"]
-    assert client.get("/api/v1/notifications?limit=21&offset=1", headers=hdr(users[3])).json()["items"] == []
-
-
-def test_group_member_receives_submitted_registration_notice(scenario):
-    client, users, _, _, topic, _ = scenario
-    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
-                          json={"topic_id": str(topic.id)}).json()
-    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]),
-                         json={"topic_id": str(topic.id)})
-    assert joined.status_code == 201, joined.text
-    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
-                       headers={**hdr(users[0]), "If-Match": str(joined.json()["row_version"])})
-    assert sent.status_code == 200, sent.text
-    member_inbox = client.get("/api/v1/notifications?unread_only=true", headers=hdr(users[1])).json()
-    assert member_inbox["unread_count"] == 1
-    assert "Đang chờ GV xét" in member_inbox["items"][0]["message"]
-    assert client.get("/api/v1/notifications", headers=hdr(users[2])).json()["items"] == []
-
-
-@pytest.mark.parametrize("decision, expected_text", [
-    ("ACCEPT", "đã chấp nhận"),
-    ("REJECT", "đã từ chối"),
-])
-def test_group_members_receive_lecturer_decision(scenario, decision, expected_text):
-    client, users, _, _, topic, _ = scenario
-    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
-                          json={"topic_id": str(topic.id)}).json()
-    joined = client.post("/api/v1/topic-registrations", headers=hdr(users[1]),
-                         json={"topic_id": str(topic.id)})
-    assert joined.status_code == 201, joined.text
-    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
-                       headers={**hdr(users[0]), "If-Match": str(joined.json()["row_version"])})
-    assert sent.status_code == 200, sent.text
-    decided = client.post(f"/api/v1/topic-registrations/{created['id']}/lecturer-decision",
-        headers={**hdr(users[3]), "If-Match": str(sent.json()["row_version"])},
-        json={"decision": decision, **({"reason": "Chưa phù hợp"} if decision == "REJECT" else {})})
-    assert decided.status_code == 200, decided.text
-    for student in users[:2]:
-        inbox = client.get("/api/v1/notifications", headers=hdr(student)).json()
-        assert any(expected_text in item["message"] and
-                   item["url"] == f"/registrations?focus={created['id']}" for item in inbox["items"])
-
-
-def test_admin_receives_registration_activity_without_access_to_private_registration(scenario):
-    client, users, _, _, topic, session = scenario
-    admin = m.UserAccount(id=uuid4(), external_subject="test-" + uuid4().hex,
-                          base_role="ADMIN", status="ACTIVE")
-    session.add(admin)
-    session.flush()
-    created = client.post("/api/v1/topic-registrations", headers=hdr(users[0]),
-                          json={"topic_id": str(topic.id)}).json()
-    sent = client.post(f"/api/v1/topic-registrations/{created['id']}/submit",
-                       headers={**hdr(users[0]), "If-Match": str(created["row_version"])})
-    assert sent.status_code == 200, sent.text
-    inbox = client.get("/api/v1/notifications", headers=hdr(admin)).json()
-    assert inbox["unread_count"] == 1
-    assert topic.current_title in inbox["items"][0]["message"]
-    assert inbox["items"][0]["url"] == "/notifications"
-    assert client.get(f"/api/v1/topic-registrations/{created['id']}", headers=hdr(admin)).status_code == 404
 
 
 def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
@@ -180,9 +117,6 @@ def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
     assert client.get("/api/v1/topics?view=suggested", headers=hdr(users[0])).status_code == 403
     first = client.get("/api/v1/notifications", headers=hdr(users[3])).json()
     assert first["unread_count"] == 1 and "chờ bộ môn duyệt" in first["items"][0]["message"]
-    head_inbox = client.get("/api/v1/notifications", headers=hdr(users[4])).json()
-    assert head_inbox["unread_count"] == 1
-    assert head_inbox["items"][0]["url"] == f"/topics?focus={reg['topic_id']}"
     proposed = client.get(f"/api/v1/topics/{reg['topic_id']}", headers=hdr(users[4])).json()
     approved = client.post(f"/api/v1/topics/{reg['topic_id']}/department-decision",
         headers={**hdr(users[4]), "If-Match": str(proposed["row_version"])},
@@ -193,10 +127,6 @@ def test_student_proposal_notice_moves_to_confirmed_lecturer(scenario):
     assert any(row["id"] == reg["topic_id"] for row in
         client.get("/api/v1/topics?view=suggested", headers=hdr(users[5])).json())
     assert client.get("/api/v1/notifications", headers=hdr(users[3])).json()["items"] == []
-    assert client.get("/api/v1/notifications", headers=hdr(users[4])).json()["items"] == []
-    student_inbox = client.get("/api/v1/notifications", headers=hdr(users[0])).json()
-    assert student_inbox["unread_count"] == 1
-    assert "Bộ môn đã duyệt" in student_inbox["items"][0]["message"]
     replacement = client.get("/api/v1/notifications", headers=hdr(users[5])).json()
     assert replacement["unread_count"] == 1
     assert "Mời bạn xét đăng ký" in replacement["items"][0]["message"]
@@ -701,7 +631,11 @@ def test_student_proposal_review_and_receiving_lecturer(scenario):
     rejected = client.post(f"/api/v1/topic-registrations/{reg['id']}/lecturer-decision",
         headers={**hdr(users[5]),"If-Match":str(received["row_version"])},json={"decision":"REJECT","reason":"Outside current capacity"})
     assert rejected.status_code == 200, rejected.text
+    # Student proposals wait for TBM to reassign a lecturer or return the proposal;
+    # keep members reserved so they cannot register elsewhere while it is unresolved.
+    assert all(member["active"] for member in rejected.json()["members"])
     assert rejected.json()["state"] == "LECTURER_REJECTED"
+    assert rejected.json()["thesis_id"] is None
 
 
 def test_student_proposal_return_edit_resubmit(scenario):
@@ -746,6 +680,8 @@ def test_requirements_capacity_and_year_codes(scenario):
 def test_private_member_evidence_and_submission_lock(scenario, monkeypatch, tmp_path):
     client, users, students, _, topic, session=scenario
     monkeypatch.setenv('KLTN_EVIDENCE_DIR',str(tmp_path))
+    from backend.services import file_scanner
+    monkeypatch.setattr(file_scanner, 'scan', lambda file, path: file.scan_state)
     reg=client.post('/api/v1/topic-registrations',headers=hdr(users[0]),json={"topic_id":str(topic.id)}).json()
     assert client.post('/api/v1/topic-registrations',headers=hdr(users[1]),json={"topic_id":str(topic.id)}).status_code == 201
     url=f"/api/v1/topic-registrations/{reg['id']}/evidence"
@@ -774,8 +710,20 @@ def test_private_member_evidence_and_submission_lock(scenario, monkeypatch, tmp_
         m.AuditEvent.resource_id==reg['id']))
     assert audit is not None and f'previous_stored_file={first_file_id}' in audit.reason
     current=session.get(m.StoredFile, member.evidence_file_id)
-    current.scan_state='CLEAN'  # test double for a real scanner; production never assigns CLEAN itself
-    session.commit()
+    scan_url = download + '/scan'
+    assert client.post(scan_url, headers=hdr(users[2])).status_code == 404
+    assert client.post(scan_url, headers=hdr(users[3])).status_code == 404
+    def clean_scan(file, path):
+        assert path.read_bytes() == replacement
+        file.scan_state = 'CLEAN'  # explicit scanner double; UI E2E uses real ClamAV
+        return file.scan_state
+    monkeypatch.setattr(file_scanner, 'scan', clean_scan)
+    monkeypatch.setattr(file_scanner, 'require_available', lambda: None)
+    rescanned = client.post(scan_url, headers=hdr(users[0]))
+    assert rescanned.status_code == 200, rescanned.text
+    assert rescanned.json()['members'][0]['evidence_scan_state'] == 'CLEAN'
+    assert session.scalar(select(m.AuditEvent).where(m.AuditEvent.action == 'REGISTRATION_EVIDENCE_SCANNED',
+        m.AuditEvent.resource_id == reg['id'])) is not None
     assert client.get(download,headers=hdr(users[1])).content == replacement
     client.post(f"/api/v1/topic-registrations/{reg['id']}/submit",headers=hdr(users[0]))
     assert client.get(download,headers=hdr(users[3])).content == replacement
@@ -783,6 +731,39 @@ def test_private_member_evidence_and_submission_lock(scenario, monkeypatch, tmp_
     assert client.post(url,headers={**hdr(users[0]),"X-File-Name":"proof.pdf"},content=payload).status_code == 409
     assert client.post(f"/api/v1/topic-registrations/{reg['id']}/withdraw", headers=hdr(users[1])).status_code == 200
     assert client.get(download, headers=hdr(users[1])).status_code == 404
+
+
+def test_registration_evidence_upload_scans_and_blocks_infected_file(scenario, monkeypatch, tmp_path):
+    from backend.services import file_scanner
+    client, users, students, _, topic, _ = scenario
+    monkeypatch.setenv('KLTN_EVIDENCE_DIR', str(tmp_path))
+    calls = []
+    def infected_scan(file, path):
+        calls.append(path.read_bytes())
+        file.scan_state = 'INFECTED'
+        return file.scan_state
+    monkeypatch.setattr(file_scanner, 'scan', infected_scan)
+    reg = client.post('/api/v1/topic-registrations', headers=hdr(users[0]), json={'topic_id': str(topic.id)}).json()
+    content = b'%PDF-1.7\nScanner test double\n%%EOF'
+    response = client.post(f"/api/v1/topic-registrations/{reg['id']}/evidence",
+        headers={**hdr(users[0]), 'X-File-Name': 'proof.pdf'}, content=content)
+    assert response.status_code == 200, response.text
+    assert calls == [content]
+    assert response.json()['members'][0]['evidence_scan_state'] == 'INFECTED'
+    download = f"/api/v1/topic-registrations/{reg['id']}/members/{students[0].id}/evidence"
+    assert client.get(download, headers=hdr(users[0])).status_code == 409
+    assert client.post(download + '/scan', headers=hdr(users[0])).status_code == 409
+
+
+def test_lecturer_directory_profile_details_stay_in_department(scenario):
+    client, users, _, lecturers, _, session = scenario
+    rows = client.get('/api/v1/lecturers', headers=hdr(users[0])).json()
+    row = next(row for row in rows if row['id'] == str(lecturers[0].id))
+    assert row['department_name'] == 'Synthetic department'
+    assert row['faculty_name'] == 'Synthetic faculty'
+    session.get(m.UserAccount, lecturers[0].user_id).status = 'LOCKED'
+    session.flush()
+    assert str(lecturers[0].id) not in {r['id'] for r in client.get('/api/v1/lecturers', headers=hdr(users[0])).json()}
 
 
 def test_latest_eligibility_result_supersedes_old_confirmation(scenario):

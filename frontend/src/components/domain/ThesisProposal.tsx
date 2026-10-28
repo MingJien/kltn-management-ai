@@ -5,6 +5,9 @@ import { downloadProposal, downloadProposalTemplate, request, uploadProposal } f
 import { scanLabel } from "./ThesisDocuments";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
+import PrintHistory from "./PrintHistory";
+import FileReviewButton from "./FileReviewButton";
+import VersionTimeline from "./VersionTimeline";
 
 export default function ThesisProposal({thesis, proposal, deadline, lecturers, userId, busy, run}: {
   thesis: Thesis; proposal: Proposal; deadline?: DocumentDeadline; lecturers: Lecturer[]; userId: string; busy: boolean; run: CoreRun;
@@ -15,6 +18,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
   const [officialRef, setOfficialRef] = useState("");
   const [downloadError, setDownloadError] = useState("");
   const [printNotice, setPrintNotice] = useState("");
+  const [printRefresh, setPrintRefresh] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
   const latest = proposal.versions[0];
@@ -34,7 +38,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
       <p className="text-caption">Có thể tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
       <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {
         setDownloadError(""); setDownloading(true);
-        try {await downloadProposalTemplate();} catch (cause) {setDownloadError(String(cause));}
+        try {await downloadProposalTemplate(thesis.round_id);} catch (cause) {setDownloadError(String(cause));}
         finally {setDownloading(false);}
       }}>Tải mẫu chính thức Mẫu 3</button>
       {downloadError && <p role="alert" className="alert alert-danger">{downloadError}</p>}
@@ -65,13 +69,13 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
       {proposal.versions.length === 0 && <p className="text-muted">Chưa có bản đề cương.</p>}
     </div></div>
 
-    {proposal.versions.map((version, index) => {
+    {proposal.versions.length > 0 && <article className="card"><div className="card-body"><VersionTimeline versions={proposal.versions} render={(version, index) => {
       const clean = version.scan_state === "CLEAN";
       const isCurrent = version.version_no === proposal.current_version_no;
       const suffix = version.file_name.slice(version.file_name.lastIndexOf(".")).toLowerCase();
       const canPrint = isCurrent && clean && [".pdf", ".docx"].includes(suffix) &&
         ["DEPARTMENT_FINALIZED", "DEAN_CONFIRMED", "PRINT_READY"].includes(proposal.state);
-      return <article className="card" key={version.id}><div className="card-body stack">
+      return <section className="core-version stack" key={version.id}>
       <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong>{index === 0 && <Status value={proposal.state} />}</div>
       <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
       {version.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
@@ -84,25 +88,33 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
         setDownloadError(""); setDownloading(true);
         try {await downloadProposal(thesis.id, version, userId);} catch (cause) {setDownloadError(String(cause));}
         finally {setDownloading(false);}
-      }}>Tải phiên bản {version.version_no}</button>
+      }}>Tải bản nộp gốc v{version.version_no}</button>
+      {clean && <p className="text-caption">Bản gốc giữ nguyên tệp đã nộp. Sau khi GVHD xác nhận và TBM chốt, dùng nút xuất bản có footer để in ký ngoài.</p>}
       {canPrint && <button type="button" className="btn btn-secondary" disabled={downloading || busy} onClick={async () => {
         setDownloadError(""); setPrintNotice(""); setDownloading(true);
         try {
           await downloadProposal(thesis.id, version, userId, true);
+          setPrintRefresh(value => value + 1);
           setPrintNotice("Đã tải bản PDF/DOCX để ký ngoài. Bản in có địa chỉ hệ thống, mã số và thời gian ở góc dưới bên trái; mã cũng có trong tên tệp. Bản nộp gốc không đổi.");
         } catch (cause) {setDownloadError(String(cause));}
         finally {setDownloading(false);}
       }}>Xuất bản để ký ngoài (địa chỉ + mã số + giờ xuất)</button>}
+      <PrintHistory endpoint={`/theses/${thesis.id}/proposal/versions/${version.id}/print-history`} userId={userId} version={version.version_no} refreshKey={printRefresh} />
+      {clean && <FileReviewButton userId={userId} run={run} disabled={busy} target={{
+        versionId: version.id, fileName: version.file_name, versionNo: version.version_no, submittedBy: version.submitted_by_name,
+        rowVersion: proposal.row_version, label: "Đề cương khóa luận", reviews: version.reviews,
+        annotationsPath: `/theses/${thesis.id}/proposal/versions/${version.id}/annotations`,
+        downloadPath: `/theses/${thesis.id}/proposal/versions/${version.id}/download`,
+        reviewPath: `/theses/${thesis.id}/proposal/reviews`,
+        choices: canReview ? [{value:"CONFIRM", label:"Xác nhận đề cương"}, {value:"REVISION_REQUIRED", label:"Yêu cầu chỉnh sửa"}]
+          : [{value:"COMMENT", label:"Góp ý chéo"}],
+      }} />}
       <Reviews items={version.reviews} />
       {index === 0 && (canReview || canComment) && !clean &&
         <p className="alert alert-warning">Chưa thể nhận xét: tệp đang cách ly – chưa quét an toàn. Cần máy quét tệp thật để chuyển trạng thái.</p>}
-      {index === 0 && (canReview || canComment) && clean && <ReviewForm disabled={busy}
-        choices={canReview ? [{value: "CONFIRM", label: "Xác nhận đề cương"}, {value: "REVISION_REQUIRED", label: "Yêu cầu chỉnh sửa"}] : [{value: "COMMENT", label: "Góp ý chéo"}]}
-        onSubmit={(decision, comment) => run(() => request(`/theses/${thesis.id}/proposal/reviews`, userId, {
-          method: "POST", headers: {"If-Match": String(proposal.row_version)}, body: JSON.stringify({decision, comment}),
-        }), "Đã lưu nhận xét đề cương.")} />}
-    </div></article>;
-    })}
+
+    </section>;
+    }} /></div></article>}
 
     {active && thesis.actions.includes("proposal:assign_reviewer") && proposal.id && !["DEPARTMENT_FINALIZED", "DEAN_CONFIRMED"].includes(proposal.state) && <div className="card"><div className="card-body stack">
       <h3>Phân công giảng viên góp ý</h3>

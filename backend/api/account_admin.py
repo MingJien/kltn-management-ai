@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -20,6 +20,8 @@ from backend.services.passwords import unusable_password
 from backend.services.roster import EMAIL
 from backend.services.account_mail import mail_delivery_ready
 from backend.services.account_directory import build_account_directory
+from backend.services.lecturer_roster import MAIL_ACTIONS, lock_identities, record_delivery
+from backend.services.notifications import notify_user
 
 router = APIRouter(prefix="/api/v1/admin", tags=["account administration"])
 AccountReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
@@ -35,7 +37,7 @@ class LecturerInvite(BaseModel):
 class RoundAssignment(BaseModel):
     round_id: UUID
     user_id: UUID
-    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR)$")
+    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR|FORM_MANAGER)$")
     basis_ref: str = Field(min_length=3, max_length=500)
 
 
@@ -199,7 +201,7 @@ def create_round(payload: RoundCreate, user: m.UserAccount = Depends(current_use
     session.add(round_)
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_CREATED",
         resource_type="thesis_round", resource_id=round_.id,
-        reason=basis, occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+        source_reference=basis, occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
     try:
         session.commit()
     except IntegrityError as exc:
@@ -362,9 +364,12 @@ def invite_lecturer(payload: LecturerInvite, user: m.UserAccount = Depends(curre
     department = session.get(m.Department, payload.department_id)
     if not department or not department.active:
         raise HTTPException(422, "Department is unavailable")
+    if not payload.lecturer_code.strip() or not payload.display_name.strip():
+        raise HTTPException(422, "Lecturer code and name are required")
+    lock_identities(session, [(payload.lecturer_code.strip(), email)])
     if session.scalar(select(m.UserAccount.id).where(func.lower(m.UserAccount.email) == email)):
         raise HTTPException(409, "Email is already assigned")
-    if session.scalar(select(m.LecturerProfile.id).where(m.LecturerProfile.lecturer_code == payload.lecturer_code.strip())):
+    if session.scalar(select(m.LecturerProfile.id).where(func.lower(m.LecturerProfile.lecturer_code) == payload.lecturer_code.strip().lower())):
         raise HTTPException(409, "Lecturer code is already assigned")
     account = m.UserAccount(id=uuid4(), email=email,
         password_hash=unusable_password(), base_role="LECTURER", status="DISABLED")
@@ -386,6 +391,8 @@ def invite_lecturer(payload: LecturerInvite, user: m.UserAccount = Depends(curre
     except Exception:
         # The account remains unverified. Staff can request a fresh activation link.
         delivered = False
+    record_delivery(session, user, account, delivered)
+    session.commit()
     return {"user_id": str(account.id), "invitation_sent": delivered}
 
 
@@ -400,7 +407,8 @@ def grant_round_assignment(payload: RoundAssignment,
         raise HTTPException(422, "An active staff account is required")
     if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR"} and target.base_role != "LECTURER":
         raise HTTPException(422, "Round account/progress coordination must be assigned to a lecturer")
-    if not round_ or round_.state not in {"DRAFT", "OPEN"}:
+    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type == "FORM_MANAGER" else {"DRAFT", "OPEN"}
+    if not round_ or round_.state not in allowed_states:
         raise HTTPException(422, "Round is unavailable")
     existing = session.scalar(select(m.ResourceAssignment.id).where(
         m.ResourceAssignment.user_id == target.id,
@@ -417,8 +425,10 @@ def grant_round_assignment(payload: RoundAssignment,
             effective_from=datetime.now(timezone.utc), state="ACTIVE"))
         session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_PERMISSION_GRANTED",
             resource_type="resource_assignment", resource_id=assignment_id,
-            reason=payload.basis_ref.strip(), occurred_at=datetime.now(timezone.utc),
+            source_reference=payload.basis_ref.strip(), occurred_at=datetime.now(timezone.utc),
             correlation_id=uuid4()))
+        from backend.services.workflow_notices import assignment_event
+        assignment_event(session,user.id,target.id,round_.id,payload.assignment_type)
         session.commit()
     except IntegrityError as exc:
         session.rollback()
@@ -433,7 +443,7 @@ def round_assignments(user: m.UserAccount = Depends(current_user),
     rows = session.execute(select(
         m.ResourceAssignment.id, m.ResourceAssignment.round_id,
         m.ResourceAssignment.user_id, m.ResourceAssignment.assignment_type).where(
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE").order_by(m.ResourceAssignment.effective_from.desc()).limit(200)).all()
     return [{"id": str(row.id), "round_id": str(row.round_id),
@@ -448,11 +458,11 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
                       session: Session = Depends(get_session)) -> None:
     _admin(user)
     assignment = session.execute(select(
-        m.ResourceAssignment.id, m.ResourceAssignment.state,
+        m.ResourceAssignment.id, m.ResourceAssignment.state, m.ResourceAssignment.user_id, m.ResourceAssignment.round_id,
         m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.id == assignment_id).with_for_update()).one_or_none()
     if not assignment or assignment.state != "ACTIVE" or assignment.assignment_type not in {
-            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"}:
+            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"}:
         raise HTTPException(404, "Active assignment not found")
     session.execute(update(m.ResourceAssignment).where(
         m.ResourceAssignment.id == assignment_id).values(
@@ -462,6 +472,8 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
         resource_type="resource_assignment", resource_id=assignment.id,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
         correlation_id=uuid4()))
+    from backend.services.workflow_notices import assignment_event
+    assignment_event(session,user.id,assignment.user_id,assignment.round_id,assignment.assignment_type,revoked=True)
     session.commit()
 
 
@@ -485,6 +497,10 @@ def lock_account(user_id: UUID, payload: AccountStatus,
         resource_type="user_account", resource_id=target.id,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
         correlation_id=uuid4()))
+    notify_user(session, recipient_user_id=target.id, actor_user_id=user.id,
+        kind="ACCOUNT_LOCKED" if payload.locked else "ACCOUNT_UNLOCKED",
+        message=("Tài khoản của bạn đã bị khóa. Lý do: " if payload.locked
+                 else "Tài khoản của bạn đã được mở khóa. Lý do: ") + payload.reason.strip())
     session.commit()
 
 
@@ -505,6 +521,9 @@ def disable_account(user_id: UUID, payload: AccountChangeReason,
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_DISABLED",
         resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    notify_user(session, recipient_user_id=target.id, actor_user_id=user.id,
+        kind="ACCOUNT_DISABLED",
+        message="Tài khoản của bạn đã bị vô hiệu hóa; hồ sơ và lịch sử vẫn được giữ. Lý do: " + payload.reason.strip())
     session.commit()
 
 
@@ -525,6 +544,9 @@ def restore_account(user_id: UUID, payload: AccountChangeReason,
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_RESTORED",
         resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    notify_user(session, recipient_user_id=target.id, actor_user_id=user.id,
+        kind="ACCOUNT_RESTORED",
+        message="Tài khoản của bạn đã được mở lại. Hãy đăng nhập và tiếp tục công việc.")
     session.commit()
 
 
@@ -543,17 +565,30 @@ def reissue_link(user_id: UUID, payload: AccountChangeReason,
         raise HTTPException(409, "Student participation is not confirmed")
     if not mail_delivery_ready():
         raise HTTPException(503, "Email delivery is unavailable")
-    target.row_version += 1  # Invalidate earlier links and sessions before issuing a new link.
     purpose = "activate" if target.status == "DISABLED" else "reset"
+    if target.base_role == "LECTURER" and purpose == "activate":
+        last = session.scalar(select(m.AuditEvent.occurred_at).where(
+            m.AuditEvent.resource_type == "user_account", m.AuditEvent.resource_id == target.id,
+            m.AuditEvent.action.in_(MAIL_ACTIONS)).order_by(m.AuditEvent.occurred_at.desc()).limit(1))
+        if last and last + timedelta(seconds=60) > datetime.now(timezone.utc):
+            raise HTTPException(429, "Vừa gửi liên kết; vui lòng đợi 60 giây rồi thử lại.")
+        _audit(session, target, "LECTURER_ACTIVATION_SENDING", user.id)
+    target.row_version += 1  # Invalidate earlier links and sessions before issuing a new link.
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ACCOUNT_LINK_REISSUED",
         resource_type="user_account", resource_id=target.id, reason=payload.reason.strip(),
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    notify_user(session, recipient_user_id=target.id, actor_user_id=user.id,
+        kind="ACCOUNT_LINK_REISSUED",
+        message="Khoa đã cấp lại liên kết đăng nhập cho tài khoản của bạn qua email đang lưu.")
     session.commit()
     try:
         _mail_link(target, purpose)
         delivered = True
     except Exception:
         delivered = False
+    if target.base_role == "LECTURER" and purpose == "activate":
+        record_delivery(session, user, target, delivered)
+        session.commit()
     return {"link_sent": delivered, "purpose": purpose}
 
 
@@ -571,8 +606,11 @@ def _replace_email(session: Session, actor: m.UserAccount, target: m.UserAccount
         resource_type="user_account", resource_id=target.id,
         before_hash=hashlib.sha256((previous or "").encode()).hexdigest(),
         after_hash=hashlib.sha256(email.encode()).hexdigest(),
-        reason=f"{reason.strip()}; reference={basis_ref.strip()}",
+        reason=reason.strip(), source_reference=basis_ref.strip(),
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    notify_user(session, recipient_user_id=target.id, actor_user_id=actor.id,
+        kind="ACCOUNT_EMAIL_CORRECTED",
+        message="Email đăng nhập của bạn đã được Khoa cập nhật. Hãy dùng liên kết kích hoạt mới gửi tới email này.")
     try:
         session.commit()
     except IntegrityError as exc:
@@ -641,4 +679,7 @@ def correct_staff_email(user_id: UUID, payload: StaffEmailCorrection,
             delivered = True
         except Exception:
             pass
+        if target.base_role == "LECTURER":
+            record_delivery(session, user, target, delivered)
+            session.commit()
     return {"user_id": str(target.id), "activation_required": True, "activation_sent": delivered}

@@ -9,10 +9,10 @@ SELECTED_TABLES = frozenset(
     {
         "academic_year", "advisor_assignment", "audit_event", "department", "department_major",
         "document", "document_deadline", "document_version", "eligibility_snapshot", "faculty", "lecturer_profile",
-        "member_work_assignment", "organizational_position",
+        "member_work_assignment", "organizational_position", "official_form", "official_form_version",
         "position_assignment", "progress_milestone", "progress_report",
-        "progress_review", "proposal", "proposal_review", "proposal_version",
-        "registration_member", "resource_assignment", "reviewer_assignment",
+        "progress_review", "progress_review_annotation", "proposal", "proposal_review", "proposal_version",
+        "registration_member", "registration_form_version", "resource_assignment", "reviewer_assignment",
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
@@ -20,6 +20,8 @@ SELECTED_TABLES = frozenset(
 )
 
 TABLE_INFO = {
+    "official_form": ("Danh mục biểu mẫu và tài liệu Khoa theo đợt", "Phân loại, phạm vi và đối tượng xem tài liệu Khoa"),
+    "official_form_version": ("Phiên bản tệp biểu mẫu và tài liệu Khoa", "Bản nháp, phát hành, thu hồi và lịch sử tệp đã quét"),
     "academic_year": ("Năm học", "Đợt và lịch KLTN"),
     "advisor_assignment": ("Phân công giảng viên hướng dẫn", "GVHD chính thức và lịch sử thay đổi"),
     "advisor_review": ("Nhận xét KLTN của GVHD", "Giai đoạn bảo vệ"),
@@ -54,10 +56,12 @@ TABLE_INFO = {
     "progress_milestone": ("Mốc tiến độ", "Lịch theo đợt KLTN"),
     "progress_report": ("Báo cáo tiến độ", "Bản nộp theo phiên bản"),
     "progress_review": ("Nhận xét tiến độ", "GVHD xác nhận, GV khác chỉ góp ý"),
+    "progress_review_annotation": ("Ghim nhận xét theo phiên bản tệp", "Ghim, nhận xét chung và tệp GV phản hồi; nháp riêng theo đúng phiên bản, chỉ công bố cùng quyết định phản hồi"),
     "proposal": ("Hồ sơ đề cương", "Trạng thái xét duyệt đề cương"),
     "proposal_review": ("Nhận xét đề cương", "Ý kiến GVHD và người được giao góp ý"),
     "proposal_version": ("Phiên bản đề cương", "Bản nộp đề cương bất biến"),
     "registration_member": ("Thành viên đăng ký", "Tự xác nhận nhóm và chống trùng đợt"),
+    "registration_form_version": ("Phiên bản đơn đăng ký Mẫu 1a/1b", "Tệp nộp bất biến trước tiếp nhận; đối chiếu thành viên và xuất bản nộp có footer, không tự xác nhận Khoa duyệt"),
     "repository_item": ("Tài liệu kho tra cứu", "Kho và AI giai đoạn sau"),
     "resource_assignment": ("Phân công quyền theo tài nguyên", "Người xác nhận điều kiện/điều phối/góp ý theo đợt hoặc KLTN"),
     "retrieval_audit": ("Nhật ký truy xuất AI", "AI giai đoạn sau"),

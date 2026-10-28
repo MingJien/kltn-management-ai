@@ -16,9 +16,17 @@ from backend.api.dependencies import current_user
 class FakeSession:
     def __init__(self, user):
         self.user = user
+        self.added = []
+        self.committed = False
 
     def scalar(self, _statement):
         return self.user
+
+    def add(self, item):
+        self.added.append(item)
+
+    def commit(self):
+        self.committed = True
 
 
 def request_with_session(user_id: str | None = None) -> Request:
@@ -101,12 +109,15 @@ def test_oidc_callback_links_only_an_existing_account(monkeypatch):
     monkeypatch.setattr(auth, "_oidc_client", FakeOIDCClient)
     monkeypatch.setenv("KLTN_FRONTEND_URL", "https://kltn.example")
     request = request_with_session()
-    response = asyncio.run(auth.callback(request, FakeSession(account)))
+    session = FakeSession(account)
+    response = asyncio.run(auth.callback(request, session))
     assert response.status_code == 303
     assert response.headers["location"] == "https://kltn.example/?login=success"
     assert request.session["user_id"] == str(account.id)
     assert request.session["credential_version"] == 1
     assert request.session["csrf_token"]
+    assert session.committed and session.added[0].action == "ACCOUNT_SIGNED_IN"
+    assert session.added[0].resource_id == account.id
 
 
 def test_oidc_callback_refuses_unlinked_account(monkeypatch):

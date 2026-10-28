@@ -27,6 +27,8 @@ class LecturerOut(BaseModel):
     id: UUID
     display_name: str
     lecturer_code: str
+    department_name: str | None = None
+    faculty_name: str | None = None
 
 
 class NotificationOut(BaseModel):
@@ -127,6 +129,7 @@ class RegistrationMemberOut(BaseModel):
     active: bool
     consent_status: str
     evidence_file_name: str | None = None
+    evidence_scan_state: str | None = None
     can_upload_evidence: bool = False
     can_withdraw: bool = False
 

@@ -15,17 +15,22 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
+from zipfile import BadZipFile
 
 from docx import Document
+from docx.opc.exceptions import OpcError
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 from fastapi import HTTPException
 from fastapi.responses import Response
-from pypdf import PdfReader, PdfWriter
+from lxml.etree import XMLSyntaxError
+from pypdf import PdfReader, PdfWriter, Transformation
 from pypdf.errors import PyPdfError
 from pypdf._page import PageObject
-from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
+from pypdf.generic import ArrayObject, DictionaryObject, NameObject, DecodedStreamObject, IndirectObject
 from sqlalchemy import select
+
+from backend.api.core_schemas import PrintExportOut
 
 from backend.db.models import entities as m
 from backend.services.account_mail import frontend_origin
@@ -77,8 +82,8 @@ def _stable_code(session, thesis, doc_prefix: str, version_no: int) -> str:
 def _footer_lines(public_url: str, code: str, instant: datetime) -> list[str]:
     """Exactly three lines at the bottom-left: URL, code, export time."""
     return [
-        f"Xuất từ: {public_url}",
-        f"Mã: {code}",
+        f"Xuất tại: {public_url}",
+        f"Mã số: {code}",
         f"Thời điểm xuất: {instant:%H:%M %d/%m/%Y}",
     ]
 
@@ -102,13 +107,35 @@ def _stamp_pdf(source: bytes, lines: list[str] | str) -> bytes:
             raise ValueError("PDF is encrypted or too long")
         line_list = [lines] if isinstance(lines, str) else list(lines)
         writer = PdfWriter()
-        for original in reader.pages:
-            page = writer.add_page(original)
-            if page.get("/Rotate", 0):
-                page.transfer_rotation_to_content()
-            width, height = float(page.mediabox.width), float(page.mediabox.height)
+        source_writer = PdfWriter(clone_from=reader)
+        for original in source_writer.pages:
+            # Fit the entire visible source above a reserved footer band. Merely
+            # painting a white rectangle over an existing page erases signatures,
+            # page numbers or text near its bottom edge. Keep the paper size and
+            # aspect ratio; transform annotations along with the visible content.
+            box = original.cropbox
+            rotation = int(original.get("/Rotate", 0)) % 360
+            if rotation not in {0, 90, 180, 270}:
+                raise ValueError("Invalid page rotation")
+            normalize = Transformation().translate(-float(box.left), -float(box.bottom)).rotate(-rotation)
+            corners = [normalize.apply_on((x, y)) for x in (float(box.left), float(box.right))
+                for y in (float(box.bottom), float(box.top))]
+            left, bottom = min(x for x, _ in corners), min(y for _, y in corners)
+            width = max(x for x, _ in corners) - left
+            height = max(y for _, y in corners) - bottom
             if width < 250 or height < 250:
                 raise ValueError("PDF page is too small for a readable footer")
+            footer_height = 18.0 + 9.0 * len(line_list)
+            scale = (height - footer_height) / height
+            page = writer.add_blank_page(width=width, height=height)
+            placement = normalize.translate(-left, -bottom).scale(scale).translate(
+                (width - width * scale) / 2, footer_height)
+            # Direct annotation dictionaries are legal PDF too. Give them owned
+            # references so pypdf also transforms their rectangles/appearances.
+            if original.get("/Annots"):
+                original[NameObject("/Annots")] = ArrayObject([item if isinstance(item, IndirectObject)
+                    else source_writer._add_object(item) for item in original["/Annots"]])
+            page.merge_transformed_page(original, placement)
             overlay = PageObject.create_blank_page(width=width, height=height)
             overlay[NameObject("/Resources")] = DictionaryObject({
                 NameObject("/Font"): DictionaryObject({NameObject("/KLTN"): DictionaryObject({
@@ -118,11 +145,9 @@ def _stamp_pdf(source: bytes, lines: list[str] | str) -> bytes:
                 })})})
             ascii_lines = [_pdf_text(line) for line in line_list]
             stream = DecodedStreamObject()
-            box_width = max(width - 52, 240)
-            box_height = 14.0 * len(ascii_lines) + 8.0
             y_start = 10.0 + 9.0 * (len(ascii_lines) - 1)
             pdf_ops = [
-                f"q 1 1 1 rg 24 6 {box_width:.2f} {box_height:.2f} re f\n",
+                "q\n",
                 f"BT /KLTN 6.50 Tf 0.16 0.22 0.29 rg 9.0 TL\n",
                 f"1 0 0 1 28 {y_start:.2f} Tm\n",
             ]
@@ -167,8 +192,8 @@ def _stamp_docx(source: bytes, lines: list[str] | str) -> bytes:
         output = io.BytesIO()
         doc.save(output)
         return output.getvalue()
-    except (ValueError, KeyError, OSError) as exc:
-        raise HTTPException(422, "Cannot create a print copy from this DOCX") from exc
+    except (ValueError, KeyError, OSError, BadZipFile, OpcError, XMLSyntaxError) as exc:
+        raise HTTPException(422, "Không thể xuất bản in: DOCX hỏng hoặc không đúng định dạng Word") from exc
 
 
 def _print_bytes(source_bytes: bytes, suffix: str, lines: list[str] | str) -> tuple[bytes, str]:
@@ -189,6 +214,59 @@ def _print_response(result: bytes, media_type: str, code: str, suffix: str,
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, no-store",
     })
+
+
+def export_history(session, *, action, resource_type, resource_id, version, document_id=None):
+    """Read existing audited exports, including records made before this UI existed."""
+    events = session.scalars(select(m.AuditEvent).where(m.AuditEvent.action == action,
+        m.AuditEvent.resource_type == resource_type, m.AuditEvent.resource_id == resource_id,
+        m.AuditEvent.before_hash == version.content_sha256)
+        .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id.desc())).all()
+    result = []
+    for event in events:
+        metadata = dict(piece.strip().split("=", 1) for piece in (event.reason or "").split(";") if "=" in piece)
+        if metadata.get("version") != str(version.version_no):
+            continue
+        if document_id and metadata.get("document") != str(document_id):
+            continue
+        if metadata.get("version_id") and metadata["version_id"] != str(version.id):
+            continue
+        if not metadata.get("code"):
+            continue
+        actor_name = "Tài khoản trong hệ thống"
+        for cls in (m.StudentProfile, m.LecturerProfile):
+            actor = session.scalar(select(cls).where(cls.user_id == event.actor_id))
+            if actor:
+                actor_name = actor.display_name
+                break
+        result.append(PrintExportOut(id=event.id, actor_name=actor_name, document_code=metadata["code"],
+            version_no=version.version_no, exported_at=event.occurred_at,
+            copy_status="SUBMITTED" if action == "REGISTRATION_FORM_PRINT_EXPORTED" else "APPROVED"))
+        if len(result) == 50:
+            break
+    return result
+
+
+def proposal_print_history(session, user, thesis_id, version_id):
+    thesis_access(session, user, thesis_id, action="proposal:view")
+    version = session.scalar(select(m.ProposalVersion).join(m.Proposal, m.Proposal.id == m.ProposalVersion.proposal_id)
+        .where(m.Proposal.thesis_id == thesis_id, m.ProposalVersion.id == version_id))
+    if version is None:
+        raise HTTPException(404, "Không tìm thấy phiên bản đề cương trong hồ sơ này")
+    return export_history(session, action="PROPOSAL_PRINT_COPY_EXPORTED", resource_type="thesis",
+        resource_id=thesis_id, version=version)
+
+
+def document_print_history(session, user, thesis_id, document_id, version_id):
+    from backend.services import documents
+    thesis_access(session, user, thesis_id, action="document:view")
+    documents.document(session, thesis_id, document_id, user=user)
+    version = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.id == version_id,
+        m.DocumentVersion.document_id == document_id))
+    if version is None:
+        raise HTTPException(404, "Không tìm thấy phiên bản tài liệu trong hồ sơ này")
+    return export_history(session, action="DOCUMENT_PRINT_COPY_EXPORTED", resource_type="thesis",
+        resource_id=thesis_id, version=version, document_id=document_id)
 
 
 def export_proposal(session, user, thesis_id, version_id) -> Response:
@@ -214,7 +292,7 @@ def export_proposal(session, user, thesis_id, version_id) -> Response:
     suffix = Path(original.original_name).suffix.lower()
     result, media_type = _print_bytes(source_bytes, suffix, lines)
     audit(session, user, "PROPOSAL_PRINT_COPY_EXPORTED", "thesis", thesis_id,
-        f"exporter={user.id}; code={code}; version={version.version_no}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
+        f"exporter={user.id}; code={code}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
     return _print_response(result, media_type, code, suffix, instant)
@@ -224,7 +302,7 @@ def export_document(session, user, thesis_id, document_id, version_id) -> Respon
     from backend.services import documents
 
     thesis = thesis_access(session, user, thesis_id, action="document:view")
-    item = documents.document(session, thesis_id, document_id, lock=True)
+    item = documents.document(session, thesis_id, document_id, lock=True, user=user)
     if item.document_type not in {"PLAN", "REPORT"}:
         raise HTTPException(409, "Only a plan or report can receive a paper copy")
     version = session.scalar(select(m.DocumentVersion).where(
@@ -249,7 +327,7 @@ def export_document(session, user, thesis_id, document_id, version_id) -> Respon
     suffix = Path(original.original_name).suffix.lower()
     result, media_type = _print_bytes(source_bytes, suffix, lines)
     audit(session, user, "DOCUMENT_PRINT_COPY_EXPORTED", "thesis", thesis_id,
-        f"exporter={user.id}; code={code}; document={item.id}; version={version.version_no}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
+        f"exporter={user.id}; code={code}; document={item.id}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
     return _print_response(result, media_type, code, suffix, instant)

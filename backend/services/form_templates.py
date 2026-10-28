@@ -8,11 +8,12 @@ possible instead of inventing a look-alike form.
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 from fastapi import HTTPException
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL_DIR = ROOT / "docs" / "BieuMau"
+OFFICIAL_DIR = Path(os.getenv("KLTN_OFFICIAL_TEMPLATE_DIR", str(ROOT / "docs" / "BieuMau"))).resolve()
 
 TEMPLATES = {
     "plan": OFFICIAL_DIR / "mau 2.Ke hoach thuc hien cua SV.docx",

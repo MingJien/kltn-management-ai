@@ -5,6 +5,8 @@ import hashlib
 import os
 import shutil
 import subprocess
+import socket
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,6 +53,43 @@ def clamd_conf() -> Path | None:
         if conf.is_file():
             return conf
     return None
+
+
+def daemon_ready() -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", 3310), timeout=1) as connection:
+            connection.sendall(b"zPING\0")
+            return connection.recv(64).rstrip(b"\0\r\n") == b"PONG"
+    except OSError:
+        return False
+
+
+def start_local_daemon(timeout: float = 90) -> bool:
+    """Reuse/start the installed Windows scanner on loopback, without changing system services."""
+    if daemon_ready():
+        return True
+    daemon = Path(r"C:\Program Files\ClamAV\clamd.exe")
+    conf = clamd_conf()
+    if os.name != "nt" or not daemon.is_file() or not conf:
+        return False
+    # Only start the known local configuration; never expose a scanner on the LAN.
+    settings = conf.read_text(encoding="utf-8").splitlines()
+    if "TCPAddr 127.0.0.1" not in settings or "TCPSocket 3310" not in settings:
+        return False
+    log_dir = Path(__file__).resolve().parents[2] / "local" / "clamav"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with (log_dir / "daemon.log").open("ab") as output:
+        process = subprocess.Popen([str(daemon), f"--config-file={conf}", "--foreground", "--fail-if-cvd-older-than=14"],
+            stdout=output, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
+    until = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < until:
+        if daemon_ready():
+            return True
+        time.sleep(.25)
+    if process.poll() is None:
+        process.terminate()
+        process.wait(timeout=10)
+    return False
 
 
 def scan(file, path: Path) -> str:

@@ -63,7 +63,7 @@ def valid_content(name, content):
     raise HTTPException(422, "Chỉ nhận PDF, DOCX không macro hoặc TXT UTF-8 với nội dung phù hợp")
 
 
-async def read_upload(request):
+async def read_upload(request, *, max_bytes=MAX_BYTES):
     from backend.api.auth import _same_app_origin
     if not _same_app_origin(request):
         raise HTTPException(403, "Nguồn yêu cầu không được phép")
@@ -73,8 +73,8 @@ async def read_upload(request):
     chunks, size = [], 0
     async for chunk in request.stream():
         size += len(chunk)
-        if size > MAX_BYTES:
-            raise HTTPException(413, "Tệp tối đa 10 MB")
+        if size > max_bytes:
+            raise HTTPException(413, f"Tệp tối đa {max_bytes // (1024 * 1024)} MB")
         chunks.append(chunk)
     content = b"".join(chunks)
     if not content:
@@ -96,13 +96,19 @@ def persist_upload(session, name, content, mime):
     return file, digest, path
 
 
-def document(session, thesis_id, document_id, *, lock=False):
+def document(session, thesis_id, document_id, *, lock=False,user=None):
     query = select(m.Document).where(m.Document.id == document_id, m.Document.thesis_id == thesis_id,
         m.Document.state == "ACTIVE", m.Document.visibility == "ASSIGNED")
     item = session.scalar(query.with_for_update() if lock else query)
     if not item:
         raise HTTPException(404, "Không tìm thấy tài liệu")
+    if user is not None and is_progress_evidence(session,item.id):
+        thesis_access(session,user,thesis_id,action="progress:view")
     return item
+
+
+def is_progress_evidence(session,document_id):
+    return session.scalar(select(m.ProgressReport.id).join(m.DocumentVersion,m.DocumentVersion.stored_file_id==m.ProgressReport.evidence_file_id).where(m.DocumentVersion.document_id==document_id).limit(1)) is not None
 
 
 def document_out(session, item):
@@ -130,7 +136,7 @@ def document_out(session, item):
 
 def rescan_version(session, user, thesis_id, document_id, version_id):
     thesis_access(session, user, thesis_id, action="document:view", lock=True, write=True)
-    item = document(session, thesis_id, document_id, lock=True)
+    item = document(session, thesis_id, document_id, lock=True,user=user)
     version = session.scalar(select(m.DocumentVersion).where(
         m.DocumentVersion.id == version_id, m.DocumentVersion.document_id == item.id).with_for_update())
     if not version:
@@ -153,12 +159,11 @@ def create_document(session, user, thesis_id, data):
     thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
     if data.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải nộp tại luồng đề cương có xét duyệt riêng")
-    if data.document_type == "REPORT":
-        raise HTTPException(409, "Báo cáo tiến độ phải nộp tại mục Tiến độ theo mốc của đợt")
-    if data.document_type == "PLAN" and session.scalar(select(m.Document.id).where(
-            m.Document.thesis_id == thesis_id, m.Document.document_type == "PLAN",
+    if data.document_type in {"PLAN", "REPORT"} and session.scalar(select(m.Document.id).where(
+            m.Document.thesis_id == thesis_id, m.Document.document_type == data.document_type,
             m.Document.state == "ACTIVE").limit(1)):
-        raise HTTPException(409, "Kế hoạch đã có; hãy nộp phiên bản mới vào hồ sơ đó")
+        label = "Kế hoạch thực hiện Mẫu 2" if data.document_type == "PLAN" else "Cuốn báo cáo KLTN"
+        raise HTTPException(409, f"{label} đã có; hãy nộp phiên bản mới vào hồ sơ đó")
     item = m.Document(id=uuid4(), thesis_id=thesis_id, title=data.title, document_type=data.document_type,
         visibility="ASSIGNED", state="ACTIVE")
     session.add(item)
@@ -172,13 +177,13 @@ def create_document(session, user, thesis_id, data):
 def withdraw_document(session, user, thesis_id, document_id, data, expected):
     """Hide a mistaken submission while retaining its versions, bytes and audit trail."""
     thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
-    item = document(session, thesis_id, document_id, lock=True)
+    item = document(session, thesis_id, document_id, lock=True,user=user)
     row_version(expected, item.row_version)
     if item.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải xử lý ở luồng đề cương")
     versions = session.scalars(select(m.DocumentVersion).where(
         m.DocumentVersion.document_id == item.id).with_for_update()).all()
-    if any(version.state != "SUBMITTED" for version in versions):
+    if any(version.state not in {"SUBMITTED", "SUPERSEDED"} for version in versions):
         raise HTTPException(409, "Tài liệu đã được xử lý; cần giữ trong hồ sơ và nộp phiên bản sửa")
     if versions:
         version_ids = [version.id for version in versions]
@@ -202,12 +207,10 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
     path = None
     try:
         thesis = thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
-        item = document(session, thesis_id, document_id, lock=True)
+        item = document(session, thesis_id, document_id, lock=True,user=user)
         row_version(expected, item.row_version)
         if item.document_type == "PROPOSAL":
             raise HTTPException(409, "Đề cương phải nộp tại mục Đề cương")
-        if item.document_type == "REPORT":
-            raise HTTPException(409, "Hồ sơ báo cáo cũ chỉ để đối chiếu; nộp tiến độ tại mục Tiến độ")
         latest = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == item.id)
             .order_by(m.DocumentVersion.version_no.desc()).limit(1))
         deadline = deadlines.for_submission(session, thesis, item.document_type)
@@ -217,13 +220,16 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
             revision_requested=bool(latest and latest.state == "REVISION_REQUESTED"),
             previous_submitted=bool(latest and latest.state == "SUBMITTED"))
         name, content, mime = await read_upload(request)
+        if item.document_type in {"PLAN", "REPORT"} and Path(name).suffix.lower() not in {".pdf", ".docx"}:
+            raise HTTPException(422, "Kế hoạch Mẫu 2 và Cuốn báo cáo KLTN phải là PDF hoặc DOCX để xuất bản có footer")
         file, digest, path = persist_upload(session, name, content, mime)
         file_scanner.scan(file, path)
         if latest and latest.state == "SUBMITTED":
             latest.state = "SUPERSEDED"
             latest.row_version += 1
+        student = profile(session, user, "STUDENT")
         version = m.DocumentVersion(id=uuid4(), document_id=item.id, version_no=latest.version_no + 1 if latest else 1,
-            stored_file_id=file.id, submitted_by=profile(session, user, "STUDENT").id,
+            stored_file_id=file.id, submitted_by=student.id,
             submitted_at=now(), due_at_at_submission=deadline.due_at,
             content_sha256=digest, state="SUBMITTED")
         session.add(version)
@@ -231,6 +237,13 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
         audit(session, user, "DOCUMENT_SELF_CORRECTED" if latest and latest.state == "SUPERSEDED" else "DOCUMENT_UPLOADED",
             "thesis", thesis_id, f"{item.title} v{version.version_no}", after_hash=digest)
         session.flush()
+        from backend.services.notifications import DOCUMENT_TYPE_LABELS, notify_thesis_advisor
+
+        label = DOCUMENT_TYPE_LABELS.get(item.document_type, item.title)
+        notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id,
+            kind="DOCUMENT_SUBMITTED",
+            message=f"{student.display_name} đã nộp {label} — {item.title} (phiên bản {version.version_no}).",
+            section="documents")
         result = document_out(session, item)
         session.commit()
         return result
@@ -247,8 +260,10 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
 
 
 def review_version(session, user, thesis_id, document_id, version_id, data, expected):
-    thesis_access(session, user, thesis_id, action="document:review", lock=True, write=True)
-    item = document(session, thesis_id, document_id, lock=True)
+    thesis = thesis_access(session, user, thesis_id, action="document:review", lock=True, write=True)
+    item = document(session, thesis_id, document_id, lock=True,user=user)
+    if is_progress_evidence(session,item.id):
+        raise HTTPException(409,"Minh chứng tiến độ cần nhận xét ở mục Tiến độ")
     if item.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương cần quy trình xét duyệt riêng; không dùng duyệt tài liệu thay TBM/Trưởng khoa")
     version = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == item.id,
@@ -269,12 +284,21 @@ def review_version(session, user, thesis_id, document_id, version_id, data, expe
         for old in prior:
             old.state = "SUPERSEDED"
             old.row_version += 1
+    from backend.services.progress_annotations import publish_annotations
+    publish_annotations(session, version, profile(session, user, "LECTURER"), kind="document", summary_comment=data.comment)
     version.state = "ACCEPTED" if data.decision == "ACCEPT" else "REVISION_REQUESTED"
     version.row_version += 1
     item.row_version += 1
     audit(session, user, "DOCUMENT_" + data.decision, "document_version", version.id, data.comment, after_hash=version.content_sha256)
     audit(session, user, "DOCUMENT_REVIEWED", "thesis", thesis_id, f"{item.title} v{version.version_no}: {data.comment}")
     session.flush()
+    from backend.services.notifications import notify_thesis_students
+
+    action_label = "tiếp nhận" if data.decision == "ACCEPT" else "yêu cầu sửa"
+    notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+        kind="DOCUMENT_ACCEPTED" if data.decision == "ACCEPT" else "DOCUMENT_REVISION_REQUESTED",
+        message=f"GVHD đã {action_label} {item.title} phiên bản {version.version_no}. Nhận xét: {data.comment[:200]}",
+        section="documents")
     result = document_out(session, item)
     session.commit()
     return result
@@ -282,9 +306,14 @@ def review_version(session, user, thesis_id, document_id, version_id, data, expe
 
 def download_version(session, user, thesis_id, document_id, version_id):
     thesis_access(session, user, thesis_id, action="document:view")
-    document(session, thesis_id, document_id)
+    document(session, thesis_id, document_id,user=user)
     version = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.id == version_id,
         m.DocumentVersion.document_id == document_id))
+    return stored_download(session, version)
+
+
+def stored_download(session, version):
+    """Read an immutable document version after its caller checks resource-specific access."""
     file = session.get(m.StoredFile, version.stored_file_id) if version else None
     if not file or not file.storage_key.startswith("documents/"):
         raise HTTPException(404, "Tệp không khả dụng")

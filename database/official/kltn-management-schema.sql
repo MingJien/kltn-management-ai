@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261021_0004.
--- 34 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261028_0015.
+-- 39 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -106,6 +106,7 @@ CREATE TABLE audit_event (
 	occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	correlation_id UUID NOT NULL,
 	id UUID NOT NULL,
+	source_reference VARCHAR(500),
 	CONSTRAINT pk_audit_event PRIMARY KEY (id),
 	CONSTRAINT fk_audit_event_actor_id_user_account FOREIGN KEY(actor_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
@@ -159,6 +160,25 @@ CREATE TABLE thesis_round (
 	CONSTRAINT ck_thesis_round_time_window CHECK (closes_at > opens_at),
 	CONSTRAINT fk_thesis_round_academic_year_id_academic_year FOREIGN KEY(academic_year_id) REFERENCES academic_year (id) ON DELETE RESTRICT
 );
+
+CREATE TABLE document_deadline (
+        round_id UUID NOT NULL,
+        document_type VARCHAR(30) NOT NULL,
+        due_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        state VARCHAR(20) DEFAULT 'OPEN' NOT NULL,
+        set_by UUID NOT NULL,
+        reason TEXT NOT NULL,
+        id UUID NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+        row_version INTEGER DEFAULT '1' NOT NULL,
+        CONSTRAINT pk_document_deadline PRIMARY KEY (id),
+        CONSTRAINT uq_document_deadline_round_id_document_type UNIQUE (round_id, document_type),
+        CONSTRAINT ck_document_deadline_document_type CHECK (document_type IN ('PROPOSAL','PLAN','REPORT','SUPPORTING')),
+        CONSTRAINT ck_document_deadline_state CHECK (state IN ('OPEN','CLOSED')),
+        CONSTRAINT fk_document_deadline_round_id_thesis_round FOREIGN KEY (round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_document_deadline_set_by_user_account FOREIGN KEY (set_by) REFERENCES user_account (id) ON DELETE RESTRICT
+    );
 
 CREATE TABLE lecturer_profile (
 	user_id UUID NOT NULL,
@@ -535,6 +555,7 @@ CREATE TABLE document_version (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	row_version INTEGER DEFAULT '1' NOT NULL,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	CONSTRAINT pk_document_version PRIMARY KEY (id),
 	CONSTRAINT uq_document_version_document_id_version_no UNIQUE (document_id, version_no),
 	CONSTRAINT ck_document_version_version_positive CHECK (version_no > 0),
@@ -590,6 +611,7 @@ CREATE TABLE proposal_version (
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	CONSTRAINT pk_proposal_version PRIMARY KEY (id),
 	CONSTRAINT uq_proposal_version_proposal_id_version_no UNIQUE (proposal_id, version_no),
 	CONSTRAINT ck_proposal_version_version_positive CHECK (version_no > 0),
@@ -660,25 +682,153 @@ CREATE TABLE signature_confirmation (
 	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
+CREATE INDEX ix_audit_event_occurred_id ON audit_event (occurred_at, id);
+
 CREATE TABLE user_notification (
-        recipient_user_id UUID NOT NULL,
-        actor_user_id UUID NOT NULL,
+	recipient_user_id UUID NOT NULL,
+	actor_user_id UUID NOT NULL,
+	registration_id UUID,
+	thesis_id UUID,
+	subject_type VARCHAR(40),
+	subject_id UUID,
+	message TEXT,
+	url VARCHAR(300),
+	kind VARCHAR(32) NOT NULL,
+	read_at TIMESTAMP WITH TIME ZONE,
+	revoked_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_user_notification PRIMARY KEY (id),
+	CONSTRAINT ck_user_notification_kind CHECK (kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','PROPOSAL_REVIEWED','PROPOSAL_FINALIZED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED','MILESTONE_OPENED','MILESTONE_EXTENDED','MILESTONE_REOPENED','MILESTONE_CLOSED','DOCUMENT_DEADLINE_SET','DOCUMENT_DEADLINE_EXTENDED','DOCUMENT_DEADLINE_REOPENED','DOCUMENT_DEADLINE_CLOSED','PROGRESS_SUBMITTED','PROGRESS_CONFIRMED','PROGRESS_REVISION_REQUIRED','PROGRESS_COMMENT','DOCUMENT_SUBMITTED','DOCUMENT_ACCEPTED','DOCUMENT_REVISION_REQUESTED','WORK_SUBMITTED','WORK_APPROVED','WORK_REVISION_REQUIRED','ACCOUNT_LOCKED','ACCOUNT_UNLOCKED','ACCOUNT_DISABLED','ACCOUNT_RESTORED','ACCOUNT_LINK_REISSUED','ACCOUNT_EMAIL_CORRECTED','REGISTRATION_FORM_SUBMITTED','PROPOSAL_REVIEWER_ASSIGNED','PROGRESS_REVIEWER_ASSIGNED','PROPOSAL_DEAN_CONFIRMED','WORKFLOW_NOTICE')),
+	CONSTRAINT fk_user_notification_recipient_user_id_user_account FOREIGN KEY(recipient_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_actor_user_id_user_account FOREIGN KEY(actor_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
+
+CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
+
+CREATE TABLE registration_form_version (
         registration_id UUID NOT NULL,
-        kind VARCHAR(32) NOT NULL,
-        read_at TIMESTAMP WITH TIME ZONE,
-        revoked_at TIMESTAMP WITH TIME ZONE,
+        stored_file_id UUID NOT NULL,
+        submitted_by UUID NOT NULL,
+        form_code VARCHAR(2) NOT NULL,
+        version_no INTEGER NOT NULL,
+        content_sha256 VARCHAR(64) NOT NULL,
+        registration_fingerprint VARCHAR(64) NOT NULL,
+        submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
         id UUID NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        CONSTRAINT pk_user_notification PRIMARY KEY (id),
-        CONSTRAINT ck_user_notification_kind CHECK (kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED')),
-        CONSTRAINT fk_user_notification_recipient_user_id_user_account FOREIGN KEY(recipient_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-        CONSTRAINT fk_user_notification_actor_user_id_user_account FOREIGN KEY(actor_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-        CONSTRAINT fk_user_notification_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT
+        CONSTRAINT pk_registration_form_version PRIMARY KEY (id),
+        CONSTRAINT uq_registration_form_version_registration_id_version_no UNIQUE (registration_id, version_no),
+        CONSTRAINT ck_registration_form_version_version_positive CHECK (version_no > 0),
+        CONSTRAINT ck_registration_form_version_form_code CHECK (form_code IN ('1A','1B')),
+        CONSTRAINT ck_registration_form_version_hash_length CHECK (length(content_sha256) = 64 AND length(registration_fingerprint) = 64),
+        CONSTRAINT fk_registration_form_version_registration_id_topic_registration FOREIGN KEY (registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_registration_form_version_stored_file_id_stored_file FOREIGN KEY (stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_registration_form_version_submitted_by_student_profile FOREIGN KEY (submitted_by) REFERENCES student_profile (id) ON DELETE RESTRICT
     );
 
-CREATE INDEX ix_user_notification_recipient_created
-        ON user_notification (recipient_user_id, created_at);
+CREATE TABLE progress_review_annotation (
+	progress_report_id UUID,
+	document_version_id UUID,
+	proposal_version_id UUID,
+	reviewer_id UUID NOT NULL,
+	stored_file_id UUID NOT NULL,
+	annotation_kind VARCHAR(20) DEFAULT 'PIN' NOT NULL,
+	attachment_file_id UUID,
+	page_number INTEGER,
+	x NUMERIC(8, 7),
+	y NUMERIC(8, 7),
+	location_label VARCHAR(255) DEFAULT '' NOT NULL,
+	quoted_text VARCHAR(1000) DEFAULT '' NOT NULL,
+	comment TEXT DEFAULT '' NOT NULL,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	published_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_progress_review_annotation PRIMARY KEY (id),
+	CONSTRAINT ck_progress_review_annotation_state CHECK (state IN ('DRAFT','PUBLISHED')),
+	CONSTRAINT ck_progress_review_annotation_page_number CHECK (page_number IS NULL OR page_number BETWEEN 1 AND 10000),
+	CONSTRAINT ck_progress_review_annotation_coordinates CHECK ((x IS NULL AND y IS NULL) OR (page_number IS NOT NULL AND x IS NOT NULL AND y IS NOT NULL AND x BETWEEN 0 AND 1 AND y BETWEEN 0 AND 1)),
+	CONSTRAINT ck_progress_review_annotation_publication CHECK ((state = 'DRAFT' AND published_at IS NULL) OR (state = 'PUBLISHED' AND published_at IS NOT NULL AND length(trim(comment)) > 0)),
+	CONSTRAINT ck_progress_review_annotation_one_target CHECK (num_nonnulls(progress_report_id, document_version_id, proposal_version_id) = 1),
+	CONSTRAINT ck_progress_review_annotation_annotation_kind CHECK (annotation_kind IN ('PIN','SUMMARY','ATTACHMENT')),
+	CONSTRAINT ck_progress_review_annotation_attachment_kind CHECK ((annotation_kind = 'ATTACHMENT' AND attachment_file_id IS NOT NULL) OR (annotation_kind IN ('PIN','SUMMARY') AND attachment_file_id IS NULL)),
+	CONSTRAINT ck_progress_review_annotation_kind_coordinates CHECK (annotation_kind = 'PIN' OR (page_number IS NULL AND x IS NULL AND y IS NULL)),
+	CONSTRAINT fk_progress_review_annotation_progress_report_id_progre_1f06 FOREIGN KEY(progress_report_id) REFERENCES progress_report (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_annotation_document_version_id_docum_1866 FOREIGN KEY(document_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_annotation_proposal_version_id_propo_6ccb FOREIGN KEY(proposal_version_id) REFERENCES proposal_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_annotation_reviewer_id_lecturer_profile FOREIGN KEY(reviewer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_annotation_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
+
+CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
+
+CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
+
+CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
+
+CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
+
+CREATE TABLE official_form (
+	round_id UUID NOT NULL,
+	code VARCHAR(50) NOT NULL,
+	title VARCHAR(255) NOT NULL,
+	document_kind VARCHAR(20) NOT NULL,
+	audience VARCHAR(30) NOT NULL,
+	state VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL,
+	created_by UUID NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_official_form PRIMARY KEY (id),
+	CONSTRAINT uq_official_form_round_id_code UNIQUE (round_id, code),
+	CONSTRAINT ck_official_form_document_kind CHECK (document_kind IN ('FORM','PUBLICATION')),
+	CONSTRAINT ck_official_form_audience CHECK (audience IN ('STUDENT_AND_LECTURER','LECTURER')),
+	CONSTRAINT ck_official_form_state CHECK (state IN ('ACTIVE','ARCHIVED')),
+	CONSTRAINT fk_official_form_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE official_form_version (
+	official_form_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	stored_file_id UUID NOT NULL,
+	uploaded_by UUID NOT NULL,
+	source_reference VARCHAR(500) NOT NULL,
+	change_reason TEXT NOT NULL,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	published_by UUID,
+	published_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_official_form_version PRIMARY KEY (id),
+	CONSTRAINT uq_official_form_version_official_form_id_version_no UNIQUE (official_form_id, version_no),
+	CONSTRAINT ck_official_form_version_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_official_form_version_state CHECK (state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')),
+	CONSTRAINT ck_official_form_version_publisher_pair CHECK ((published_at IS NULL) = (published_by IS NULL)),
+	CONSTRAINT ck_official_form_version_published_stamp CHECK (state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL),
+	CONSTRAINT ck_official_form_version_draft_stamp CHECK (state != 'DRAFT' OR published_at IS NULL),
+	CONSTRAINT fk_official_form_version_official_form_id_official_form FOREIGN KEY(official_form_id) REFERENCES official_form (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_uploaded_by_user_account FOREIGN KEY(uploaded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_published_by_user_account FOREIGN KEY(published_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_official_form_current ON official_form_version (official_form_id) WHERE state = 'PUBLISHED';
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

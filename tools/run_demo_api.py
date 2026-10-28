@@ -14,6 +14,12 @@ def main() -> None:
     load_local_env()
     os.environ["DATABASE_URL"] = database_url()
     validate_official_database()
+    from backend.services.file_scanner import start_local_daemon
+    print("Checking local ClamAV scanner...", flush=True)
+    if start_local_daemon():
+        print("PASS ClamAV local scanner is ready.", flush=True)
+    else:
+        print("ClamAV daemon unavailable; unscanned files stay quarantined. See local/clamav/daemon.log.", flush=True)
     if not os.getenv("QDRANT_URL") and not os.getenv("QDRANT_LOCAL_PATH"):
         os.environ["QDRANT_LOCAL_PATH"] = "tmp/qdrant-prototype"
     os.environ["KLTN_ENV"] = "development"

@@ -16,7 +16,8 @@ test("Danh sách tài khoản phân trang 20/trang và tìm kiếm về trang 1"
     await expect(page.getByRole("heading",{name:"Tổng quan",exact:true})).toBeVisible();
     await page.locator("#main-content").getByRole("link",{name:"Tài khoản và phân công"}).click();
     await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption({label:"SYN-DEMO · OPEN"});
-    await page.getByLabel("Người được giao").selectOption({label:accounts.admin.email});
+    await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_IMPORTER");
+    await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption({label:accounts.admin.email});
     await page.getByLabel("Căn cứ phân công").fill("SYNTHETIC-PAG");
     await page.getByRole("button",{name:"Lưu phân công"}).click();
     await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_VERIFIER");
@@ -34,25 +35,20 @@ test("Danh sách tài khoản phân trang 20/trang và tìm kiếm về trang 1"
     await page.getByRole("button",{name:"Kiểm tra tệp"}).click();
     await expect(page.getByRole("heading",{name:/Xem trước: 26 sinh viên/})).toBeVisible();
     await page.getByRole("button",{name:"Nhập sau khi kiểm"}).click();
-    await expect(page.getByText(/Đã nhập 26 kết quả chờ xác nhận/)).toBeVisible();
-    await page.getByRole("tab",{name:/Danh sách & xác nhận/}).click();
+    await expect(page.getByText(/Đã ghi nhận 26 sinh viên đủ điều kiện/)).toBeVisible();
+    await page.getByRole("tab",{name:/Danh sách sinh viên/}).click();
     await page.getByRole("searchbox",{name:"Tìm sinh viên",exact:true}).fill("E2E-PAG-");
-    await page.getByLabel("Căn cứ đối chiếu danh sách").fill("SYNTHETIC-PAG-APPROVAL");
-    await page.getByRole("button",{name:"Chọn tất cả chờ xác nhận"}).click();
-    await page.getByRole("button",{name:"Xác nhận đã đối chiếu"}).click();
-    await expect(page.getByText(/Đã xác nhận 26 sinh viên/)).toBeVisible();
-
     await page.goto(web+"/administration");
     const card = page.locator("section.card").filter({has: page.getByRole("heading",{name:"Tài khoản",exact:true})});
     const list = card.locator(".account-list__row");
     const usersCall = (offset: number) => page.waitForResponse(r =>
-      r.request().method() === "GET" && r.url().includes("/admin/users?") && r.url().includes("offset=" + String(offset)));
+      r.request().method() === "GET" && r.url().includes("/admin/users/directory?") && r.url().includes("offset=" + String(offset)));
     const goPage = async (target: number) => {
       const resp = usersCall((target - 1) * 20);
       await card.getByRole("button",{name: "Trang sau"}).click();
-      const rows = await (await resp).json() as unknown[];
+      const result = await (await resp).json() as {items:unknown[]};
       await expect(card.getByText("Trang " + String(target))).toBeVisible();
-      return rows.length;
+      return result.items.length;
     };
     await expect(list).toHaveCount(20);
     await expect(card.getByText("Trang 1")).toBeVisible();
@@ -68,7 +64,7 @@ test("Danh sách tài khoản phân trang 20/trang và tìm kiếm về trang 1"
     expect(size).toBeGreaterThan(0);
     expect(size).toBeLessThan(20);
     await expect.poll(() => card.getByRole("button",{name:"Trang sau"}).isDisabled()).toBe(true);
-    await page.getByLabel("Tìm theo email hoặc MSSV").fill("pag-student-007");
+    await page.getByRole("textbox",{name:/Tìm theo .*email/}).fill("pag-student-007");
     await expect(list).toHaveCount(1);
     await expect(card.getByText("Trang 1")).toBeVisible();
     await expect(card.getByRole("button",{name:"Trang sau"})).toBeDisabled();

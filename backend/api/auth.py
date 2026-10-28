@@ -7,7 +7,9 @@ import threading
 import time
 from collections import deque
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Literal
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -16,13 +18,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import get_session
-from backend.db.models.entities import UserAccount
+from backend.db.models.entities import AuditEvent, UserAccount
 from backend.services.account_mail import frontend_origin
 from backend.services.passwords import needs_rehash, verify_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 _failed_logins: dict[str, deque[float]] = {}
 _login_lock = threading.Lock()
+
+
+def _access_audit(session, user, action):
+    session.add(AuditEvent(id=uuid4(), actor_id=user.id, action=action,
+        resource_type="user_account", resource_id=user.id,
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    session.commit()
 
 
 class LocalLogin(BaseModel):
@@ -184,6 +193,7 @@ def demo_login(payload: DemoLogin, request: Request, session: Session = Depends(
     user = _demo_user(session, payload.key)
     if user is None:
         raise HTTPException(404, "Demo account is unavailable")
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
     request.session.clear()
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
@@ -216,7 +226,7 @@ def local_login(payload: LocalLogin, request: Request, session: Session = Depend
         user.password_hash = hash_password(payload.password)
         user.row_version += 1
         request.session["credential_version"] = user.row_version
-        session.commit()
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
 
 
 @router.get("/login")
@@ -249,6 +259,7 @@ async def callback(request: Request, session: Session = Depends(get_session)):
         request.session.clear()
         return JSONResponse({"detail": "This University account has not been linked to an active KLTN account"}, status_code=403)
 
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
     request.session.clear()
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
@@ -258,9 +269,15 @@ async def callback(request: Request, session: Session = Depends(get_session)):
 
 
 @router.post("/logout", status_code=204)
-def logout(request: Request) -> None:
+def logout(request: Request, session: Session = Depends(get_session)) -> None:
     if not _same_app_origin(request):
         raise HTTPException(403, "Request origin is not allowed")
     if request.session.get("user_id"):
         require_csrf(request)
+        try:
+            user = session.get(UserAccount, UUID(request.session["user_id"]))
+        except (ValueError, TypeError):
+            user = None
+        if user and user.row_version == request.session.get("credential_version"):
+            _access_audit(session, user, "ACCOUNT_SIGNED_OUT")
     request.session.clear()

@@ -120,7 +120,8 @@ def test_admin_corrects_staff_email_without_creating_a_new_account(monkeypatch):
         audit = session.scalar(select(m.AuditEvent).where(
             m.AuditEvent.action == "ACCOUNT_EMAIL_CORRECTED",
             m.AuditEvent.resource_id == lecturer.id))
-        assert audit.actor_id == admin.id and "KHOA-2026-EMAIL" in audit.reason
+        assert audit.actor_id == admin.id and audit.source_reference == "KHOA-2026-EMAIL"
+        assert audit.reason == "Lecturer lost mailbox access"
         assert audit.before_hash != audit.after_hash
         activate(LinkPassword(token=make_token(lecturer, "activate"), password="new-password-123456"),
                  post_request(), session)
@@ -182,15 +183,12 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
             validate_rows(session, wrong_major)
         assert mismatched.value.status_code == 422
         result = import_roster(session, staff, round_.id, rows, "KHOA-2026-TEST")
-        assert result["new_accounts"] == 1 and result["submitted"] == 1
+        assert result["new_accounts"] == 1 and result["confirmed"] == 1
         student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.student_code == student_code))
         account = session.get(m.UserAccount, student.user_id)
         assert student.class_name == "CS-01" and student.major_code == "7480201"
         assert account.status == "DISABLED" and not account.email_verified_at
         assert account.password_hash.startswith("!")
-        assert not confirmed_student_ids(session, round_.id, [student.id])
-        confirm_roster(round_.id, ConfirmRows(snapshot_ids=result["snapshot_ids"],
-            basis_ref="KHOA-2026-TEST"), staff, session)
         assert student.id in confirmed_student_ids(session, round_.id, [student.id])
         tasks = BackgroundTasks()
         activation_request(ActivationRequest(identifier=student_code, email=email), post_request(), tasks, session)
@@ -202,9 +200,7 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
             activate(LinkPassword(token=token, password="strong-password-123"), post_request(), session)
         assert revoked.value.status_code == 403
         again = import_roster(session, staff, round_.id, rows, "KHOA-2026-TEST-2")
-        assert again["new_accounts"] == 0 and again["submitted"] == 1
-        confirm_roster(round_.id, ConfirmRows(snapshot_ids=again["snapshot_ids"],
-            basis_ref="KHOA-2026-TEST-2"), staff, session)
+        assert again["new_accounts"] == 0 and again["confirmed"] == 1
         activate(LinkPassword(token=token, password="strong-password-123"), post_request(), session)
         assert account.status == "ACTIVE" and account.email_verified_at
         assert verify_password(account.password_hash, "strong-password-123")

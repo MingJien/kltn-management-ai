@@ -216,7 +216,7 @@ def record_special_decision(round_id: UUID, payload: SpecialDecision,
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id,
         action="ELIGIBILITY_SPECIAL_DECISION_RECORDED", resource_type="eligibility_snapshot",
         resource_id=replacement.id,
-        reason=f"QĐ5964 Điều 2; khoản 1 đã được người xác nhận đối chiếu; ngoại lệ khoản 2 theo ref={payload.official_ref.strip()}",
+        reason=payload.reason.strip(), source_reference=payload.official_ref.strip(),
         occurred_at=now, correlation_id=uuid4()))
     session.commit()
     return {"state": "CONFIRMED", "snapshot_id": str(replacement.id)}
@@ -243,7 +243,7 @@ def revoke_eligibility(round_id: UUID, payload: RevokeStudent,
     session.add(replacement)
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_REVOKED",
         resource_type="eligibility_snapshot", resource_id=replacement.id,
-        reason=payload.reason.strip(), occurred_at=now, correlation_id=uuid4()))
+        reason=payload.reason.strip(), source_reference=payload.basis_ref.strip(), occurred_at=now, correlation_id=uuid4()))
     session.commit()
     return {"state": "REJECTED", "snapshot_id": str(replacement.id),
             "note": "Existing academic records were preserved for manual review"}
@@ -295,7 +295,7 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROSTER_IDENTITY_CORRECTED",
         resource_type="student_profile", resource_id=student.id,
         before_hash=before, after_hash=fingerprint(),
-        reason=f"{payload.reason.strip()}; reference={payload.basis_ref.strip()}",
+        reason=payload.reason.strip(), source_reference=payload.basis_ref.strip(),
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
     try:
         session.commit()

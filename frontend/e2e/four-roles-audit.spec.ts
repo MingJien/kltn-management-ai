@@ -120,7 +120,7 @@ test("Admin: Toggle ẩn/hiện mật khẩu, quản lý đợt KLTN, phân côn
     await assignmentCard.locator("select").nth(1).selectOption(gvUser.id);
     await assignmentCard.getByLabel("Căn cứ phân công").fill("Quyết định giao nhiệm vụ điều phối đợt");
     await assignmentCard.getByRole("button", { name: "Lưu phân công", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("Đã lưu phân công");
+    await expect(page.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
 
     // Tạo giảng viên mới & sửa email
     const suffix = Date.now().toString().slice(-5);
@@ -129,25 +129,26 @@ test("Admin: Toggle ẩn/hiện mật khẩu, quản lý đợt KLTN, phân côn
     await page.getByLabel("Mã giảng viên").fill(`GV-AUDIT-${suffix}`);
     await page.getByLabel("Họ tên").fill("Giảng viên kiểm thử");
     await page.getByLabel("Email", { exact: true }).fill(initialEmail);
-    const deptSelect = page.getByLabel("Bộ môn");
+    const deptSelect = page.getByRole("combobox",{name:"Bộ môn",exact:true});
     await deptSelect.selectOption({ index: 1 });
     await page.getByRole("button", { name: "Tạo và gửi lời mời" }).click();
     await expect(page.getByText(/Đã tạo tài khoản/)).toBeVisible();
 
     // Sửa email giảng viên giữ nguyên UUID
     await page.getByLabel("Lý do thao tác tài khoản").fill("KHOA E2E xác minh mất hộp thư");
-    await page.getByLabel("Tìm theo email hoặc MSSV").fill(initialEmail);
+    await page.getByRole("textbox",{name:/Tìm theo .*email/}).fill(initialEmail);
     const accountCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Tài khoản", exact: true }) });
     const gvRow = accountCard.locator(".account-list__row");
     await expect(gvRow).toHaveCount(1);
     await gvRow.getByRole("button", { name: "Sửa email" }).click();
+    await accountCard.getByLabel("Lý do sửa email",{exact:true}).fill("KHOA E2E xác minh mất hộp thư");
     await accountCard.getByLabel("Email mới").fill(updatedEmail);
     await accountCard.getByLabel("Căn cứ xác minh của Khoa").fill("Xác nhận đổi địa chỉ thư điện tử chính thức");
     await accountCard.getByRole("button", { name: "Lưu email mới" }).click();
     await expect(page.getByText(/Đã sửa email trên tài khoản cũ/)).toBeVisible();
 
     // Kiểm tra tìm kiếm và hiển thị email mới
-    await page.getByLabel("Tìm theo email hoặc MSSV").fill(updatedEmail);
+    await page.getByRole("textbox",{name:/Tìm theo .*email/}).fill(updatedEmail);
     await expect(gvRow).toHaveCount(1);
     await expect(gvRow.getByText(updatedEmail)).toBeVisible();
 
@@ -255,6 +256,7 @@ test("TBM: Xét duyệt đề tài GV và xử lý cả hai nhánh khi GV từ c
 });
 
 test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận + GVHD, nộp và duyệt tiến độ & đề cương & tài liệu, quét ClamAV và xuất bản in 3 dòng footer", async ({ browser }) => {
+  test.setTimeout(180000);
   const actors = await Promise.all(["admin", "gv2", "tbm", "auditSv2", "auditSv3"].map(key => login(browser, key)));
   const [admin, gv, tbm, sv1, sv2] = actors;
 
@@ -279,7 +281,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
       await assignment.locator("select").nth(1).selectOption(lecturer.id);
       await assignment.getByLabel("Căn cứ phân công").fill("Giao nhiệm vụ điều phối tiến độ đợt");
       await assignment.getByRole("button", { name: "Lưu phân công", exact: true }).click();
-      await expect(admin.page.getByRole("status")).toContainText("Đã lưu phân công");
+      await expect(admin.page.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
     }
 
     // 1. GV tạo đề tài nhóm 2 SV

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type { Review } from "../../api";
+import ReviewCommentText from "./ReviewCommentText";
 
 export const stateLabel: Record<string, string> = {
   ACTIVE: "Đang thực hiện", IN_PROGRESS: "Đang thực hiện", PROPOSAL_APPROVED: "Đề cương đã duyệt",
@@ -13,6 +14,7 @@ export const stateLabel: Record<string, string> = {
   DEPARTMENT_FINALIZED: "Bộ môn đã chốt", DEAN_CONFIRMED: "Đã ghi nhận bản ký Trưởng khoa",
   COMMENT: "Góp ý đề cương",
   LOCKED: "Đã khóa", DISABLED: "Ngừng sử dụng", FINAL: "Bản cuối đã khóa",
+  SUPERSEDED: "Đã có phiên bản mới",
 };
 
 export function formatDate(value: string | null) {
@@ -26,7 +28,7 @@ export function Status({value, label}: {value: string; label?: string}) {
 export function Reviews({items}: {items: Review[]}) {
   return <div className="stack">{items.map((item, index) => <div className="core-review" key={`${item.created_at}-${index}`}>
     <strong>{item.reviewer_name}</strong> · {stateLabel[item.decision] || item.decision}
-    <p className="core-prewrap">{item.comment}</p>
+    <p className="core-prewrap"><ReviewCommentText text={item.comment} /></p>
     <small className="text-muted">{formatDate(item.created_at)}</small>
   </div>)}</div>;
 }
@@ -38,12 +40,13 @@ export function ReviewForm({choices, disabled, onSubmit}: {
   const id = useId();
   const [decision, setDecision] = useState(choices[0].value);
   const [comment, setComment] = useState("");
+  const selected = choices.some(choice=>choice.value===decision) ? decision : choices[0].value;
   return <form className="core-form" onSubmit={async (event) => {
     event.preventDefault();
-    if (await onSubmit(decision, comment.trim())) setComment("");
+    if (await onSubmit(selected, comment.trim())) setComment("");
   }}>
     <div className="input-group"><label htmlFor={`${id}-decision`}>Kết quả</label>
-      <select className="input" id={`${id}-decision`} value={decision} onChange={event => setDecision(event.target.value)} disabled={disabled}>
+      <select className="input" id={`${id}-decision`} value={selected} onChange={event => setDecision(event.target.value)} disabled={disabled}>
         {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
       </select>
     </div>

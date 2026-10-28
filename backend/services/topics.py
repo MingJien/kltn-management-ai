@@ -45,6 +45,9 @@ def _audit(session: Session, topic: m.Topic, actor: UUID, action: str,
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4(),
     ))
 
+    from backend.services.workflow_notices import topic_event
+    topic_event(session, topic, actor, action)
+
 
 def _title_version(session: Session, topic: m.Topic, actor: UUID, title: str,
                    reason: str | None = None) -> None:
@@ -159,11 +162,14 @@ def visible_topics(session: Session, user: m.UserAccount,
                  m.Topic.receiving_lecturer_id == viewer.id),
             m.Topic.state == "SUBMITTED" if head else m.Topic.proposer_user_id == user.id,
         )
+    elif user.base_role == "ADMIN" and view == "all":
+        viewer = None
     else:
         return []
-    query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
     if view == "all":
-        query = query.where(m.Topic.state == "APPROVED")
+        query = select(m.Topic).where(m.Topic.state.in_(["APPROVED", "LOCKED"]))
+    else:
+        query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
     if round_id is not None:
         query = query.where(m.Topic.round_id == round_id)
     if search:
@@ -189,6 +195,8 @@ def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> 
     row = session.get(m.Topic, topic_id)
     if row is None:
         _fail(404, "Topic not found")
+    if row.state in {"APPROVED", "LOCKED"} and user.base_role in {"ADMIN", "LECTURER", "STUDENT"}:
+        return topic_out(session, row)
     if user.base_role == "STUDENT":
         viewer = profile(session, user, "STUDENT")
         allowed = row.state == "APPROVED" or row.proposer_user_id == user.id or session.scalar(

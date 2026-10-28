@@ -106,6 +106,7 @@ class ThesisMemberOut(BaseModel):
 
 class ThesisWorkspaceOut(BaseModel):
     id: UUID
+    registration_id: UUID
     title: str
     state: str
     row_version: int
@@ -119,6 +120,25 @@ class ThesisWorkspaceOut(BaseModel):
     pending_advisor: PendingAdvisorOut | None
     cross_reviewers: list[PendingAdvisorOut]
     actions: list[str]
+
+
+class RegistrationFormVersionOut(BaseModel):
+    id: UUID
+    version_no: int
+    form_code: Literal["1A", "1B"]
+    file_name: str
+    byte_size: int
+    scan_state: str
+    submitted_at: datetime
+    submitted_by_name: str
+    current: bool
+
+
+class RegistrationFormsOut(BaseModel):
+    form_code: Literal["1A", "1B"]
+    can_submit: bool
+    registration_version: int
+    versions: list[RegistrationFormVersionOut]
 
 
 class MilestoneOut(BaseModel):
@@ -142,7 +162,7 @@ class DocumentDeadlineOut(BaseModel):
 
 
 class DocumentDeadlineSet(BaseModel):
-    document_type: Literal["PROPOSAL", "PLAN", "SUPPORTING"]
+    document_type: Literal["PROPOSAL", "PLAN", "REPORT", "SUPPORTING"]
     due_at: AwareDatetime
     reason: str = Field(min_length=3, max_length=2000)
 
@@ -156,6 +176,15 @@ class ReviewOut(BaseModel):
     decision: str
     comment: str
     created_at: datetime
+
+
+class PrintExportOut(BaseModel):
+    id: UUID
+    actor_name: str
+    document_code: str
+    version_no: int
+    exported_at: datetime
+    copy_status: Literal["SUBMITTED", "APPROVED"]
 
 
 class ProposalVersionOut(BaseModel):
@@ -201,6 +230,39 @@ class ProgressOut(BaseModel):
     evidence_scan_state: str | None
     evidence_file_name: str | None
     reviews: list[ReviewOut]
+
+
+class ProgressAnnotationSave(BaseModel):
+    annotation_kind: Literal["PIN", "SUMMARY", "ATTACHMENT"] = "PIN"
+    page_number: int | None = Field(default=None, ge=1, le=10000)
+    x: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    y: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    location_label: str = Field(default="", max_length=255)
+    quoted_text: str = Field(default="", max_length=1000)
+    comment: str = Field(default="", max_length=2000)
+
+
+class ReviewAttachmentOut(BaseModel):
+    file_name: str
+    byte_size: int
+    scan_state: str
+
+
+class ProgressAnnotationOut(ProgressAnnotationSave):
+    attachment: ReviewAttachmentOut | None = None
+    id: UUID
+    reviewer_id: UUID
+    reviewer_name: str
+    state: str
+    row_version: int
+    updated_at: datetime
+    published_at: datetime | None
+
+
+class ProgressAnnotationsOut(BaseModel):
+    annotations: list[ProgressAnnotationOut]
+    can_edit: bool
+    read_only_reason: str | None = None
 
 
 class DocumentVersionOut(BaseModel):

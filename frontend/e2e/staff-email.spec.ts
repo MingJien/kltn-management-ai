@@ -22,13 +22,13 @@ test("ADMIN sửa email giảng viên trên tài khoản cũ, giữ UUID và c�
     await page.getByLabel("Mã giảng viên").fill(`E2E-EMAIL-${suffix}`);
     await page.getByLabel("Họ tên").fill("GV sửa email");
     await page.getByLabel("Email",{exact:true}).fill(oldEmail);
-    const department = page.getByLabel("Bộ môn");
+    const department = page.getByRole("combobox",{name:"Bộ môn",exact:true});
     await expect(department.locator("option")).not.toHaveCount(1);
     await department.selectOption({index:1});
     await page.getByRole("button",{name:"Tạo và gửi lời mời"}).click();
     await expect(page.getByText(/Đã tạo tài khoản/)).toBeVisible();
     await page.getByLabel("Lý do thao tác tài khoản").fill("KHOA E2E xác minh mất hộp thư");
-    await page.getByLabel("Tìm theo email hoặc MSSV").fill(oldEmail);
+    await page.getByRole("textbox",{name:/Tìm theo .*email/}).fill(oldEmail);
     const card = page.locator("section.card").filter({has: page.getByRole("heading",{name:"Tài khoản",exact:true})});
     const rows = card.locator(".account-list__row");
     await expect(rows).toHaveCount(1);
@@ -41,7 +41,7 @@ test("ADMIN sửa email giảng viên trên tài khoản cũ, giữ UUID và c�
     await card.getByLabel("Căn cứ xác minh của Khoa").fill("KHOA-E2E-EMAIL");
     await card.getByRole("button",{name:"Lưu email mới"}).click();
     await expect(page.getByText(/Đã sửa email trên tài khoản cũ/)).toBeVisible();
-    await page.getByLabel("Tìm theo email hoặc MSSV").fill(newEmail);
+    await page.getByRole("textbox",{name:/Tìm theo .*email/}).fill(newEmail);
     await expect(rows).toHaveCount(1);
     await expect(rows.getByText(newEmail)).toBeVisible();
     await expect(rows.getByText("chưa kích hoạt")).toBeVisible();

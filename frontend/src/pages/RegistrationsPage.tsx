@@ -7,6 +7,8 @@ import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import Dialog from "../components/ui/Dialog";
 import PageHeader from "../components/layout/PageHeader";
+import RegistrationForms from "../components/domain/RegistrationForms";
+import { scanLabel } from "../components/domain/ThesisDocuments";
 
 const PAGE_SIZE = 24;
 export default function RegistrationsPage({userId, context}: {userId: string; context: Context}) {
@@ -134,7 +136,12 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
               {member.is_coordinator ? " · đại diện" : ""}{!member.active ? " · đã kết thúc đăng ký" : ""}
               {member.active && member.consent_status !== "ACCEPTED" ? <ThesisStatusBadge state={member.consent_status} /> : null}
               {member.evidence_file_name && (context.base_role !== "STUDENT" || me?.active || member.student_id === context.student_id) ?
-                <div><a href={evidenceUrl(row.id,member.student_id)}>Tải minh chứng: {member.evidence_file_name}</a></div> : null}
+                <div className="stack">
+                  {member.evidence_scan_state === "CLEAN" ? <a href={evidenceUrl(row.id,member.student_id)}>Tải minh chứng: {member.evidence_file_name}</a>
+                    : <span>{member.evidence_file_name} · {scanLabel(member.evidence_scan_state || "QUARANTINED")}. Chưa thể tải tệp này.</span>}
+                  {["QUARANTINED", "FAILED"].includes(member.evidence_scan_state || "QUARANTINED") && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+                    onClick={() => void operate(() => request(`/topic-registrations/${row.id}/members/${member.student_id}/evidence/scan`, userId, {method:"POST"}), "Đã quét lại minh chứng; xem trạng thái tệp.")}>Quét lại minh chứng của {member.display_name}</button>}
+                </div> : null}
             </li>)}</ul></div>
           {row.lecturer_reason ? <p className="alert alert-warning">Lý do của GV: {row.lecturer_reason}</p> : null}
           {row.proposer_type === "STUDENT" && row.state === "SUBMITTED" && row.topic_state !== "APPROVED" ?
@@ -176,6 +183,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
             <span className="text-caption">{draft ? "Tệp mới thay minh chứng đang gắn. Sau gửi hồ sơ, minh chứng được khóa."
               : "Bạn vừa tham gia nhóm đã gửi: có thể bổ sung minh chứng lần đầu trước khi GV xét."}</span>
           </div> : null}
+          {(me?.active || context.base_role === "LECTURER") && <RegistrationForms row={row} userId={userId} onChanged={reload} />}
           <div className="registration-card__actions">
             {draft && me?.active ? <>
               {me.consent_status === "PENDING" ? <button className="btn btn-secondary" disabled={busy}
@@ -191,7 +199,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
             </> : null}
             {row.state === "LECTURER_REJECTED" && row.proposer_type === "STUDENT" && context.actions.includes("topic:department_decide") ?
               <button className="btn btn-secondary" disabled={busy} onClick={() => {setResolutionTarget(row); setResolutionChoice("REASSIGN"); setResolutionLecturerId(""); setResolutionReason(""); setError("");}}>Xử lý GV từ chối</button> : null}
-            {row.thesis_id ? <Link className="btn btn-primary" to={"/theses/" + row.thesis_id}>Mở hồ sơ khóa luận · đề cương · tiến độ · tài liệu</Link> : null}
+            {row.thesis_id ? <Link className="btn btn-primary" to={"/theses/" + row.thesis_id}>Mở hồ sơ khóa luận</Link> : null}
             {me?.can_withdraw ? <>
               <p className="registration-card__hint"><Info size={15} aria-hidden="true" />
                 {row.state === "SUBMITTED" ? "GV chưa chấp nhận — có thể rút để chọn đề tài khác khi đợt còn mở."

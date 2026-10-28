@@ -253,16 +253,22 @@ export default function RosterPage({context}: {context:Context}) {
               <p>Kiểm tra tệp, xem trước dữ liệu; khi nhập, sinh viên được ghi nhận đủ điều kiện ngay và có thể kích hoạt tài khoản.</p></div><span className="badge badge-primary">CSV · XLSX</span></div>
             <div className="card-body stack">
               <div className="roster-form-grid">
-                <label className="input-group">Tệp danh sách<input id="roster-file-input" className="input" type="file" accept=".csv,.xlsx" onChange={e=>{setFile(e.target.files?.[0]||null);setPreview(null);setError("");setNotice("");}} /></label>
-                {file && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
-                  <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                  <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
-                    setFile(null); setPreview(null);
-                    const el = document.getElementById("roster-file-input") as HTMLInputElement | null;
-                    if (el) el.value = "";
-                  }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
-                </div>}
-                <label className="input-group">Mã/số văn bản nguồn<input id="roster-reference" className="input" required minLength={3} maxLength={500} value={reference} onChange={e=>{setReference(e.target.value);setError("");}} placeholder="Demo: DEMO-DS-SV-DOT-1-2026" /></label>
+                <label className="input-group">
+                  <span>Tệp danh sách</span>
+                  <input id="roster-file-input" className="input" type="file" accept=".csv,.xlsx" onChange={e=>{setFile(e.target.files?.[0]||null);setPreview(null);setError("");setNotice("");}} />
+                  {file && <div className="roster-file-selected flex items-center justify-between gap-2">
+                    <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                    <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+                      setFile(null); setPreview(null);
+                      const el = document.getElementById("roster-file-input") as HTMLInputElement | null;
+                      if (el) el.value = "";
+                    }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+                  </div>}
+                </label>
+                <label className="input-group">
+                  <span>Mã/số văn bản nguồn</span>
+                  <input id="roster-reference" className="input" required minLength={3} maxLength={500} value={reference} onChange={e=>{setReference(e.target.value);setError("");}} placeholder="Demo: DEMO-DS-SV-DOT-1-2026" />
+                </label>
               </div>
               <div className="roster-help-note"><strong>Mã bộ môn trong Excel</strong>
                 <p>Cột này xác định bộ môn quản lý sinh viên và phạm vi đề tài, GVHD; hãy điền đúng mã đã có trong hệ thống. Không dùng mã giả lập cho danh sách thật.</p>

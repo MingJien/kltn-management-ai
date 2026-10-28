@@ -44,6 +44,8 @@ const messages: Record<string, string> = {
 };
 
 export function apiMessage(status: number, detail: unknown, path = ""): string {
+  if (path.startsWith("/admin/lecturers") && typeof detail === "string"
+      && [409, 413, 422, 429, 503].includes(status)) return messages[detail] || detail;
   if (status === 422 && path.includes("/roster")) {
     if (Array.isArray(detail)) {
       const locations = detail.flatMap(item => Array.isArray(item?.loc) ? item.loc : []);

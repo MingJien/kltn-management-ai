@@ -17,6 +17,10 @@ from backend.services.theses import now
 def workspace(scenario, monkeypatch, tmp_path):
     client, users, students, lecturers, topic, session = scenario
     monkeypatch.setenv("KLTN_DOCUMENT_DIR", str(tmp_path / "documents"))
+    # Service tests exercise quarantine explicitly; real ClamAV is covered by browser integration.
+    from backend.services import file_scanner
+    monkeypatch.setattr(file_scanner, "executable", lambda: None)
+    monkeypatch.setattr(file_scanner, "clamdscan_executable", lambda: None)
     made = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={
         "topic_id": str(topic.id), "member_student_ids": [str(students[0].id)], "confirm_creator": True})
     assert made.status_code == 201, made.text
@@ -31,10 +35,9 @@ def workspace(scenario, monkeypatch, tmp_path):
     thesis_id = accepted["thesis_id"]
     session.add(m.ResourceAssignment(id=uuid4(), assignment_type="KLTN_COORDINATOR", user_id=users[4].id,
         round_id=topic.round_id, effective_from=now()-timedelta(days=1), state="ACTIVE"))
-    for doc_type in ("PROPOSAL", "PLAN", "SUPPORTING"):
-        session.add(m.DocumentDeadline(id=uuid4(), round_id=topic.round_id,
-            document_type=doc_type, due_at=now()+timedelta(days=30),
-            state="OPEN", set_by=users[4].id, reason="Initial deadline"))
+    for kind in ("PROPOSAL","PLAN","SUPPORTING"):
+        session.add(m.DocumentDeadline(id=uuid4(), round_id=topic.round_id, document_type=kind,
+            due_at=now()+timedelta(days=7), state="OPEN", set_by=users[4].id, reason="Synthetic test policy"))
     session.commit()
     return client, users, students, lecturers, session, f"/api/v1/theses/{thesis_id}"
 
@@ -103,22 +106,20 @@ def test_progress_revision_cross_comment_and_closed_milestone(workspace):
     assert report.status_code == 201, report.text
     first = report.json()
     assert client.post(path+"/progress-reports", headers=hdr(users[1]), json=payload).status_code == 409
+    # Progress is private to the group and formal advisor, including when a former peer role exists.
     thesis = client.get(path, headers=hdr(users[4])).json()
-    assert client.post(path+"/progress-reviewers", headers=version_headers(users[4], thesis), json={
-        "lecturer_id": str(lecturers[2].id), "reason": "Internal peer comments"}).status_code == 204
-    assert client.get(path+"/documents", headers=hdr(users[5])).status_code == 403
-    assert client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[5], first), json={
-        "decision": "CONFIRM", "comment": "Peer cannot confirm"}).status_code == 403
-    commented = client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[5], first), json={
-        "decision": "COMMENT_ONLY", "comment": "Consider extra validation"})
-    assert commented.status_code == 200, commented.text
-    assert commented.json()["state"] == "SUBMITTED"
-    returned = client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[3], commented.json()), json={
+    assert client.post(path+"/progress-reviewers", headers=version_headers(users[4],thesis), json={
+        "lecturer_id":str(lecturers[2].id),"reason":"Retired peer workflow"}).status_code==403
+    assert client.get(path+"/progress-reports",headers=hdr(users[4])).status_code==403
+    assert client.get(path+"/progress-reports",headers=hdr(users[5])).status_code==404
+    returned = client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[3], first), json={
         "decision": "REVISION_REQUIRED", "comment": "Add measurements"})
     assert returned.status_code == 200, returned.text
     second = client.post(path+"/progress-reports", headers=hdr(users[1]), json={**payload, "summary": "Revised with measurements"})
     assert second.status_code == 201, second.text
     assert second.json()["version_no"] == 2
+    assert client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[3], first), json={
+        "decision": "CONFIRM", "comment": "A stale screen must not confirm version 1"}).status_code == 409
     confirmed = client.post(path+f"/progress-reports/{second.json()['id']}/review", headers=version_headers(users[3], second.json()), json={
         "decision": "CONFIRM", "comment": "Measurements verified"})
     assert confirmed.status_code == 200, confirmed.text
@@ -181,17 +182,17 @@ def upload(client, user, path, doc, content=b"Synthetic report", name="report.tx
         "Content-Type": "application/octet-stream", "X-File-Name": name}, content=content)
 
 
-def test_progress_report_cannot_be_created_as_standalone_document(workspace):
+def test_final_thesis_report_is_distinct_from_milestone_progress(workspace):
     client, users, _, _, _, path = workspace
     response = client.post(path+"/documents", headers=hdr(users[0]),
-        json={"title": "Progress report outside milestone", "document_type": "REPORT"})
-    assert response.status_code == 409
-    assert "Tiến độ" in response.json()["detail"]
-    assert client.get(path+"/documents", headers=hdr(users[0])).json() == []
+        json={"title": "Cuốn báo cáo KLTN trước bảo vệ", "document_type": "REPORT"})
+    assert response.status_code == 201
+    assert response.json()["document_type"] == "REPORT"
+    assert len(client.get(path+"/documents", headers=hdr(users[0])).json()) == 1
+    assert client.get(path+"/progress-reports", headers=hdr(users[0])).json() == []
 
 
 def test_document_versions_review_download_and_corruption_detection(workspace, monkeypatch):
-    monkeypatch.setattr("backend.services.documents.file_scanner.scan", lambda file, path: file.scan_state)
     client, users, _, _, session, path = workspace
     doc = client.post(path+"/documents", headers=hdr(users[0]), json={"title": "Results", "document_type": "SUPPORTING"}).json()
     first = upload(client, users[0], path, doc)
@@ -235,6 +236,10 @@ def test_student_withdraws_mistaken_document_without_erasing_versions(workspace)
     uploaded = upload(client, users[0], path, created, b"Wrong attachment", "wrong.txt")
     assert uploaded.status_code == 201, uploaded.text
     doc = uploaded.json()
+    corrected = upload(client, users[0], path, doc, b"Corrected but still wrong attachment", "wrong-v2.txt")
+    assert corrected.status_code == 201, corrected.text
+    doc = corrected.json()
+    assert len(doc["versions"]) == 2 and doc["versions"][1]["state"] == "SUPERSEDED"
     withdraw = path+f"/documents/{doc['id']}/withdraw"
     assert client.post(withdraw, headers=version_headers(users[3], doc),
         json={"reason": "Wrong attachment"}).status_code == 403
@@ -248,8 +253,7 @@ def test_student_withdraws_mistaken_document_without_erasing_versions(workspace)
     assert session.scalar(select(m.AuditEvent.id).where(m.AuditEvent.action == "DOCUMENT_WITHDRAWN"))
 
 
-def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace, monkeypatch):
-    monkeypatch.setattr("backend.services.documents.file_scanner.scan", lambda file, path: file.scan_state)
+def test_advisor_can_request_reupload_before_scan_but_cannot_accept(workspace):
     client, users, _, _, _, path = workspace
     created = client.post(path+"/documents", headers=hdr(users[0]),
         json={"title": "Report for advisor", "document_type": "SUPPORTING"}).json()
@@ -296,7 +300,7 @@ def test_approved_document_print_copy_has_footer_and_preserves_source(workspace)
     assert exported.headers["x-exported-at"]
     assert len(exported.headers["x-print-sha256"]) == 64
     footer = PdfReader(BytesIO(exported.content)).pages[0].extract_text()
-    assert code in footer and ("5173" in footer) and ("Ma:" in footer or "ma so" in footer)
+    assert code in footer and ("5173" in footer) and ("Ma so:" in footer or "ma so" in footer)
     event = session.scalar(select(m.AuditEvent).where(m.AuditEvent.action == "DOCUMENT_PRINT_COPY_EXPORTED"))
     assert event and event.after_hash == exported.headers["x-print-sha256"]
     original = client.get(path+f"/documents/{doc['id']}/versions/{version['id']}/download", headers=hdr(users[0]))
@@ -395,12 +399,15 @@ def test_proposal_versions_scoped_review_and_paper_reference(workspace, monkeypa
     assert revision.status_code == 200, revision.text
     row = revision.json()
     assert row["state"] == "REVISION_REQUIRED"
+    stale_row = dict(row)
     second = client.post(path+"/proposal/versions", headers={**version_headers(users[1], row),
         "X-File-Name": "proposal-v2.pdf", "Content-Type": "application/octet-stream"},
         content=b"%PDF-1.4\nrevised synthetic proposal")
     assert second.status_code == 201, second.text
     row = second.json()
     assert [v["version_no"] for v in row["versions"]] == [2, 1]
+    assert client.post(path+"/proposal/reviews", headers=version_headers(users[3], stale_row),
+        json={"decision": "CONFIRM", "comment": "A stale screen must not confirm the replacement"}).status_code == 409
     v2_file = session.get(m.StoredFile, session.get(m.ProposalVersion, row["versions"][0]["id"]).stored_file_id)
     v2_file.scan_state = "CLEAN"
     session.commit()
@@ -464,9 +471,12 @@ def test_finalized_proposal_print_copy_has_footer_and_preserves_source(workspace
     assert exported.headers["x-exported-at"]
     assert len(exported.headers["x-print-sha256"]) == 64
     footer = PdfReader(BytesIO(exported.content)).pages[0].extract_text()
-    assert code in footer and ("5173" in footer) and ("Ma:" in footer or "ma so" in footer)
+    assert code in footer and ("5173" in footer) and ("Ma so:" in footer or "ma so" in footer)
     event = session.scalar(select(m.AuditEvent).where(m.AuditEvent.action == "PROPOSAL_PRINT_COPY_EXPORTED"))
     assert event and event.after_hash == exported.headers["x-print-sha256"]
+    history = client.get(print_path.removesuffix("/print-copy") + "/print-history", headers=hdr(users[0]))
+    assert history.status_code == 200 and history.json()[0]["document_code"] == code
+    assert history.json()[0]["copy_status"] == "APPROVED"
     original = client.get(path+f"/proposal/versions/{version_id}/download", headers=hdr(users[0]))
     assert original.content == source_pdf
 
@@ -517,7 +527,7 @@ def test_cross_department_and_expired_assignments_do_not_grant_access(workspace)
     assert client.post(path+"/advisor-nomination", headers=version_headers(users[4], original), json={
         "lecturer_id": str(lecturers[2].id), "reason": "Wrong department"}).status_code == 404
     assert client.post(path+"/progress-reviewers", headers=version_headers(users[4], original), json={
-        "lecturer_id": str(lecturers[2].id), "reason": "Wrong department"}).status_code == 422
+        "lecturer_id": str(lecturers[2].id), "reason": "Wrong department"}).status_code == 403
     head = session.scalar(select(m.PositionAssignment).where(m.PositionAssignment.lecturer_id == lecturers[1].id))
     head.effective_to = now()-timedelta(hours=1)
     session.commit()
@@ -529,18 +539,16 @@ def test_cross_department_and_expired_assignments_do_not_grant_access(workspace)
         "lecturer_id": str(lecturers[0].id), "reason": "Expired position"}).status_code == 403
 
 
-def test_cross_reviewer_revocation_takes_effect_immediately(workspace):
-    client, users, _, lecturers, _, path = workspace
+def test_old_cross_reviewer_assignment_no_longer_grants_private_progress(workspace):
+    from backend.services.theses import now
+    client, users, _, lecturers, session, path = workspace
     original = client.get(path, headers=hdr(users[4])).json()
-    assert client.post(path+"/progress-reviewers", headers=version_headers(users[4], original), json={
-        "lecturer_id": str(lecturers[2].id), "reason": "Peer checkpoint review"}).status_code == 204
-    assigned = client.get(path, headers=hdr(users[4])).json()
-    assert assigned["cross_reviewers"][0]["lecturer_id"] == str(lecturers[2].id)
-    assert client.get(path+"/progress-reports", headers=hdr(users[5])).status_code == 200
-    assert client.post(path+f"/progress-reviewers/{lecturers[2].id}/revoke", headers=version_headers(users[4], assigned), json={
-        "reason": "Checkpoint finished"}).status_code == 204
-    assert client.get(path, headers=hdr(users[5])).status_code == 404
-    assert client.get(path+"/progress-reports", headers=hdr(users[5])).status_code == 404
+    session.add(m.ResourceAssignment(id=uuid4(),user_id=users[5].id,thesis_id=original["id"],
+        assignment_type="PROGRESS_REVIEWER",state="ACTIVE",effective_from=now()))
+    session.commit()
+    assert client.get(path+"/progress-reports",headers=hdr(users[5])).status_code==404
+    assert client.get(path,headers=hdr(users[4])).json()["cross_reviewers"]==[]
+    assert client.post(path+f"/progress-reviewers/{lecturers[2].id}/revoke",headers=version_headers(users[4],original),json={"reason":"Legacy workflow disabled"}).status_code==403
 
 
 def test_status_and_password_changes_revoke_all_previous_sessions(workspace):

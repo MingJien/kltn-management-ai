@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Context } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import LecturerImport from "../components/domain/LecturerImport";
 import {
   AlertTriangle,
   Ban,
@@ -75,12 +77,14 @@ export default function AdministrationPage({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lecturerRevision, setLecturerRevision] = useState(0);
   const [term, setTerm] = useState("");
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const isAdmin = context.base_role === "ADMIN";
 
   const assignmentDescriptions: Record<string, string> = {
+    FORM_MANAGER: "Được thêm, cập nhật, phát hành và thu hồi biểu mẫu/tài liệu Khoa của đợt được giao; không có quyền duyệt đề tài hoặc gia hạn mốc.",
     ELIGIBILITY_IMPORTER:
       "Được nhập danh sách chính thức của Khoa; sinh viên được ghi nhận đủ điều kiện ngay. Sinh viên vẫn phải kích hoạt tài khoản trước khi gửi đăng ký.",
     ELIGIBILITY_VERIFIER:
@@ -97,6 +101,7 @@ export default function AdministrationPage({
 
   function changeKind(next: string) {
     setKind(next);
+    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && next !== "FORM_MANAGER") {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
     if (userId && !staffAccounts.some((a) => a.id === userId && eligibleStaff(a, next))) {
       setUserId("");
       setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
@@ -189,6 +194,7 @@ export default function AdministrationPage({
     setNotice("");
     try {
       const result = await action();
+      setLecturerRevision(value => value + 1);
       await refresh(search.trim() || term, page);
       if (permissionsChanged) await onPermissionsChanged();
       setNotice(typeof result === "string" ? result : message);
@@ -214,6 +220,7 @@ export default function AdministrationPage({
       />
 
       <div className="stack">
+        <Link className="btn btn-secondary" to="/forms">Mở quản lý biểu mẫu và tài liệu Khoa</Link>
         {error ? (
           <p role="alert" className="alert alert-danger" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <AlertTriangle size={18} aria-hidden="true" /> {error}
@@ -225,8 +232,9 @@ export default function AdministrationPage({
           </p>
         ) : null}
 
+        {isAdmin ? <LecturerImport userId={context.user_id} departments={departments} refreshVersion={lecturerRevision} onCreated={() => refresh(term, page)} /> : null}
         {isAdmin && (
-          <div className="grid grid-auto">
+          <div className="admin-grid-top">
             {/* CARD 1: MỜI GIẢNG VIÊN */}
             <section className="card admin-card">
               <div className="admin-card__header">
@@ -239,6 +247,7 @@ export default function AdministrationPage({
                     <p className="admin-card__subtitle">Tạo tài khoản và gửi liên kết kích hoạt qua email</p>
                   </div>
                 </div>
+                <span className="admin-card__counter">Giảng viên mới</span>
               </div>
               <div className="card-body stack">
                 <form
@@ -261,48 +270,56 @@ export default function AdministrationPage({
                     }, "Đã tạo tài khoản.");
                   }}
                 >
-                  <label className="input-group">
-                    Mã giảng viên
-                    <input
-                      className="input"
-                      required
-                      placeholder="VD: GV001"
-                      value={lecturerCode}
-                      onChange={(e) => setLecturerCode(e.target.value)}
-                    />
-                  </label>
-                  <label className="input-group">
-                    Họ tên
-                    <input
-                      className="input"
-                      required
-                      placeholder="VD: TS. Nguyễn Văn A"
-                      value={lecturerName}
-                      onChange={(e) => setLecturerName(e.target.value)}
-                    />
-                  </label>
-                  <label className="input-group">
-                    Email
-                    <input
-                      className="input"
-                      type="email"
-                      required
-                      placeholder="email@truong.edu.vn"
-                      value={lecturerEmail}
-                      onChange={(e) => setLecturerEmail(e.target.value)}
-                    />
-                  </label>
-                  <label className="input-group">
-                    Bộ môn
-                    <select className="input" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-                      <option value="">Chọn bộ môn trực thuộc</option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.code} · {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="grid grid-cols-2">
+                    <label className="input-group">
+                      Mã giảng viên
+                      <input
+                        className="input"
+                        required
+                        placeholder="VD: GV001"
+                        value={lecturerCode}
+                        onChange={(e) => setLecturerCode(e.target.value)}
+                      />
+                    </label>
+                    <label className="input-group">
+                      Bộ môn
+                      <select className="input" required value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+                        <option value="">Chọn bộ môn trực thuộc</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.code} · {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2">
+                    <label className="input-group">
+                      Họ tên
+                      <input
+                        className="input"
+                        required
+                        placeholder="VD: TS. Nguyễn Văn A"
+                        value={lecturerName}
+                        onChange={(e) => setLecturerName(e.target.value)}
+                      />
+                    </label>
+                    <label className="input-group">
+                      Email
+                      <input
+                        className="input"
+                        type="email"
+                        required
+                        placeholder="email@truong.edu.vn"
+                        value={lecturerEmail}
+                        onChange={(e) => setLecturerEmail(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="admin-callout admin-callout--neutral">
+                    <Info size={15} aria-hidden="true" />
+                    <span>Hệ thống tạo tài khoản cơ sở và gửi liên kết kích hoạt đến hộp thư công vụ.</span>
+                  </div>
                   <button className="btn btn-primary" disabled={busy}>
                     <UserPlus size={16} aria-hidden="true" /> Tạo và gửi lời mời
                   </button>
@@ -322,6 +339,7 @@ export default function AdministrationPage({
                     <p className="admin-card__subtitle">Gán trách nhiệm quản trị đợt khóa luận cho cán bộ/GV</p>
                   </div>
                 </div>
+                <span className="admin-card__counter">Nhiệm vụ đợt</span>
               </div>
               <div className="card-body stack">
                 <form
@@ -357,7 +375,7 @@ export default function AdministrationPage({
                     <select className="input" required value={roundId} onChange={(e) => setRoundId(e.target.value)}>
                       <option value="">Chọn đợt khóa luận áp dụng</option>
                       {rounds
-                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN")
+                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (kind === "FORM_MANAGER" && r.state === "CLOSED"))
                         .map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.code} · {r.state}
@@ -371,7 +389,7 @@ export default function AdministrationPage({
                       <input
                         className="input"
                         aria-label="Tìm người được giao theo mã hoặc tên"
-                        placeholder="Mã GV hoặc tên"
+                        placeholder="Mã hoặc tên GV"
                         maxLength={100}
                         value={staffSearch}
                         disabled={busy}
@@ -402,7 +420,7 @@ export default function AdministrationPage({
                       </select>
                     </div>
                     <span className="text-caption">{matchingStaff.length} tài khoản phù hợp. Tìm bằng mã/tên, rồi chọn email bên phải.</span>
-                    {selectedStaff ? <p role="status" className="text-caption">Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
+                    {selectedStaff ? <p role="status" className="text-caption" style={{ color: "var(--primary-800)", fontWeight: 500 }}>Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
                   </div>
                   <label className="input-group">
                     Nhiệm vụ
@@ -412,6 +430,7 @@ export default function AdministrationPage({
                       <option value="ELIGIBILITY_VERIFIER">Điều chỉnh/thu hồi điều kiện</option>
                       <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
                       <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
+                      <option value="FORM_MANAGER">Quản lý biểu mẫu và tài liệu Khoa</option>
                     </select>
                   </label>
                   {assignmentDescriptions[kind] ? (
@@ -458,64 +477,94 @@ export default function AdministrationPage({
                   <p className="admin-card__subtitle">Các quyền hạn bổ nhiệm đang hoạt động trong các đợt khóa luận</p>
                 </div>
               </div>
+              <span className="admin-card__counter">{assignments.length} phân công</span>
             </div>
             <div className="card-body stack">
-              <label className="input-group">
-                <span>
-                  Lý do thu hồi (nếu cần){" "}
-                  <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để kích hoạt nút Thu hồi)</small>
-                </span>
-                <input
-                  className="input"
-                  minLength={5}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Nhập lý do thu hồi nhiệm vụ..."
-                />
-              </label>
+              <div className="admin-revoke-bar">
+                <label className="input-group">
+                  <span className="admin-reason-label">
+                    <Shield size={14} aria-hidden="true" style={{ color: "var(--primary-600)" }} />
+                    <span>Lý do thu hồi (nếu cần)</span>
+                    <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để kích hoạt nút Thu hồi)</small>
+                  </span>
+                  <input
+                    className="input"
+                    minLength={5}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Nhập lý do thu hồi nhiệm vụ..."
+                  />
+                </label>
+                <div
+                  className={`admin-reason-status ${
+                    reason.trim().length >= 5 ? "admin-reason-status--valid" : "admin-reason-status--hint"
+                  }`}
+                >
+                  {reason.trim().length >= 5 ? (
+                    <>
+                      <CheckCircle2 size={13} aria-hidden="true" /> Đã đủ điều kiện thu hồi ({reason.trim().length} ký tự)
+                    </>
+                  ) : (
+                    <>
+                      <Info size={13} aria-hidden="true" /> Cần tối thiểu 5 ký tự để thu hồi ({reason.trim().length}/5)
+                    </>
+                  )}
+                </div>
+              </div>
 
-              <div className="account-list">
-                {assignments.map((a) => (
-                  <div className="account-list__row assignment-item" key={a.id}>
-                    <div className="assignment-item__info">
-                      <span className="assignment-item__round">
-                        <Calendar size={13} aria-hidden="true" /> {a.round_code}
-                      </span>
-                      <span className="assignment-item__email">
-                        <Mail size={13} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px", color: "var(--neutral-400)" }} />
-                        {a.email}
-                      </span>
-                      <span className="badge badge-primary assignment-item__duty">
-                        <Briefcase size={12} aria-hidden="true" />
-                        {a.assignment_type === "ELIGIBILITY_VERIFIER"
-                          ? "Điều chỉnh/thu hồi điều kiện"
-                          : a.assignment_type === "ACCOUNT_MANAGER"
-                          ? "Quản lý tài khoản SV"
-                          : a.assignment_type === "KLTN_COORDINATOR"
-                          ? "Quản lý mốc tiến độ toàn đợt"
-                          : "Nhập danh sách SV"}
-                      </span>
+              <div className="account-list assignment-list">
+                {assignments.map((a) => {
+                  const dutyClass =
+                    a.assignment_type === "KLTN_COORDINATOR"
+                      ? "assignment-item__duty--coordinator"
+                      : a.assignment_type === "ELIGIBILITY_VERIFIER"
+                      ? "assignment-item__duty--verifier"
+                      : a.assignment_type === "ACCOUNT_MANAGER"
+                      ? "assignment-item__duty--manager"
+                      : "assignment-item__duty--importer";
+
+                  return (
+                    <div className="account-list__row assignment-item" key={a.id}>
+                      <div className="assignment-item__info">
+                        <span className="assignment-item__round">
+                          <Calendar size={13} aria-hidden="true" /> {a.round_code}
+                        </span>
+                        <span className="assignment-item__email">
+                          <Mail size={13} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px", color: "var(--neutral-400)" }} />
+                          {a.email}
+                        </span>
+                        <span className={`badge ${dutyClass} assignment-item__duty`}>
+                          <Briefcase size={12} aria-hidden="true" />
+                          {a.assignment_type === "FORM_MANAGER" ? "Quản lý biểu mẫu và tài liệu Khoa" : a.assignment_type === "ELIGIBILITY_VERIFIER"
+                            ? "Điều chỉnh/thu hồi điều kiện"
+                            : a.assignment_type === "ACCOUNT_MANAGER"
+                            ? "Quản lý tài khoản SV"
+                            : a.assignment_type === "KLTN_COORDINATOR"
+                            ? "Quản lý mốc tiến độ toàn đợt"
+                            : "Nhập danh sách SV"}
+                        </span>
+                      </div>
+                      <button
+                        className="btn btn-secondary btn-sm admin-btn-danger-hover"
+                        disabled={busy || reason.trim().length < 5}
+                        title={reason.trim().length < 5 ? "Cần nhập lý do thu hồi (ít nhất 5 ký tự)" : ""}
+                        onClick={() =>
+                          void run(
+                            () =>
+                              request(`/admin/round-assignments/${a.id}/revoke`, context.user_id, {
+                                method: "POST",
+                                body: JSON.stringify({ reason }),
+                              }),
+                            "Đã thu hồi phân công.",
+                            true,
+                          )
+                        }
+                      >
+                        Thu hồi
+                      </button>
                     </div>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      disabled={busy || reason.trim().length < 5}
-                      title={reason.trim().length < 5 ? "Cần nhập lý do thu hồi (ít nhất 5 ký tự)" : ""}
-                      onClick={() =>
-                        void run(
-                          () =>
-                            request(`/admin/round-assignments/${a.id}/revoke`, context.user_id, {
-                              method: "POST",
-                              body: JSON.stringify({ reason }),
-                            }),
-                          "Đã thu hồi phân công.",
-                          true,
-                        )
-                      }
-                    >
-                      Thu hồi
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
                 {!assignments.length ? (
                   <div className="admin-empty-state">
                     <Briefcase size={28} aria-hidden="true" />
@@ -539,33 +588,59 @@ export default function AdministrationPage({
                 <p className="admin-card__subtitle">Quản lý trạng thái, cấp lại mật khẩu/liên kết và hiệu chỉnh email</p>
               </div>
             </div>
+            <span className="admin-card__counter">{directoryCounts.ALL ?? accounts.length} tài khoản</span>
           </div>
 
           <div className="card-body stack">
             {/* Overview Metric Bar */}
             <div className="admin-metrics" role="region" aria-label="Thống kê tài khoản trang hiện tại">
               <div className="admin-metric-card">
-                <span className="admin-metric-card__label">Tổng trên trang</span>
-                <span className="admin-metric-card__value">{totalAccounts}</span>
+                <div className="admin-metric-card__icon-box">
+                  <Users size={18} aria-hidden="true" />
+                </div>
+                <div className="admin-metric-card__content">
+                  <span className="admin-metric-card__label">Tổng trên trang</span>
+                  <span className="admin-metric-card__value">{totalAccounts}</span>
+                </div>
               </div>
               <div className="admin-metric-card admin-metric-card--student">
-                <span className="admin-metric-card__label">Sinh viên</span>
-                <span className="admin-metric-card__value">{studentCount}</span>
+                <div className="admin-metric-card__icon-box">
+                  <GraduationCap size={18} aria-hidden="true" />
+                </div>
+                <div className="admin-metric-card__content">
+                  <span className="admin-metric-card__label">Sinh viên</span>
+                  <span className="admin-metric-card__value">{studentCount}</span>
+                </div>
               </div>
               <div className="admin-metric-card admin-metric-card--lecturer">
-                <span className="admin-metric-card__label">Giảng viên</span>
-                <span className="admin-metric-card__value">{lecturerCount}</span>
+                <div className="admin-metric-card__icon-box">
+                  <BookOpen size={18} aria-hidden="true" />
+                </div>
+                <div className="admin-metric-card__content">
+                  <span className="admin-metric-card__label">Giảng viên</span>
+                  <span className="admin-metric-card__value">{lecturerCount}</span>
+                </div>
               </div>
               <div className="admin-metric-card admin-metric-card--warning">
-                <span className="admin-metric-card__label">Chưa kích hoạt</span>
-                <span className="admin-metric-card__value">{unverifiedCount}</span>
+                <div className="admin-metric-card__icon-box">
+                  <Clock size={18} aria-hidden="true" />
+                </div>
+                <div className="admin-metric-card__content">
+                  <span className="admin-metric-card__label">Chưa kích hoạt</span>
+                  <span className="admin-metric-card__value">{unverifiedCount}</span>
+                </div>
               </div>
               {lockedOrDisabledCount > 0 && (
-                <div className="admin-metric-card">
-                  <span className="admin-metric-card__label">Bị khóa / Vô hiệu</span>
-                  <span className="admin-metric-card__value" style={{ color: "var(--danger-text)" }}>
-                    {lockedOrDisabledCount}
-                  </span>
+                <div className="admin-metric-card admin-metric-card--danger">
+                  <div className="admin-metric-card__icon-box">
+                    <Lock size={18} aria-hidden="true" />
+                  </div>
+                  <div className="admin-metric-card__content">
+                    <span className="admin-metric-card__label">Bị khóa / Vô hiệu</span>
+                    <span className="admin-metric-card__value" style={{ color: "var(--danger-text)" }}>
+                      {lockedOrDisabledCount}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -620,43 +695,46 @@ export default function AdministrationPage({
             <div className="admin-toolbar">
               <div className="admin-toolbar__row">
                 <form
-                  className="account-search admin-search-wrap"
+                  className="account-search"
                   onSubmit={(e) => {
                     e.preventDefault();
                     setTerm(search.trim());
                     setPage(0);
                   }}
                 >
-                  <Search size={16} className="admin-search-wrap__icon" aria-hidden="true" />
-                  <input
-                    className="input"
-                    aria-label="Tìm theo mã, tên hoặc email tài khoản"
-                    placeholder="Tìm email, MSSV, mã hoặc tên giảng viên..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  {search && (
-                    <button
-                      type="button"
-                      className="admin-search-wrap__clear"
-                      onClick={() => {
-                        setSearch("");
-                        setTerm("");
-                        setPage(0);
-                      }}
-                      aria-label="Xóa nội dung tìm kiếm"
-                    >
-                      <X size={14} aria-hidden="true" />
-                    </button>
-                  )}
+                  <div className="admin-search-wrap">
+                    <Search size={16} className="admin-search-wrap__icon" aria-hidden="true" />
+                    <input
+                      className="input"
+                      aria-label="Tìm theo mã, tên hoặc email tài khoản"
+                      placeholder="Tìm email, MSSV, mã hoặc tên giảng viên..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        className="admin-search-wrap__clear"
+                        onClick={() => {
+                          setSearch("");
+                          setTerm("");
+                          setPage(0);
+                        }}
+                        aria-label="Xóa nội dung tìm kiếm"
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                   <button className="btn btn-secondary">Tìm</button>
                 </form>
               </div>
 
               <div className="admin-reason-field">
                 <label className="input-group">
-                  <span>
-                    Lý do thao tác tài khoản{" "}
+                  <span className="admin-reason-label">
+                    <Shield size={14} aria-hidden="true" style={{ color: "var(--primary-600)" }} />
+                    <span>Lý do thao tác tài khoản</span>
                     <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để Khóa, Vô hiệu hóa hoặc Cấp lại)</small>
                   </span>
                   <input
@@ -825,6 +903,8 @@ export default function AdministrationPage({
 
                     {/* Actions Toolbar */}
                     <div className="account-list__actions">
+                      <Link className="btn btn-ghost btn-sm" style={{gridColumn: "1 / -1"}}
+                        to={`/activity?resource_type=user_account&resource_id=${a.id}`}>Lịch sử tài khoản</Link>
                       {isSelf ? (
                         <span
                           className="account-current-badge text-caption"
@@ -938,6 +1018,9 @@ export default function AdministrationPage({
                                 setEmailReason("");
                                 setOfficialRef("");
                                 setEmailRoundId("");
+                                setTimeout(() => {
+                                  document.querySelector(".admin-edit-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                }, 50);
                               }}
                             >
                               <Mail size={13} aria-hidden="true" /> Sửa email

@@ -237,7 +237,8 @@ def import_roster(session: Session, user: m.UserAccount, round_id: UUID,
             added += 1
         session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_ROSTER_IMPORTED",
             resource_type="thesis_round", resource_id=round_id,
-            reason=f"reference={reference}; new_accounts={created}; confirmed={added}; skipped={skipped}",
+            source_reference=reference,
+            reason=f"Tạo {created} tài khoản; xác nhận {added} sinh viên; giữ nguyên {skipped} dòng đã có",
             occurred_at=now, correlation_id=uuid4()))
         session.commit()
     except IntegrityError as exc:

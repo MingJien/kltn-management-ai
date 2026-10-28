@@ -58,7 +58,7 @@ export default function NotificationsPage({userId}: {userId: string}) {
           ? {...item, read_at: new Date().toISOString()} : item));
         window.dispatchEvent(new Event("kltn:notifications-changed"));
       }
-      navigate(notice.url);
+      navigate(notice.url,{state:{noticeId:notice.id}});
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {

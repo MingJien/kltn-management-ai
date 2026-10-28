@@ -39,8 +39,17 @@
 
 .app-shell__content {
   flex: 1;
-  padding: var(--content-padding);
+  padding: 28px 36px 56px;
   background: var(--neutral-50);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-shell__content > * {
+  width: 100%;
+  max-width: 1200px;
 }
 
 /* ── Sidebar collapsed state (desktop only; mobile giữ drawer nguyên bản) ── */

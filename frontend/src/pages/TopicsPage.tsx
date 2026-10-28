@@ -18,7 +18,8 @@ function roundDisplay(label: string) {
   return {year: match?.[1] || label, period: match?.[2] || ""};
 }
 
-function LecturerLink({id, name}: {id: string | null; name: string | null}) {
+function LecturerLink({id, name, canOpen=true}: {id: string | null; name: string | null; canOpen?:boolean}) {
+  if (!canOpen && name) return <span>{name}</span>;
   return id && name ? <Link className="lecturer-link" to={`/lecturers/${id}`} state={{name}}>{name}</Link>
     : <span className="text-muted">Chờ bộ môn chọn</span>;
 }
@@ -48,10 +49,12 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const [reason, setReason] = useState("");
   const [receiver, setReceiver] = useState("");
   const student = context.base_role === "STUDENT";
+  const admin = context.base_role === "ADMIN";
   const head = context.actions.includes("topic:department_decide");
   const path = "/topics?" + new URLSearchParams({limit:String(PAGE_SIZE), offset:String(page * PAGE_SIZE), search, view});
   const reload = useCallback(async () => setTopics(await request<Topic[]>(path, userId)), [path, userId]);
   const loadLecturers = useCallback(async (signal?: AbortSignal) => {
+    if (admin) {setLecturers([]);setLecturersLoading(false);return;}
     setLecturersLoading(true); setLecturersError("");
     try {
       const rows = await request<Lecturer[]>("/lecturers", userId, {signal});
@@ -59,7 +62,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     } catch (cause) {
       if (!signal?.aborted) setLecturersError(errorMessage(cause));
     } finally {if (!signal?.aborted) setLecturersLoading(false);}
-  }, [userId]);
+  }, [userId,admin]);
   useEffect(() => {
     const controller = new AbortController();
     void loadLecturers(controller.signal);
@@ -137,7 +140,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const receiverReady = !lecturersLoading && !lecturersError && lecturers.some(item => item.id === receiver);
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
-      description={student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
+      description={admin ? "Danh sách đề tài đã công bố để tra cứu. Hồ sơ đăng ký, bài nộp và phản hồi riêng vẫn theo đúng quyền." : student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
     <div className="topic-toolbar">
       <input aria-label="Tìm đề tài" className="input" maxLength={200} placeholder="Tìm theo mã, tên đề tài hoặc GV"
         value={filter} onChange={(event) => setFilter(event.target.value)} />
@@ -148,11 +151,11 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
           <Plus size={16} aria-hidden="true" />{student ? "Tự đề xuất đề tài" : "Tạo đề tài"}
         </button> : null}
     </div>
-    {roundsLoaded && !rounds.length ? <p className="text-caption">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
+    {!admin && roundsLoaded && !rounds.length ? <p className="text-caption">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
     <div className="tabs" aria-label="Lọc đề tài">
       {[...(head ? [["pending","Chờ duyệt"]] : []), ["all",student ? "Đề tài có sẵn" : "Tất cả đề tài"],
-        ...(!student ? [["suggested","SV đề xuất cho tôi"]] : []),
-        ["mine",student ? "Đề xuất của tôi" : "Đề tài của tôi"]].map(([key,label]) =>
+        ...(!student && !admin ? [["suggested","SV đề xuất cho tôi"]] : []),
+        ...(!admin ? [["mine",student ? "Đề xuất của tôi" : "Đề tài của tôi"]] : [])].map(([key,label]) =>
         <button key={key} aria-pressed={view === key} className={"tabs__tab " + (view === key ? "tabs__tab--active" : "")}
           onClick={() => {setView(key); setPage(0);}}>{label}</button>)}
     </div>
@@ -162,7 +165,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
       <div className="grid topic-grid">{topics.map((topic) => {
         const round = roundDisplay(topic.round_label);
         const full = topic.registered_member_count >= topic.max_students;
-        const canRegister = topic.available && !full;
+        const canRegister = topic.available && !full && topic.department_id === context.department_id;
         return <article key={topic.id} className="card topic-card">
           <div className="card-body topic-card__body">
             <div className="topic-card__top">
@@ -188,7 +191,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
             </div>
             <div className="topic-card__facts">
               <div className="topic-card__fact"><UserRound size={17} aria-hidden="true" /><span><small>{topic.proposer_type === "STUDENT" && topic.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</small>
-                <LecturerLink id={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
+                <LecturerLink canOpen={!admin && topic.department_id===context.department_id} id={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
               <div className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
                 <Users size={17} aria-hidden="true" /><span><small>Sinh viên</small><strong>{topic.registered_member_count}/{topic.max_students} SV</strong></span>
               </div>
@@ -199,7 +202,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
               <button className="btn btn-secondary" onClick={() => choose(topic)}>{head && topic.state === "SUBMITTED" ? "Xem và duyệt" : "Xem chi tiết"}</button>
               {student && topic.state === "APPROVED" ? <button className="btn btn-primary" disabled={!canRegister}
                 onClick={() => {choose(topic,false); setRegisterOpen(true);}}>
-                {canRegister ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : "Đã đóng đăng ký"}
+                {canRegister ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : topic.department_id !== context.department_id ? "Đề tài bộ môn khác" : "Đã đóng đăng ký"}
               </button> : null}
             </div>
           </div>
@@ -221,7 +224,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
         <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>
           <p>{selected.description || "Chưa có mô tả."}</p></section>
         <div className="topic-detail-content__facts">
-          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerLink id={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
+          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerLink canOpen={!admin && selected.department_id===context.department_id} id={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
           <div><span>Sinh viên</span><strong>{selected.registered_member_count}/{selected.max_students} SV</strong></div>
         </div>
         <section className="topic-detail-content__section"><h3>Kỹ năng và yêu cầu</h3>

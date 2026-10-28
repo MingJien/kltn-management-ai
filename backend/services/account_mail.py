@@ -18,6 +18,10 @@ def frontend_origin(configured: str | None = None) -> str:
     return value
 
 
+def delivery_mode() -> str:
+    return "smtp" if os.getenv("KLTN_SMTP_HOST", "").strip() and os.getenv("KLTN_MAIL_FROM", "").strip() else "development_outbox"
+
+
 def mail_delivery_ready() -> bool:
     """Accept a complete SMTP setup, or the explicit development outbox."""
     sender = os.getenv("KLTN_MAIL_FROM", "").strip()

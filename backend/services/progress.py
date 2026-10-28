@@ -1,5 +1,6 @@
 """Versioned progress submissions and individual work evidence."""
 from uuid import uuid4
+from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -37,6 +38,12 @@ def create_milestone(session, user, thesis_id, data):
     session.add(item)
     audit(session, user, "MILESTONE_OPENED", "round", thesis.round_id, f"{data.code}: {data.title}")
     session.flush()
+    from backend.services.notifications import format_due, notify_round_participants
+
+    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
+        kind="MILESTONE_OPENED",
+        message=f"Mốc {data.code} — {data.title} đã mở cho đợt {round_.code}, hạn nộp {format_due(data.due_at)}.",
+        section="progress")
     result = milestone_out(item)
     session.commit()
     return result
@@ -44,7 +51,9 @@ def create_milestone(session, user, thesis_id, data):
 
 def close_milestone(session, user, thesis_id, milestone_id, data, expected):
     thesis = thesis_access(session, user, thesis_id, action="milestone:manage", write=True)
-    session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
+    if round_.state == "ARCHIVED":
+        raise HTTPException(409, "Đợt đã lưu trữ; không thể đóng mốc tiến độ")
     item = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == milestone_id,
         m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
     if not item:
@@ -56,6 +65,12 @@ def close_milestone(session, user, thesis_id, milestone_id, data, expected):
     item.row_version += 1
     audit(session, user, "MILESTONE_CLOSED", "round", thesis.round_id, f"{item.code}: {data.reason}")
     session.flush()
+    from backend.services.notifications import notify_round_participants
+
+    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
+        kind="MILESTONE_CLOSED",
+        message=f"Mốc {item.code} — {item.title} đã đóng nhận báo cáo cho đợt {round_.code}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
+        section="progress")
     result = milestone_out(item)
     session.commit()
     return result
@@ -71,16 +86,30 @@ def extend_milestone(session, user, thesis_id, milestone_id, data, expected):
     if not item:
         raise HTTPException(404, "Không tìm thấy mốc trong đợt này")
     row_version(expected, item.row_version)
-    if item.state != "OPEN" or item.due_at is None:
-        raise HTTPException(409, "Chỉ gia hạn mốc đang mở và đã có hạn nộp")
+    latest = session.scalar(select(func.max(m.ProgressMilestone.version_no)).where(
+        m.ProgressMilestone.round_id == thesis.round_id, m.ProgressMilestone.code == item.code))
+    if item.version_no != latest:
+        raise HTTPException(409, "Mốc đã có phiên bản mới; không thể mở lại phiên bản cũ")
+    if item.due_at is None:
+        raise HTTPException(409, "Mốc chưa có hạn nộp")
     if data.due_at <= item.due_at or data.due_at <= now():
         raise HTTPException(422, "Hạn mới phải sau hạn cũ và sau thời điểm hiện tại")
     old_due = item.due_at
+    reopening = item.state == "CLOSED"
     item.due_at = data.due_at
+    item.state = "OPEN"
     item.row_version += 1
-    audit(session, user, "MILESTONE_EXTENDED", "round", thesis.round_id,
+    audit(session, user, "MILESTONE_REOPENED" if reopening else "MILESTONE_EXTENDED", "round", thesis.round_id,
         f"{item.code}: {old_due.isoformat()} -> {data.due_at.isoformat()}; {data.reason}")
     session.flush()
+    from backend.services.notifications import format_due, notify_round_participants
+
+    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
+        kind="MILESTONE_REOPENED" if reopening else "MILESTONE_EXTENDED",
+        message=(f"Mốc {item.code} — {item.title} đã được gia hạn và mở nhận lại đến {format_due(data.due_at)}."
+                 if reopening else
+                 f"Mốc {item.code} — {item.title} đã được gia hạn đến {format_due(data.due_at)}."),
+        section="progress")
     result = milestone_out(item)
     session.commit()
     return result
@@ -106,7 +135,7 @@ def progress_out(session, item):
             decision=review.decision, comment=review.comment, created_at=review.created_at) for review in reviews])
 
 
-def create_progress(session, user, thesis_id, data):
+def create_progress(session, user, thesis_id, data, *, commit=True):
     thesis = thesis_access(session, user, thesis_id, action="progress:submit", lock=True, write=True)
     milestone = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == data.milestone_id,
         m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
@@ -145,12 +174,17 @@ def create_progress(session, user, thesis_id, data):
     audit(session, user, "PROGRESS_SELF_CORRECTED" if latest and not revision_requested else "PROGRESS_SUBMITTED",
         "thesis", thesis.id, f"{milestone.code}; version={item.version_no}")
     session.flush()
+    from backend.services.notifications import notify_thesis_advisor
+
+    notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id, kind="PROGRESS_SUBMITTED",
+        message=f"{student.display_name} đã nộp báo cáo tiến độ mốc {milestone.code} (lần {item.version_no}).")
     result = progress_out(session, item)
-    session.commit()
+    if commit:
+        session.commit()
     return result
 
 
-async def attach_evidence(session, user, thesis_id, report_id, request, expected):
+async def attach_evidence(session, user, thesis_id, report_id, request, expected, *, submitted_upload=None):
     """Attach a local file to an already submitted report without changing its submission time."""
     path = None
     try:
@@ -172,9 +206,10 @@ async def attach_evidence(session, user, thesis_id, report_id, request, expected
         if session.scalar(select(m.ProgressReview.id).where(m.ProgressReview.progress_report_id == report.id).limit(1)):
             raise HTTPException(409, "Báo cáo đã được nhận xét; không thể thêm minh chứng")
         milestone = session.get(m.ProgressMilestone, report.milestone_id)
-        if not milestone or milestone.state != "OPEN" or not milestone.due_at or now() > milestone.due_at:
+        if not milestone or (submitted_upload is None and
+                (milestone.state != "OPEN" or not milestone.due_at or now() > milestone.due_at)):
             raise HTTPException(409, "Đã hết hạn thêm minh chứng; cần GVHD yêu cầu sửa để nộp phiên bản mới")
-        name, content, mime = await documents.read_upload(request)
+        name, content, mime = submitted_upload if submitted_upload is not None else await documents.read_upload(request)
         file, digest, path = documents.persist_upload(session, name, content, mime)
         documents.file_scanner.scan(file, path)
         item = m.Document(id=uuid4(), thesis_id=thesis.id,
@@ -204,6 +239,46 @@ async def attach_evidence(session, user, thesis_id, report_id, request, expected
         raise
 
 
+async def create_progress_with_evidence(session, user, thesis_id, data, upload):
+    """The report and its optional file are submitted once, including a permitted late/revision submission."""
+    try:
+        created = create_progress(session, user, thesis_id, data, commit=False)
+        return await attach_evidence(session, user, thesis_id, created.id, None, created.row_version,
+                                     submitted_upload=upload)
+    except Exception:
+        session.rollback()
+        raise
+
+
+def evidence_version(session, user, thesis_id, report_id, *, write=False):
+    thesis_access(session, user, thesis_id, action="progress:view", write=write, lock=write)
+    report = session.scalar(select(m.ProgressReport).where(m.ProgressReport.id == report_id,
+        m.ProgressReport.thesis_id == thesis_id))
+    version = session.scalar(select(m.DocumentVersion).join(m.Document,
+        m.Document.id == m.DocumentVersion.document_id).where(m.Document.thesis_id == thesis_id,
+            m.DocumentVersion.stored_file_id == report.evidence_file_id)) if report and report.evidence_file_id else None
+    if version is None:
+        raise HTTPException(404, "Không tìm thấy minh chứng của báo cáo")
+    return version
+
+
+def download_evidence(session, user, thesis_id, report_id):
+    version = evidence_version(session, user, thesis_id, report_id)
+    return documents.stored_download(session, version)
+
+
+def rescan_evidence(session, user, thesis_id, report_id):
+    version = evidence_version(session, user, thesis_id, report_id, write=True)
+    file = session.get(m.StoredFile, version.stored_file_id)
+    if file.scan_state == "INFECTED":
+        raise HTTPException(409, "Tệp nhiễm mã độc; cần yêu cầu nộp phiên bản mới")
+    documents.file_scanner.require_available()
+    state = documents.file_scanner.scan(file, documents.storage_root() / Path(file.storage_key).name)
+    audit(session, user, "PROGRESS_EVIDENCE_SCANNED", "thesis", thesis_id, f"{report_id}: {state}")
+    session.commit()
+    return {"scan_state":state}
+
+
 def review_progress(session, user, thesis_id, report_id, data, expected):
     thesis = thesis_access(session, user, thesis_id, lock=True, write=True)
     permissions = rights(session, user, thesis)
@@ -226,6 +301,8 @@ def review_progress(session, user, thesis_id, report_id, data, expected):
     if session.scalar(select(m.ProgressReview.id).where(m.ProgressReview.progress_report_id == report.id,
             m.ProgressReview.reviewer_id == lecturer.id)):
         raise HTTPException(409, "Bạn đã gửi nhận xét cho phiên bản này")
+    from backend.services.progress_annotations import publish_annotations
+    publish_annotations(session, report, lecturer, summary_comment=data.comment)
     session.add(m.ProgressReview(id=uuid4(), progress_report_id=report.id, reviewer_id=lecturer.id,
         decision=data.decision, comment=data.comment))
     if data.decision != "COMMENT_ONLY":
@@ -233,6 +310,21 @@ def review_progress(session, user, thesis_id, report_id, data, expected):
     report.row_version += 1
     audit(session, user, "PROGRESS_" + data.decision, "thesis", thesis.id, data.comment)
     session.flush()
+    from backend.services.notifications import notify_thesis_advisor, notify_thesis_students
+
+    milestone = session.get(m.ProgressMilestone, report.milestone_id)
+    milestone_label = f"{milestone.code} — {milestone.title}" if milestone else "tiến độ"
+    if data.decision == "COMMENT_ONLY":
+        message = f"{lecturer.display_name} đã góp ý báo cáo {milestone_label}: {data.comment[:200]}"
+        notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+            kind="PROGRESS_COMMENT", message=message)
+        notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id,
+            kind="PROGRESS_COMMENT", message=message)
+    else:
+        decided = "xác nhận tiến độ" if data.decision == "CONFIRM" else "yêu cầu sửa và nộp lại"
+        notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+            kind="PROGRESS_CONFIRMED" if data.decision == "CONFIRM" else "PROGRESS_REVISION_REQUIRED",
+            message=f"GVHD {lecturer.display_name} đã {decided} báo cáo {milestone_label}. Nhận xét: {data.comment[:200]}")
     result = progress_out(session, report)
     session.commit()
     return result
@@ -252,6 +344,14 @@ def assign_cross_reviewer(session, user, thesis_id, data, expected):
         assignment_type="PROGRESS_REVIEWER", state="ACTIVE", effective_from=now()))
     thesis.row_version += 1
     audit(session, user, "PROGRESS_REVIEWER_ASSIGNED", "thesis", thesis.id, f"{lecturer.lecturer_code}: {data.reason}")
+    session.flush()
+    from backend.services.notifications import notify_user
+
+    notify_user(session, recipient_user_id=lecturer.user_id, actor_user_id=user.id,
+        kind="PROGRESS_REVIEWER_ASSIGNED",
+        message=(f"Bạn được phân công góp ý chéo tiến độ khóa luận {thesis.current_title}. "
+                 f"Lý do: {data.reason[:200]}"),
+        url=f"/theses/{thesis.id}?section=progress")
     session.commit()
 
 
@@ -298,6 +398,12 @@ def create_work(session, user, thesis_id, data):
     session.add(item)
     audit(session, user, "WORK_SUBMITTED", "thesis", thesis.id, student.student_code)
     session.flush()
+    from backend.services.notifications import notify_thesis_advisor
+
+    member_student = session.get(m.StudentProfile, member.student_id)
+    notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id, kind="WORK_SUBMITTED",
+        message=f"{student.display_name} đã gửi phân công công việc cho {member_student.display_name}.",
+        section="progress")
     result = work_out(session, item)
     session.commit()
     return result
@@ -320,6 +426,17 @@ def review_work(session, user, thesis_id, work_id, data, expected):
     item.row_version += 1
     audit(session, user, "WORK_" + data.decision, "thesis", thesis.id, data.comment)
     session.flush()
+    from backend.services.notifications import notify_user
+
+    member = session.get(m.ThesisMember, item.thesis_member_id)
+    member_student = session.get(m.StudentProfile, member.student_id) if member else None
+    if member_student is not None:
+        notify_user(session, recipient_user_id=member_student.user_id, actor_user_id=user.id,
+            kind="WORK_APPROVED" if data.decision == "APPROVE" else "WORK_REVISION_REQUIRED",
+            message=(f"GVHD đã duyệt phân công công việc của bạn: {data.comment[:200]}"
+                     if data.decision == "APPROVE" else
+                     f"GVHD yêu cầu sửa phân công công việc: {data.comment[:200]}"),
+            url=f"/theses/{thesis.id}")
     result = work_out(session, item)
     session.commit()
     return result

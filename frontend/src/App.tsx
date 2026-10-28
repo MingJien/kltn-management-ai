@@ -10,6 +10,8 @@ import ThesisViewPage from "./pages/ThesisViewPage";
 import AccountAccessPage from "./pages/AccountAccessPage";
 import AccountPage from "./pages/AccountPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import ActivityPage from "./pages/ActivityPage";
+import SchoolFormsPage from "./pages/SchoolFormsPage";
 import AdministrationPage from "./pages/AdministrationPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
@@ -29,8 +31,11 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(true);
+  const [noticeRevision,setNoticeRevision] = useState("");
   useEffect(() => {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
+    labels["/forms"] = "Biểu mẫu và tài liệu Khoa";
+    labels["/activity"] = "Nhật ký hoạt động";
     const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
     const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
       : plannedId && Object.hasOwn(plannedPages, plannedId) ? plannedPages[plannedId as PlannedPageId].title
@@ -62,6 +67,12 @@ function App() {
     window.addEventListener("kltn:session-expired", expired);
     return () => window.removeEventListener("kltn:session-expired", expired);
   }, [restore]);
+
+  useEffect(() => {
+    if (!location.state?.noticeId) return;
+    setNoticeRevision(location.key);
+    void restore();
+  },[location.key,location.state,restore]);
 
   async function signIn() {
     if (loading) return;
@@ -122,7 +133,7 @@ function App() {
   return (
     <AppShell context={context} onLogout={() => void signOut()}>
       {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
-      <Suspense fallback={<p role="status">Đang tải trang…</p>}><Routes>
+      <Suspense fallback={<p role="status">Đang tải trang…</p>}><Routes key={noticeRevision}>
         <Route
           path="/"
           element={<WorkspacePage context={context} />}
@@ -131,6 +142,7 @@ function App() {
           setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
         }} />} />
         <Route path="/notifications" element={<NotificationsPage userId={context.user_id} />} />
+        <Route path="/activity" element={<ActivityPage context={context} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
         <Route path="/rounds" element={context.base_role === "ADMIN" ?
@@ -139,7 +151,7 @@ function App() {
           <RosterPage context={context} /> : <Navigate to="/" replace />} />
         <Route
           path="/topics"
-          element={workflowAccess ?
+          element={(workflowAccess || context.base_role === "ADMIN") ?
             <TopicsPage userId={context.user_id} context={context} />
             : <Navigate to="/" replace />}
         />
@@ -152,6 +164,7 @@ function App() {
         <Route path="/theses" element={workflowAccess ? <ThesesPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/proposals" element={workflowAccess ? <ThesesPage context={context} section="proposal" /> : <Navigate to="/" replace />} />
         <Route path="/progress" element={workflowAccess ? <ThesesPage context={context} section="progress" /> : <Navigate to="/" replace />} />
+        <Route path="/forms" element={<SchoolFormsPage context={context}/>} />
         <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
         <Route path="/lecturers/:lecturerId" element={workflowAccess ?

@@ -1,16 +1,18 @@
-import { useState } from "react";
-import { X } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { MessageSquare, X } from "lucide-react";
 import type { AuditEvent, Milestone, ProgressReport, Thesis, ThesisDocument } from "../../api";
-import { downloadDocument, request, uploadProgressEvidence } from "../../api";
-import type { CoreRun } from "./ThesisDocuments";
+import { downloadProgressEvidence, request, uploadProgressEvidence, submitProgress } from "../../api";
+import { scanLabel, type CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
+
+const ProgressReviewWorkspace = lazy(() => import("./ProgressReviewWorkspace"));
 
 function ExtendForm({thesis, milestone, userId, busy, run}: {
   thesis: Thesis; milestone: Milestone; userId: string; busy: boolean; run: CoreRun;
 }) {
   const [dueAt, setDueAt] = useState("");
   const [reason, setReason] = useState("");
-  return <details><summary>Gia hạn cho toàn đợt</summary><form className="core-form" onSubmit={async event => {
+  return <details><summary>{milestone.state === "CLOSED" ? "Gia hạn và mở lại toàn đợt" : "Gia hạn cho toàn đợt"}</summary><form className="core-form" onSubmit={async event => {
     event.preventDefault();
     if (await run(() => request(`/theses/${thesis.id}/milestones/${milestone.id}/extend`, userId, {
       method: "POST", headers: {"If-Match": String(milestone.row_version)},
@@ -23,28 +25,33 @@ function ExtendForm({thesis, milestone, userId, busy, run}: {
     <label htmlFor={`extend-reason-${milestone.id}`}>Lý do gia hạn</label>
     <textarea className="input" id={`extend-reason-${milestone.id}`} value={reason}
       onChange={event => setReason(event.target.value)} required minLength={3} maxLength={2000} disabled={busy} />
-    <button className="btn btn-secondary" disabled={busy || !dueAt || reason.trim().length < 3}>Lưu gia hạn</button>
+    <button className="btn btn-secondary" disabled={busy || !dueAt || reason.trim().length < 3}>{milestone.state === "CLOSED" ? "Gia hạn và mở lại mốc" : "Lưu gia hạn"}</button>
   </form></details>;
 }
 
-function ProgressEvidence({report, docs, thesis, userId}: {
-  report: ProgressReport; docs: ThesisDocument[]; thesis: Thesis; userId: string;
+function ProgressEvidence({report, thesis, userId, busy, run, readOnly = false}: {
+  report: ProgressReport; thesis: Thesis; userId: string; busy:boolean; run:CoreRun; readOnly?: boolean;
 }) {
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState(false);
-  const versionId = report.evidence_document_version_id;
-  const doc = docs.find(item => item.versions.some(version => version.id === versionId));
-  const version = doc?.versions.find(item => item.id === versionId);
+  const [viewing, setViewing] = useState(false);
   const clean = report.evidence_scan_state === "CLEAN";
   return <div className="stack">
-    <p className="text-body-sm">Minh chứng của báo cáo: {report.evidence_file_name} · {clean ? "đã quét an toàn" : "đang cách ly – chưa thể tải hoặc xác nhận"}.</p>
-    {doc && version && <button type="button" className="btn btn-secondary" disabled={!clean || downloading}
-      title={!clean ? "Tệp chưa được quét an toàn" : undefined} onClick={async () => {
-        setError(""); setDownloading(true);
-        try {await downloadDocument(thesis.id, doc, version, userId);} catch (cause) {setError(String(cause));}
-        finally {setDownloading(false);}
-      }}>Tải minh chứng của báo cáo</button>}
-    {clean && (!doc || !version) && <p role="alert" className="alert alert-warning">Không tìm thấy tệp gắn với báo cáo; cần kiểm tra hồ sơ.</p>}
+    <div className="progress-evidence-row">
+      <p className="text-body-sm" style={{margin: 0}}>Minh chứng của báo cáo: <strong>{report.evidence_file_name}</strong> · {scanLabel(report.evidence_scan_state || "QUARANTINED")}.</p>
+      <div className="progress-evidence-actions" style={{flexWrap: "wrap", flexShrink: 1, minWidth: 0}}>
+        {clean && <button type="button" className="btn btn-primary btn-sm" style={{whiteSpace: "normal", maxWidth: "100%"}} onClick={() => setViewing(true)}><MessageSquare size={16} /> {readOnly || !thesis.actions.some(action => ["progress:review", "progress:comment"].includes(action)) ? "Xem tệp & nhận xét" : "Mở tệp và phản hồi theo vị trí"}</button>}
+        {viewing && <Suspense fallback={<p role="status">Đang mở không gian nhận xét…</p>}><ProgressReviewWorkspace thesis={thesis} report={report} userId={userId} run={run} onClose={() => setViewing(false)} /></Suspense>}
+        <button type="button" className="btn btn-secondary btn-sm" disabled={!clean || downloading}
+          title={!clean ? "Tệp chưa được quét an toàn" : undefined} onClick={async () => {
+            setError(""); setDownloading(true);
+            try {await downloadProgressEvidence(thesis.id, report);} catch (cause) {setError(String(cause));}
+            finally {setDownloading(false);}
+          }}>Tải minh chứng của báo cáo</button>
+        {!readOnly && ["QUARANTINED","FAILED"].includes(report.evidence_scan_state || "") && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+          onClick={()=>run(()=>request(`/theses/${thesis.id}/progress-reports/${report.id}/evidence/scan`,userId,{method:"POST"}),"Đã quét lại minh chứng; xem trạng thái tệp.")}>Quét lại minh chứng</button>}
+      </div>
+    </div>
     {error && <p role="alert" className="alert alert-danger">{error}</p>}
   </div>;
 }
@@ -59,7 +66,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
   const [expectedRatio, setExpectedRatio] = useState("");
   const [milestoneId, setMilestoneId] = useState("");
   const [summary, setSummary] = useState("");
-  const [ratio, setRatio] = useState(0);
+  const [ratio, setRatio] = useState("");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [evidenceNotice, setEvidenceNotice] = useState("");
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
@@ -72,12 +79,39 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     if (previous?.state === "REVISION_REQUIRED") return true;
     if (item.state !== "OPEN") return false;
     if (!previous) return true; // An initial report may still be accepted late while the round milestone is open.
-    return previous.state === "SUBMITTED" && previous.reviews.length === 0 && !!item.due_at
+    return previous.submitted_by_student_id === studentId && previous.state === "SUBMITTED" && previous.reviews.length === 0 && !!item.due_at
       && Date.now() <= new Date(item.due_at).getTime();
   });
   const selected = available.some(item => item.id === milestoneId) ? milestoneId : "";
   const milestoneAudit = milestoneHistory;
-  const milestoneAction: Record<string, string> = {MILESTONE_OPENED: "Mở mốc", MILESTONE_EXTENDED: "Gia hạn mốc", MILESTONE_CLOSED: "Đóng mốc"};
+  const milestoneAction: Record<string, string> = {MILESTONE_OPENED: "Mở mốc", MILESTONE_EXTENDED: "Gia hạn mốc", MILESTONE_REOPENED: "Gia hạn và mở lại mốc", MILESTONE_CLOSED: "Đóng mốc"};
+  const renderReportDetails = (report: ProgressReport, isCurrent: boolean) => <>
+      <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}</p>
+      <p className="text-body-sm text-muted">Hạn áp dụng lúc nộp: {formatDate(report.due_at_at_submission)}</p>
+      <p className="core-prewrap">{report.summary}</p>
+      {report.evidence_document_version_id && <ProgressEvidence report={report} thesis={thesis} userId={userId} busy={busy} run={run} readOnly={!isCurrent} />}
+      {report.state === "SUBMITTED" && !report.evidence_document_version_id && report.submitted_by_student_id === studentId && report.reviews.length === 0 && isCurrent && milestones.some(item => item.id === report.milestone_id && item.state === "OPEN" && !!item.due_at && Date.now() <= new Date(item.due_at).getTime()) &&
+        <div className="input-group"><label htmlFor={`retry-evidence-${report.id}`}>Bổ sung minh chứng từ máy cho báo cáo này (không bắt buộc)</label>
+          <input className="input" id={`retry-evidence-${report.id}`} type="file" accept=".pdf,.docx,.txt" disabled={busy}
+            onChange={async event => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (file.size > 10*1024*1024) {setEvidenceNotice("Tệp vượt quá 10 MB."); return;}
+              if (await run(() => uploadProgressEvidence(thesis.id, report, userId, file), "Đã lưu minh chứng, chờ quét an toàn.")) {
+                setEvidenceNotice(""); event.target.value = "";
+              }
+            }} />
+        </div>}
+      <Reviews items={report.reviews} />
+      {active && report.state === "SUBMITTED" && isCurrent && !(report.evidence_document_version_id && report.evidence_scan_state === "CLEAN") &&
+        ((thesis.actions.includes("progress:review") || thesis.actions.includes("progress:comment"))) &&
+        <ReviewForm key={report.id} disabled={busy} choices={thesis.actions.includes("progress:review") ? (report.evidence_document_version_id && report.evidence_scan_state !== "CLEAN"
+          ? [{value: "REVISION_REQUIRED", label: "Yêu cầu nộp lại (chưa xem tệp)"}]
+          : [{value: "CONFIRM", label: "Xác nhận tiến độ"}, {value: "REVISION_REQUIRED", label: "Yêu cầu sửa và nộp lại"}])
+          : [{value: "COMMENT_ONLY", label: "Góp ý chéo (không chốt tiến độ)"}]} onSubmit={(decision, comment) => run(() => request(`/theses/${thesis.id}/progress-reports/${report.id}/review`, userId, {
+          method: "POST", headers: {"If-Match": String(report.row_version)}, body: JSON.stringify({decision, comment}),
+        }), "Đã lưu nhận xét tiến độ.")} />}
+  </>;
   return <div className="stack">
     {thesis.actions.includes("milestone:manage") && active && <form className="card" onSubmit={async event => {
       event.preventDefault();
@@ -87,6 +121,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     }}><div className="card-body core-form">
       <h3>Mở mốc theo kế hoạch đợt</h3>
       <p className="text-body-sm text-muted">Áp dụng cho mọi khóa luận trong {thesis.round_label}. Mốc đã mở giữ nguyên; đóng trước khi ban hành phiên bản mới cùng mã.</p>
+      <p className="text-body-sm text-muted">Mốc này dùng cho báo cáo tiến độ định kỳ. Hạn nộp từng loại tài liệu (Đề cương, Kế hoạch, Cuốn báo cáo KLTN, Tài liệu hỗ trợ) được đặt riêng ở mục “Hạn nộp tài liệu theo đợt” phía trên, không phải ở đây.</p>
       <div className="core-fields">
         <div className="input-group"><label htmlFor="milestone-code">Mã mốc</label><input className="input" id="milestone-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} pattern="(?:[A-Z0-9_]|-){1,50}" maxLength={50} placeholder="NOI_BO_1" required disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-title">Tên mốc</label><input className="input" id="milestone-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>
@@ -98,7 +133,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     {milestones.map(milestone => <article className="card" key={milestone.id}><div className="card-body stack">
       <div className="flex justify-between gap-3"><h3>{milestone.title} · v{milestone.version_no}</h3><Status value={milestone.state} /></div>
       <p className="text-muted">{milestone.code} · Hạn: {formatDate(milestone.due_at)}{milestone.expected_ratio !== null ? ` · Dự kiến ${milestone.expected_ratio}%` : ""}</p>
-      {thesis.actions.includes("milestone:manage") && milestone.state === "OPEN" && milestone.due_at && active &&
+      {thesis.actions.includes("milestone:manage") && milestone.due_at && active &&
         <ExtendForm thesis={thesis} milestone={milestone} userId={userId} busy={busy} run={run} />}
       {thesis.actions.includes("milestone:manage") && milestone.state === "OPEN" && active && <details><summary>Đóng mốc cho toàn đợt</summary>
         <ReviewForm disabled={busy} choices={[{value: "CLOSE", label: "Đóng mốc, ngừng nhận báo cáo mới"}]} onSubmit={(_, reason) => run(() => request(`/theses/${thesis.id}/milestones/${milestone.id}/close`, userId, {
@@ -147,19 +182,12 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     )}
     {thesis.actions.includes("progress:submit") && active && <form className="card" onSubmit={async event => {
       event.preventDefault();
-      let created: ProgressReport | null = null;
-      const sent = await run(async () => {created = await request<ProgressReport>(`/theses/${thesis.id}/progress-reports`, userId, {method: "POST", body: JSON.stringify({
-        milestone_id: selected, summary, reported_ratio: ratio, document_version_id: null,
-      })});}, "Đã gửi báo cáo tiến độ cho GVHD.");
+      const form = event.currentTarget;
+      const sent = await run(() => submitProgress(thesis.id, userId, {
+        milestone_id: selected, summary, reported_ratio: ratio === "" ? 0 : Number(ratio), document_version_id: null,
+      }, evidenceFile), "Đã gửi báo cáo tiến độ cho GVHD.");
       if (sent) {
-        setSummary(""); setMilestoneId("");
-        if (evidenceFile && created) {
-          const uploaded = await run(() => uploadProgressEvidence(thesis.id, created!, userId, evidenceFile),
-            "Đã lưu minh chứng; xem trạng thái quét ở thẻ báo cáo.");
-          setEvidenceNotice(uploaded ? "Minh chứng đã lưu cùng báo cáo tiến độ; xem trạng thái quét ở thẻ báo cáo." :
-            "Báo cáo đã gửi nhưng tải minh chứng chưa thành công. Hãy tải lại tại thẻ báo cáo bên dưới.");
-          if (uploaded) setEvidenceFile(null);
-        }
+        setSummary(""); setMilestoneId(""); setEvidenceFile(null); setEvidenceNotice(""); form.reset();
       }
     }}><div className="card-body core-form">
       <h3>Nộp báo cáo tiến độ</h3>
@@ -168,53 +196,49 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         <option value="">Chọn mốc có thể nộp</option>{available.map(item => <option key={item.id} value={item.id}>{item.title} · v{item.version_no}{latest.has(item.id) ? " · nộp phiên bản mới" : ""}</option>)}
       </select></div>
       <div className="input-group"><label htmlFor="report-summary">Kết quả, khó khăn và kế hoạch</label><textarea className="input" id="report-summary" value={summary} onChange={event => setSummary(event.target.value)} required maxLength={10000} disabled={busy} /></div>
-      <div className="input-group"><label htmlFor="report-ratio">Tiến độ tự báo cáo (%)</label><input className="input" id="report-ratio" type="number" min={0} max={100} step="0.01" value={ratio} onChange={event => setRatio(Number(event.target.value))} required disabled={busy} /></div>
-      <div className="input-group"><label htmlFor="report-evidence-file">Minh chứng tiến độ từ máy (không bắt buộc; PDF, DOCX, TXT; tối đa 10 MB)</label>
-        <input className="input" id="report-evidence-file" type="file" accept=".pdf,.docx,.txt" disabled={busy}
-          onChange={event => setEvidenceFile(event.target.files?.[0] || null)} />
-        {evidenceFile && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
-          <span className="text-body-sm font-semibold">{evidenceFile.name} ({(evidenceFile.size / 1024).toFixed(1)} KB)</span>
-          <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
-            setEvidenceFile(null);
-            const el = document.getElementById("report-evidence-file") as HTMLInputElement | null;
-            if (el) el.value = "";
-          }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
-        </div>}
-        <p className="text-caption">Có thể để trống. Tệp gắn trực tiếp với báo cáo ở dưới. Khi còn cách ly, GVHD có thể yêu cầu nộp lại nhưng chưa thể tải hoặc xác nhận.</p>
-        {evidenceFile && evidenceFile.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
+      <div className="progress-form-row">
+        <div className="input-group"><label htmlFor="report-ratio">Tiến độ tự báo cáo (%)</label><input className="input" id="report-ratio" type="number" min={0} max={100} step="0.01" placeholder="0" value={ratio} onChange={event => setRatio(event.target.value)} required disabled={busy} /></div>
+        <div className="input-group"><label htmlFor="report-evidence-file">Minh chứng tiến độ từ máy (không bắt buộc; PDF, DOCX, TXT; tối đa 10 MB)</label>
+          <input className="input" id="report-evidence-file" type="file" accept=".pdf,.docx,.txt" disabled={busy}
+            onChange={event => setEvidenceFile(event.target.files?.[0] || null)} />
+          {evidenceFile && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
+            <span className="text-body-sm font-semibold">{evidenceFile.name} ({(evidenceFile.size / 1024).toFixed(1)} KB)</span>
+            <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
+              setEvidenceFile(null);
+              const el = document.getElementById("report-evidence-file") as HTMLInputElement | null;
+              if (el) el.value = "";
+            }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+          </div>}
+          <p className="text-caption">Có thể để trống. Tệp gắn trực tiếp với báo cáo ở dưới. Khi còn cách ly, GVHD có thể yêu cầu nộp lại nhưng chưa thể tải hoặc xác nhận.</p>
+          {evidenceFile && evidenceFile.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
+        </div>
       </div>
       {evidenceNotice && <p role="status" className="alert alert-info">{evidenceNotice}</p>}
       <button className="btn btn-primary" disabled={busy || !selected || !summary.trim() || !!(evidenceFile && evidenceFile.size > 10*1024*1024)}>Gửi báo cáo</button>
     </div></form>}
-    <h2>Lịch sử báo cáo và nhận xét</h2>
-    {reports.map(report => <article className="card" key={report.id}><div className="card-body stack">
-      <div className="flex justify-between gap-3"><h3>{milestones.find(item => item.id === report.milestone_id)?.title || "Báo cáo"} · lần nộp {report.version_no}</h3>{latest.get(report.milestone_id)?.id === report.id ? <Status value={report.state} /> : <span className="badge">Đã có phiên bản mới</span>}</div>
-      <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}</p>
-      <p className="text-body-sm text-muted">Hạn áp dụng lúc nộp: {formatDate(report.due_at_at_submission)}</p>
-      <p className="core-prewrap">{report.summary}</p>
-      {report.evidence_document_version_id && <ProgressEvidence report={report} docs={docs} thesis={thesis} userId={userId} />}
-      {report.state === "SUBMITTED" && !report.evidence_document_version_id && report.submitted_by_student_id === studentId && report.reviews.length === 0 && latest.get(report.milestone_id)?.id === report.id && milestones.some(item => item.id === report.milestone_id && item.state === "OPEN" && !!item.due_at && Date.now() <= new Date(item.due_at).getTime()) &&
-        <div className="input-group"><label htmlFor={`retry-evidence-${report.id}`}>Bổ sung minh chứng từ máy cho báo cáo này (không bắt buộc)</label>
-          <input className="input" id={`retry-evidence-${report.id}`} type="file" accept=".pdf,.docx,.txt" disabled={busy}
-            onChange={async event => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              if (file.size > 10*1024*1024) {setEvidenceNotice("Tệp vượt quá 10 MB."); return;}
-              if (await run(() => uploadProgressEvidence(thesis.id, report, userId, file), "Đã lưu minh chứng, chờ quét an toàn.")) {
-                setEvidenceNotice(""); event.target.value = "";
-              }
-            }} />
-        </div>}
-      <Reviews items={report.reviews} />
-      {active && report.state === "SUBMITTED" && latest.get(report.milestone_id)?.id === report.id &&
-        ((thesis.actions.includes("progress:review") || thesis.actions.includes("progress:comment"))) &&
-        <ReviewForm disabled={busy} choices={thesis.actions.includes("progress:review") ? (report.evidence_document_version_id && report.evidence_scan_state !== "CLEAN"
-          ? [{value: "REVISION_REQUIRED", label: "Yêu cầu nộp lại (chưa xem tệp)"}]
-          : [{value: "CONFIRM", label: "Xác nhận tiến độ"}, {value: "REVISION_REQUIRED", label: "Yêu cầu sửa và nộp lại"}])
-          : [{value: "COMMENT_ONLY", label: "Góp ý chéo (không chốt tiến độ)"}]} onSubmit={(decision, comment) => run(() => request(`/theses/${thesis.id}/progress-reports/${report.id}/review`, userId, {
-          method: "POST", headers: {"If-Match": String(report.row_version)}, body: JSON.stringify({decision, comment}),
-        }), "Đã lưu nhận xét tiến độ.")} />}
-    </div></article>)}
+    {thesis.actions.includes("progress:view") ? <>
+    <h2>Báo cáo tiến độ và nhận xét</h2>
+    {Array.from(latest.values()).sort((a, b) => Date.parse(b.submitted_at) - Date.parse(a.submitted_at)).map(report => {
+      const previousVersions = reports.filter(item => item.milestone_id === report.milestone_id && item.id !== report.id)
+        .sort((a, b) => b.version_no - a.version_no);
+      return <article className="card progress-report" key={report.milestone_id}><div className="card-body stack">
+        <div className="flex justify-between gap-3"><h3>{milestones.find(item => item.id === report.milestone_id)?.title || "Báo cáo"}</h3><Status value={report.state} /></div>
+        <p className="text-body-sm font-semibold">Bản mới nhất · lần nộp {report.version_no}</p>
+        {renderReportDetails(report, true)}
+        {previousVersions.length > 0 && <details className="progress-report-history">
+          <summary>Lịch sử cập nhật ({previousVersions.length} bản trước)</summary>
+          <p className="text-body-sm text-muted">Các bản trước được giữ để đối chiếu nội dung và nhận xét. GVHD xử lý bản mới nhất ở phía trên.</p>
+          <div className="progress-report-history__list">{previousVersions.map(previous => <details className="progress-report-history__version" key={previous.id}>
+            <summary><span>Lần nộp {previous.version_no} · {formatDate(previous.submitted_at)} · {previous.submitted_by_name}</span>
+              {previous.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+              {previous.reviews.length > 0 && <span className="badge">{previous.reviews.length} nhận xét</span>}
+            </summary>
+            <div className="stack progress-report-history__content">{renderReportDetails(previous, false)}</div>
+          </details>)}</div>
+        </details>}
+      </div></article>;
+    })}
     {reports.length === 0 && <p className="text-muted">Chưa có báo cáo tiến độ.</p>}
+    </> : <p className="alert alert-info">Bạn quản lý mốc chung. Nội dung báo cáo, minh chứng và nhận xét riêng chỉ nhóm SV và GVHD được xem.</p>}
   </div>;
 }

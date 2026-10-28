@@ -14,7 +14,10 @@ from backend.api.auth import allowed_frontend_origins, router as auth_router
 from backend.api.account import router as account_router
 from backend.api.roster import router as roster_router, assignment_router
 from backend.api.account_admin import router as account_admin_router
+from backend.api.lecturer_import import router as lecturer_import_router
 from backend.api.core import router as thesis_workspace_router
+from backend.api.activity import router as activity_router
+from backend.api.school_forms import router as school_forms_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, RejectedProposalResolution, MemberResponse,
@@ -56,8 +59,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_frontend_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-Preview-SHA256", "X-CSRF-Token"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-Form-Code", "X-Preview-SHA256", "X-CSRF-Token"],
     expose_headers=["X-Document-Code", "X-Exported-At", "X-Print-SHA256", "Content-Disposition"],
 )
 app.include_router(auth_router)
@@ -65,7 +68,10 @@ app.include_router(account_router)
 app.include_router(roster_router)
 app.include_router(assignment_router)
 app.include_router(account_admin_router)
+app.include_router(lecturer_import_router)
 app.include_router(thesis_workspace_router)
+app.include_router(activity_router)
+app.include_router(school_forms_router)
 
 
 @app.get("/api/v1/notifications", response_model=NotificationSummaryOut)
@@ -110,6 +116,13 @@ def registration_evidence_download(registration_id: UUID, student_id: UUID,
     return download_evidence(session, user, registration_id, student_id)
 
 
+@app.post("/api/v1/topic-registrations/{registration_id}/members/{student_id}/evidence/scan", response_model=RegistrationOut)
+def registration_evidence_scan(registration_id: UUID, student_id: UUID,
+    user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
+    from backend.services.evidence import rescan_evidence
+    return rescan_evidence(session, user, registration_id, student_id)
+
+
 @app.get("/health/live", response_model=HealthOut)
 def live() -> HealthOut:
     return HealthOut(status="ok")
@@ -147,8 +160,10 @@ def context(
         m.ResourceAssignment.state == "ACTIVE",
         m.ResourceAssignment.effective_from <= now,
         or_(m.ResourceAssignment.effective_to.is_(None), m.ResourceAssignment.effective_to > now),
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
     )).all()
+    if "FORM_MANAGER" in assignment_types:
+        actions.append("forms:manage")
     if "ELIGIBILITY_IMPORTER" in assignment_types:
         actions.append("eligibility:import")
     if "ELIGIBILITY_VERIFIER" in assignment_types:
@@ -226,7 +241,11 @@ def lecturers(user: m.UserAccount = Depends(current_user), session: Session = De
     rows = session.scalars(select(m.LecturerProfile).join(m.UserAccount, m.UserAccount.id == m.LecturerProfile.user_id)
         .where(m.LecturerProfile.department_id == viewer.department_id, m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER")
         .order_by(m.LecturerProfile.display_name)).all()
-    return [LecturerOut(id=row.id, display_name=row.display_name, lecturer_code=row.lecturer_code) for row in rows]
+    department = session.get(m.Department, viewer.department_id)
+    faculty = session.get(m.Faculty, department.faculty_id) if department else None
+    return [LecturerOut(id=row.id, display_name=row.display_name, lecturer_code=row.lecturer_code,
+        department_name=department.name if department else None, faculty_name=faculty.name if faculty else None)
+        for row in rows]
 
 
 @app.post("/api/v1/student-proposals", response_model=RegistrationOut, status_code=201)

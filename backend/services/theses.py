@@ -25,9 +25,10 @@ def effective(cls):
         or_(cls.effective_to.is_(None), cls.effective_to > instant))
 
 
-def audit(session, user, action, resource_type, resource_id, reason=None, before_hash=None, after_hash=None):
+def audit(session, user, action, resource_type, resource_id, reason=None, before_hash=None, after_hash=None,
+          source_reference=None):
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action=action,
-        resource_type=resource_type, resource_id=resource_id, reason=reason,
+        resource_type=resource_type, resource_id=resource_id, reason=reason, source_reference=source_reference,
         before_hash=before_hash, after_hash=after_hash, occurred_at=now(), correlation_id=uuid4()))
 
 
@@ -74,7 +75,7 @@ def rights(session, user, thesis):
         if advisor and advisor.lecturer_id == lecturer.id:
             result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review", "proposal:view", "proposal:review"})
         if _is_department_head(session, lecturer.id, thesis.department_id):
-            result.update({"view", "document:view", "progress:view", "work:view", "progress:assign_reviewer", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
+            result.update({"view", "document:view", "work:view", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
         if is_faculty_dean(session, lecturer.id, thesis.department_id):
             result.update({"view", "proposal:view", "proposal:dean_confirm"})
         proposal = session.scalar(select(m.Proposal).where(m.Proposal.thesis_id == thesis.id))
@@ -84,8 +85,6 @@ def rights(session, user, thesis):
             m.ReviewerAssignment.review_scope == "PROPOSAL",
             m.ReviewerAssignment.state == "ACTIVE").limit(1)):
             result.update({"view", "proposal:view", "proposal:comment"})
-        if resource_role(session, user.id, "PROGRESS_REVIEWER", thesis_id=thesis.id):
-            result.update({"view", "progress:view", "progress:comment"})
         if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=thesis.round_id):
             result.update({"view", "milestone:manage"})
     return result
@@ -124,7 +123,7 @@ def workspace_out(session, user, thesis):
     if thesis.state not in EDITABLE:
         actions.difference_update({"progress:submit", "document:submit", "work:submit", "progress:review", "document:review",
             "work:review", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
-    return ThesisWorkspaceOut(id=thesis.id, title=thesis.current_title, state=thesis.state,
+    return ThesisWorkspaceOut(id=thesis.id, registration_id=thesis.registration_id, title=thesis.current_title, state=thesis.state,
         row_version=thesis.row_version, round_id=thesis.round_id, round_label=f"{year.code} / {round_.code}",
         member_student_ids=[member.student_id for member in members], members=[member_out(member) for member in members],
         advisor_lecturer_id=current.lecturer_id if current else None,
@@ -133,7 +132,7 @@ def workspace_out(session, user, thesis):
             display_name=session.get(m.LecturerProfile, item.lecturer_id).display_name, state=item.state,
             effective_from=item.effective_from, effective_to=item.effective_to) for item in history],
         pending_advisor=None,
-        cross_reviewers=[PendingAdvisorOut(lecturer_id=lecturer.id, display_name=lecturer.display_name) for lecturer in cross_reviewers],
+        cross_reviewers=[],
         actions=sorted(actions))
 
 
@@ -157,7 +156,7 @@ def list_theses(session, user):
             m.ReviewerAssignment.review_scope == "PROPOSAL",
             m.ReviewerAssignment.state == "ACTIVE")
         query = select(m.Thesis).where(or_(m.Thesis.department_id.in_(heads), m.Thesis.id.in_(advisors),
-            m.Thesis.id.in_(resources), m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews)))
+            m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews)))
     else:
         return []
     return [workspace_out(session, user, row) for row in session.scalars(query.order_by(m.Thesis.created_at.desc(), m.Thesis.id)).all()]

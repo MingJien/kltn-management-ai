@@ -71,6 +71,9 @@ def _registration_audit(session: Session, reg: m.TopicRegistration, user: m.User
         after_hash=_registration_hash(session, reg), reason=reason,
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
 
+    from backend.services.workflow_notices import registration_event
+    registration_event(session, reg, user.id, action)
+
 
 def registration_out(session: Session, reg: m.TopicRegistration) -> RegistrationOut:
     return registrations_out(session, [reg])[0]
@@ -138,6 +141,7 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
             active=item.active,
             consent_status=item.consent_status,
             evidence_file_name=files[item.evidence_file_id].original_name if item.evidence_file_id else None,
+            evidence_scan_state=files[item.evidence_file_id].scan_state if item.evidence_file_id else None,
             can_upload_evidence=may_upload_evidence(reg, item),
             can_withdraw=may_withdraw(reg, item, acceptance_times.get(reg.id)),
         ) for item in reg_members],
@@ -299,6 +303,7 @@ def respond_to_registration(session: Session, user: m.UserAccount, registration_
         member.consent_status = data.consent_status
         member.responded_by_user_id = user.id
         member.responded_at = datetime.now(timezone.utc)
+        _registration_audit(session, reg, user, "REGISTRATION_MEMBER_CONFIRMED" if data.consent_status == "ACCEPTED" else "REGISTRATION_MEMBER_DECLINED", None)
         reg.row_version += 1
         session.flush()
         result = registration_out(session, reg)
@@ -361,7 +366,7 @@ def submit_registration(session: Session, user: m.UserAccount, registration_id: 
         reg.submitted_at = now
         reg.row_version += 1
         session.flush()
-        from backend.services.notifications import add_notice, notify_admins, notify_department_heads
+        from backend.services.notifications import add_notice, notify_department_heads
 
         if student_proposal:
             add_notice(session, topic=topic,
@@ -369,20 +374,14 @@ def submit_registration(session: Session, user: m.UserAccount, registration_id: 
                        kind="PROPOSAL_SUBMITTED")
             notify_department_heads(session, topic=topic, actor_user_id=user.id,
                                     registration_id=reg.id)
-            notify_admins(session, topic=topic, actor_user_id=user.id,
-                          registration_id=reg.id, kind="PROPOSAL_SUBMITTED")
         else:
+            add_notice(session, topic=topic, actor_user_id=user.id, registration_id=reg.id, kind="REGISTRATION_SUBMITTED")
             for member in members:
                 member_user = session.get(m.StudentProfile, member.student_id).user_id
-                add_notice(session, topic=topic,
-                           actor_user_id=member_user, registration_id=reg.id,
-                           kind="REGISTRATION_SUBMITTED")
                 if member_user != user.id:
                     add_notice(session, topic=topic, actor_user_id=user.id,
                                registration_id=reg.id, kind="REGISTRATION_SUBMITTED",
                                recipient_user_id=member_user)
-            notify_admins(session, topic=topic, actor_user_id=user.id,
-                          registration_id=reg.id, kind="REGISTRATION_SUBMITTED")
         _registration_audit(session, reg, user, "REGISTRATION_SUBMITTED", before)
         result = registration_out(session, reg)
         session.commit()

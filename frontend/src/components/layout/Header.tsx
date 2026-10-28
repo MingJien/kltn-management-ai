@@ -17,12 +17,14 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/proposals": "Đề cương",
   "/progress": "Tiến độ",
   "/documents": "Tài liệu",
+  "/forms": "Biểu mẫu và tài liệu Khoa",
   "/account": "Tài khoản",
   "/administration": "Quản trị",
   "/rounds": "Đợt KLTN",
   "/roster": "Danh sách sinh viên",
   "/ai": "Tra cứu thử nghiệm",
   "/notifications": "Thông báo",
+  "/activity": "Nhật ký hoạt động",
 };
 
 interface HeaderProps {

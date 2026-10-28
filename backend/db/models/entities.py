@@ -445,6 +445,45 @@ class StoredFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     scanned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class OfficialForm(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "official_form"
+    __table_args__ = (
+        UniqueConstraint("round_id", "code"),
+        CheckConstraint("document_kind IN ('FORM','PUBLICATION')", name="document_kind"),
+        CheckConstraint("audience IN ('STUDENT_AND_LECTURER','LECTURER')", name="audience"),
+        CheckConstraint("state IN ('ACTIVE','ARCHIVED')", name="state"),
+    )
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    document_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    audience: Mapped[str] = mapped_column(String(30), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
+    created_by: Mapped[uuid.UUID] = fk("user_account.id")
+
+
+class OfficialFormVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "official_form_version"
+    __table_args__ = (
+        UniqueConstraint("official_form_id", "version_no"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')", name="state"),
+        CheckConstraint("(published_at IS NULL) = (published_by IS NULL)", name="publisher_pair"),
+        CheckConstraint("state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL", name="published_stamp"),
+        CheckConstraint("state != 'DRAFT' OR published_at IS NULL", name="draft_stamp"),
+        Index("uq_official_form_current", "official_form_id", unique=True, postgresql_where=text("state = 'PUBLISHED'")),
+    )
+    official_form_id: Mapped[uuid.UUID] = fk("official_form.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    uploaded_by: Mapped[uuid.UUID] = fk("user_account.id")
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    change_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    published_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class Proposal(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "proposal"
     __table_args__ = (
@@ -532,7 +571,7 @@ class DocumentDeadline(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base
     __tablename__ = "document_deadline"
     __table_args__ = (
         UniqueConstraint("round_id", "document_type"),
-        CheckConstraint("document_type IN ('PROPOSAL','PLAN','SUPPORTING')", name="document_type"),
+        CheckConstraint("document_type IN ('PROPOSAL','PLAN','REPORT','SUPPORTING')", name="document_type"),
         CheckConstraint("state IN ('OPEN','CLOSED')", name="state"),
     )
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
@@ -574,6 +613,41 @@ class ProgressReview(UuidPrimaryKeyMixin, TimestampMixin, Base):
     comment: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class ProgressReviewAnnotation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "progress_review_annotation"
+    __table_args__ = (
+        CheckConstraint("state IN ('DRAFT','PUBLISHED')", name="state"),
+        CheckConstraint("page_number IS NULL OR page_number BETWEEN 1 AND 10000", name="page_number"),
+        CheckConstraint("(x IS NULL AND y IS NULL) OR (page_number IS NOT NULL AND x IS NOT NULL AND y IS NOT NULL AND x BETWEEN 0 AND 1 AND y BETWEEN 0 AND 1)", name="coordinates"),
+        CheckConstraint("(state = 'DRAFT' AND published_at IS NULL) OR (state = 'PUBLISHED' AND published_at IS NOT NULL AND length(trim(comment)) > 0)", name="publication"),
+        Index("ix_progress_review_annotation_report_reviewer", "progress_report_id", "reviewer_id", "state"),
+        Index("ix_progress_review_annotation_document_reviewer", "document_version_id", "reviewer_id", "state"),
+        Index("ix_progress_review_annotation_proposal_reviewer", "proposal_version_id", "reviewer_id", "state"),
+        CheckConstraint("num_nonnulls(progress_report_id, document_version_id, proposal_version_id) = 1", name="one_target"),
+        CheckConstraint("annotation_kind IN ('PIN','SUMMARY','ATTACHMENT')", name="annotation_kind"),
+        CheckConstraint("(annotation_kind = 'ATTACHMENT' AND attachment_file_id IS NOT NULL) OR (annotation_kind IN ('PIN','SUMMARY') AND attachment_file_id IS NULL)", name="attachment_kind"),
+        CheckConstraint("annotation_kind = 'PIN' OR (page_number IS NULL AND x IS NULL AND y IS NULL)", name="kind_coordinates"),
+        Index("uq_review_summary_progress", "progress_report_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL")),
+        Index("uq_review_summary_document", "document_version_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL")),
+        Index("uq_review_summary_proposal", "proposal_version_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL")),
+    )
+    progress_report_id: Mapped[Optional[uuid.UUID]] = fk("progress_report.id", nullable=True)
+    document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
+    proposal_version_id: Mapped[Optional[uuid.UUID]] = fk("proposal_version.id", nullable=True)
+    reviewer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    annotation_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="PIN", server_default="PIN")
+    attachment_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    page_number: Mapped[Optional[int]] = mapped_column(Integer)
+    x: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 7))
+    y: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 7))
+    location_label: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
+    quoted_text: Mapped[str] = mapped_column(String(1000), nullable=False, default="", server_default="")
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class Document(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "document"
     __table_args__ = (
@@ -607,8 +681,27 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
+class RegistrationFormVersion(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "registration_form_version"
+    __table_args__ = (
+        UniqueConstraint("registration_id", "version_no"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("form_code IN ('1A','1B')", name="form_code"),
+        CheckConstraint("length(content_sha256) = 64 AND length(registration_fingerprint) = 64", name="hash_length"),
+    )
+    registration_id: Mapped[uuid.UUID] = fk("topic_registration.id")
+    stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
+    form_code: Mapped[str] = mapped_column(String(2), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    registration_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class AuditEvent(UuidPrimaryKeyMixin, Base):
     __tablename__ = "audit_event"
+    __table_args__ = (Index("ix_audit_event_occurred_id", "occurred_at", "id"),)
     actor_id: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -616,22 +709,44 @@ class AuditEvent(UuidPrimaryKeyMixin, Base):
     before_hash: Mapped[Optional[str]] = mapped_column(String(64))
     after_hash: Mapped[Optional[str]] = mapped_column(String(64))
     reason: Mapped[Optional[str]] = mapped_column(Text)
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
 
 
 class UserNotification(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A short in-web notice addressed to one account.
+
+    Older proposal/registration notices are keyed by registration; later thesis and
+    account notices may instead carry thesis/subject/message/url. No separate table.
+    """
     __tablename__ = "user_notification"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED')",
+            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','PROPOSAL_REVIEWED','PROPOSAL_FINALIZED',"
+            "'REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED',"
+            "'MILESTONE_OPENED','MILESTONE_EXTENDED','MILESTONE_REOPENED','MILESTONE_CLOSED',"
+            "'DOCUMENT_DEADLINE_SET','DOCUMENT_DEADLINE_EXTENDED','DOCUMENT_DEADLINE_REOPENED','DOCUMENT_DEADLINE_CLOSED',"
+            "'PROGRESS_SUBMITTED','PROGRESS_CONFIRMED','PROGRESS_REVISION_REQUIRED','PROGRESS_COMMENT',"
+            "'DOCUMENT_SUBMITTED','DOCUMENT_ACCEPTED','DOCUMENT_REVISION_REQUESTED',"
+            "'WORK_SUBMITTED','WORK_APPROVED','WORK_REVISION_REQUIRED',"
+            "'ACCOUNT_LOCKED','ACCOUNT_UNLOCKED','ACCOUNT_DISABLED','ACCOUNT_RESTORED',"
+            "'ACCOUNT_LINK_REISSUED','ACCOUNT_EMAIL_CORRECTED',"
+            "'REGISTRATION_FORM_SUBMITTED','PROPOSAL_REVIEWER_ASSIGNED',"
+            "'PROGRESS_REVIEWER_ASSIGNED','PROPOSAL_DEAN_CONFIRMED','WORKFLOW_NOTICE')",
             name="kind",
         ),
         Index("ix_user_notification_recipient_created", "recipient_user_id", "created_at"),
+        Index("ix_user_notification_thesis_created", "thesis_id", "created_at"),
     )
     recipient_user_id: Mapped[uuid.UUID] = fk("user_account.id")
     actor_user_id: Mapped[uuid.UUID] = fk("user_account.id")
-    registration_id: Mapped[uuid.UUID] = fk("topic_registration.id")
+    registration_id: Mapped[Optional[uuid.UUID]] = fk("topic_registration.id", nullable=True)
+    thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
+    subject_type: Mapped[Optional[str]] = mapped_column(String(40))
+    subject_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    message: Mapped[Optional[str]] = mapped_column(Text)
+    url: Mapped[Optional[str]] = mapped_column(String(300))
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

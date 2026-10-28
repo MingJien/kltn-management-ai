@@ -47,7 +47,7 @@ export default function NotificationsBell({userId}: {userId: string}) {
         window.dispatchEvent(new Event("kltn:notifications-changed"));
       }
       setOpen(false);
-      navigate(notice.url);
+      navigate(notice.url,{state:{noticeId:notice.id}});
     } catch (cause) {setError(errorMessage(cause));}
     finally {setBusyId("");}
   }

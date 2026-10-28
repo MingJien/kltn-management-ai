@@ -4,13 +4,13 @@ Command: python -m tools.run_e2e [playwright spec filter...]
 Requires frontend npm dependencies and `npx playwright install chromium`.
 Never reuses or stops a user's running API/Vite server.
 
-The run refuses kltn_management: that database is the working database and must
-not receive synthetic test rows, temporary schemas or cleanup operations. Point
-DATABASE_URL at a separate database created only for tests.
+The run uses a new owned schema, never public. Running on kltn_management needs
+KLTN_E2E_ALLOW_ISOLATED_SCHEMA=true; no existing schema is reused or cleaned up.
 """
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 import re
@@ -55,6 +55,10 @@ def available_port(preferred: int) -> int:
 def main() -> int:
     from backend.db.validate_schema import load_env
     load_env()
+    from backend.services.file_scanner import start_local_daemon
+    print("Checking real ClamAV scanner...", flush=True)
+    if not start_local_daemon():
+        raise RuntimeError("E2E BLOCKED: real ClamAV daemon is not ready; uploads must not be falsely marked CLEAN")
     api_port, web_port = available_port(DEFAULT_API_PORT), available_port(DEFAULT_WEB_PORT)
     if api_port == web_port:
         web_port = available_port(0)
@@ -88,9 +92,10 @@ def main() -> int:
         env.update(DATABASE_URL=private_url, KLTN_ENV='test', KLTN_DEV_AUTH='false',
             AUTH_SESSION_SECRET=secrets.token_urlsafe(48), PYTHONIOENCODING='utf-8',
             KLTN_ALLOW_SYNTHETIC_SEED='true', KLTN_PROPOSAL_DIR=str(directory / 'uploads' / 'proposals'),
+            KLTN_DOCUMENT_DIR=str(directory / 'uploads' / 'documents'),
             KLTN_FRONTEND_URL=f'http://127.0.0.1:{web_port}', VITE_API_URL=f'http://127.0.0.1:{api_port}',
             KLTN_E2E_API_PORT=str(api_port), KLTN_E2E_WEB_PORT=str(web_port),
-            KLTN_EVIDENCE_DIR=str(directory / 'uploads'), KLTN_E2E_RUN_DIR=str(directory),
+            KLTN_EVIDENCE_DIR=str(directory / 'uploads' / 'registration'), KLTN_E2E_RUN_DIR=str(directory),
             # Never deliver synthetic test account links through the developer's real SMTP.
             KLTN_MAIL_FROM='', KLTN_SMTP_HOST='', KLTN_SMTP_USER='', KLTN_SMTP_PASSWORD='')
         migration = subprocess.run([sys.executable, '-m', 'alembic', 'upgrade', 'head'],
@@ -124,7 +129,7 @@ def main() -> int:
                 base_role='ADMIN', status='ACTIVE')
             session.add(admin)
             accounts['admin'] = {'email':admin.email, 'password':admin_password}
-            for key in ('proposalPeer','race1','race2','race3','proposalFlow','returnFlow','auditSv1','auditSv2','auditSv3'):
+            for key in ('proposalPeer','race1','race2','race3','proposalFlow','returnFlow','auditSv1','auditSv2','auditSv3','nv5Student','nv5Outsider','annotationStudent','formStudent','formMember'):
                 password = secrets.token_urlsafe(20)
                 email = key.lower() + '@e2e.test'
                 user = m.UserAccount(id=uuid4(),email=email,password_hash=hash_password(password),
@@ -139,6 +144,24 @@ def main() -> int:
                 accounts[key] = {'email':email,'password':password}
         private_engine.dispose()
         env['KLTN_E2E_ACCOUNTS_JSON'] = json.dumps(accounts)
+        # Read the actual faculty templates and fill a synthetic local copy for print QA.
+        # The original templates are never written to, and copies stay Git-ignored.
+        from backend.services.form_templates import template_available, official_template, official_template_by_id
+        from docx import Document
+        for kind in ('plan','proposal'):
+            if template_available(kind):
+                doc = Document(io.BytesIO(official_template(kind)))
+                doc.add_paragraph('DU LIEU GIA KIEM THU NV5 - KHONG PHAI HO SO SINH VIEN THAT')
+                output = directory / f'synthetic-{kind}.docx'
+                doc.save(output)
+                env[f'KLTN_E2E_{kind.upper()}_FILE'] = str(output)
+        for form_code in ('1a','1b'):
+            content, _, _ = official_template_by_id('mau-0'+form_code, 'STUDENT')
+            doc = Document(io.BytesIO(content))
+            doc.add_paragraph('DU LIEU GIA KIEM THU - KHONG PHAI DON CUA SINH VIEN THAT')
+            output = directory / f'synthetic-form-{form_code}.docx'
+            doc.save(output)
+            env[f'KLTN_E2E_FORM_{form_code.upper()}_FILE'] = str(output)
         with (directory / 'api.log').open('w', encoding='utf-8') as log:
             api = subprocess.Popen([sys.executable,'-m','uvicorn','backend.api.main:app',
                 '--host','127.0.0.1','--port',str(api_port)],cwd=ROOT,env=env,stdout=log,stderr=log,
