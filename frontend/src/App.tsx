@@ -13,10 +13,12 @@ import NotificationsPage from "./pages/NotificationsPage";
 import ActivityPage from "./pages/ActivityPage";
 import SchoolFormsPage from "./pages/SchoolFormsPage";
 import AdministrationPage from "./pages/AdministrationPage";
+import LecturersPage from "./pages/LecturersPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
 import LecturerProfilePage from "./pages/LecturerProfilePage";
 import ThesesPage from "./pages/ThesesPage";
+import SubmissionsPage from "./pages/SubmissionsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
 import { plannedPages, type PlannedPageId } from "./plannedPages";
@@ -34,7 +36,8 @@ function App() {
   const [noticeRevision,setNoticeRevision] = useState("");
   useEffect(() => {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
-    labels["/forms"] = "Biểu mẫu và tài liệu Khoa";
+    labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
+    labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
     labels["/activity"] = "Nhật ký hoạt động";
     const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
     const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
@@ -145,6 +148,7 @@ function App() {
         <Route path="/activity" element={<ActivityPage context={context} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers" element={context.base_role === "ADMIN" ? <LecturersPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/rounds" element={context.base_role === "ADMIN" ?
           <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
@@ -164,6 +168,7 @@ function App() {
         <Route path="/theses" element={workflowAccess ? <ThesesPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/proposals" element={workflowAccess ? <ThesesPage context={context} section="proposal" /> : <Navigate to="/" replace />} />
         <Route path="/progress" element={workflowAccess ? <ThesesPage context={context} section="progress" /> : <Navigate to="/" replace />} />
+        <Route path="/submissions" element={workflowAccess ? <SubmissionsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/forms" element={<SchoolFormsPage context={context}/>} />
         <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />

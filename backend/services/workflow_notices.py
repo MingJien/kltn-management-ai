@@ -55,6 +55,14 @@ def topic_event(session, topic, actor_id, event):
     if event == "TOPIC_SUBMITTED" and topic.proposer_type == "LECTURER":
         recipients = department_heads(session, topic.department_id)
         label = "đã gửi đề tài chờ bộ môn duyệt"
+    elif event in {"TOPIC_ARCHIVED", "TOPIC_RESTORED"}:
+        recipients = {topic.proposer_user_id}
+        if topic.receiving_lecturer_id:
+            recipients.add(session.get(m.LecturerProfile, topic.receiving_lecturer_id).user_id)
+        recipients |= set(session.scalars(select(m.StudentProfile.user_id).join(m.RegistrationMember,
+            m.RegistrationMember.student_id == m.StudentProfile.id).join(m.TopicRegistration,
+            m.TopicRegistration.id == m.RegistrationMember.registration_id).where(m.TopicRegistration.topic_id == topic.id)))
+        label = "đã ngừng sử dụng đề tài cho đăng ký mới (hồ sơ đang làm được giữ nguyên)" if event == "TOPIC_ARCHIVED" else "đã khôi phục hiển thị đề tài"
     elif event in {"TOPIC_APPROVED", "TOPIC_RETURNED", "TOPIC_REJECTED"}:
         recipients = {topic.proposer_user_id}
         if topic.proposer_type == "STUDENT":

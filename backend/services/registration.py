@@ -172,7 +172,7 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
             fail(404, "Topic not found")
         round_ = session.get(m.ThesisRound, topic.round_id)
         student_proposal = topic.proposer_type == "STUDENT" and topic.proposer_user_id == user.id
-        allowed_state = topic.state == "APPROVED" or (student_proposal and topic.state == "DRAFT")
+        allowed_state = topic.archived_at is None and (topic.state == "APPROVED" or (student_proposal and topic.state == "DRAFT"))
         if not allowed_state or round_ is None or round_.state != "OPEN" or not (round_.opens_at <= now <= round_.closes_at):
             fail(409, "Topic or registration round is not open")
         if topic.proposer_type == "STUDENT" and topic.state != "APPROVED" and not student_proposal:

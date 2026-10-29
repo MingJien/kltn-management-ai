@@ -237,6 +237,9 @@ class Topic(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
     decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    archived_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    archive_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class TopicTitleVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):

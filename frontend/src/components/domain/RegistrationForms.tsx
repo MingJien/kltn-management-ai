@@ -6,8 +6,8 @@ import {formatDate} from "./CoreForms";
 import {scanLabel} from "./ThesisDocuments";
 import PrintHistory from "./PrintHistory";
 
-export default function RegistrationForms({row,userId,onChanged}:{row:Registration;userId:string;onChanged:()=>Promise<void>}) {
-  const [open,setOpen]=useState(false);
+export default function RegistrationForms({row,userId,onChanged,defaultOpen=false}:{row:Registration;userId:string;onChanged:()=>Promise<void>;defaultOpen?:boolean}) {
+  const [open,setOpen]=useState(defaultOpen);
   const [forms,setForms]=useState<Forms|null>(null);
   const [file,setFile]=useState<File|null>(null);
   const [busy,setBusy]=useState(false);
@@ -31,8 +31,8 @@ export default function RegistrationForms({row,userId,onChanged}:{row:Registrati
   return <details className="registration-forms" open={open} onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary>Đơn đăng ký Mẫu 1a/1b · tệp nộp và bản in</summary>
     {open && <div className="stack" style={{marginTop:"var(--space-3)"}}>
-      <p className="text-body-sm">Nộp đơn đã điền theo mẫu của Khoa trước khi GV tiếp nhận. Đây là tệp hồ sơ bổ sung; nộp tệp không thay thế nút gửi đăng ký và không tự xác nhận Khoa đã duyệt.</p>
-      <p className="text-body-sm text-muted">Mẫu 1a/1b được nộp sau khi SV đã có tài khoản và lập hồ sơ đăng ký đề tài. Danh sách đủ điều kiện do Khoa xác nhận trước khi cấp quyền đăng ký; không dùng đơn này để tự xác nhận đủ điều kiện.</p>
+      <p className="text-body-sm">Điền đúng mẫu cá nhân hoặc nhóm, nộp tệp tại đây rồi mở hồ sơ đăng ký để gửi hoặc xem quyết định tiếp nhận.</p>
+      <p className="text-body-sm text-muted">Trạng thái đăng ký và bản nộp được theo dõi riêng. Tệp đã nộp chưa phải xác nhận Khoa duyệt.</p>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void run(()=>load(),"Đã làm mới các phiên bản đơn.")}>Làm mới đơn đăng ký</button>
       {error && <p role="alert" className="alert alert-danger">{error}</p>}
       {notice && <p role="status" className="alert alert-info">{notice}</p>}

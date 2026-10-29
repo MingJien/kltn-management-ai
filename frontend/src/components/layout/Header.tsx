@@ -17,7 +17,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/proposals": "Đề cương",
   "/progress": "Tiến độ",
   "/documents": "Tài liệu",
-  "/forms": "Biểu mẫu và tài liệu Khoa",
+  "/forms": "Kho biểu mẫu & tài liệu Khoa",
+  "/submissions": "Hồ sơ nộp & xét duyệt",
   "/account": "Tài khoản",
   "/administration": "Quản trị",
   "/rounds": "Đợt KLTN",
@@ -38,7 +39,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
   const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
   const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
     ? plannedPages[plannedId as PlannedPageId].title
-    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/theses/") ? "Khóa luận" : "Trang");
+    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/theses/") ? (new URLSearchParams(location.search).get("section") === "progress" ? "Báo cáo tiến độ" : ["submissions","proposal","documents"].includes(new URLSearchParams(location.search).get("section") || "") ? "Hồ sơ nộp & xét duyệt" : "Khóa luận & GVHD") : "Trang");
 
   return (
     <header className="app-shell__header">

@@ -1,3 +1,4 @@
+import EmptyState from "../ui/EmptyState";
 import { lazy, Suspense, useState } from "react";
 import { MessageSquare, X } from "lucide-react";
 import type { AuditEvent, Milestone, ProgressReport, Thesis, ThesisDocument } from "../../api";
@@ -238,7 +239,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         </details>}
       </div></article>;
     })}
-    {reports.length === 0 && <p className="text-muted">Chưa có báo cáo tiến độ.</p>}
+    {reports.length === 0 && <EmptyState title="Chưa có báo cáo tiến độ." />}
     </> : <p className="alert alert-info">Bạn quản lý mốc chung. Nội dung báo cáo, minh chứng và nhận xét riêng chỉ nhóm SV và GVHD được xem.</p>}
   </div>;
 }

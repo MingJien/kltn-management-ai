@@ -1,4 +1,4 @@
--- Schema-only review snapshot at Alembic revision 20261028_0015.
+-- Schema-only review snapshot at Alembic revision 20261029_0016.
 -- 39 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
@@ -301,6 +301,9 @@ CREATE TABLE topic (
 	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
 	decided_by UUID,
 	decided_at TIMESTAMP WITH TIME ZONE,
+	archived_at TIMESTAMP WITH TIME ZONE,
+	archived_by UUID,
+	archive_reason TEXT,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
@@ -314,7 +317,8 @@ CREATE TABLE topic (
 	CONSTRAINT fk_topic_receiving_lecturer_id_lecturer_profile FOREIGN KEY(receiving_lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_proposer_user_id_user_account FOREIGN KEY(proposer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_topic_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
+	CONSTRAINT fk_topic_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_topic_archived_by_user_account FOREIGN KEY(archived_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE topic_registration (

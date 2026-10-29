@@ -220,11 +220,12 @@ def topics(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     search: str | None = Query(default=None, max_length=200),
-    view: str = Query(default="all", pattern="^(all|mine|pending|suggested)$"),
+    view: str = Query(default="all", pattern="^(all|mine|pending|suggested|archived)$"),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|title_asc|title_desc)$"),
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> list[TopicOut]:
-    return visible_topics(session, user, round_id, limit, offset, search, view)
+    return visible_topics(session, user, round_id, limit, offset, search, view, sort)
 
 
 @app.post("/api/v1/topics", response_model=TopicOut, status_code=201)
@@ -513,3 +514,16 @@ def topic_detail(
     session: Session = Depends(get_session),
 ) -> TopicOut:
     return get_visible_topic(session, user, topic_id)
+
+
+@app.post("/api/v1/topics/{topic_id}/{operation}", status_code=204)
+def topic_lifecycle(topic_id: UUID, operation: str, payload: dict,
+                    if_match: int = Header(alias="If-Match"),
+                    user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
+    if operation not in {"delete-draft", "archive", "restore"}:
+        raise HTTPException(404, "Unknown topic action")
+    reason = payload.get("reason")
+    if not isinstance(reason, str) or not 5 <= len(reason.strip()) <= 2000:
+        raise HTTPException(422, "Lý do cần từ 5 đến 2000 ký tự")
+    from backend.services.topics import lifecycle
+    lifecycle(session, user, topic_id, "delete" if operation == "delete-draft" else operation, reason, if_match)

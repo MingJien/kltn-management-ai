@@ -1,3 +1,4 @@
+import EmptyState from "../ui/EmptyState";
 import { useState } from "react";
 import type { Context, Thesis, WorkAssignment } from "../../api";
 import { request } from "../../api";
@@ -41,6 +42,6 @@ export default function ThesisWork({thesis, assignments, context, busy, run}: {
           method: "POST", headers: {"If-Match": String(assignment.row_version)}, body: JSON.stringify({decision, comment}),
         }), "Đã lưu nhận xét phân công.")} />}
     </article>)}
-    {assignments.length === 0 && <p className="text-muted">Chưa khai phân công công việc.</p>}
+    {assignments.length === 0 && <EmptyState title="Chưa khai phân công công việc." />}
   </section>;
 }

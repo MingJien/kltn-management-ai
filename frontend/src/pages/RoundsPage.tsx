@@ -84,7 +84,25 @@ export default function RoundsPage({context}: {context: Context}) {
     <div className="stack">
       {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
       {notice ? <p role="status" className="alert alert-success">{notice}</p> : null}
-      <section className="card"><div className="card-body stack"><h2>{editing ? "Sửa bản nháp " + editing.code : "Tạo đợt mới"}</h2>
+      <section className="card"><div className="card-body stack"><h2>Các đợt đã tạo</h2>
+        {!rounds.length ? <p>Chưa có đợt nào.</p> : <div className="account-list">{rounds.map(row => <div className="account-list__row" key={row.id}>
+          <div><strong>{row.academic_year_code} · {row.code}</strong><br />
+            <span>{row.round_type === "MAIN" ? "Đợt chính" : "Đợt bổ sung"} · {row.state === "DRAFT" ? "Bản nháp" : row.state === "OPEN" ? "Đã mở" : row.state === "CLOSED" ? "Đã đóng" : "Lưu trữ"}</span><br />
+            <span className="text-caption">{new Date(row.opens_at).toLocaleString("vi-VN")} – {new Date(row.closes_at).toLocaleString("vi-VN")}</span>
+          </div>
+          <div className="flex gap-2">{row.state === "DRAFT" ? <button className="btn btn-secondary btn-sm" disabled={busy}
+            onClick={() => {
+              setEditing(row); setYearCode(row.academic_year_code); setYearStart(row.year_starts_on);
+              setYearEnd(row.year_ends_on); setCode(row.code); setRoundType(row.round_type);
+              setOpensAt(localDateTime(row.opens_at)); setClosesAt(localDateTime(row.closes_at));
+              setBasis(""); setError(""); document.getElementById("round-editor")?.scrollIntoView({block: "start", behavior: "smooth"});
+            }}>Sửa bản nháp</button> : null}
+          {row.state === "DRAFT" || row.state === "OPEN" ? <button className="btn btn-secondary btn-sm" disabled={busy}
+            onClick={() => {setTarget({round: row, state: row.state === "DRAFT" ? "OPEN" : "CLOSED"}); setReason(""); setError("");}}>
+            {row.state === "DRAFT" ? "Mở đợt" : "Đóng đợt"}</button> : null}</div>
+        </div>)}</div>}
+      </div></section>
+      <section className="card" id="round-editor"><div className="card-body stack"><h2>{editing ? "Sửa bản nháp " + editing.code : "Tạo đợt mới"}</h2>
         <form className="stack" onSubmit={event => void create(event)}>
           <div className="grid grid-auto">
             <label className="input-group">Năm học (ví dụ 2026-2027)
@@ -115,24 +133,6 @@ export default function RoundsPage({context}: {context: Context}) {
               setEditing(null); setCode(""); setOpensAt(""); setClosesAt(""); setBasis("");
             }}>Hủy sửa</button> : null}</div>
         </form>
-      </div></section>
-      <section className="card"><div className="card-body stack"><h2>Các đợt đã tạo</h2>
-        {!rounds.length ? <p>Chưa có đợt nào.</p> : <div className="account-list">{rounds.map(row => <div className="account-list__row" key={row.id}>
-          <div><strong>{row.academic_year_code} · {row.code}</strong><br />
-            <span>{row.round_type === "MAIN" ? "Đợt chính" : "Đợt bổ sung"} · {row.state === "DRAFT" ? "Bản nháp" : row.state === "OPEN" ? "Đã mở" : row.state === "CLOSED" ? "Đã đóng" : "Lưu trữ"}</span><br />
-            <span className="text-caption">{new Date(row.opens_at).toLocaleString("vi-VN")} – {new Date(row.closes_at).toLocaleString("vi-VN")}</span>
-          </div>
-          <div className="flex gap-2">{row.state === "DRAFT" ? <button className="btn btn-secondary btn-sm" disabled={busy}
-            onClick={() => {
-              setEditing(row); setYearCode(row.academic_year_code); setYearStart(row.year_starts_on);
-              setYearEnd(row.year_ends_on); setCode(row.code); setRoundType(row.round_type);
-              setOpensAt(localDateTime(row.opens_at)); setClosesAt(localDateTime(row.closes_at));
-              setBasis(""); setError(""); window.scrollTo({top: 0, behavior: "smooth"});
-            }}>Sửa bản nháp</button> : null}
-          {row.state === "DRAFT" || row.state === "OPEN" ? <button className="btn btn-secondary btn-sm" disabled={busy}
-            onClick={() => {setTarget({round: row, state: row.state === "DRAFT" ? "OPEN" : "CLOSED"}); setReason(""); setError("");}}>
-            {row.state === "DRAFT" ? "Mở đợt" : "Đóng đợt"}</button> : null}</div>
-        </div>)}</div>}
       </div></section>
     </div>
     <Dialog open={!!target} onClose={() => setTarget(null)} busy={busy}

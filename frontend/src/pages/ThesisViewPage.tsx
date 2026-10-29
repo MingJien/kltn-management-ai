@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
-import { BookOpen, ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
+import { ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
 import { errorMessage } from "../errors";
 import type { AuditEvent, Context, DocumentDeadline, Lecturer, Milestone, ProgressReport, Proposal, Thesis, ThesisDocument, WorkAssignment } from "../api";
 import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
 import { formatDate, ReviewForm, Status } from "../components/domain/CoreForms";
-import ThesisDocuments from "../components/domain/ThesisDocuments";
+import ThesisSubmissions from "../components/domain/ThesisSubmissions";
 import ThesisProgress from "../components/domain/ThesisProgress";
-import ThesisProposal from "../components/domain/ThesisProposal";
 import ThesisWork from "../components/domain/ThesisWork";
-import DocumentDeadlines from "../components/domain/DocumentDeadlines";
 
 type Data = {thesis: Thesis; milestones: Milestone[]; deadlines: DocumentDeadline[]; deadlineHistory:AuditEvent[]; reports: ProgressReport[]; docs: ThesisDocument[]; work: WorkAssignment[]; lecturers: Lecturer[]; audit: AuditEvent[]; milestoneHistory: AuditEvent[]; proposal: Proposal | null};
 
@@ -70,7 +68,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     if (busy) return false;
     setBusy(true); setError(""); setMessage("");
     try {await action(); await load(); setMessage(success); return true;}
-    catch (cause) {setError(errorMessage(cause)); return false;}
+    catch (cause) {setError(errorMessage(cause)); await load().catch(() => undefined); return false;}
     finally {setBusy(false);}
   }
   async function refresh() {
@@ -82,15 +80,18 @@ function ThesisWorkspace({context}: {context: Context}) {
 
   if (!data) return <><Link to="/theses">Quay lại khóa luận</Link>{error ? <div className="alert alert-danger" role="alert">{error} <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void refresh()}>Thử tải lại hồ sơ</button></div> : <p role="status">Đang tải hồ sơ khóa luận…</p>}</>;
   const {thesis, docs, milestones, deadlines, deadlineHistory, reports, work, lecturers, audit, milestoneHistory, proposal} = data;
-  const tabs = ["overview", ...(proposal ? ["proposal"] : []), ...(thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? ["progress"] : []),
-    ...(thesis.actions.includes("document:view") ? ["documents"] : [])];
-  const section = tabs.includes(params.get("section") || "") ? params.get("section")! : "overview";
+  const tabs = ["overview", ...(proposal || thesis.actions.includes("document:view") ? ["submissions"] : []),
+    ...(thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? ["progress"] : [])];
+  const requested = params.get("section") || "overview";
+  const normalized = ["proposal", "documents"].includes(requested) ? "submissions" : requested;
+  const section = tabs.includes(normalized) ? normalized : "overview";
+  const submissionKind = params.get("kind") || (requested === "proposal" ? "PROPOSAL" : "PLAN");
   const active = ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state);
   return <>
     <Link to="/theses" className="workspace-back-link">
       <span>←</span> Danh sách khóa luận
     </Link>
-    <PageHeader title={thesis.title} description={`${thesis.round_label} · GVHD: ${thesis.advisor_name || "Chưa có"}`}>
+    <PageHeader title={{overview:"Khóa luận & GVHD",submissions:"Hồ sơ nộp & xét duyệt",progress:"Báo cáo tiến độ"}[section] || "Hồ sơ khóa luận"} description={`${thesis.title} · ${thesis.round_label}`}>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
@@ -103,14 +104,12 @@ function ThesisWorkspace({context}: {context: Context}) {
             role="tab"
             aria-selected={section === tab}
             className={`core-tab-btn ${section === tab ? "core-tab-btn--active btn btn-primary" : "btn btn-secondary"}`}
-            aria-pressed={section === tab}
             onClick={() => setParams({section: tab})}
           >
             {tab === "overview" && <GraduationCap size={15} aria-hidden="true" />}
-            {tab === "proposal" && <BookOpen size={15} aria-hidden="true" />}
             {tab === "progress" && <ClipboardList size={15} aria-hidden="true" />}
-            {tab === "documents" && <FolderOpen size={15} aria-hidden="true" />}
-            <span>{tab === "overview" ? "Tổng quan & GVHD" : tab === "proposal" ? "Đề cương" : tab === "progress" ? "Tiến độ" : "Tài liệu"}</span>
+            {tab === "submissions" && <FolderOpen size={15} aria-hidden="true" />}
+            <span>{tab === "overview" ? "Tổng quan & GVHD" : tab === "progress" ? "Báo cáo tiến độ" : "Hồ sơ nộp & xét duyệt"}</span>
           </button>
         ))}
       </div>
@@ -120,7 +119,7 @@ function ThesisWorkspace({context}: {context: Context}) {
       </div>
     </div>
 
-    <div className="workspace-tab-banner">
+    {section !== "submissions" && <div className="workspace-tab-banner">
       {section === "overview" && (
         <div className="workspace-tab-banner__content">
           <GraduationCap className="workspace-tab-banner__icon" size={20} aria-hidden="true" />
@@ -130,39 +129,21 @@ function ThesisWorkspace({context}: {context: Context}) {
           </div>
         </div>
       )}
-      {section === "proposal" && (
-        <div className="workspace-tab-banner__content">
-          <BookOpen className="workspace-tab-banner__icon" size={20} aria-hidden="true" />
-          <div>
-            <strong>Đề cương khóa luận (Mẫu 3)</strong>
-            <p>Tải biểu mẫu chính thức, nộp bản thảo PDF/DOCX, theo dõi các phiên bản chỉnh sửa và phê duyệt của Bộ môn.</p>
-          </div>
-        </div>
-      )}
       {section === "progress" && (
         <div className="workspace-tab-banner__content">
           <ClipboardList className="workspace-tab-banner__icon" size={20} aria-hidden="true" />
           <div>
             <strong>Tiến độ thực hiện & Báo cáo định kỳ</strong>
-            <p>Theo dõi các mốc thời gian của đợt, nộp báo cáo tiến độ theo tỷ lệ hoàn thành và tải minh chứng đính kèm.</p>
+            <p>Chỉ dành cho báo cáo định kỳ và minh chứng của báo cáo. Mẫu 1–2–3 và các bản tài liệu nộp tại Hồ sơ nộp & xét duyệt.</p>
           </div>
         </div>
       )}
-      {section === "documents" && (
-        <div className="workspace-tab-banner__content">
-          <FolderOpen className="workspace-tab-banner__icon" size={20} aria-hidden="true" />
-          <div>
-            <strong>Hồ sơ tài liệu khóa luận</strong>
-            <p>Kế hoạch thực hiện (Mẫu 2), các bản thảo tài liệu, trạng thái quét an toàn và lịch sử các phiên bản nộp.</p>
-          </div>
-        </div>
-      )}
-    </div>
+    </div>}
     {error && <div className="alert alert-danger" role="alert">{error} <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void run(async () => {}, "Đã tải dữ liệu mới.")}>Tải lại dữ liệu</button></div>}
     {message && <div className="alert alert-success" role="status">{message}</div>}
     {busy && <p role="status">{refreshing ? "Đang tải dữ liệu mới…" : "Đang lưu và cập nhật hồ sơ…"}</p>}
     {section === "overview" && <div className="stack">
-      <div className="workspace-overview-grid">
+      <section className="thesis-identity card"><div className="card-body"><span className="section-eyebrow">HỒ SƠ ĐANG LÀM VIỆC</span><h2>{thesis.title}</h2><p>{thesis.round_label}</p><div className="flex gap-3" style={{flexWrap:"wrap"}}><span>{thesis.members.length} sinh viên</span><span>GVHD: <strong>{thesis.advisor_name || "Chưa phân công"}</strong></span><Status value={thesis.state}/></div></div></section><div className="workspace-overview-grid">
         <div className="card">
           <div className="card-body stack">
             <h2 style={{margin: 0, fontSize: "16px", fontWeight: 650}}>Nhóm sinh viên thực hiện</h2>
@@ -224,9 +205,9 @@ function ThesisWorkspace({context}: {context: Context}) {
               <p className="text-body-sm text-muted" style={{margin: "2px 0 0"}}>Chuyển nhanh tới phân hệ để nộp và kiểm tra hồ sơ</p>
             </div>
             <div className="flex gap-2" style={{flexWrap: "wrap"}}>
-              {proposal || thesis.actions.includes("proposal:view") ? <Link className="btn btn-secondary btn-sm" to={`/theses/${thesis.id}?section=proposal`}>Mở đề cương khóa luận</Link> : null}
+              {proposal || thesis.actions.includes("document:view") ? <Link className="btn btn-secondary btn-sm" to={"/theses/" + thesis.id + "?section=submissions"}>Mở hồ sơ nộp & xét duyệt</Link> : null}
               {thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? <Link className="btn btn-secondary btn-sm" to={`/theses/${thesis.id}?section=progress`}>Mở mốc và báo cáo tiến độ</Link> : null}
-              {thesis.actions.includes("document:view") ? <Link className="btn btn-secondary btn-sm" to={`/theses/${thesis.id}?section=documents`}>Mở tài liệu và phiên bản</Link> : null}
+
             </div>
           </div>
         </div>
@@ -234,8 +215,7 @@ function ThesisWorkspace({context}: {context: Context}) {
       {thesis.actions.includes("work:view") && <div className="card"><div className="card-body"><ThesisWork thesis={thesis} assignments={work} context={context} busy={busy} run={run} /></div></div>}
       {thesis.actions.includes("audit:view") && <details className="card"><summary className="card-body">Lịch sử thao tác nghiệp vụ</summary><div className="card-body stack">{audit.map((event, index) => <p key={`${event.occurred_at}-${index}`}><strong>{event.actor_name}</strong> · {event.action} · {formatDate(event.occurred_at)}<br />{event.reason}</p>)}</div></details>}
     </div>}
-    {section === "progress" && <div className="stack"><DocumentDeadlines thesis={thesis} deadlines={deadlines} history={deadlineHistory} userId={context.user_id} busy={busy} run={run} /><ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} studentId={context.student_id} busy={busy} run={run} /></div>}
-    {section === "proposal" && proposal && <ThesisProposal thesis={thesis} proposal={proposal} deadline={deadlines.find(item => item.document_type === "PROPOSAL")} lecturers={lecturers} userId={context.user_id} busy={busy} run={run} />}
-    {section === "documents" && <ThesisDocuments thesis={thesis} docs={docs} deadlines={deadlines} reports={reports} userId={context.user_id} busy={busy} run={run} />}
+    {section === "progress" && <div className="stack"><ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} studentId={context.student_id} busy={busy} run={run} /></div>}
+    {section === "submissions" && <ThesisSubmissions thesis={thesis} proposal={proposal} docs={docs} deadlines={deadlines} history={deadlineHistory} lecturers={lecturers} reports={reports} userId={context.user_id} busy={busy} run={run} kind={submissionKind} />}
   </>;
 }

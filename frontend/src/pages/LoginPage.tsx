@@ -54,7 +54,7 @@ export default function LoginPage({
 
           <div className="login-brand__content">
             <img className="login-brand__logo" src="/assets/dthu-logo.png" alt="" />
-            <h1 className="login-brand__title">Hệ thống Quản lý<br />Khóa luận Tốt nghiệp</h1>
+            <p className="login-brand__title">Hệ thống Quản lý<br />Khóa luận Tốt nghiệp</p>
             <p className="login-brand__subtitle">Khoa Công Nghệ và Kỹ thuật — Đại học Đồng Tháp</p>
 
             <div className="login-brand__features">
@@ -74,7 +74,7 @@ export default function LoginPage({
           <div className="login-card">
             <div className="login-card__header">
               <img className="login-card__logo" src="/assets/dthu-logo.png" alt="Logo Đại học Đồng Tháp" />
-              <h2>Đăng nhập hệ thống</h2>
+              <h1>Đăng nhập hệ thống</h1>
               <p>Sử dụng tài khoản được cấp để truy cập</p>
             </div>
 

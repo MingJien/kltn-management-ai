@@ -79,10 +79,10 @@ function FormCard({item,userId,manage,run,busy,onPreview}:{item:SchoolForm;userI
         <button className="btn btn-secondary" disabled={busy || !file || file.size>25*1024*1024 || source.trim().length<3 || reason.trim().length<5}><Upload size={16}/>Lưu bản nháp</button>
         {file && file.size>25*1024*1024 && <p role="alert">Tệp biểu mẫu Khoa tối đa 25 MB.</p>}
       </form>}
-      <details><summary>Sửa tên, đối tượng xem hoặc ngừng sử dụng</summary><form className="core-form" onSubmit={async event=>{event.preventDefault();await run(()=>request(endpoint,userId,{method:"PATCH",headers:{"If-Match":String(item.row_version)},body:JSON.stringify({title,audience,state,reason:metaReason})}),"Đã cập nhật danh mục.");}}>
+      <details><summary>Sửa tên / đối tượng · Ẩn hoặc khôi phục danh mục</summary><form className="core-form" onSubmit={async event=>{event.preventDefault();await run(()=>request(endpoint,userId,{method:"PATCH",headers:{"If-Match":String(item.row_version)},body:JSON.stringify({title,audience,state,reason:metaReason})}),"Đã cập nhật danh mục.");}}>
         <label>Tên hiển thị<input className="input" value={title} required minLength={3} maxLength={255} onChange={event=>setTitle(event.target.value)}/></label>
         <label>Đối tượng xem<select className="input" value={audience} onChange={event=>setAudience(event.target.value as SchoolForm["audience"])}><option value="STUDENT_AND_LECTURER">Sinh viên và giảng viên</option><option value="LECTURER">Chỉ giảng viên</option></select></label>
-        <label>Trạng thái danh mục<select className="input" value={state} onChange={event=>setState(event.target.value)}><option value="ACTIVE">Đang dùng</option><option value="ARCHIVED">Ngừng sử dụng</option></select></label>
+        <label>Trạng thái danh mục<select className="input" value={state} onChange={event=>setState(event.target.value)}><option value="ACTIVE">Đang dùng</option><option value="ARCHIVED">Ẩn / ngừng sử dụng (giữ lịch sử)</option></select></label>
         <label>Lý do sửa danh mục<textarea className="input" required minLength={5} maxLength={2000} value={metaReason} onChange={event=>setMetaReason(event.target.value)}/></label>
         <button className="btn btn-secondary" disabled={busy || metaReason.trim().length<5}>Lưu danh mục</button>
       </form></details>
@@ -98,6 +98,7 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   const [error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
   const [bootstrapInfo,setBootstrapInfo]=useState<{created:number;published:number;drafts:number;missing:string[]}|null>(null);
   const [code,setCode]=useState(""),[title,setTitle]=useState(""),[kind,setKind]=useState("FORM"),[audience,setAudience]=useState("STUDENT_AND_LECTURER"),[reason,setReason]=useState("");
+  const [selectedId,setSelectedId]=useState<string|null>(null);
   const [search,setSearch]=useState(""),[category,setCategory]=useState("ALL");
   const [preview,setPreview]=useState<{item:SchoolForm;version:SchoolFormVersion}|null>(null);
   const load=useCallback(async(signal?:AbortSignal)=>{
@@ -111,8 +112,17 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   };
   const displayed=items.filter(item=>(category==="ALL" || item.document_kind===category) && `${item.code} ${item.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));
   const selected=rounds.find(row=>row.id===roundId),manage=!!selected?.can_manage;
-  return <><PageHeader title="Biểu mẫu và tài liệu Khoa" description="Xem bộ mẫu áp dụng và tài liệu Khoa công bố theo từng đợt. Bản mới được phát hành có kiểm soát; các phiên bản cũ vẫn lưu."/>
-    <div className="stack"><div className="card"><div className="card-body stack">
+  useEffect(()=>{setSelectedId(null);},[roundId,context.user_id]);
+  useEffect(()=>{
+    if(manage || !roundId)return;
+    const controller=new AbortController();
+    const update=()=>{if(document.visibilityState==="visible")void load(controller.signal).catch(()=>{});};
+    const timer=window.setInterval(update,30000);window.addEventListener("focus",update);
+    return()=>{controller.abort();window.clearInterval(timer);window.removeEventListener("focus",update);};
+  },[load,manage,roundId]);
+
+  return <><PageHeader title="Kho biểu mẫu & tài liệu Khoa" description={manage ? "Quản lý mẫu trắng, hướng dẫn và tài liệu công bố theo đợt. Bản mới chỉ hiển thị cho đúng đối tượng sau khi phát hành." : "Xem và tải mẫu trắng, hướng dẫn hoặc tài liệu Khoa công bố. Bản đã điền được nộp tại Hồ sơ nộp & xét duyệt."}>{context.base_role !== "ADMIN" && <Link className="btn btn-primary" to="/submissions">Mở hồ sơ nộp & xét duyệt</Link>}</PageHeader>
+    <div className="stack school-forms-page"><div className="card"><div className="card-body stack">
       <div className="flex gap-2" style={{alignItems:"end",flexWrap:"wrap"}}><label>Đợt KLTN<select className="input" value={roundId} disabled={busy} onChange={event=>setParams({round_id:event.target.value})}>{!rounds.length && <option value="">Chưa có đợt trong phạm vi</option>}{rounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label><button type="button" className="btn btn-secondary" disabled={busy || loading} onClick={()=>void run(async()=>{},"Đã làm mới kho tài liệu Khoa.")}><RefreshCw size={16}/>Làm mới kho</button></div>
       <div className="flex gap-2" style={{flexWrap:"wrap"}}><label>Tìm biểu mẫu / tài liệu<input className="input" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Nhập tên hoặc mã"/></label><label>Nhóm tài liệu<select className="input" value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">Tất cả</option><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label></div>
       {manage ? <p>Bạn được quản lý biểu mẫu của đợt này. Tải lên chỉ tạo nháp; bấm phát hành để SV/GV đúng quyền xem.</p> : <p>Mẫu trắng để điền và danh sách SV đã chốt được trình bày riêng. Tài liệu công bố chỉ hiện trong phạm vi đợt của bạn.</p>}
@@ -131,6 +141,6 @@ export default function SchoolFormsPage({context}:{context:Context}) {
       <label>Lý do tạo danh mục<textarea className="input" required minLength={5} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/></label>
       <button className="btn btn-primary" disabled={busy || !roundId || reason.trim().length<5}><BookOpen size={16}/>Tạo danh mục</button>
     </form></div></details>}
-    {loading?<p role="status">Đang tải tài liệu Khoa…</p>:displayed.length===0?<p>Chưa có tài liệu đã phát hành trong phạm vi này.</p>:displayed.map(item=><FormCard key={item.id} item={item} userId={context.user_id} manage={manage} busy={busy} run={run} onPreview={version=>setPreview({item,version})}/>)}
+    {loading?<p role="status">Đang tải tài liệu Khoa…</p>:displayed.length===0?<p>Chưa có tài liệu đã phát hành trong phạm vi này.</p>:<><div className="table-container" role="region" aria-label="Danh mục biểu mẫu Khoa" tabIndex={0}><table className="table"><thead><tr><th>Mã / tên biểu mẫu</th><th>Loại</th><th>Đối tượng</th><th>Bản đang áp dụng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{displayed.map(item=>{const published=item.versions.find(v=>v.state==="PUBLISHED");return <tr key={item.id}><td><strong>{item.title}</strong><div className="text-caption">{item.code}</div></td><td>{item.document_kind==="FORM"?"Biểu mẫu":"Tài liệu công bố"}</td><td>{item.audience==="LECTURER"?"Giảng viên":"SV và GV"}</td><td>{published?`v${published.version_no} · ${formatDate(published.published_at || published.uploaded_at)}`:"Chưa phát hành"}</td><td>{item.state==="ACTIVE"?"Đang sử dụng":"Đã ẩn / ngừng sử dụng"}</td><td><button type="button" className="btn btn-secondary btn-sm" aria-expanded={selectedId===item.id} onClick={()=>setSelectedId(selectedId===item.id?null:item.id)}>{selectedId===item.id?"Thu gọn":manage?"Quản lý & phiên bản":"Xem & tải biểu mẫu"}</button></td></tr>;})}</tbody></table></div>{displayed.filter(item=>item.id===selectedId).map(item=><FormCard key={item.id} item={item} userId={context.user_id} manage={manage} busy={busy} run={run} onPreview={version=>setPreview({item,version})}/>)}</>}
     </div>{preview && <Preview item={preview.item} version={preview.version} userId={context.user_id} onClose={()=>setPreview(null)}/>}</>;
 }

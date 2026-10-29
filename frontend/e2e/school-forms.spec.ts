@@ -44,7 +44,7 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await page.goto(web);await page.getByLabel("Email",{exact:true}).fill(accounts[key].email);await page.getByLabel("Mật khẩu",{exact:true}).fill(accounts[key].password);
   await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();await expect(page.getByRole("heading",{name:"Tổng quan",exact:true})).toBeVisible();actors.push({context,page});return page;}
  try {
-  const admin=await login("admin"),manager=await login("tbm"),sv=await login("nv5Student"),gv=await login("gv2");
+  const admin=await login("admin"),manager=await login("tbm"),sv=await login("formStudent"),gv=await login("gv2");
   const round=(await read(manager,"/rounds/open"))[0],managerId=(await read(manager,"/me/context")).user_id;
   await manager.goto(web+"/forms");await expect(manager.getByText("Thêm biểu mẫu hoặc tài liệu công bố",{exact:true})).toHaveCount(0);
   expect((await post(manager,"/school-forms",{round_id:round.id,code:"test-no-right",title:"No assignment",document_kind:"FORM",audience:"LECTURER",reason:"Synthetic denied attempt"})).status()).toBe(403);
@@ -58,14 +58,16 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await expect(admin.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
   await manager.reload();await manager.getByText("Khởi tạo từ bộ mẫu Khoa đang dùng",{exact:true}).click();
   await manager.getByRole("button",{name:"Khởi tạo bộ mẫu có sẵn",exact:true}).click();
-  await expect(manager.locator(".school-form-card")).toHaveCount(12,{timeout:300000});
-  await sv.goto(web+`/forms?round_id=${round.id}`);await expect(sv.locator(".school-form-card")).toHaveCount(6);
+  await expect(manager.locator(".table-container table tbody tr")).toHaveCount(12,{timeout:300000});
+  await sv.goto(web+`/forms?round_id=${round.id}`);await expect(sv.locator(".table-container table tbody tr")).toHaveCount(6);
   expect((await read(sv,"/theses")).length).toBe(0); // Forms work before a thesis exists.
-  await gv.goto(web+`/forms?round_id=${round.id}`);await expect(gv.locator(".school-form-card")).toHaveCount(12);
+  await gv.goto(web+`/forms?round_id=${round.id}`);await expect(gv.locator(".table-container table tbody tr")).toHaveCount(12);
   const lecturerForm=(await read(manager,`/school-forms?round_id=${round.id}`)).find((item:any)=>item.code==="mau-06");
   expect((await sv.request.get(api+`/school-forms/${lecturerForm.id}/versions/${lecturerForm.versions[0].id}/download`)).status()).toBe(404);
   const title="Mẫu 2 - Kế hoạch thực hiện của SV";
   const card=(page:Page)=>page.locator(".school-form-card").filter({has:page.getByRole("heading",{name:title,exact:true})});
+  const choose=async(page:Page,title:string)=>{const row=page.locator(".table-container table tbody tr").filter({hasText:title});const button=row.getByRole("button");if(await button.textContent()!=="Thu gọn")await button.click();};
+  await choose(manager,title);await choose(sv,title);
   await card(manager).getByText("Cập nhật biểu mẫu / tài liệu",{exact:true}).click();
   await card(manager).getByLabel("Lý do thao tác / cập nhật phiên bản",{exact:true}).fill("Khoa điều chỉnh Mẫu 2 theo góp ý DEMO");
   await card(manager).getByLabel("Nguồn / văn bản áp dụng",{exact:true}).fill("Thông báo Khoa DEMO 28/10");
@@ -88,6 +90,7 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await create.getByLabel("Mã tài liệu",{exact:true}).fill("ds-sv-da-chot");await create.getByLabel("Tên tài liệu",{exact:true}).fill("Danh sách SV đã chốt DEMO");
   await create.getByLabel("Phân loại",{exact:true}).selectOption("PUBLICATION");await create.getByLabel("Lý do tạo danh mục",{exact:true}).fill("Khoa công bố danh sách DEMO theo đợt");
   await create.getByRole("button",{name:"Tạo danh mục",exact:true}).click();
+  await choose(manager,"Danh sách SV đã chốt DEMO");
   const list=manager.locator(".school-form-card").filter({has:manager.getByRole("heading",{name:"Danh sách SV đã chốt DEMO",exact:true})});
   await list.getByText("Cập nhật biểu mẫu / tài liệu",{exact:true}).click();await list.getByLabel("Lý do thao tác / cập nhật phiên bản",{exact:true}).fill("Khoa chốt danh sách sinh viên DEMO");
   await list.getByLabel("Nguồn / văn bản áp dụng",{exact:true}).fill("Quyết định DEMO 28/10");
@@ -95,6 +98,7 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await list.getByRole("button",{name:"Lưu bản nháp",exact:true}).click();await expect(list.getByRole("button",{name:"Phát hành v1",exact:true})).toBeEnabled();await list.getByRole("button",{name:"Phát hành v1",exact:true}).click();
   await expect(manager.getByRole("status").filter({hasText:"Đã phát hành"})).toBeVisible();
   await sv.getByRole("button",{name:"Làm mới kho",exact:true}).click();
+  await choose(sv,"Danh sách SV đã chốt DEMO");
   const studentList=sv.locator(".school-form-card").filter({has:sv.getByRole("heading",{name:"Danh sách SV đã chốt DEMO",exact:true})});
   await studentList.getByRole("button",{name:"Xem trực tiếp",exact:true}).click();await expect(sv.getByRole("dialog").getByRole("cell",{name:"000123",exact:true})).toBeVisible();
   await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"school-publication-excel.png")});
@@ -112,6 +116,7 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await manager.screenshot({path:test.info().outputPath("forms-manager.png"),fullPage:true});
   await sv.screenshot({path:test.info().outputPath("forms-student.png"),fullPage:true});
   // Withdrawal never silently brings the old local template back.
+  await choose(manager,title);
   await card(manager).getByText("Thu hồi v2",{exact:true}).click();await card(manager).getByLabel("Lý do thu hồi phiên bản",{exact:true}).first().fill("Khoa thu hồi mẫu DEMO đang điều chỉnh");
   await card(manager).getByRole("button",{name:"Xác nhận thu hồi v2",exact:true}).click();await expect(manager.getByRole("status").filter({hasText:"Đã thu hồi"})).toBeVisible();
   expect((await sv.request.get(api+`/form-templates/plan?round_id=${round.id}`)).status()).toBe(409);

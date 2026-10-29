@@ -21,7 +21,7 @@ const actions: Record<string, string> = {
   ROUND_PERMISSION_REVOKED: "Thu hồi nhiệm vụ theo đợt", ELIGIBILITY_ROSTER_IMPORTED: "Nhập danh sách sinh viên đủ điều kiện",
   ELIGIBILITY_SPECIAL_DECISION_RECORDED: "Ghi nhận quyết định đủ điều kiện", ELIGIBILITY_REVOKED: "Thu hồi kết quả đủ điều kiện",
   ROSTER_IDENTITY_CORRECTED: "Đính chính thông tin sinh viên", TOPIC_CREATED: "Tạo đề tài", TOPIC_UPDATED: "Cập nhật đề tài",
-  TOPIC_SUBMITTED: "Gửi đề tài xét duyệt", TOPIC_APPROVED: "Duyệt đề tài", TOPIC_RETURNED: "Yêu cầu sửa đề tài",
+  TOPIC_ARCHIVED: "Ngừng sử dụng đề tài", TOPIC_RESTORED: "Khôi phục hiển thị đề tài", TOPIC_DELETED: "Xóa đề tài nháp", TOPIC_SUBMITTED: "Gửi đề tài xét duyệt", TOPIC_APPROVED: "Duyệt đề tài", TOPIC_RETURNED: "Yêu cầu sửa đề tài",
   TOPIC_REJECTED: "Từ chối đề tài", TOPIC_PROPOSAL_WITHDRAWN: "Rút đề xuất đề tài",
   REGISTRATION_SUBMITTED: "Gửi hồ sơ đăng ký", REGISTRATION_CANCELLED: "Hủy hồ sơ đăng ký",
   REGISTRATION_ACCEPT: "GV chấp nhận đăng ký", REGISTRATION_REJECT: "GV từ chối đăng ký",

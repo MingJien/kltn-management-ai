@@ -51,6 +51,16 @@ class TitleVersionOut(BaseModel):
     created_at: datetime
 
 
+class TopicRegisteredStudentOut(BaseModel):
+    student_id: UUID
+    student_code: str
+    display_name: str
+    class_name: str | None = None
+    is_coordinator: bool = False
+    consent_status: str = "PENDING"
+    registration_state: str | None = None
+
+
 class TopicOut(BaseModel):
     id: UUID
     round_id: UUID
@@ -73,6 +83,10 @@ class TopicOut(BaseModel):
     registered_member_count: int = 0
     remaining_slots: int = 0
     registration_state: str | None = None
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
+    has_links: bool = False
+    registered_students: list[TopicRegisteredStudentOut] = []
 
 
 class TopicCreate(BaseModel):

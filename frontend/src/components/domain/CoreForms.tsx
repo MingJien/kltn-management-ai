@@ -1,28 +1,17 @@
 import { useId, useState } from "react";
 import type { Review } from "../../api";
 import ReviewCommentText from "./ReviewCommentText";
+import ThesisStatusBadge from "./ThesisStatusBadge";
+import { stateLabel } from "./stateLabels";
 
-export const stateLabel: Record<string, string> = {
-  ACTIVE: "Đang thực hiện", IN_PROGRESS: "Đang thực hiện", PROPOSAL_APPROVED: "Đề cương đã duyệt",
-  EXTENDED: "Được gia hạn", WITHDRAWN: "Đã rút", READY_FOR_DEFENSE: "Sẵn sàng bảo vệ",
-  DEFENDED: "Đã bảo vệ", COMPLETED: "Hoàn thành", ARCHIVED: "Đã lưu trữ",
-  SUBMITTED: "Chờ GVHD xem", CONFIRMED: "Đã xác nhận", REVISION_REQUIRED: "Cần chỉnh sửa",
-  REVISION_REQUESTED: "Cần chỉnh sửa", ACCEPTED: "GVHD đã tiếp nhận", APPROVED: "Đã duyệt",
-  OPEN: "Đang mở", CLOSED: "Đã đóng", ENDED: "Đã kết thúc", REVOKED: "Đã thu hồi",
-  COMMENT_ONLY: "Góp ý chéo", CONFIRM: "Xác nhận", ACCEPT: "Tiếp nhận",
-  UNDER_REVIEW: "Đang nhận xét", ADVISOR_CONFIRMED: "GVHD đã xác nhận",
-  DEPARTMENT_FINALIZED: "Bộ môn đã chốt", DEAN_CONFIRMED: "Đã ghi nhận bản ký Trưởng khoa",
-  COMMENT: "Góp ý đề cương",
-  LOCKED: "Đã khóa", DISABLED: "Ngừng sử dụng", FINAL: "Bản cuối đã khóa",
-  SUPERSEDED: "Đã có phiên bản mới",
-};
+export { stateLabel } from "./stateLabels";
 
 export function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString("vi-VN", {timeZone: "Asia/Ho_Chi_Minh"}) : "Chưa đặt";
 }
 
 export function Status({value, label}: {value: string; label?: string}) {
-  return <span className="badge badge-primary">{label || stateLabel[value] || value}</span>;
+  return <ThesisStatusBadge state={value} label={label || stateLabel[value] || value} />;
 }
 
 export function Reviews({items}: {items: Review[]}) {

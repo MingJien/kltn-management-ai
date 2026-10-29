@@ -13,6 +13,14 @@ const COLLAPSE_KEY = "kltn.sidebar.collapsed";
 
 export default function AppShell({ context, children, onLogout }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [sidebarOpen]);
   const [collapsed, setCollapsed] = useState(() => {
     try { return window.localStorage.getItem(COLLAPSE_KEY) === "1"; } catch { return false; }
   });

@@ -42,6 +42,19 @@ export type Topic = {
   registered_member_count: number;
   remaining_slots: number;
   registration_state: string | null;
+  archived_at: string | null;
+  archive_reason: string | null;
+  has_links: boolean;
+  registered_students?: TopicRegisteredStudent[];
+};
+export type TopicRegisteredStudent = {
+  student_id: string;
+  student_code: string;
+  display_name: string;
+  class_name: string | null;
+  is_coordinator: boolean;
+  consent_status: string;
+  registration_state: string | null;
 };
 export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
 export type Lecturer = {id: string; display_name: string; lecturer_code: string; department_name?: string | null; faculty_name?: string | null};
@@ -114,10 +127,9 @@ export async function downloadRegistrationForm(registrationId:string,version:Reg
   link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-// Keep local API and UI on the same hostname (localhost or 127.0.0.1).
-// A session cookie issued for one hostname is not sent to the other.
+// Local dev uses Vite proxy so UI and API share one origin and session cookie.
 const baseUrl = import.meta.env.VITE_API_URL
-  || `${window.location.protocol}//${window.location.hostname}:8000`;
+  || (import.meta.env.DEV ? "" : `${window.location.protocol}//${window.location.hostname}:8000`);
 let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {

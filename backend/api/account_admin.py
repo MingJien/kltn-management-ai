@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, StringConstraints, model_validator
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -683,3 +683,15 @@ def correct_staff_email(user_id: UUID, payload: StaffEmailCorrection,
             record_delivery(session, user, target, delivered)
             session.commit()
     return {"user_id": str(target.id), "activation_required": True, "activation_sent": delivered}
+
+
+@router.get("/dashboard")
+def dashboard(user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)) -> dict:
+    _admin(user)
+    def grouped(column):
+        return dict(session.execute(select(column, func.count()).group_by(column)).all())
+    return {"generated_at": datetime.now(timezone.utc),
+        "accounts": grouped(m.UserAccount.base_role), "account_status": grouped(case(((m.UserAccount.status == "DISABLED") & m.UserAccount.email_verified_at.is_(None), "PENDING_ACTIVATION"), else_=m.UserAccount.status)),
+        "rounds": grouped(m.ThesisRound.state), "topics": grouped(case((m.Topic.archived_at.is_not(None), "ARCHIVED"), else_=m.Topic.state)),
+        "registrations": grouped(m.TopicRegistration.state), "theses": grouped(m.Thesis.state),
+        "documents": grouped(m.DocumentVersion.state), "reports": grouped(m.ProgressReport.state)}

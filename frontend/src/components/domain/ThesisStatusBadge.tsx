@@ -1,73 +1,95 @@
-import {
-  FileEdit, Send, Eye, UserCheck, UserX, RotateCcw, Check, CheckCheck, X,
-  ShieldCheck, Building2, Printer, Award, PenTool, Ban, Clock, CheckCircle,
-  Loader, Play, AlertTriangle, HelpCircle, Database, MessageCircle,
-  ThumbsUp, ThumbsDown,
-} from "lucide-react";
+import { stateLabel } from "./stateLabels";
 
 type BadgeVariant = "info" | "warning" | "success" | "danger" | "neutral" | "primary";
 
-interface StateConfig {
-  variant: BadgeVariant;
-  icon: React.ComponentType<{ size?: number }>;
-  label?: string;
-}
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Bản nháp",
+  SUBMITTED: "Đã gửi",
+  APPROVED: "Đã duyệt",
+  RETURNED: "Trả lại để sửa",
+  REJECTED: "Từ chối",
+  LOCKED: "Đã khóa",
+  CANCELLED: "Đã hủy",
+  LECTURER_ACCEPTED: "GV đã chấp nhận",
+  LECTURER_REJECTED: "GV từ chối",
+  FINALIZED: "Đã tiếp nhận chính thức",
+  ACCEPTED: "Đã xác nhận",
+  PENDING: "Chờ xác nhận",
+  DECLINED: "Không tham gia",
+};
 
-/**
- * Maps every business state from state-models.md to a badge variant + icon.
- * UI changes ONLY the visual presentation, not the state names or transitions.
- */
-const STATE_MAP: Record<string, StateConfig> = {
-  // Topic & Registration states
-  DRAFT: { variant: "info", icon: FileEdit },
-  SUBMITTED: { variant: "warning", icon: Send },
-  UNDER_REVIEW: { variant: "warning", icon: Eye },
-  LECTURER_ACCEPTED: { variant: "warning", icon: UserCheck },
-  LECTURER_REJECTED: { variant: "danger", icon: UserX },
-  RETURNED: { variant: "info", icon: RotateCcw },
-  APPROVED: { variant: "success", icon: Check },
-  FINALIZED: { variant: "success", icon: CheckCheck },
-  CANCELLED: { variant: "danger", icon: X },
-  // Thesis lifecycle states
-  ADVISOR_CONFIRMED: { variant: "success", icon: ShieldCheck },
-  DEPARTMENT_FINALIZED: { variant: "success", icon: Building2 },
-  PRINT_READY: { variant: "neutral", icon: Printer },
-  DEAN_CONFIRMED: { variant: "success", icon: Award },
-  SIGNED: { variant: "success", icon: PenTool },
-  VOID: { variant: "danger", icon: Ban },
-  IN_PROGRESS: { variant: "warning", icon: Clock },
-  COMPLETED: { variant: "success", icon: CheckCircle },
-  // AI / Async states
-  QUEUED: { variant: "neutral", icon: Loader },
-  RUNNING: { variant: "warning", icon: Play },
-  FAILED: { variant: "danger", icon: AlertTriangle },
-  NO_EVIDENCE: { variant: "neutral", icon: HelpCircle },
-  RETRIEVAL_ONLY: { variant: "info", icon: Database },
-  ANSWERED: { variant: "success", icon: MessageCircle },
-  // Consent states
-  ACCEPTED: { variant: "success", icon: ThumbsUp },
-  PENDING: { variant: "warning", icon: Clock },
-  DECLINED: { variant: "danger", icon: ThumbsDown },
+const STATE_VARIANT: Record<string, BadgeVariant> = {
+  DRAFT: "info",
+  SUBMITTED: "warning",
+  UNDER_REVIEW: "warning",
+  LECTURER_ACCEPTED: "warning",
+  LECTURER_REJECTED: "danger",
+  RETURNED: "info",
+  APPROVED: "success",
+  FINALIZED: "success",
+  CANCELLED: "danger",
+  REJECTED: "danger",
+  ADVISOR_CONFIRMED: "success",
+  DEPARTMENT_FINALIZED: "success",
+  PRINT_READY: "neutral",
+  DEAN_CONFIRMED: "success",
+  SIGNED: "success",
+  VOID: "danger",
+  IN_PROGRESS: "warning",
+  ACTIVE: "primary",
+  COMPLETED: "success",
+  QUEUED: "neutral",
+  RUNNING: "warning",
+  FAILED: "danger",
+  NO_EVIDENCE: "neutral",
+  RETRIEVAL_ONLY: "info",
+  ANSWERED: "success",
+  ACCEPTED: "success",
+  PENDING: "warning",
+  DECLINED: "danger",
+  REVISION_REQUIRED: "warning",
+  REVISION_REQUESTED: "warning",
+  OPEN: "success",
+  CLOSED: "neutral",
+  CONFIRMED: "success",
+  PROPOSAL_APPROVED: "success",
+  EXTENDED: "info",
+  READY_FOR_DEFENSE: "info",
+  DEFENDED: "success",
+  ARCHIVED: "neutral",
+  WITHDRAWN: "danger",
+  REVOKED: "danger",
+  FINAL: "success",
+  SUPERSEDED: "neutral",
+  LOCKED: "neutral",
+  DISABLED: "neutral",
+  ENDED: "neutral",
+  COMMENT_ONLY: "info",
+  COMMENT: "info",
+  CONFIRM: "info",
+  ACCEPT: "success",
 };
 
 interface ThesisStatusBadgeProps {
   state: string;
   showIcon?: boolean;
   className?: string;
+  label?: string;
 }
 
 export default function ThesisStatusBadge({
   state,
   showIcon = true,
   className = "",
+  label,
 }: ThesisStatusBadgeProps) {
-  const config = STATE_MAP[state] || { variant: "neutral" as BadgeVariant, icon: HelpCircle };
-  const Icon = config.icon;
+  const variant = STATE_VARIANT[state] || "neutral";
+  const classes = ["badge", "badge-" + variant, className].filter(Boolean).join(" ");
 
   return (
-    <span className={`badge badge-${config.variant} ${className}`}>
-      {showIcon && <Icon size={12} />}
-      {({DRAFT:"Bản nháp",SUBMITTED:"Đã gửi",APPROVED:"Đã duyệt",RETURNED:"Trả lại để sửa",REJECTED:"Từ chối",LOCKED:"Đã khóa",CANCELLED:"Đã hủy",LECTURER_ACCEPTED:"GV đã chấp nhận",LECTURER_REJECTED:"GV từ chối",FINALIZED:"Đã tiếp nhận chính thức",ACCEPTED:"Đã xác nhận",PENDING:"Chờ xác nhận",DECLINED:"Không tham gia"} as Record<string,string>)[state] || state}
+    <span className={classes}>
+      {showIcon ? <span className={"status-dot status-dot--" + variant} aria-hidden="true" /> : null}
+      {label || STATUS_LABEL[state] || stateLabel[state] || state}
     </span>
   );
 }

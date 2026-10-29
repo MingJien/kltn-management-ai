@@ -4,7 +4,7 @@ import type { Context } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
-import LecturerImport from "../components/domain/LecturerImport";
+
 import {
   AlertTriangle,
   Ban,
@@ -232,7 +232,7 @@ export default function AdministrationPage({
           </p>
         ) : null}
 
-        {isAdmin ? <LecturerImport userId={context.user_id} departments={departments} refreshVersion={lecturerRevision} onCreated={() => refresh(term, page)} /> : null}
+        {isAdmin ? <Link className="btn btn-secondary" to="/lecturers">Mở danh sách GV · Nhập Excel · Gửi link kích hoạt</Link> : null}
         {isAdmin && (
           <div className="admin-grid-top">
             {/* CARD 1: MỜI GIẢNG VIÊN */}
@@ -593,7 +593,7 @@ export default function AdministrationPage({
 
           <div className="card-body stack">
             {/* Overview Metric Bar */}
-            <div className="admin-metrics" role="region" aria-label="Thống kê tài khoản trang hiện tại">
+            <div className="admin-metrics" role="region" aria-label="Thống kê tài khoản trang hiện tại" tabIndex={0}>
               <div className="admin-metric-card">
                 <div className="admin-metric-card__icon-box">
                   <Users size={18} aria-hidden="true" />

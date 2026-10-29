@@ -160,7 +160,7 @@ export default function RosterPage({context}: {context:Context}) {
         <label className="input-group roster-context__select">Đợt KLTN<select className="input" value={roundId} onChange={e=>setRoundId(e.target.value)}>
           {[...new Map(assignments.map(a=>[a.round_id,a])).values()].map(a=><option key={a.round_id} value={a.round_id}>{a.round_code}</option>)}
         </select></label>
-        <div className={`roster-metrics${revokedCount ? " roster-metrics--with-revoked" : ""}`} aria-label="Tình trạng danh sách">
+        <div className={`roster-metrics${revokedCount ? " roster-metrics--with-revoked" : ""}`} role="region" aria-label="Tình trạng danh sách" tabIndex={0}>
           <div><span>Đủ điều kiện</span><strong>{confirmedCount}</strong></div>
           <div><span>Đã kích hoạt</span><strong>{activatedCount}/{confirmedCount}</strong></div>
           <div><span>Đã gửi đăng ký</span><strong>{registrationSubmittedCount}/{confirmedCount}</strong></div>
@@ -219,7 +219,7 @@ export default function RosterPage({context}: {context:Context}) {
                   <p>Nhập lại danh sách chính thức của đợt để các hồ sơ này được ghi nhận đủ điều kiện ngay; không cần thao tác xác nhận riêng.</p>
                 </div>
               ) : null}
-              <div className="table-scroll"><table className="account-table"><thead><tr><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Đủ điều kiện</th><th>Kích hoạt</th><th>Đăng ký đề tài</th></tr></thead>
+              <div className="table-scroll" role="region" aria-label="Danh sách sinh viên đủ điều kiện" tabIndex={0}><table className="account-table"><thead><tr><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Đủ điều kiện</th><th>Kích hoạt</th><th>Đăng ký đề tài</th></tr></thead>
                 <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}><td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
                   <td>{row.department_code}</td><td>{row.major_code||"—"}{catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name
                     ? ` · ${catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name}`:""}</td>
@@ -275,7 +275,7 @@ export default function RosterPage({context}: {context:Context}) {
                 <p>{departmentError||(!catalog.length?"Chưa có cặp bộ môn–ngành đang hoạt động; chưa thể nhập.":
                   `Đã có ${new Set(catalog.map(item=>item.department_code)).size} bộ môn và ${catalog.length} ngành để đối chiếu.`)}</p>
                 <p>Mã BM-* là mã nội bộ trong danh mục Khoa, không phải mã bộ môn chính thức của Trường. Mỗi dòng Excel cần đủ MSSV, họ tên, email, mã bộ môn, lớp, mã ngành; cặp mã phải đúng danh mục.</p>
-                <details><summary>Xem mã bộ môn và ngành được chấp nhận</summary><div className="table-scroll"><table className="account-table"><thead><tr><th>Mã bộ môn</th><th>Tên bộ môn</th><th>Mã ngành</th><th>Tên ngành</th></tr></thead><tbody>
+                <details><summary>Xem mã bộ môn và ngành được chấp nhận</summary><div className="table-scroll" role="region" aria-label="Danh mục bộ môn và ngành" tabIndex={0}><table className="account-table"><thead><tr><th>Mã bộ môn</th><th>Tên bộ môn</th><th>Mã ngành</th><th>Tên ngành</th></tr></thead><tbody>
                   {catalog.map(item=><tr key={`${item.department_code}-${item.major_code}`}><td>{item.department_code}</td><td>{item.department_name}</td><td>{item.major_code}</td><td>{item.major_name}</td></tr>)}
                 </tbody></table></div></details>
                 <a href="/templates/danh-sach-sinh-vien-kltn-mau.xlsx" download>Tải Excel mẫu (dữ liệu giả lập, mã hợp lệ)</a>
@@ -301,7 +301,7 @@ export default function RosterPage({context}: {context:Context}) {
                 `Đã xem trước ${preview.count} sinh viên. Kiểm tra các dòng rồi nhấn “Nhập sau khi kiểm”.`}</p>
               {error?<p role="alert" className="alert alert-danger">{error}</p>:null}
               {preview?<div className="roster-preview stack"><div><span className="roster-eyebrow">ĐÃ KIỂM TRA · CHƯA NHẬP</span><h3>Xem trước: {preview.count} sinh viên</h3></div>
-                <div className="table-scroll"><table className="account-table"><thead><tr><th>Dòng</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Mã bộ môn</th><th>Lớp</th><th>Mã ngành</th></tr></thead>
+                <div className="table-scroll" role="region" aria-label="Xem trước danh sách nhập" tabIndex={0}><table className="account-table"><thead><tr><th>Dòng</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Mã bộ môn</th><th>Lớp</th><th>Mã ngành</th></tr></thead>
                   <tbody>{preview.rows.map(row=><tr key={row.line}><td>{row.line}</td><td>{row.student_code}</td><td>{row.display_name}</td>
                     <td>{row.email}</td><td>{row.department_code} · {catalog.find(item=>item.department_code===row.department_code)?.department_name||"?"}</td><td>{row.class_name}</td>
                     <td>{row.major_code} · {catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name||"?"}</td></tr>)}</tbody></table></div>

@@ -60,7 +60,7 @@
   gap: var(--space-3);
   padding: 16px 24px;
   border-bottom: 1px solid var(--neutral-150);
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfd 100%);
+  background: #ffffff;
 }
 
 .admin-card__title-group {
@@ -84,9 +84,7 @@
   transition: transform 0.2s ease;
 }
 
-.admin-card:hover .admin-card__icon {
-  transform: scale(1.05);
-}
+/* icon scale on hover removed */
 
 .admin-card__icon--warning {
   background: var(--warning-bg);
@@ -176,7 +174,6 @@
 }
 
 .admin-metric-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 14px -3px rgba(15, 23, 42, 0.08);
   border-color: var(--neutral-300);
 }
@@ -194,9 +191,7 @@
   transition: transform 0.2s ease;
 }
 
-.admin-metric-card:hover .admin-metric-card__icon-box {
-  transform: scale(1.08);
-}
+/* metric icon scale removed */
 
 .admin-metric-card--student .admin-metric-card__icon-box {
   background: #eff6ff;
@@ -400,7 +395,6 @@
 
 .account-list__row:hover {
   border-color: var(--neutral-300);
-  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.05);
   background: #fafbfd;
 }
 
@@ -577,7 +571,6 @@
 }
 
 .account-list__action-slot .btn:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06);
   border-color: var(--neutral-300);
   background: #ffffff;
@@ -880,7 +873,6 @@
   border-color: var(--primary-400);
   color: var(--primary-800);
   background: var(--primary-50);
-  transform: translateY(-1px);
 }
 
 .account-category-tab--active {

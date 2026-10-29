@@ -30,7 +30,7 @@ export default function ThesesPage({context, section = "overview"}: {context: Co
   const visibleRows = rows.filter(row => section === "overview" || row.actions.includes(
     section === "proposal" ? "proposal:view" : section === "documents" ? "document:view" : "progress:view")
     || (section === "progress" && row.actions.includes("milestone:manage")));
-  if (!loading && visibleRows.length === 1 && section !== "overview") {
+  if (!loading && visibleRows.length === 1) {
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(`kltn_active_thesis_id_${context.user_id}`, visibleRows[0].id);
     }
@@ -53,10 +53,9 @@ export default function ThesesPage({context, section = "overview"}: {context: Co
       <div className="flex justify-between gap-3"><h2><Link className="core-thesis-link" to={`/theses/${row.id}?section=${section}`}>{row.title}</Link></h2><Status value={row.state} /></div>
       <p className="text-muted">{row.round_label} · GVHD chính thức: {row.advisor_name || "Chưa có"}</p>
       <p>{row.members.map(member => member.display_name).join(", ")}</p>
-      <div className="flex gap-2" style={{marginTop:"var(--space-3)", flexWrap:"wrap"}}>
-        {row.actions.includes("proposal:view") && <Link className="btn btn-secondary" to={`/theses/${row.id}?section=proposal`}>Mở đề cương khóa luận</Link>}
-        {(row.actions.includes("progress:view") || row.actions.includes("milestone:manage")) && <Link className="btn btn-secondary" to={`/theses/${row.id}?section=progress`}>Mở mốc và báo cáo tiến độ</Link>}
-        {row.actions.includes("document:view") && <Link className="btn btn-secondary" to={`/theses/${row.id}?section=documents`}>Mở tài liệu và phiên bản</Link>}
+      <div className="flex gap-2" style={{marginTop:"var(--space-3)",flexWrap:"wrap"}}>
+        <Link className="btn btn-primary" to={`/theses/${row.id}?section=${section}`}>{section === "overview" ? "Xem hồ sơ & GVHD" : section === "proposal" ? "Xử lý đề cương Mẫu 3" : section === "progress" ? "Xem mốc & báo cáo định kỳ" : "Xem tài liệu & phiên bản"}</Link>
+        <span className="text-caption">{row.members.length} sinh viên · {row.advisor_history.filter(item=>item.state==="ACTIVE").length} GVHD đang phụ trách</span>
       </div>
     </div></article>)}</div>}
   </>;

@@ -7,7 +7,6 @@ import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import Dialog from "../components/ui/Dialog";
 import PageHeader from "../components/layout/PageHeader";
-import RegistrationForms from "../components/domain/RegistrationForms";
 import { scanLabel } from "../components/domain/ThesisDocuments";
 
 const PAGE_SIZE = 24;
@@ -183,7 +182,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
             <span className="text-caption">{draft ? "Tệp mới thay minh chứng đang gắn. Sau gửi hồ sơ, minh chứng được khóa."
               : "Bạn vừa tham gia nhóm đã gửi: có thể bổ sung minh chứng lần đầu trước khi GV xét."}</span>
           </div> : null}
-          {(me?.active || context.base_role === "LECTURER") && <RegistrationForms row={row} userId={userId} onChanged={reload} />}
+          {(me?.active || context.base_role === "LECTURER") && <Link className="btn btn-secondary" to={row.thesis_id ? "/theses/" + row.thesis_id + "?section=submissions&kind=REGISTRATION" : "/submissions?registration=" + row.id}>Mở đơn Mẫu 1a/1b · nộp, tải & lịch sử</Link>}
           <div className="registration-card__actions">
             {draft && me?.active ? <>
               {me.consent_status === "PENDING" ? <button className="btn btn-secondary" disabled={busy}

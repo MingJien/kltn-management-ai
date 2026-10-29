@@ -243,7 +243,7 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
         notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id,
             kind="DOCUMENT_SUBMITTED",
             message=f"{student.display_name} đã nộp {label} — {item.title} (phiên bản {version.version_no}).",
-            section="documents")
+            section="submissions&kind=" + item.document_type)
         result = document_out(session, item)
         session.commit()
         return result
@@ -298,7 +298,7 @@ def review_version(session, user, thesis_id, document_id, version_id, data, expe
     notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
         kind="DOCUMENT_ACCEPTED" if data.decision == "ACCEPT" else "DOCUMENT_REVISION_REQUESTED",
         message=f"GVHD đã {action_label} {item.title} phiên bản {version.version_no}. Nhận xét: {data.comment[:200]}",
-        section="documents")
+        section="submissions&kind=" + item.document_type)
     result = document_out(session, item)
     session.commit()
     return result

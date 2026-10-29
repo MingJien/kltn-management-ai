@@ -191,9 +191,9 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await oldCard.getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click();
     await expect(gv.getByRole("dialog").getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true})).toHaveCount(0);
     await gv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
-    await tbm.getByRole("button",{name:"Tiến độ",exact:true}).or(tbm.getByRole("tab",{name:"Tiến độ",exact:true})).click();
+    await tbm.goto(`${web}${base}?section=documents`);
     await tbm.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
-    const deadline=tbm.locator("section.card").filter({has:tbm.getByRole("heading",{name:"Hạn nộp tài liệu theo đợt",exact:true})});
+    const deadline=tbm.locator("section.card").filter({has:tbm.getByRole("heading",{name:"Lịch nhận tài liệu của đợt",exact:true})});
     await deadline.getByLabel("Loại tài liệu",{exact:true}).selectOption("PLAN");
     await deadline.getByLabel("Hạn mới (giờ Việt Nam)",{exact:true}).fill(local(new Date(Date.now()+70*86400000)));
     await deadline.getByLabel("Căn cứ / lý do",{exact:true}).fill("Khoa gia hạn Mẫu 2 cả đợt");
@@ -330,6 +330,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await milestone.getByLabel("Lý do gia hạn",{exact:true}).fill("Khoa mở lại mốc cho toàn đợt");
     await milestone.getByRole("button",{name:"Gia hạn và mở lại mốc",exact:true}).click();
     await expect(tbm.getByText(/NV5_LATE:.*Khoa mở lại mốc cho toàn đợt/)).toBeVisible();
+    await tbm.goto(`${web}${base}?section=documents`);
     await deadline.getByLabel("Loại tài liệu",{exact:true}).selectOption("PLAN");
     await deadline.getByLabel("Hạn mới (giờ Việt Nam)",{exact:true}).fill(local(new Date(Date.now()+90*86400000)));
     await deadline.getByLabel("Căn cứ / lý do",{exact:true}).fill("Khoa mở lại hạn kế hoạch cả đợt");

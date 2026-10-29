@@ -77,13 +77,10 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
   const collapseTitle = collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng";
 
   const isThesesActive = pathname === "/theses" || (isThesisDetail && currentSection === "overview");
-  const isProposalActive = pathname === "/proposals" || (isThesisDetail && currentSection === "proposal");
   const isProgressActive = pathname === "/progress" || (isThesisDetail && currentSection === "progress");
-  const isDocumentsActive = pathname === "/documents" || (isThesisDetail && currentSection === "documents");
+  const isSubmissionsActive = ["/submissions", "/proposals", "/documents"].includes(pathname) || (isThesisDetail && ["submissions", "proposal", "documents"].includes(currentSection));
 
-  const proposalPath = activeThesisId ? `/theses/${activeThesisId}?section=proposal` : "/proposals";
-  const progressPath = activeThesisId ? `/theses/${activeThesisId}?section=progress` : "/progress";
-  const documentsPath = activeThesisId ? `/theses/${activeThesisId}?section=documents` : "/documents";
+  const progressPath = context.base_role === "STUDENT" && activeThesisId ? `/theses/${activeThesisId}?section=progress` : "/progress";
 
   return <>
     <div className={"sidebar-overlay " + (isOpen ? "sidebar-overlay--visible" : "")} onClick={onClose} aria-hidden="true" />
@@ -112,15 +109,13 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
                 onClick={onClose}><ClipboardList aria-hidden="true" /><span>{context.base_role === "STUDENT" ? "Đăng ký của tôi" : "Hồ sơ đăng ký"}</span></NavLink>
               <PlannedLink id="changes" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
             </SidebarGroup>
-            <SidebarGroup label="HỒ SƠ KHÓA LUẬN" active={["/theses", "/proposals", "/progress", "/documents"].includes(pathname) || isThesisDetail} collapsed={collapsed}>
+            <SidebarGroup label="HỒ SƠ KHÓA LUẬN" active={["/theses", "/submissions", "/proposals", "/progress", "/documents"].includes(pathname) || isThesisDetail} collapsed={collapsed}>
               <NavLink to="/theses" end title={collapsed ? "Khóa luận & GVHD" : undefined} className={() => "sidebar__item " + (isThesesActive ? "sidebar__item--active" : "")}
                 onClick={onClose}><GraduationCap aria-hidden="true" /><span>Khóa luận & GVHD</span></NavLink>
-              <NavLink to={proposalPath} title={collapsed ? "Đề cương" : undefined} className={() => "sidebar__item sidebar__item--sub " + (isProposalActive ? "sidebar__item--active" : "")}
-                onClick={onClose}><BookOpen aria-hidden="true" /><span>Đề cương</span></NavLink>
-              <NavLink to={progressPath} title={collapsed ? "Tiến độ" : undefined} className={() => "sidebar__item sidebar__item--sub " + (isProgressActive ? "sidebar__item--active" : "")}
-                onClick={onClose}><ClipboardList aria-hidden="true" /><span>Tiến độ</span></NavLink>
-              <NavLink to={documentsPath} title={collapsed ? "Tài liệu" : undefined} className={() => "sidebar__item sidebar__item--sub " + (isDocumentsActive ? "sidebar__item--active" : "")}
-                onClick={onClose}><FolderOpen aria-hidden="true" /><span>Tài liệu</span></NavLink>
+              <NavLink to="/submissions" title={collapsed ? "Hồ sơ nộp & xét duyệt" : undefined} className={() => "sidebar__item " + (isSubmissionsActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><FolderOpen aria-hidden="true" /><span>Hồ sơ nộp & xét duyệt</span></NavLink>
+              <NavLink to={progressPath} title={collapsed ? "Báo cáo tiến độ" : undefined} className={() => "sidebar__item " + (isProgressActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><ClipboardList aria-hidden="true" /><span>Báo cáo tiến độ</span></NavLink>
             </SidebarGroup>
             <SidebarGroup label="BẢO VỆ VÀ ĐÁNH GIÁ" active={["council", "defense", "evaluation", "results"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed} defaultOpen={false}>
               <PlannedLink id="council" collapsed={collapsed} icon={<UsersRound aria-hidden="true" />} onClose={onClose} />
@@ -136,14 +131,15 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
               <PlannedLink id="similarity" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
             </SidebarGroup>
           </> : null}
-          <SidebarGroup label="BIỂU MẪU VÀ TÀI LIỆU KHOA" active={pathname === "/forms"} collapsed={collapsed}>
-            <NavLink to="/forms" title={collapsed ? "Biểu mẫu và tài liệu Khoa" : undefined} className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FolderOpen aria-hidden="true"/><span>{context.actions.includes("forms:manage")?"Quản lý biểu mẫu Khoa":"Biểu mẫu và tài liệu Khoa"}</span></NavLink>
+          <SidebarGroup label="TÀI LIỆU KHOA" active={pathname === "/forms"} collapsed={collapsed}>
+            <NavLink to="/forms" title={collapsed ? "Kho biểu mẫu & tài liệu Khoa" : undefined} className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FolderOpen aria-hidden="true"/><span>{context.actions.includes("forms:manage")?"Quản lý kho biểu mẫu Khoa":"Kho biểu mẫu & tài liệu Khoa"}</span></NavLink>
           </SidebarGroup>
-          {context.actions.includes("account:manage") ? <SidebarGroup label="QUẢN TRỊ" active={["/administration", "/rounds"].includes(pathname)} collapsed={collapsed}>
+          {context.actions.includes("account:manage") ? <SidebarGroup label="QUẢN TRỊ" active={["/administration", "/rounds", "/lecturers"].includes(pathname)} collapsed={collapsed}>
             <NavLink to="/administration" title={collapsed ? "Tài khoản và phân công" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản và phân công</span></NavLink>
             {context.base_role === "ADMIN" ? <NavLink to="/rounds" title={collapsed ? "Đợt KLTN" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink> : null}
+            {context.base_role === "ADMIN" && <NavLink to="/lecturers" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><GraduationCap aria-hidden="true"/><span>Danh sách giảng viên</span></NavLink>}
           </SidebarGroup> : null}
           {context.actions.some(a=>a.startsWith("eligibility:")) ? <SidebarGroup label="ĐIỀU KIỆN THEO ĐỢT" active={pathname === "/roster"} collapsed={collapsed}>
             <NavLink to="/roster" title={collapsed ? "Danh sách sinh viên" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}

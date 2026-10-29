@@ -122,6 +122,8 @@ def initial_ddl() -> list[str]:
     if len(form_ddl) != 1:
         raise RuntimeError("Registration-form migration DDL changed; update snapshot projection")
     statements.append(form_ddl[0])
+    topic_index = next(i for i, statement in enumerate(statements) if statement.startswith("CREATE TABLE topic ("))
+    statements[topic_index] = str(CreateTable(target_metadata.tables["topic"]).compile(dialect=postgresql.dialect())).strip() + ";"
     annotation_table = target_metadata.tables["progress_review_annotation"]
     statements.append(str(CreateTable(annotation_table).compile(dialect=postgresql.dialect())).strip() + ";")
     statements.extend(str(CreateIndex(index).compile(dialect=postgresql.dialect())).strip() + ";" for index in annotation_table.indexes)
