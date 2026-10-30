@@ -21,7 +21,7 @@ Set-Location 'D:\KLTN'
 npm run dev --prefix 'D:\KLTN\frontend'
 ```
 
-Mở `http://localhost:5173`. Cấu hình máy và mật khẩu nằm trong `.env` cục bộ; không đưa file đó lên Git.
+Mở `http://127.0.0.1:1573`. Cấu hình máy và mật khẩu nằm trong `.env` cục bộ; không đưa file đó lên Git.
 
 ## Kiểm tra nhanh
 
