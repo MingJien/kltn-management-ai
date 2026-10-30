@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import os
+import ipaddress
+import secrets
 import threading
 import time
 from collections import deque
 from collections.abc import Mapping
+from datetime import datetime, timezone
+from typing import Literal
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -13,7 +18,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import get_session
-from backend.db.models.entities import UserAccount
+from backend.db.models.entities import AuditEvent, UserAccount
+from backend.services.account_mail import frontend_origin
 from backend.services.passwords import needs_rehash, verify_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -21,18 +27,79 @@ _failed_logins: dict[str, deque[float]] = {}
 _login_lock = threading.Lock()
 
 
+def _access_audit(session, user, action):
+    session.add(AuditEvent(id=uuid4(), actor_id=user.id, action=action,
+        resource_type="user_account", resource_id=user.id,
+        occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+    session.commit()
+
+
 class LocalLogin(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=1, max_length=1024)
 
 
+DemoKey = Literal["sv1", "sv2", "sv3", "gv", "tbm", "gv2"]
+
+
+class DemoLogin(BaseModel):
+    key: DemoKey
+
+
+_DEMO_ACCOUNTS = {
+    "sv1": ("synthetic-demo-student-1", "sv1@demo.test", "STUDENT", "Sinh viên demo 1"),
+    "sv2": ("synthetic-demo-student-2", "sv2@demo.test", "STUDENT", "Sinh viên demo 2"),
+    "sv3": ("synthetic-demo-student-3", "sv3@demo.test", "STUDENT", "Sinh viên demo 3"),
+    "gv": ("synthetic-demo-lecturer-1", "gv@demo.test", "LECTURER", "Giảng viên demo"),
+    "tbm": ("synthetic-demo-lecturer-2", "tbm@demo.test", "LECTURER", "Trưởng bộ môn demo"),
+    "gv2": ("synthetic-demo-lecturer-3", "gv2@demo.test", "LECTURER", "Giảng viên demo 2"),
+}
+
+
+def _require_local_demo(request: Request) -> None:
+    if os.getenv("KLTN_ENV") != "development" or os.getenv("KLTN_DEMO_MODE") != "true":
+        raise HTTPException(404, "Demo mode is unavailable")
+    try:
+        if not request.client or not ipaddress.ip_address(request.client.host).is_loopback:
+            raise HTTPException(404, "Demo mode is unavailable")
+    except ValueError:
+        raise HTTPException(404, "Demo mode is unavailable") from None
+    if not _same_app_origin(request):
+        raise HTTPException(403, "Request origin is not allowed")
+
+
+def _demo_user(session: Session, key: DemoKey) -> UserAccount | None:
+    subject, email, role, _ = _DEMO_ACCOUNTS[key]
+    return session.scalar(select(UserAccount).where(
+        UserAccount.external_subject == subject,
+        UserAccount.email == email,
+        UserAccount.base_role == role,
+        UserAccount.status == "ACTIVE",
+    ))
+
+
+def allowed_frontend_origins() -> list[str]:
+    configured = os.getenv("KLTN_FRONTEND_URL", "").strip().rstrip("/")
+    if os.getenv("KLTN_ENV") == "production":
+        return [configured] if configured else []
+    return list(dict.fromkeys(origin for origin in (
+        "http://localhost:5173", "http://127.0.0.1:5173", configured,
+    ) if origin))
+
+
 def _same_app_origin(request: Request) -> bool:
     origin = request.headers.get("origin")
     if not origin:
-        return True  # Command-line clients do not send Origin.
-    configured = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    allowed = {"http://localhost:5173", "http://127.0.0.1:5173", configured}
-    return origin.rstrip("/") in allowed
+        # Browser writes provide Origin. Allow origin-less local test/CLI requests only.
+        return os.getenv("KLTN_ENV") in {"development", "test"}
+    return origin in allowed_frontend_origins()
+
+
+def require_csrf(request: Request) -> None:
+    expected = request.session.get("csrf_token")
+    provided = request.headers.get("x-csrf-token", "")
+    if not isinstance(expected, str) or not secrets.compare_digest(expected, provided):
+        raise HTTPException(403, "Request verification failed")
 
 
 def _throttle_key(request: Request, email: str) -> str:
@@ -70,7 +137,7 @@ def oidc_is_configured() -> bool:
 
 
 def development_auth_is_enabled() -> bool:
-    return os.getenv("KLTN_ENV") in {"development", "test"} and os.getenv("KLTN_DEV_AUTH") == "true"
+    return os.getenv("KLTN_ENV") == "test" and os.getenv("KLTN_DEV_AUTH") == "true"
 
 
 def authentication_mode() -> str:
@@ -108,6 +175,31 @@ def auth_config() -> dict[str, str]:
     return {"mode": authentication_mode()}
 
 
+@router.get("/demo-accounts")
+def demo_accounts(request: Request, session: Session = Depends(get_session)) -> list[dict[str, str]]:
+    _require_local_demo(request)
+    return [
+        {"key": key, "email": email, "role": role, "label": label}
+        for key, (_, email, role, label) in _DEMO_ACCOUNTS.items()
+        if _demo_user(session, key) is not None
+    ]
+
+
+@router.post("/demo-login", status_code=204)
+def demo_login(payload: DemoLogin, request: Request, session: Session = Depends(get_session)) -> None:
+    _require_local_demo(request)
+    if "session" not in request.scope:
+        raise HTTPException(503, "Session support is not configured")
+    user = _demo_user(session, payload.key)
+    if user is None:
+        raise HTTPException(404, "Demo account is unavailable")
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
+    request.session.clear()
+    request.session["user_id"] = str(user.id)
+    request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
+
+
 @router.post("/login", status_code=204)
 def local_login(payload: LocalLogin, request: Request, session: Session = Depends(get_session)) -> None:
     if "session" not in request.scope:
@@ -128,12 +220,13 @@ def local_login(payload: LocalLogin, request: Request, session: Session = Depend
     request.session.clear()
     request.session["user_id"] = str(user.id)
     request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
     if needs_rehash(user.password_hash):
         from backend.services.passwords import hash_password
         user.password_hash = hash_password(payload.password)
         user.row_version += 1
         request.session["credential_version"] = user.row_version
-        session.commit()
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
 
 
 @router.get("/login")
@@ -166,12 +259,25 @@ async def callback(request: Request, session: Session = Depends(get_session)):
         request.session.clear()
         return JSONResponse({"detail": "This University account has not been linked to an active KLTN account"}, status_code=403)
 
+    _access_audit(session, user, "ACCOUNT_SIGNED_IN")
     request.session.clear()
     request.session["user_id"] = str(user.id)
-    frontend_url = os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    request.session["credential_version"] = user.row_version
+    request.session["csrf_token"] = secrets.token_urlsafe(32)
+    frontend_url = frontend_origin()
     return RedirectResponse(f"{frontend_url}/?login=success", status_code=303)
 
 
 @router.post("/logout", status_code=204)
-def logout(request: Request) -> None:
+def logout(request: Request, session: Session = Depends(get_session)) -> None:
+    if not _same_app_origin(request):
+        raise HTTPException(403, "Request origin is not allowed")
+    if request.session.get("user_id"):
+        require_csrf(request)
+        try:
+            user = session.get(UserAccount, UUID(request.session["user_id"]))
+        except (ValueError, TypeError):
+            user = None
+        if user and user.row_version == request.session.get("credential_version"):
+            _access_audit(session, user, "ACCOUNT_SIGNED_OUT")
     request.session.clear()

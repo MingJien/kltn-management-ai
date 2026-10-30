@@ -1,127 +1,168 @@
-import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard, BookOpen, Users, FileText, ClipboardList,
-  FileCheck, Clock, FolderOpen, Scale, UserCheck, MessageSquare,
-  PenTool, FileSpreadsheet, Archive, Bot, Search,
-} from "lucide-react";
-import type { Context } from "../../api";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { BookOpen, Bot, CalendarDays, ChevronsLeft, ChevronsRight, ChevronDown, ClipboardList, FileText, FolderOpen, GraduationCap, History, LayoutDashboard, UserRound, UsersRound, ShieldCheck } from "lucide-react";
+import type { Context, Thesis } from "../../api";
+import { request } from "../../api";
+import { plannedPages, type PlannedPageId } from "../../plannedPages";
+import { roleLabel } from "./roleLabel";
+import { initialsOf } from "./initials";
 
-const NAV_GROUPS = [
-  {
-    label: "TỔNG QUAN",
-    items: [
-      { to: "/", icon: LayoutDashboard, label: "Workspace", end: true },
-    ],
-  },
-  {
-    label: "QUẢN LÝ",
-    items: [
-      { to: "/rounds", icon: BookOpen, label: "Đợt & Năm học" },
-      { to: "/eligibility", icon: UserCheck, label: "Điều kiện SV" },
-      { to: "/topics", icon: FileText, label: "Đề tài" },
-      { to: "/registrations", icon: ClipboardList, label: "Đăng ký" },
-    ],
-  },
-  {
-    label: "KHÓA LUẬN",
-    items: [
-      { to: "/proposals", icon: FileCheck, label: "Đề cương" },
-      { to: "/progress", icon: Clock, label: "Tiến độ" },
-      { to: "/documents", icon: FolderOpen, label: "Tài liệu" },
-    ],
-  },
-  {
-    label: "HỘI ĐỒNG",
-    items: [
-      { to: "/councils", icon: Scale, label: "Hội đồng & Phiên" },
-      { to: "/reviews", icon: MessageSquare, label: "Nhận xét" },
-      { to: "/scoring", icon: PenTool, label: "Chấm điểm" },
-      { to: "/minutes", icon: FileSpreadsheet, label: "Biên bản" },
-    ],
-  },
-  {
-    label: "TRA CỨU",
-    items: [
-      { to: "/archive", icon: Archive, label: "Kho & Báo cáo" },
-      { to: "/ai", icon: Bot, label: "Chatbot AI" },
-      { to: "/similarity", icon: Search, label: "Tìm tương đồng" },
-    ],
-  },
-];
-
-interface SidebarProps {
-  context: Context | null;
-  isOpen: boolean;
-  onClose: () => void;
+function SidebarGroup({label, active, collapsed, defaultOpen = true, children}: {label: string; active: boolean; collapsed: boolean; defaultOpen?: boolean; children: ReactNode}) {
+  const [open, setOpen] = useState(active ? true : defaultOpen);
+  const id = `sidebar-group-${label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  useEffect(() => { if (active) setOpen(true); }, [active]);
+  const expanded = collapsed ? true : open;
+  return <div className="sidebar__group">
+    {collapsed ? null : (
+      <button type="button" className="sidebar__group-label" aria-expanded={open} aria-controls={id}
+        onClick={() => setOpen(value => !value)}>
+        <span>{label}</span><ChevronDown size={14} aria-hidden="true" />
+      </button>
+    )}
+    <div id={id} className="sidebar__group-items" hidden={!expanded}>{children}</div>
+  </div>;
 }
-
-export default function Sidebar({ context, isOpen, onClose }: SidebarProps) {
+function PlannedLink({id, icon, onClose, collapsed}: {id: PlannedPageId; icon: ReactNode; onClose: () => void; collapsed: boolean}) {
+  return <NavLink to={`/planned/${id}`} className={({isActive}) => `sidebar__item sidebar__item--planned ${isActive ? "sidebar__item--active" : ""}`}
+    title={collapsed ? plannedPages[id].title : undefined}
+    onClick={onClose}>
+    {icon}<span className="sidebar__item-copy"><span>{plannedPages[id].title}</span><small>Đang phát triển</small></span>
+  </NavLink>;
+}
+export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, onClose}: {
+  context: Context; isOpen: boolean; collapsed: boolean; onToggleCollapsed: () => void; onClose: () => void;
+}) {
   const location = useLocation();
+  const pathname = location.pathname;
+  const searchParams = new URLSearchParams(location.search);
+  const currentSection = searchParams.get("section") || "overview";
+  const isThesisDetail = pathname.startsWith("/theses/");
+  const thesisIdMatch = pathname.match(/^\/theses\/([a-zA-Z0-9-]+)/);
+  const detailThesisId = thesisIdMatch ? thesisIdMatch[1] : null;
+  const storageKey = `kltn_active_thesis_id_${context.user_id}`;
+  const [activeThesisId, setActiveThesisId] = useState<string | null>(() => {
+    return detailThesisId || (typeof sessionStorage !== "undefined" ? sessionStorage.getItem(storageKey) : null);
+  });
 
-  return (
-    <>
-      {/* Mobile overlay */}
-      <div
-        className={`sidebar-overlay ${isOpen ? "sidebar-overlay--visible" : ""}`}
-        onClick={onClose}
-        aria-hidden="true"
-      />
+  const workflowAccess = context.base_role === "STUDENT" || context.base_role === "LECTURER";
 
-      <aside
-        className={`app-shell__sidebar ${isOpen ? "sidebar--open" : ""}`}
-        aria-label="Sidebar navigation"
-      >
-        <div className="sidebar">
-          {/* Brand */}
-          <div className="sidebar__brand">
-            <div className="sidebar__brand-mark">K</div>
-            <div className="sidebar__brand-text">
-              <strong>KLTN</strong>
-              <span>Quản lý Khóa luận</span>
-            </div>
-          </div>
+  useEffect(() => {
+    if (detailThesisId) {
+      setActiveThesisId(detailThesisId);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(storageKey, detailThesisId);
+      }
+    }
+  }, [detailThesisId, storageKey]);
 
-          {/* Navigation */}
-          <nav className="sidebar__nav">
-            {NAV_GROUPS.map((group) => (
-              <div className="sidebar__group" key={group.label}>
-                <div className="sidebar__group-label">{group.label}</div>
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.to === "/"}
-                    className={({ isActive }) =>
-                      `sidebar__item ${isActive ? "sidebar__item--active" : ""}`
-                    }
-                    onClick={onClose}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            ))}
-          </nav>
+  useEffect(() => {
+    if (workflowAccess && !activeThesisId && context.user_id) {
+      const controller = new AbortController();
+      request<Thesis[]>("/theses", context.user_id, {signal: controller.signal})
+        .then(rows => {
+          if (rows.length === 1) {
+            setActiveThesisId(rows[0].id);
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.setItem(storageKey, rows[0].id);
+            }
+          }
+        })
+        .catch(() => {});
+      return () => controller.abort();
+    }
+  }, [workflowAccess, activeThesisId, context.user_id, storageKey]);
 
-          {/* User panel */}
-          {context && (
-            <div className="sidebar__footer">
-              <div className="sidebar__user">
-                <div className="sidebar__avatar">
-                  {context.display_name.charAt(0).toUpperCase()}
-                </div>
-                <div className="sidebar__user-info">
-                  <span className="sidebar__user-name">{context.display_name}</span>
-                  <span className="sidebar__user-role">
-                    {context.actions.includes("topic:department_decide") ? "Trưởng bộ môn" : context.base_role === "STUDENT" ? "Sinh viên" : context.base_role === "LECTURER" ? "Giảng viên" : "Quản trị"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+  const topicLabel = context.actions.includes("topic:department_decide") ? "Đề tài và duyệt"
+    : context.base_role === "STUDENT" ? "Chọn đề tài" : "Đề tài của tôi";
+  const collapseTitle = collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng";
+
+  const isThesesActive = pathname === "/theses" || (isThesisDetail && currentSection === "overview");
+  const isProgressActive = pathname === "/progress" || (isThesisDetail && currentSection === "progress");
+  const isSubmissionsActive = ["/submissions", "/proposals", "/documents"].includes(pathname) || (isThesisDetail && ["submissions", "proposal", "documents"].includes(currentSection));
+
+  const progressPath = context.base_role === "STUDENT" && activeThesisId ? `/theses/${activeThesisId}?section=progress` : "/progress";
+
+  return <>
+    <div className={"sidebar-overlay " + (isOpen ? "sidebar-overlay--visible" : "")} onClick={onClose} aria-hidden="true" />
+    <aside className={"app-shell__sidebar " + (isOpen ? "sidebar--open" : "")} aria-label="Điều hướng chính">
+      <div className="sidebar">
+        <div className="sidebar__brand">
+          <img className="sidebar__brand-mark" src="/assets/dthu-logo.png" alt="Đại học Đồng Tháp" />
+          <span className="sidebar__brand-eyebrow">HỆ THỐNG QUẢN LÝ</span>
+          <strong className="sidebar__brand-title">Khóa luận Tốt nghiệp</strong>
+          <span className="sidebar__brand-faculty">Khoa Công nghệ và Kỹ thuật</span>
         </div>
-      </aside>
-    </>
-  );
+        <nav className="sidebar__nav" aria-label="Chức năng">
+          <SidebarGroup label="TỔNG QUAN" active={pathname === "/" || pathname === "/activity" || pathname === "/planned/reports"} collapsed={collapsed}>
+            <NavLink to="/" end title={collapsed ? "Tổng quan" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><LayoutDashboard aria-hidden="true" /><span>Tổng quan</span></NavLink>
+            {workflowAccess ? <PlannedLink id="reports" collapsed={collapsed} icon={<ClipboardList aria-hidden="true" />} onClose={onClose} /> : null}
+            <NavLink to="/activity" title={collapsed ? "Nhật ký hoạt động" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><History aria-hidden="true" /><span>{context.base_role === "ADMIN" ? "Nhật ký hệ thống" : "Lịch sử hoạt động"}</span></NavLink>
+          </SidebarGroup>
+          {context.base_role === "ADMIN" && <SidebarGroup label="DANH SÁCH ĐỀ TÀI" active={pathname === "/topics"} collapsed={collapsed}><NavLink to="/topics" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FileText aria-hidden="true"/><span>Đề tài đã công bố</span></NavLink></SidebarGroup>}
+          {workflowAccess ? <>
+            <SidebarGroup label="ĐỀ TÀI VÀ ĐĂNG KÝ" active={["/topics", "/registrations", "/planned/changes"].includes(pathname)} collapsed={collapsed}>
+              <NavLink to="/topics" title={collapsed ? topicLabel : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><FileText aria-hidden="true" /><span>{topicLabel}</span></NavLink>
+              <NavLink to="/registrations" title={collapsed ? "Đăng ký" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><ClipboardList aria-hidden="true" /><span>{context.base_role === "STUDENT" ? "Đăng ký của tôi" : "Hồ sơ đăng ký"}</span></NavLink>
+              <PlannedLink id="changes" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
+            </SidebarGroup>
+            <SidebarGroup label="HỒ SƠ KHÓA LUẬN" active={["/theses", "/submissions", "/proposals", "/progress", "/documents"].includes(pathname) || isThesisDetail} collapsed={collapsed}>
+              <NavLink to="/theses" end title={collapsed ? "Khóa luận & GVHD" : undefined} className={() => "sidebar__item " + (isThesesActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><GraduationCap aria-hidden="true" /><span>Khóa luận & GVHD</span></NavLink>
+              <NavLink to="/submissions" title={collapsed ? "Hồ sơ nộp & xét duyệt" : undefined} className={() => "sidebar__item " + (isSubmissionsActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><FolderOpen aria-hidden="true" /><span>Hồ sơ nộp & xét duyệt</span></NavLink>
+              <NavLink to={progressPath} title={collapsed ? "Báo cáo tiến độ" : undefined} className={() => "sidebar__item " + (isProgressActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><ClipboardList aria-hidden="true" /><span>Báo cáo tiến độ</span></NavLink>
+            </SidebarGroup>
+            <SidebarGroup label="BẢO VỆ VÀ ĐÁNH GIÁ" active={["council", "defense", "evaluation", "results"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed} defaultOpen={false}>
+              <PlannedLink id="council" collapsed={collapsed} icon={<UsersRound aria-hidden="true" />} onClose={onClose} />
+              <PlannedLink id="defense" collapsed={collapsed} icon={<CalendarDays aria-hidden="true" />} onClose={onClose} />
+              <PlannedLink id="evaluation" collapsed={collapsed} icon={<ClipboardList aria-hidden="true" />} onClose={onClose} />
+              <PlannedLink id="results" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
+            </SidebarGroup>
+            <SidebarGroup label="THỬ NGHIỆM AI" active={pathname === "/ai" || ["repository", "chatbot", "similarity"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed}>
+              <NavLink to="/ai" title={collapsed ? "Tra cứu tài liệu" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+                onClick={onClose}><Bot aria-hidden="true" /><span>Tra cứu tài liệu</span></NavLink>
+              <PlannedLink id="repository" collapsed={collapsed} icon={<BookOpen aria-hidden="true" />} onClose={onClose} />
+              <PlannedLink id="chatbot" collapsed={collapsed} icon={<Bot aria-hidden="true" />} onClose={onClose} />
+              <PlannedLink id="similarity" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
+            </SidebarGroup>
+          </> : null}
+          <SidebarGroup label="TÀI LIỆU KHOA" active={pathname === "/forms"} collapsed={collapsed}>
+            <NavLink to="/forms" title={collapsed ? "Kho biểu mẫu & tài liệu Khoa" : undefined} className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FolderOpen aria-hidden="true"/><span>{context.actions.includes("forms:manage")?"Quản lý kho biểu mẫu Khoa":"Kho biểu mẫu & tài liệu Khoa"}</span></NavLink>
+          </SidebarGroup>
+          {context.actions.includes("account:manage") ? <SidebarGroup label="QUẢN TRỊ" active={["/administration", "/rounds", "/lecturers"].includes(pathname)} collapsed={collapsed}>
+            <NavLink to="/administration" title={collapsed ? "Tài khoản và phân công" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản và phân công</span></NavLink>
+            {context.base_role === "ADMIN" ? <NavLink to="/rounds" title={collapsed ? "Đợt KLTN" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink> : null}
+            {context.base_role === "ADMIN" && <NavLink to="/lecturers" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><GraduationCap aria-hidden="true"/><span>Danh sách giảng viên</span></NavLink>}
+          </SidebarGroup> : null}
+          {context.actions.some(a=>a.startsWith("eligibility:")) ? <SidebarGroup label="ĐIỀU KIỆN THEO ĐỢT" active={pathname === "/roster"} collapsed={collapsed}>
+            <NavLink to="/roster" title={collapsed ? "Danh sách sinh viên" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><ShieldCheck aria-hidden="true" /><span>Danh sách sinh viên</span></NavLink>
+          </SidebarGroup> : null}
+          <SidebarGroup label="TÀI KHOẢN" active={pathname === "/account" || pathname === "/planned/expertise"} collapsed={collapsed}>
+            <NavLink to="/account" title={collapsed ? "Thông tin của tôi" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
+              onClick={onClose}><UserRound aria-hidden="true" /><span>Thông tin của tôi</span></NavLink>
+            {context.base_role === "LECTURER" ? <PlannedLink id="expertise" collapsed={collapsed} icon={<BookOpen aria-hidden="true" />} onClose={onClose} /> : null}
+          </SidebarGroup>
+        </nav>
+        <div className="sidebar__footer">
+          <Link to="/account" className="sidebar__user" aria-label="Quản lý tài khoản" title="Quản lý tài khoản" onClick={onClose}>
+            <span className="sidebar__avatar" aria-hidden="true">{initialsOf(context.display_name)}</span>
+            <span className="sidebar__user-info"><span className="sidebar__user-name">{context.display_name}</span>
+              <span className="sidebar__user-role">{roleLabel(context)}</span></span>
+          </Link>
+          <button type="button" className="sidebar__collapse" onClick={onToggleCollapsed}
+            aria-label={collapseTitle} aria-pressed={collapsed} title={collapseTitle}>
+            {collapsed ? <ChevronsRight size={16} aria-hidden="true" /> : <ChevronsLeft size={16} aria-hidden="true" />}
+          </button>
+        </div>
+      </div>
+    </aside>
+  </>;
 }

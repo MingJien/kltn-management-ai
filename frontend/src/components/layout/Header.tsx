@@ -1,36 +1,45 @@
 import { useLocation } from "react-router-dom";
 import { Menu, LogOut } from "lucide-react";
+import { plannedPages, type PlannedPageId } from "../../plannedPages";
+import type { Context } from "../../api";
+import NotificationsBell from "./NotificationsBell";
+import ProfilePopup from "./ProfilePopup";
 
 /**
  * Route path → breadcrumb label mapping.
  * Only includes paths that are statically known.
  */
 const BREADCRUMB_MAP: Record<string, string> = {
-  "/": "Workspace",
-  "/rounds": "Đợt & Năm học",
-  "/eligibility": "Điều kiện SV",
+  "/": "Tổng quan",
   "/topics": "Đề tài",
   "/registrations": "Đăng ký",
+  "/theses": "Khóa luận & GVHD",
   "/proposals": "Đề cương",
   "/progress": "Tiến độ",
   "/documents": "Tài liệu",
-  "/councils": "Hội đồng & Phiên",
-  "/reviews": "Nhận xét",
-  "/scoring": "Chấm điểm",
-  "/minutes": "Biên bản",
-  "/archive": "Kho & Báo cáo",
-  "/ai": "Chatbot AI",
-  "/similarity": "Tìm tương đồng",
+  "/forms": "Kho biểu mẫu & tài liệu Khoa",
+  "/submissions": "Hồ sơ nộp & xét duyệt",
+  "/account": "Tài khoản",
+  "/administration": "Quản trị",
+  "/rounds": "Đợt KLTN",
+  "/roster": "Danh sách sinh viên",
+  "/ai": "Tra cứu thử nghiệm",
+  "/notifications": "Thông báo",
+  "/activity": "Nhật ký hoạt động",
 };
 
 interface HeaderProps {
+  context: Context;
   onToggleSidebar: () => void;
   onLogout: () => void;
 }
 
-export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
+export default function Header({ context, onToggleSidebar, onLogout }: HeaderProps) {
   const location = useLocation();
-  const currentLabel = BREADCRUMB_MAP[location.pathname] || "Trang";
+  const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
+  const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
+    ? plannedPages[plannedId as PlannedPageId].title
+    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/theses/") ? (new URLSearchParams(location.search).get("section") === "progress" ? "Báo cáo tiến độ" : ["submissions","proposal","documents"].includes(new URLSearchParams(location.search).get("section") || "") ? "Hồ sơ nộp & xét duyệt" : "Khóa luận & GVHD") : "Trang");
 
   return (
     <header className="app-shell__header">
@@ -39,18 +48,20 @@ export default function Header({ onToggleSidebar, onLogout }: HeaderProps) {
           <button
             className="header__toggle"
             onClick={onToggleSidebar}
-            aria-label="Toggle sidebar"
+            aria-label="Mở hoặc đóng menu"
           >
             <Menu size={20} />
           </button>
-          <nav className="header__breadcrumb" aria-label="Breadcrumb">
-            Workspace
-            <span className="header__breadcrumb-sep">/</span>
+          <nav className="header__breadcrumb" aria-label="Vị trí trang">
+            <span className="header__breadcrumb-root">KLTN</span>
+            <span className="header__breadcrumb-sep" aria-hidden="true">/</span>
             <span>{currentLabel}</span>
           </nav>
         </div>
         <div className="header__right">
-          <button className="btn btn-ghost btn-sm" onClick={onLogout} aria-label="Đăng xuất">
+          <NotificationsBell userId={context.user_id} />
+          <ProfilePopup context={context} onLogout={onLogout} />
+          <button className="btn btn-ghost btn-sm header__logout-standalone" onClick={onLogout} aria-label="Đăng xuất">
             <LogOut size={18} /> Đăng xuất
           </button>
         </div>

@@ -8,11 +8,11 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, delete, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.schemas import OpenRoundOut, RequirementInput, TitleVersionOut, TopicCreate, TopicDecision, TopicOut, TopicUpdate
+from backend.api.schemas import OpenRoundOut, RequirementInput, TitleVersionOut, TopicCreate, TopicDecision, TopicOut, TopicRegisteredStudentOut, TopicUpdate
 from backend.db.models import entities as m
 from backend.services.registration import _is_department_head, profile, row_version
 
@@ -31,6 +31,9 @@ def _fingerprint(topic: m.Topic, session: Session) -> str:
         "title": topic.current_title, "description": topic.description,
         "max_students": topic.max_students, "state": topic.state,
         "code": topic.code,
+        "archived_at": topic.archived_at.isoformat() if topic.archived_at else None,
+        "archived_by": str(topic.archived_by) if topic.archived_by else None,
+        "archive_reason": topic.archive_reason,
         "receiving_lecturer_id": str(topic.receiving_lecturer_id) if topic.receiving_lecturer_id else None,
         "requirements": requirements,
     }, ensure_ascii=False, sort_keys=True)
@@ -45,6 +48,9 @@ def _audit(session: Session, topic: m.Topic, actor: UUID, action: str,
         occurred_at=datetime.now(timezone.utc), correlation_id=uuid4(),
     ))
 
+    from backend.services.workflow_notices import topic_event
+    topic_event(session, topic, actor, action)
+
 
 def _title_version(session: Session, topic: m.Topic, actor: UUID, title: str,
                    reason: str | None = None) -> None:
@@ -58,36 +64,91 @@ def _title_version(session: Session, topic: m.Topic, actor: UUID, title: str,
 
 
 def topic_out(session: Session, topic: m.Topic) -> TopicOut:
-    reason = None
-    if topic.state in {"RETURNED", "REJECTED"}:
-        reason = session.scalar(select(m.AuditEvent.reason).where(
-            m.AuditEvent.resource_type == "topic", m.AuditEvent.resource_id == topic.id,
-            m.AuditEvent.action.in_(["TOPIC_RETURNED", "TOPIC_REJECTED"]),
-        ).order_by(m.AuditEvent.occurred_at.desc()).limit(1))
-    lecturer = session.get(m.LecturerProfile, topic.receiving_lecturer_id) if topic.receiving_lecturer_id else None
-    requirements = session.scalars(select(m.TopicRequirement).where(m.TopicRequirement.topic_id == topic.id)
-                                   .order_by(m.TopicRequirement.created_at, m.TopicRequirement.id)).all()
-    versions = session.scalars(select(m.TopicTitleVersion).where(m.TopicTitleVersion.topic_id == topic.id)
-                               .order_by(m.TopicTitleVersion.version_no)).all()
-    occupied = session.scalar(select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id,
-        m.TopicRegistration.state.in_(["LECTURER_ACCEPTED", "FINALIZED"])).limit(1))
-    round_ = session.get(m.ThesisRound, topic.round_id)
+    return topics_out(session, [topic])[0]
+
+
+def topics_out(session: Session, topics: list[m.Topic]) -> list[TopicOut]:
+    """Batch related reads so list size does not multiply database round trips."""
+    if not topics:
+        return []
+    ids = [t.id for t in topics]
+    requirements = session.scalars(select(m.TopicRequirement).where(m.TopicRequirement.topic_id.in_(ids))
+        .order_by(m.TopicRequirement.created_at, m.TopicRequirement.id)).all()
+    versions = session.scalars(select(m.TopicTitleVersion).where(m.TopicTitleVersion.topic_id.in_(ids))
+        .order_by(m.TopicTitleVersion.version_no)).all()
+    lecturers = {l.id: l for l in session.scalars(select(m.LecturerProfile).where(
+        m.LecturerProfile.id.in_([t.receiving_lecturer_id for t in topics if t.receiving_lecturer_id]))).all()}
+    rounds = {r.id: r for r in session.scalars(select(m.ThesisRound).where(
+        m.ThesisRound.id.in_({t.round_id for t in topics}))).all()}
+    years = {y.id: y for y in session.scalars(select(m.AcademicYear).where(
+        m.AcademicYear.id.in_({r.academic_year_id for r in rounds.values()}))).all()}
+    year_rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.academic_year_id.in_(years))
+        .order_by(m.ThesisRound.opens_at, m.ThesisRound.code, m.ThesisRound.id)).all()
+    registrations = session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id.in_(ids),
+        m.TopicRegistration.state.in_(["DRAFT", "RETURNED", "SUBMITTED", "LECTURER_ACCEPTED", "FINALIZED"]))).all()
+    counts = dict(session.execute(select(m.RegistrationMember.registration_id, func.count()).where(
+        m.RegistrationMember.registration_id.in_([r.id for r in registrations]), m.RegistrationMember.active.is_(True))
+        .group_by(m.RegistrationMember.registration_id)).all())
+    reg_ids = [r.id for r in registrations]
+    members = session.scalars(select(m.RegistrationMember).where(
+        m.RegistrationMember.registration_id.in_(reg_ids),
+        m.RegistrationMember.active.is_(True)
+    )).all() if reg_ids else []
+    student_ids = {mem.student_id for mem in members}
+    students = {s.id: s for s in session.scalars(select(m.StudentProfile).where(
+        m.StudentProfile.id.in_(student_ids)
+    )).all()} if student_ids else {}
+    linked_topics = set(session.scalars(select(m.TopicRegistration.topic_id).where(m.TopicRegistration.topic_id.in_(ids))))
+    reasons: dict[UUID, str | None] = {}
+    for event in session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_type == "topic",
+        m.AuditEvent.resource_id.in_([t.id for t in topics if t.state in {"RETURNED", "REJECTED"}]),
+        m.AuditEvent.action.in_(["TOPIC_RETURNED", "TOPIC_REJECTED"]))
+        .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id)).all():
+        reasons.setdefault(event.resource_id, event.reason)
     now = datetime.now(timezone.utc)
-    return TopicOut(
-        id=topic.id, round_id=topic.round_id, department_id=topic.department_id,
-        proposer_user_id=topic.proposer_user_id, title=topic.current_title,
-        description=topic.description, max_students=topic.max_students,
-        state=topic.state, row_version=topic.row_version, decision_reason=reason,
-        code=topic.code, round_label=round_out(session, round_).label, proposer_type=topic.proposer_type,
-        receiving_lecturer_id=topic.receiving_lecturer_id,
-        receiving_lecturer_name=lecturer.display_name if lecturer else None,
-        requirements=[RequirementInput(requirement_type=r.requirement_type, value_text=r.value_text or "",
-            preferred_gpa=float(r.preferred_gpa) if r.preferred_gpa is not None else None) for r in requirements],
-        title_versions=[TitleVersionOut(version_no=v.version_no, title=v.title,
-            change_reason=v.change_reason, created_at=v.created_at) for v in versions],
-        available=topic.state == "APPROVED" and not occupied and round_.state == "OPEN"
-            and round_.opens_at <= now <= round_.closes_at,
-    )
+    result = []
+    for topic in topics:
+        round_ = rounds[topic.round_id]
+        year = years[round_.academic_year_id]
+        same_year = [r.id for r in year_rounds if r.academic_year_id == year.id]
+        label = f"Năm học {year.starts_on.year}-{year.ends_on.year}"
+        if len(same_year) > 1:
+            label += f" (đợt {same_year.index(round_.id) + 1})"
+        regs = [r for r in registrations if r.topic_id == topic.id]
+        state = "LEGACY_REVIEW" if len(regs) > 1 else regs[0].state if regs else None
+        count = sum(counts.get(r.id, 0) for r in regs)
+        remaining = max(0, topic.max_students - count)
+        available = topic.archived_at is None and topic.state == "APPROVED" and state not in {"LECTURER_ACCEPTED", "FINALIZED", "LEGACY_REVIEW"} and remaining > 0
+        available = available and round_.state == "OPEN" and round_.opens_at <= now <= round_.closes_at
+        lecturer = lecturers.get(topic.receiving_lecturer_id)
+        topic_reg_ids = {r.id for r in regs}
+        topic_members = [mem for mem in members if mem.registration_id in topic_reg_ids]
+        registered_students = [
+            TopicRegisteredStudentOut(
+                student_id=mem.student_id,
+                student_code=students[mem.student_id].student_code,
+                display_name=students[mem.student_id].display_name,
+                class_name=students[mem.student_id].class_name,
+                is_coordinator=mem.is_coordinator,
+                consent_status=mem.consent_status,
+                registration_state=next((r.state for r in regs if r.id == mem.registration_id), None),
+            )
+            for mem in topic_members if mem.student_id in students
+        ]
+        result.append(TopicOut(id=topic.id, round_id=topic.round_id, department_id=topic.department_id,
+            proposer_user_id=topic.proposer_user_id, title=topic.current_title, description=topic.description,
+            max_students=topic.max_students, state=topic.state, row_version=topic.row_version,
+            decision_reason=reasons.get(topic.id), code=topic.code, round_label=label, proposer_type=topic.proposer_type,
+            receiving_lecturer_id=topic.receiving_lecturer_id, receiving_lecturer_name=lecturer.display_name if lecturer else None,
+            requirements=[RequirementInput(requirement_type=r.requirement_type, value_text=r.value_text or "",
+                preferred_gpa=float(r.preferred_gpa) if r.preferred_gpa is not None else None)
+                for r in requirements if r.topic_id == topic.id],
+            title_versions=[TitleVersionOut(version_no=v.version_no, title=v.title, change_reason=v.change_reason,
+                created_at=v.created_at) for v in versions if v.topic_id == topic.id],
+            registered_member_count=count, remaining_slots=remaining, registration_state=state, available=available,
+            archived_at=topic.archived_at, archive_reason=topic.archive_reason, has_links=topic.id in linked_topics,
+            registered_students=registered_students))
+    return result
 
 
 def open_rounds(session: Session) -> list[m.ThesisRound]:
@@ -104,42 +165,85 @@ def round_out(session: Session, round_: m.ThesisRound) -> OpenRoundOut:
     rounds = session.scalars(select(m.ThesisRound).where(
         m.ThesisRound.academic_year_id == year.id,
     ).order_by(m.ThesisRound.opens_at, m.ThesisRound.created_at, m.ThesisRound.id)).all()
-    suffix = f" (đợt {next(i for i, row in enumerate(rounds, 1) if row.id == round_.id)})" if len(rounds) > 1 else ""
+    number = next(i for i, row in enumerate(rounds, 1) if row.id == round_.id)
+    kind = "Đợt chính" if round_.round_type == "MAIN" else "Đợt bổ sung"
+    suffix = f" · Đợt {number}" if len(rounds) > 1 else ""
     return OpenRoundOut(id=round_.id, code=round_.code, closes_at=round_.closes_at,
-                        academic_year=year_label, label=f"Năm học {year_label}{suffix}")
+                        academic_year=year_label, label=f"Năm học {year_label}{suffix} · {kind}")
 
 
 def visible_topics(session: Session, user: m.UserAccount,
-                   round_id: UUID | None, limit: int) -> list[TopicOut]:
+                   round_id: UUID | None, limit: int, offset: int = 0,
+                   search: str | None = None, view: str = "all",
+                   sort: str = "newest") -> list[TopicOut]:
     if user.base_role == "STUDENT":
         viewer = profile(session, user, "STUDENT")
         group_topics = select(m.TopicRegistration.topic_id).join(m.RegistrationMember,
             m.RegistrationMember.registration_id == m.TopicRegistration.id).where(m.RegistrationMember.student_id == viewer.id)
-        allowed = or_(and_(m.Topic.state == "APPROVED", m.Topic.proposer_type == "LECTURER"),
+        allowed = or_(m.Topic.state == "APPROVED",
                       m.Topic.proposer_user_id == user.id, m.Topic.id.in_(group_topics))
     elif user.base_role == "LECTURER":
         viewer = profile(session, user, "LECTURER")
         head = _is_department_head(session, viewer.id, viewer.department_id)
         allowed = or_(
             m.Topic.state == "APPROVED", m.Topic.proposer_user_id == user.id,
+            and_(m.Topic.proposer_type == "STUDENT",
+                 m.Topic.state.in_(["SUBMITTED", "RETURNED", "REJECTED"]),
+                 m.Topic.receiving_lecturer_id == viewer.id),
             m.Topic.state == "SUBMITTED" if head else m.Topic.proposer_user_id == user.id,
         )
+    elif user.base_role == "ADMIN" and view == "all":
+        viewer = None
     else:
         return []
-    query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
+    if view == "all":
+        query = select(m.Topic).where(m.Topic.state.in_(["APPROVED", "LOCKED"]))
+    else:
+        query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
+    if view == "archived":
+        if user.base_role != "LECTURER" or not head:
+            _fail(403, "Chỉ Trưởng bộ môn được quản lý đề tài ngừng sử dụng")
+        query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, m.Topic.archived_at.is_not(None))
+    elif view != "mine":
+        query = query.where(m.Topic.archived_at.is_(None))
     if round_id is not None:
         query = query.where(m.Topic.round_id == round_id)
-    rows = session.scalars(query.order_by(m.Topic.created_at.desc(), m.Topic.id).limit(limit)).all()
-    return [topic_out(session, row) for row in rows]
+    if search:
+        term = "%" + search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        receivers = select(m.LecturerProfile.id).where(m.LecturerProfile.display_name.ilike(term, escape="\\"))
+        query = query.where(or_(m.Topic.code.ilike(term, escape="\\"),
+            m.Topic.current_title.ilike(term, escape="\\"), m.Topic.receiving_lecturer_id.in_(receivers)))
+    if view == "pending":
+        query = query.where(m.Topic.state == "SUBMITTED")
+    elif view == "mine":
+        query = query.where(m.Topic.proposer_user_id == user.id)
+    elif view == "suggested":
+        if user.base_role != "LECTURER":
+            _fail(403, "Only lecturers can view proposals addressed to them")
+        query = query.where(m.Topic.proposer_type == "STUDENT",
+            m.Topic.receiving_lecturer_id == viewer.id,
+            m.Topic.state.in_(["SUBMITTED", "RETURNED", "REJECTED", "APPROVED"]))
+    if sort == "oldest":
+        order_clauses = [m.Topic.created_at.asc(), m.Topic.id.asc()]
+    elif sort == "title_asc":
+        order_clauses = [m.Topic.current_title.asc(), m.Topic.id.asc()]
+    elif sort == "title_desc":
+        order_clauses = [m.Topic.current_title.desc(), m.Topic.id.desc()]
+    else:
+        order_clauses = [m.Topic.created_at.desc(), m.Topic.id.desc()]
+    rows = session.scalars(query.order_by(*order_clauses).offset(offset).limit(limit)).all()
+    return topics_out(session, rows)
 
 
 def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> TopicOut:
     row = session.get(m.Topic, topic_id)
     if row is None:
         _fail(404, "Topic not found")
+    if row.state in {"APPROVED", "LOCKED"} and user.base_role in {"ADMIN", "LECTURER", "STUDENT"}:
+        return topic_out(session, row)
     if user.base_role == "STUDENT":
         viewer = profile(session, user, "STUDENT")
-        allowed = (row.state == "APPROVED" and row.proposer_type == "LECTURER") or row.proposer_user_id == user.id or session.scalar(
+        allowed = row.state == "APPROVED" or row.proposer_user_id == user.id or session.scalar(
             select(m.RegistrationMember.id).join(m.TopicRegistration,
                 m.TopicRegistration.id == m.RegistrationMember.registration_id).where(
                 m.TopicRegistration.topic_id == row.id, m.RegistrationMember.student_id == viewer.id).limit(1)) is not None
@@ -147,6 +251,9 @@ def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> 
         viewer = profile(session, user, "LECTURER")
         allowed = row.state == "APPROVED" or row.proposer_user_id == user.id or (
             row.state == "SUBMITTED" and _is_department_head(session, viewer.id, row.department_id)
+        ) or (
+            row.proposer_type == "STUDENT" and row.state in {"SUBMITTED", "RETURNED", "REJECTED"}
+            and row.receiving_lecturer_id == viewer.id
         )
     else:
         _fail(404, "Topic not found")
@@ -171,7 +278,7 @@ def _own_editable_topic(session: Session, user: m.UserAccount,
 def receiving_lecturer(session: Session, lecturer_id: UUID | None, department_id: UUID) -> m.LecturerProfile:
     lecturer = session.get(m.LecturerProfile, lecturer_id) if lecturer_id else None
     account = session.get(m.UserAccount, lecturer.user_id) if lecturer else None
-    if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE":
+    if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE" or account.base_role != "LECTURER":
         _fail(422, "Choose an active lecturer in the same department")
     return lecturer
 
@@ -181,7 +288,12 @@ def allocate_topic_code(session: Session, round_: m.ThesisRound) -> str:
     prefix = f"DT-{year.starts_on.year}-{year.ends_on.year}-"
     # Serialize allocation for this year, even if two rounds create topics together.
     session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:prefix))"), {"prefix": prefix})
-    codes = session.scalars(select(m.Topic.code).where(m.Topic.code.startswith(prefix))).all()
+    codes = list(session.scalars(select(m.Topic.code).where(m.Topic.code.startswith(prefix))))
+    # Deleted drafts must not cause a previously issued public code to be reused.
+    for reason in session.scalars(select(m.AuditEvent.reason).where(m.AuditEvent.action == "TOPIC_DELETED", m.AuditEvent.reason.startswith(prefix))):
+        code = reason.split(" · ", 1)[0]
+        if code[len(prefix):].isdigit():
+            codes.append(code)
     number = max((int(code[len(prefix):]) for code in codes), default=0) + 1
     return prefix + str(number).zfill(4)
 
@@ -197,6 +309,8 @@ def create_topic(session: Session, user: m.UserAccount, data: TopicCreate, *, st
     if user.base_role != "LECTURER" and not (student_proposal and user.base_role == "STUDENT"):
         _fail(403, "Only lecturers propose topics")
     lecturer = profile(session, user, user.base_role)
+    if student_proposal and data.requirements:
+        _fail(422, "Students describe their proposal; lecturer requirements are not student-editable")
     round_ = session.get(m.ThesisRound, data.round_id)
     now = datetime.now(timezone.utc)
     if not round_ or round_.state != "OPEN" or not round_.opens_at <= now <= round_.closes_at:
@@ -254,6 +368,8 @@ def update_topic(session: Session, user: m.UserAccount, topic_id: UUID,
                 _fail(422, "Student proposal membership is fixed in its registration")
             topic.max_students = data.max_students
         if data.requirements is not None:
+            if user.base_role != "LECTURER":
+                _fail(422, "Students describe their proposal; lecturer requirements are not student-editable")
             save_requirements(session, topic, data.requirements)
         if "receiving_lecturer_id" in data.model_fields_set:
             if topic.proposer_type != "STUDENT":
@@ -276,6 +392,10 @@ def submit_topic(session: Session, user: m.UserAccount, topic_id: UUID,
         topic = _own_editable_topic(session, user, topic_id)
         if topic.proposer_type == "STUDENT":
             _fail(409, "Submit the student registration after all members confirm")
+        round_ = session.get(m.ThesisRound, topic.round_id)
+        now = datetime.now(timezone.utc)
+        if not round_ or round_.state != "OPEN" or not round_.opens_at <= now <= round_.closes_at:
+            _fail(409, "The selected round is not open")
         row_version(expected_version, topic.row_version)
         before = _fingerprint(topic, session)
         topic.state = "SUBMITTED"
@@ -314,6 +434,20 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         if data.decision == "APPROVE":
             if topic.proposer_type == "STUDENT":
                 topic.receiving_lecturer_id = receiving_lecturer(session, data.receiving_lecturer_id, topic.department_id).id
+                registration = session.scalar(select(m.TopicRegistration).where(
+                    m.TopicRegistration.topic_id == topic.id,
+                    m.TopicRegistration.state == "SUBMITTED").limit(1))
+                if registration is not None:
+                    from backend.services.notifications import add_notice, revoke_proposal_notice
+
+                    revoke_proposal_notice(session, registration_id=registration.id,
+                                           lecturer_id=None, now=datetime.now(timezone.utc))
+                    add_notice(session, topic=topic,
+                               actor_user_id=topic.proposer_user_id, registration_id=registration.id,
+                               kind="PROPOSAL_APPROVED")
+                    add_notice(session, topic=topic, actor_user_id=user.id,
+                               registration_id=registration.id, kind="PROPOSAL_APPROVED",
+                               recipient_user_id=topic.proposer_user_id)
             elif data.receiving_lecturer_id is not None and data.receiving_lecturer_id != topic.receiving_lecturer_id:
                 _fail(422, "Lecturer topics remain with the proposing lecturer")
         if data.revised_title:
@@ -330,6 +464,10 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         if topic.proposer_type == "STUDENT" and data.decision in {"RETURN", "REJECT"}:
             for reg in session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.topic_id == topic.id,
                 m.TopicRegistration.state == "SUBMITTED").with_for_update()).all():
+                from backend.services.notifications import revoke_proposal_notice
+
+                revoke_proposal_notice(session, registration_id=reg.id,
+                                       lecturer_id=None, now=datetime.now(timezone.utc))
                 reg.state = "RETURNED" if data.decision == "RETURN" else "CANCELLED"
                 reg.row_version += 1
                 if data.decision == "REJECT":
@@ -340,6 +478,47 @@ def department_decision(session: Session, user: m.UserAccount, topic_id: UUID,
         result = topic_out(session, topic)
         session.commit()
         return result
+    except Exception:
+        session.rollback()
+        raise
+
+
+def lifecycle(session, user, topic_id, operation, reason, expected):
+    reason = reason.strip()
+    if len(reason) < 5:
+        _fail(422, "Lý do cần ít nhất 5 ký tự")
+    try:
+        topic = session.scalar(select(m.Topic).where(m.Topic.id == topic_id).with_for_update())
+        if not topic:
+            _fail(404, "Không tìm thấy đề tài")
+        row_version(expected, topic.row_version)
+        if operation == "delete":
+            if user.base_role not in {"LECTURER", "STUDENT"} or topic.proposer_user_id != user.id:
+                _fail(403, "Chỉ người tạo được xóa đề tài nháp của mình")
+            if topic.state != "DRAFT" or session.scalar(select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id).limit(1)) or session.scalar(select(m.Thesis.id).where(m.Thesis.topic_id == topic.id).limit(1)):
+                _fail(409, "Chỉ xóa nháp chưa có đăng ký hoặc khóa luận; hồ sơ đã liên kết phải giữ lại")
+            _audit(session, topic, user.id, "TOPIC_DELETED", _fingerprint(topic, session), f"{topic.code} · {reason}")
+            session.execute(delete(m.TopicRequirement).where(m.TopicRequirement.topic_id == topic.id))
+            session.execute(delete(m.TopicTitleVersion).where(m.TopicTitleVersion.topic_id == topic.id))
+            session.delete(topic)
+            session.commit()
+            return
+        if user.base_role != "LECTURER":
+            _fail(403, "Trưởng bộ môn mới được quản lý việc ngừng sử dụng đề tài")
+        lecturer = profile(session, user, "LECTURER")
+        if not _is_department_head(session, lecturer.id, topic.department_id):
+            _fail(403, "Đề tài nằm ngoài bộ môn được giao")
+        if operation == "archive" and topic.archived_at is not None:
+            _fail(409, "Đề tài đã ngừng sử dụng")
+        if operation == "restore" and topic.archived_at is None:
+            _fail(409, "Đề tài chưa ngừng sử dụng")
+        before = _fingerprint(topic, session)
+        topic.archived_at = datetime.now(timezone.utc) if operation == "archive" else None
+        topic.archived_by = user.id if operation == "archive" else None
+        topic.archive_reason = reason if operation == "archive" else None
+        topic.row_version += 1
+        _audit(session, topic, user.id, "TOPIC_ARCHIVED" if operation == "archive" else "TOPIC_RESTORED", before, reason)
+        session.commit()
     except Exception:
         session.rollback()
         raise

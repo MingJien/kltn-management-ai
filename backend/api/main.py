@@ -2,36 +2,47 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import or_, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
-from backend.api.auth import router as auth_router
+from backend.api.auth import allowed_frontend_origins, router as auth_router
+from backend.api.account import router as account_router
+from backend.api.roster import router as roster_router, assignment_router
+from backend.api.account_admin import router as account_admin_router
+from backend.api.lecturer_import import router as lecturer_import_router
+from backend.api.core import router as thesis_workspace_router
+from backend.api.activity import router as activity_router
+from backend.api.school_forms import router as school_forms_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
-    ContextOut, ErrorOut, HealthOut, LecturerDecision, MemberResponse,
-    RegistrationCreate, RegistrationOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
-    SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, ThesisOut, StudentProposalCreate, LecturerOut,
+    ContextOut, ErrorOut, HealthOut, LecturerDecision, RejectedProposalResolution, MemberResponse,
+    RegistrationCreate, RegistrationOut, PendingRegistrationSummaryOut, TopicOut, TopicCreate, TopicUpdate, TopicDecision, OpenRoundOut,
+    SimilarTopicRequest, SearchResult, ChatRequest, ChatOut, EligibleStudentOut, StudentProposalCreate, LecturerOut, MyEligibilityOut,
+    NotificationSummaryOut,
 )
 from backend.db.models import entities as m
 from backend.services.registration import (
-    _is_department_head, cancel_registration, create_registration, finalize_registration,
-    get_registration, lecturer_decision, profile, registration_out,
+    _is_department_head, cancel_registration, create_registration,
+    withdraw_registration,
+    get_registration, lecturer_decision, resolve_rejected_student_proposal, profile, registration_out, registrations_out,
     respond_to_registration, submit_registration,
     confirmed_student_ids,
 )
+from backend.services.account_directory import lecturer_duties_for_user
 from backend.services.topics import (
     create_topic, department_decision, get_visible_topic, open_rounds,
     submit_topic, update_topic, visible_topics, round_out,
 )
 
 app = FastAPI(
-    title="KLTN prototype API",
+    title="KLTN API",
     version="0.3.0",
-    description="NV4 prototype. Development identity is disabled outside development/test.",
+    description="Quy trình đề tài và đăng ký KLTN; các chức năng AI còn ở mức thử nghiệm. Development identity chỉ bật trong development/test.",
 )
 _session_secret = os.getenv("AUTH_SESSION_SECRET") or secrets.token_urlsafe(48)
 from starlette.middleware.sessions import SessionMiddleware
@@ -46,16 +57,49 @@ app.add_middleware(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys([
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        os.getenv("KLTN_FRONTEND_URL", "http://localhost:5173").rstrip("/"),
-    ])),
+    allow_origins=allowed_frontend_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "X-Dev-User-Id", "If-Match", "X-File-Name", "X-Form-Code", "X-Preview-SHA256", "X-CSRF-Token"],
+    expose_headers=["X-Document-Code", "X-Exported-At", "X-Print-SHA256", "Content-Disposition"],
 )
 app.include_router(auth_router)
+app.include_router(account_router)
+app.include_router(roster_router)
+app.include_router(assignment_router)
+app.include_router(account_admin_router)
+app.include_router(lecturer_import_router)
+app.include_router(thesis_workspace_router)
+app.include_router(activity_router)
+app.include_router(school_forms_router)
+
+
+@app.get("/api/v1/notifications", response_model=NotificationSummaryOut)
+def notifications(limit: int = Query(default=20, ge=1, le=100),
+                  offset: int = Query(default=0, ge=0),
+                  unread_only: bool = False,
+                  user: m.UserAccount = Depends(current_user),
+                  session: Session = Depends(get_session)) -> NotificationSummaryOut:
+    from backend.services.notifications import list_notices
+
+    return list_notices(session, user.id, limit=limit, offset=offset, unread_only=unread_only)
+
+
+@app.post("/api/v1/notifications/{notification_id}/read", status_code=204)
+def read_notification(notification_id: UUID, user: m.UserAccount = Depends(current_user),
+                      session: Session = Depends(get_session)) -> None:
+    from backend.services.notifications import mark_notice_read
+
+    mark_notice_read(session, user.id, notification_id)
+
+
+@app.middleware("http")
+async def private_api_responses(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/v1/"):
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.post("/api/v1/topic-registrations/{registration_id}/evidence", response_model=RegistrationOut)
@@ -70,6 +114,13 @@ def registration_evidence_download(registration_id: UUID, student_id: UUID,
     user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
     from backend.services.evidence import download_evidence
     return download_evidence(session, user, registration_id, student_id)
+
+
+@app.post("/api/v1/topic-registrations/{registration_id}/members/{student_id}/evidence/scan", response_model=RegistrationOut)
+def registration_evidence_scan(registration_id: UUID, student_id: UUID,
+    user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
+    from backend.services.evidence import rescan_evidence
+    return rescan_evidence(session, user, registration_id, student_id)
 
 
 @app.get("/health/live", response_model=HealthOut)
@@ -88,33 +139,68 @@ def ready(session: Session = Depends(get_session)) -> HealthOut:
 
 @app.get("/api/v1/me/context", response_model=ContextOut)
 def context(
+    request: Request,
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> ContextOut:
+    csrf_token = request.session.get("csrf_token") if request.session.get("user_id") else None
     student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == user.id))
     lecturer = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == user.id))
+    student = student if user.base_role == "STUDENT" else None
+    lecturer = lecturer if user.base_role == "LECTURER" else None
     actions: list[str] = []
-    if student:
+    if student and user.base_role == "STUDENT":
         actions.append("registration:create")
-    if lecturer:
+    if user.base_role == "ADMIN":
+        actions.append("account:manage")
+    now = datetime.now(timezone.utc)
+    assignment_types = session.scalars(select(m.ResourceAssignment.assignment_type).where(
+        m.ResourceAssignment.user_id == user.id,
+        m.ResourceAssignment.round_id.is_not(None),
+        m.ResourceAssignment.state == "ACTIVE",
+        m.ResourceAssignment.effective_from <= now,
+        or_(m.ResourceAssignment.effective_to.is_(None), m.ResourceAssignment.effective_to > now),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
+    )).all()
+    if "FORM_MANAGER" in assignment_types:
+        actions.append("forms:manage")
+    if "ELIGIBILITY_IMPORTER" in assignment_types:
+        actions.append("eligibility:import")
+    if "ELIGIBILITY_VERIFIER" in assignment_types:
+        actions.append("eligibility:manage")
+    if "ACCOUNT_MANAGER" in assignment_types:
+        actions.append("account:manage")
+    if lecturer and user.base_role == "LECTURER":
         actions.extend(["topic:create", "topic:submit"])
         if session.scalar(select(m.Topic.id).where(
             or_(m.Topic.proposer_user_id == user.id, m.Topic.receiving_lecturer_id == lecturer.id), m.Topic.state == "APPROVED"
         ).limit(1)) is not None:
             actions.append("registration:lecturer_decide")
-        department_ids = session.scalars(select(m.Department.id)).all()
-        if any(_is_department_head(session, lecturer.id, department_id) for department_id in department_ids):
+        if _is_department_head(session, lecturer.id, lecturer.department_id):
             actions.append("topic:department_decide")
-            actions.append("registration:department_finalize")
+    profile_department_id = student.department_id if student else lecturer.department_id if lecturer else None
+    profile_department = session.get(m.Department, profile_department_id) if profile_department_id else None
+    profile_major = session.scalar(select(m.DepartmentMajor).where(
+        m.DepartmentMajor.department_id == profile_department_id,
+        m.DepartmentMajor.code == student.major_code,
+        m.DepartmentMajor.active.is_(True))) if student and student.major_code else None
     return ContextOut(
         user_id=user.id, base_role=user.base_role,
         student_id=student.id if student else None,
         lecturer_id=lecturer.id if lecturer else None, actions=actions,
         display_name=(student.display_name if student else lecturer.display_name if lecturer else user.email or str(user.id)),
-        department_id=(student.department_id if student else lecturer.department_id if lecturer else None),
+        department_id=profile_department_id,
+        department_code=profile_department.code if profile_department else None,
+        department_name=profile_department.name if profile_department else None,
         email=user.email,
         student_code=student.student_code if student else None,
+        class_name=student.class_name if student else None,
+        major_code=student.major_code if student else None,
+        major_name=profile_major.name if profile_major else None,
         lecturer_code=lecturer.lecturer_code if lecturer else None,
+        lecturer_duties=lecturer_duties_for_user(session, user.id) if lecturer else [],
+        csrf_token=csrf_token,
+        can_change_password=bool(user.email_verified_at and user.password_hash and user.password_hash.startswith("$argon2")),
     )
 
 
@@ -132,10 +218,14 @@ def rounds_open(
 def topics(
     round_id: UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: str | None = Query(default=None, max_length=200),
+    view: str = Query(default="all", pattern="^(all|mine|pending|suggested|archived)$"),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|title_asc|title_desc)$"),
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> list[TopicOut]:
-    return visible_topics(session, user, round_id, limit)
+    return visible_topics(session, user, round_id, limit, offset, search, view, sort)
 
 
 @app.post("/api/v1/topics", response_model=TopicOut, status_code=201)
@@ -150,9 +240,13 @@ def lecturers(user: m.UserAccount = Depends(current_user), session: Session = De
         raise HTTPException(403, "Student or lecturer required")
     viewer = profile(session, user, user.base_role)
     rows = session.scalars(select(m.LecturerProfile).join(m.UserAccount, m.UserAccount.id == m.LecturerProfile.user_id)
-        .where(m.LecturerProfile.department_id == viewer.department_id, m.UserAccount.status == "ACTIVE")
+        .where(m.LecturerProfile.department_id == viewer.department_id, m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER")
         .order_by(m.LecturerProfile.display_name)).all()
-    return [LecturerOut(id=row.id, display_name=row.display_name, lecturer_code=row.lecturer_code) for row in rows]
+    department = session.get(m.Department, viewer.department_id)
+    faculty = session.get(m.Faculty, department.faculty_id) if department else None
+    return [LecturerOut(id=row.id, display_name=row.display_name, lecturer_code=row.lecturer_code,
+        department_name=department.name if department else None, faculty_name=faculty.name if faculty else None)
+        for row in rows]
 
 
 @app.post("/api/v1/student-proposals", response_model=RegistrationOut, status_code=201)
@@ -161,7 +255,8 @@ def student_proposal(payload: StudentProposalCreate, user: m.UserAccount = Depen
     try:
         topic = create_topic(session, user, payload, student_proposal=True)
         return create_registration(session, user, RegistrationCreate(topic_id=topic.id,
-            member_student_ids=payload.member_student_ids, confirm_creator=payload.confirm_creator))
+            member_student_ids=payload.member_student_ids, confirm_creator=payload.confirm_creator,
+            expected_member_count=payload.expected_member_count))
     except Exception:
         session.rollback()
         raise
@@ -203,6 +298,8 @@ def register(
 
 @app.get("/api/v1/topic-registrations", response_model=list[RegistrationOut])
 def registrations(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> list[RegistrationOut]:
@@ -211,23 +308,49 @@ def registrations(
         ids = session.scalars(select(m.RegistrationMember.registration_id).where(
             m.RegistrationMember.student_id == student.id
         )).all()
-        rows = session.scalars(select(m.TopicRegistration).where(m.TopicRegistration.id.in_(ids))).all()
+        query = select(m.TopicRegistration).where(m.TopicRegistration.id.in_(ids))
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
         topics = session.scalars(select(m.Topic).where(or_(m.Topic.proposer_user_id == user.id,
             m.Topic.receiving_lecturer_id == lecturer.id))).all()
-        departments = session.scalars(select(m.Department.id)).all()
-        head_departments = {dep for dep in departments if _is_department_head(session, lecturer.id, dep)}
+        head_departments = {lecturer.department_id} if _is_department_head(session, lecturer.id, lecturer.department_id) else set()
         topic_ids = [t.id for t in topics]
         topic_ids += session.scalars(select(m.Topic.id).where(m.Topic.department_id.in_(head_departments))).all()
-        rows = session.scalars(select(m.TopicRegistration).where(
+        query = select(m.TopicRegistration).where(
             m.TopicRegistration.topic_id.in_(topic_ids),
             m.TopicRegistration.state != "DRAFT",
             m.TopicRegistration.submitted_at.is_not(None),
-        )).all()
+        )
     else:
-        rows = []
-    return [registration_out(session, row) for row in rows]
+        return []
+    rows = session.scalars(query.order_by(m.TopicRegistration.created_at.desc(), m.TopicRegistration.id)
+        .offset(offset).limit(limit)).all()
+    return registrations_out(session, rows)
+
+
+@app.get("/api/v1/topic-registrations/pending-summary", response_model=PendingRegistrationSummaryOut)
+def pending_registration_summary(
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> PendingRegistrationSummaryOut:
+    if user.base_role != "LECTURER":
+        raise HTTPException(403, "Only lecturers can view pending registrations")
+    lecturer = profile(session, user, "LECTURER")
+    receiving = or_(
+        m.Topic.receiving_lecturer_id == lecturer.id,
+        (m.Topic.receiving_lecturer_id.is_(None)) & (m.Topic.proposer_type == "LECTURER")
+        & (m.Topic.proposer_user_id == user.id),
+    )
+    query = select(m.TopicRegistration).join(m.Topic, m.Topic.id == m.TopicRegistration.topic_id).where(
+        m.TopicRegistration.state == "SUBMITTED",
+        m.TopicRegistration.submitted_at.is_not(None),
+        m.Topic.state == "APPROVED",
+        receiving,
+    )
+    count = session.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = session.scalars(query.order_by(m.TopicRegistration.submitted_at.desc(),
+        m.TopicRegistration.id).limit(5)).all()
+    return PendingRegistrationSummaryOut(count=count, items=registrations_out(session, rows))
 
 
 @app.get("/api/v1/topic-registrations/{registration_id}", response_model=RegistrationOut)
@@ -239,7 +362,7 @@ def registration(
     return get_registration(session, user, registration_id)
 
 
-@app.post("/api/v1/topic-registrations/{registration_id}/member-response", response_model=RegistrationOut)
+@app.post("/api/v1/topic-registrations/{registration_id}/member-response", response_model=RegistrationOut, deprecated=True)
 def registration_member_response(
     registration_id: UUID,
     payload: MemberResponse,
@@ -267,6 +390,15 @@ def registration_cancel(
     return cancel_registration(session, user, registration_id)
 
 
+@app.post("/api/v1/topic-registrations/{registration_id}/withdraw", response_model=RegistrationOut)
+def registration_withdraw(
+    registration_id: UUID,
+    user: m.UserAccount = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> RegistrationOut:
+    return withdraw_registration(session, user, registration_id)
+
+
 @app.post("/api/v1/topic-registrations/{registration_id}/lecturer-decision", response_model=RegistrationOut)
 def decide(
     registration_id: UUID,
@@ -278,14 +410,15 @@ def decide(
     return lecturer_decision(session, user, registration_id, payload, if_match)
 
 
-@app.post("/api/v1/topic-registrations/{registration_id}/department-finalization", response_model=RegistrationOut)
-def finalize(
+@app.post("/api/v1/topic-registrations/{registration_id}/resolve-lecturer-rejection", response_model=RegistrationOut)
+def resolve_lecturer_rejection(
     registration_id: UUID,
+    payload: RejectedProposalResolution,
     if_match: int = Header(alias="If-Match"),
     user: m.UserAccount = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> RegistrationOut:
-    return finalize_registration(session, user, registration_id, if_match)
+    return resolve_rejected_student_proposal(session, user, registration_id, payload, if_match)
 
 
 from functools import lru_cache
@@ -335,7 +468,18 @@ def ai_chat(
     return ChatOut(**result)
 
 
-@app.get("/api/v1/eligible-students", response_model=list[EligibleStudentOut])
+@app.get("/api/v1/me/eligibility", response_model=MyEligibilityOut)
+def my_eligibility(round_id: UUID, user: m.UserAccount = Depends(current_user),
+                   session: Session = Depends(get_session)):
+    me = profile(session, user, "STUDENT")
+    active = session.scalar(select(m.RegistrationMember.id).where(
+        m.RegistrationMember.student_id == me.id, m.RegistrationMember.round_id == round_id,
+        m.RegistrationMember.active.is_(True)).limit(1))
+    return MyEligibilityOut(eligible=me.id in confirmed_student_ids(session, round_id, [me.id]),
+                            has_active_registration=active is not None)
+
+
+@app.get("/api/v1/eligible-students", response_model=list[EligibleStudentOut], deprecated=True)
 def eligible_students(
     round_id: UUID,
     user: m.UserAccount = Depends(current_user),
@@ -346,11 +490,15 @@ def eligible_students(
     me = profile(session, user, "STUDENT")
     students = session.scalars(
         select(m.StudentProfile)
+        .join(m.UserAccount, m.UserAccount.id == m.StudentProfile.user_id)
         .join(m.EligibilitySnapshot, m.EligibilitySnapshot.student_id == m.StudentProfile.id)
         .where(
             m.StudentProfile.department_id == me.department_id,
+            m.StudentProfile.id == me.id,
             m.EligibilitySnapshot.round_id == round_id,
             m.EligibilitySnapshot.state == "CONFIRMED",
+            m.UserAccount.status == "ACTIVE",
+            m.UserAccount.base_role == "STUDENT",
         ).distinct()
         .order_by(m.StudentProfile.display_name)
         .limit(100)
@@ -368,34 +516,14 @@ def topic_detail(
     return get_visible_topic(session, user, topic_id)
 
 
-@app.get("/api/v1/theses/{thesis_id}", response_model=ThesisOut)
-def thesis_detail(
-    thesis_id: UUID,
-    user: m.UserAccount = Depends(current_user),
-    session: Session = Depends(get_session),
-) -> ThesisOut:
-    thesis = session.get(m.Thesis, thesis_id)
-    if thesis is None:
-        raise HTTPException(404, "Thesis not found")
-    members = session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis_id,
-                                                           m.ThesisMember.active.is_(True))).all()
-    advisor = session.scalar(select(m.AdvisorAssignment).where(
-        m.AdvisorAssignment.thesis_id == thesis_id, m.AdvisorAssignment.state == "ACTIVE",
-        m.AdvisorAssignment.assignment_type == "PRIMARY",
-    ))
-    allowed = False
-    if user.base_role == "STUDENT":
-        student = profile(session, user, "STUDENT")
-        allowed = any(member.student_id == student.id for member in members)
-    elif user.base_role == "LECTURER":
-        lecturer = profile(session, user, "LECTURER")
-        allowed = (advisor is not None and advisor.lecturer_id == lecturer.id) or _is_department_head(
-            session, lecturer.id, thesis.department_id
-        )
-    if not allowed:
-        raise HTTPException(404, "Thesis not found")
-    if advisor is None:
-        raise HTTPException(409, "Primary advisor assignment missing")
-    return ThesisOut(id=thesis.id, title=thesis.current_title, state=thesis.state,
-                     member_student_ids=[member.student_id for member in members],
-                     advisor_lecturer_id=advisor.lecturer_id)
+@app.post("/api/v1/topics/{topic_id}/{operation}", status_code=204)
+def topic_lifecycle(topic_id: UUID, operation: str, payload: dict,
+                    if_match: int = Header(alias="If-Match"),
+                    user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
+    if operation not in {"delete-draft", "archive", "restore"}:
+        raise HTTPException(404, "Unknown topic action")
+    reason = payload.get("reason")
+    if not isinstance(reason, str) or not 5 <= len(reason.strip()) <= 2000:
+        raise HTTPException(422, "Lý do cần từ 5 đến 2000 ký tự")
+    from backend.services.topics import lifecycle
+    lifecycle(session, user, topic_id, "delete" if operation == "delete-draft" else operation, reason, if_match)

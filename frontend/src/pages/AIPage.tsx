@@ -1,3 +1,4 @@
+import { errorMessage } from "../errors";
 import { FormEvent, useState } from "react";
 import type { SearchHit, ChatResult } from "../api";
 import { request } from "../api";
@@ -35,7 +36,7 @@ export default function AIPage({ userId }: AIPageProps) {
           : "Không tìm thấy nguồn trong phạm vi được phép."
       );
     } catch (error) {
-      setMessage(String(error));
+      setMessage(errorMessage(error));
     } finally {
       setSearchLoading(false);
     }
@@ -53,7 +54,7 @@ export default function AIPage({ userId }: AIPageProps) {
         })
       );
     } catch (error) {
-      setMessage(String(error));
+      setMessage(errorMessage(error));
     } finally {
       setChatLoading(false);
     }
@@ -70,14 +71,14 @@ export default function AIPage({ userId }: AIPageProps) {
       <div className="tabs">
         <button
           className={`tabs__tab ${activeTab === "chat" ? "tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("chat")}
+          onClick={() => { setMessage(""); setActiveTab("chat"); }}
         >
           <Bot size={16} />
           Hỏi đáp
         </button>
         <button
           className={`tabs__tab ${activeTab === "similarity" ? "tabs__tab--active" : ""}`}
-          onClick={() => setActiveTab("similarity")}
+          onClick={() => { setMessage(""); setActiveTab("similarity"); }}
         >
           <Search size={16} />
           Tìm đề tài tương đồng
@@ -87,6 +88,7 @@ export default function AIPage({ userId }: AIPageProps) {
       {/* Chat tab */}
       {activeTab === "chat" && (
         <>
+          {message ? <p className="alert alert-danger" role="alert">{message}</p> : null}
           <div className="card" style={{ marginBottom: "var(--space-4)" }}>
             <div className="card-body">
               <form onSubmit={handleAsk}>

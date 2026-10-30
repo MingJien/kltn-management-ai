@@ -1,0 +1,13 @@
+.version-timeline { min-width: 0; }
+.version-current-label { color: #147b76; font-size: 10px; letter-spacing: .09em; font-weight: 700; margin: 0 0 10px; }
+.version-history { border-top: 1px solid #e1ebe9; margin-top: 18px; padding-top: 14px; }
+.version-history > summary { color: #376b73; font-weight: 600; font-size: 13px; cursor: pointer; padding: 8px 0; }
+.version-history-list { display: grid; gap: 8px; margin-top: 10px; }
+.version-history-item { border: 1px solid #e0eae8; border-radius: 10px; background: #fafcfb; overflow: hidden; }
+.version-history-item > summary { cursor: pointer; padding: 12px; display: flex; align-items: center; gap: 12px; }
+.version-history-number { padding: 5px 9px; color: #567980; background: #eaf1f0; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.version-history-caption { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 12px; color: #365861; }
+.version-history-caption small { display: block; color: #809498; font-size: 11px; margin-top: 4px; }
+.version-review-count { font-size: 11px; color: #6a8588; }
+.version-history-item > .core-version { margin: 0 12px 12px; background: #fff; }
+@media (max-width: 600px) { .version-history-item > summary { gap: 8px; flex-wrap: wrap; } .version-review-count { margin-left: auto; } }

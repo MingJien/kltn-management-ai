@@ -1,4 +1,4 @@
-"""Run the local prototype API against the isolated kltn_dev demo database."""
+"""Run the local prototype API against the verified kltn_management database."""
 from __future__ import annotations
 
 import os
@@ -6,26 +6,24 @@ import secrets
 from pathlib import Path
 
 import uvicorn
-from sqlalchemy.engine import make_url
-
-from backend.api.dependencies import load_local_env
+from backend.api.dependencies import database_url, load_local_env
+from tools.validate_official_database import main as validate_official_database
 
 
 def main() -> None:
     load_local_env()
-    configured_url = os.getenv("DATABASE_URL")
-    if not configured_url:
-        raise SystemExit("DATABASE_URL is missing; configure the local .env first")
-
-    # Keep the main kltn_ai database as configured in .env; this process alone
-    # connects to kltn_dev for the synthetic prototype demonstration.
-    os.environ["DATABASE_URL"] = make_url(configured_url).set(
-        database="kltn_dev"
-    ).render_as_string(hide_password=False)
+    os.environ["DATABASE_URL"] = database_url()
+    validate_official_database()
+    from backend.services.file_scanner import start_local_daemon
+    print("Checking local ClamAV scanner...", flush=True)
+    if start_local_daemon():
+        print("PASS ClamAV local scanner is ready.", flush=True)
+    else:
+        print("ClamAV daemon unavailable; unscanned files stay quarantined. See local/clamav/daemon.log.", flush=True)
     if not os.getenv("QDRANT_URL") and not os.getenv("QDRANT_LOCAL_PATH"):
         os.environ["QDRANT_LOCAL_PATH"] = "tmp/qdrant-prototype"
     os.environ["KLTN_ENV"] = "development"
-    # Browser demo uses email/password sessions; UUID headers remain opt-in for automated tests.
+    # Browser demo uses scoped sessions; UUID headers remain opt-in for automated tests.
     os.environ["KLTN_DEV_AUTH"] = "false"
     if not os.getenv("AUTH_SESSION_SECRET"):
         secret_file = Path(__file__).resolve().parents[1] / "local" / "demo-session-secret.txt"

@@ -481,7 +481,7 @@ def write_readme(manifest: dict, schema: Schema, stats: dict, generated_at: str)
         "",
         f"Nguồn tạo: **{schema.source}**. Database: **`{schema.database}`**, schema **`public`**; PostgreSQL **{schema.postgres_version}**; Alembic **`{schema.alembic_revision}`**. Ngày sinh: **{generated_at}**.",
         "",
-        "Các ảnh được sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu. Bảng xám là context; một bảng ở nhiều ảnh vẫn chỉ là một bảng vật lý.",
+        "Sáu ảnh được liên kết bên dưới là ERD hiện hành, sinh tự động từ bảng/cột/PK/FK/UNIQUE đã introspect và đối chiếu với SQLAlchemy metadata. Kết nối PostgreSQL đặt `default_transaction_read_only=on`; script không ghi dữ liệu. Các tệp ảnh không được liên kết trong bảng dưới không thuộc bộ ERD hiện hành.",
         "",
         "## Chạy lại bằng một lệnh",
         "",
@@ -513,9 +513,9 @@ def write_readme(manifest: dict, schema: Schema, stats: dict, generated_at: str)
         )
     lines += [
         "",
-        "Mỗi đường nối biểu diễn đúng một FK thật giữa hai bảng đang thấy. Ký hiệu **1/N** chỉ phía bảng cha và số bản ghi con; **≤1** khi cột FK thuộc khóa duy nhất. Trong ô bảng, **UK** nghĩa là cột thuộc ít nhất một UNIQUE constraint/index, kể cả khóa ghép, không khẳng định cột đó đứng một mình là duy nhất. FK ra bảng không nằm trong cụm vẫn được ghi `FK` tại cột nhưng không kéo toàn bộ dependency tree vào ảnh. Tự tham chiếu của `rubric_criterion` và `minute_version` được vẽ thành vòng lặp. `minute_signature → council_member` là FK thật; Chair/Secretary chỉ là giá trị role nghiệp vụ, không phải FK riêng.",
+        "Mỗi đường nối biểu diễn một FK thật giữa hai bảng trong cụm. `1/N` chỉ quan hệ một-nhiều; `≤1` đánh dấu phía con có khóa duy nhất. `UK` nghĩa là cột thuộc một ràng buộc hoặc chỉ mục UNIQUE, có thể là khóa ghép. FK ra ngoài cụm vẫn được ghi ở cột nhưng không kéo toàn bộ bảng liên quan vào ảnh.",
         "",
-        "ERD cụm là **view để trình bày**. [ERD tổng thể](../erd.md), [từ điển dữ liệu](../data-dictionary.md) và schema PostgreSQL/Alembic là nguồn tra đầy đủ mọi bảng, cột và ràng buộc. Ảnh chỉ hiện PK, FK, UNIQUE, code/version/state và một số cột nghiệp vụ; các cột audit thông dụng được ẩn để dễ đọc.",
+        "ERD cụm là các góc nhìn để trình bày. [ERD đầy đủ](../erd-kltn-management.md), [từ điển dữ liệu](../database-dictionary.md) và [SQL schema-only](../../database/official/kltn-management-schema.sql) là nguồn tra cấu trúc hiện hành. Ảnh chỉ hiển thị PK, FK, UNIQUE, trạng thái và một số cột nghiệp vụ để dễ đọc.",
         "",
     ]
     (OUT / "README.md").write_text("\n".join(lines), encoding="utf-8")
@@ -524,8 +524,8 @@ def write_readme(manifest: dict, schema: Schema, stats: dict, generated_at: str)
 def verify_outputs(manifest: dict) -> None:
     expected = {f"{cluster['slug']}.png" for cluster in manifest["clusters"]}
     found = {p.name for p in OUT.glob("*.png")}
-    if found != expected:
-        raise AssertionError(f"PNG không đúng 6 tên: thiếu={sorted(expected-found)}, thừa={sorted(found-expected)}")
+    if not expected <= found:
+        raise AssertionError(f"Thiếu PNG hiện hành: {sorted(expected-found)}")
     for cluster in manifest["clusters"]:
         png = OUT / f"{cluster['slug']}.png"
         svg = OUT / f"{cluster['slug']}.svg"

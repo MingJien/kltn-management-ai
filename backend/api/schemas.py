@@ -27,6 +27,21 @@ class LecturerOut(BaseModel):
     id: UUID
     display_name: str
     lecturer_code: str
+    department_name: str | None = None
+    faculty_name: str | None = None
+
+
+class NotificationOut(BaseModel):
+    id: UUID
+    message: str
+    created_at: datetime
+    read_at: datetime | None
+    url: str
+
+
+class NotificationSummaryOut(BaseModel):
+    unread_count: int
+    items: list[NotificationOut]
 
 
 class TitleVersionOut(BaseModel):
@@ -34,6 +49,16 @@ class TitleVersionOut(BaseModel):
     title: str
     change_reason: str | None
     created_at: datetime
+
+
+class TopicRegisteredStudentOut(BaseModel):
+    student_id: UUID
+    student_code: str
+    display_name: str
+    class_name: str | None = None
+    is_coordinator: bool = False
+    consent_status: str = "PENDING"
+    registration_state: str | None = None
 
 
 class TopicOut(BaseModel):
@@ -55,6 +80,13 @@ class TopicOut(BaseModel):
     requirements: list[RequirementInput]
     title_versions: list[TitleVersionOut]
     available: bool
+    registered_member_count: int = 0
+    remaining_slots: int = 0
+    registration_state: str | None = None
+    archived_at: datetime | None = None
+    archive_reason: str | None = None
+    has_links: bool = False
+    registered_students: list[TopicRegisteredStudentOut] = []
 
 
 class TopicCreate(BaseModel):
@@ -91,13 +123,16 @@ class OpenRoundOut(BaseModel):
 
 class RegistrationCreate(BaseModel):
     topic_id: UUID
-    member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
-    confirm_creator: bool = False
+    # Legacy clients may send their own ID. Selecting another student is rejected.
+    member_student_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=1)
+    confirm_creator: bool = True
+    expected_member_count: int | None = Field(default=None, ge=1, le=3)
 
 
 class StudentProposalCreate(TopicCreate):
-    member_student_ids: list[UUID] = Field(min_length=1, max_length=3)
-    confirm_creator: bool = False
+    member_student_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=1)
+    confirm_creator: bool = True
+    expected_member_count: int | None = Field(default=None, ge=1, le=3)
 
 
 class RegistrationMemberOut(BaseModel):
@@ -108,10 +143,13 @@ class RegistrationMemberOut(BaseModel):
     active: bool
     consent_status: str
     evidence_file_name: str | None = None
+    evidence_scan_state: str | None = None
+    can_upload_evidence: bool = False
+    can_withdraw: bool = False
 
 
 class MemberResponse(BaseModel):
-    consent_status: Literal["ACCEPTED", "DECLINED"]
+    consent_status: Literal["ACCEPTED"]
 
 
 class RegistrationOut(BaseModel):
@@ -120,6 +158,8 @@ class RegistrationOut(BaseModel):
     round_id: UUID
     state: str
     row_version: int
+    expected_member_count: int
+    submitted_at: datetime | None = None
     member_student_ids: list[UUID]
     members: list[RegistrationMemberOut]
     lecturer_decided_at: datetime | None = None
@@ -129,14 +169,32 @@ class RegistrationOut(BaseModel):
     topic_code: str
     topic_state: str
     proposer_type: str
+    receiving_lecturer_id: UUID | None
     receiving_lecturer_user_id: UUID | None
     receiving_lecturer_name: str | None
     lecturer_reason: str | None
 
 
+class PendingRegistrationSummaryOut(BaseModel):
+    count: int
+    items: list[RegistrationOut]
+
+
 class LecturerDecision(BaseModel):
     decision: Literal["ACCEPT", "REJECT"]
     reason: str | None = Field(default=None, max_length=2000)
+
+
+class RejectedProposalResolution(BaseModel):
+    decision: Literal["REASSIGN", "RETURN_TO_STUDENT"]
+    reason: str = Field(min_length=3, max_length=2000)
+    receiving_lecturer_id: UUID | None = None
+
+
+class LecturerDutyOut(BaseModel):
+    code: str
+    label: str
+    scope: str | None = None
 
 
 class ContextOut(BaseModel):
@@ -147,9 +205,17 @@ class ContextOut(BaseModel):
     actions: list[str]
     display_name: str
     department_id: UUID | None = None
+    department_code: str | None = None
+    department_name: str | None = None
     email: str | None = None
     student_code: str | None = None
+    class_name: str | None = None
+    major_code: str | None = None
+    major_name: str | None = None
     lecturer_code: str | None = None
+    lecturer_duties: list[LecturerDutyOut] = Field(default_factory=list)
+    csrf_token: str | None = None
+    can_change_password: bool = False
 
 
 class ErrorOut(BaseModel):
@@ -210,6 +276,11 @@ class EligibleStudentOut(BaseModel):
     id: UUID
     display_name: str
     student_code: str
+
+
+class MyEligibilityOut(BaseModel):
+    eligible: bool
+    has_active_registration: bool
 
 
 class ThesisOut(BaseModel):

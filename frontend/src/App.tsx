@@ -1,204 +1,189 @@
-import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
-import { Context, emailLogin, logout, request, setDevelopmentAuthEnabled } from "./api";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { ApiError, errorMessage } from "./errors";
+import { Context, demoLogin, emailLogin, logout, request, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
 import WorkspacePage from "./pages/WorkspacePage";
 import TopicsPage from "./pages/TopicsPage";
 import RegistrationsPage from "./pages/RegistrationsPage";
 import ThesisViewPage from "./pages/ThesisViewPage";
-import AIPage from "./pages/AIPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
-import { LogIn } from "lucide-react";
+import AccountAccessPage from "./pages/AccountAccessPage";
+import AccountPage from "./pages/AccountPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import ActivityPage from "./pages/ActivityPage";
+import SchoolFormsPage from "./pages/SchoolFormsPage";
+import AdministrationPage from "./pages/AdministrationPage";
+import LecturersPage from "./pages/LecturersPage";
+import RosterPage from "./pages/RosterPage";
+import RoundsPage from "./pages/RoundsPage";
+import LecturerProfilePage from "./pages/LecturerProfilePage";
+import ThesesPage from "./pages/ThesesPage";
+import SubmissionsPage from "./pages/SubmissionsPage";
+import ComingSoonPage from "./pages/ComingSoonPage";
+import LoginPage from "./pages/LoginPage";
+import { plannedPages, type PlannedPageId } from "./plannedPages";
+const AIPage = lazy(() => import("./pages/AIPage"));
 
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [context, setContext] = useState<Context | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const [noticeRevision,setNoticeRevision] = useState("");
+  useEffect(() => {
+    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
+    labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
+    labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
+    labels["/activity"] = "Nhật ký hoạt động";
+    const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
+    const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
+      : plannedId && Object.hasOwn(plannedPages, plannedId) ? plannedPages[plannedId as PlannedPageId].title
+      : labels[location.pathname] || "Khóa luận";
+    document.title = `${context ? page : "Đăng nhập"} · KLTN`;
+  }, [location.pathname, context]);
 
   const restore = useCallback(async () => {
     setError("");
     setLoading(true);
     try {
       const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
       setContext(result);
     } catch (cause) {
+      setSessionCsrfToken(null);
       setContext(null);
-      if (/Sign in required|Missing development identity|401/.test(String(cause))) setError("");
-      else setError(String(cause));
+      if (cause instanceof ApiError && cause.status === 401) setError("");
+      else setError(errorMessage(cause));
     } finally {
       setLoading(false);
+      setRestoring(false);
     }
   }, []);
 
   useEffect(() => {
-    setDevelopmentAuthEnabled(false);
     void restore();
-  }, []); // initial session restore only
+    const expired = () => {setSessionCsrfToken(null); setContext(null); setPassword(""); setError("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");};
+    window.addEventListener("kltn:session-expired", expired);
+    return () => window.removeEventListener("kltn:session-expired", expired);
+  }, [restore]);
+
+  useEffect(() => {
+    if (!location.state?.noticeId) return;
+    setNoticeRevision(location.key);
+    void restore();
+  },[location.key,location.state,restore]);
 
   async function signIn() {
+    if (loading) return;
     setError("");
     setLoading(true);
     try {
       await emailLogin(email, password);
       setPassword("");
-      setContext(await request<Context>("/me/context", ""));
+      const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
+      setContext(result);
     } catch (cause) {
-      setError(String(cause));
+      setPassword("");
+      setError(errorMessage(cause));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signInDemo(key: string) {
+    if (loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      await demoLogin(key);
+      const result = await request<Context>("/me/context", "");
+      setSessionCsrfToken(result.csrf_token);
+      setContext(result);
+    } catch (cause) {
+      setError(errorMessage(cause));
     } finally {
       setLoading(false);
     }
   }
 
   async function signOut() {
-    try { await logout(); } finally { setContext(null); }
+    try { await logout(); setSessionCsrfToken(null); setContext(null); setPassword(""); }
+    catch (cause) { setError(errorMessage(cause)); }
   }
 
-  // Not connected — show login card
+  if (restoring) return <div className="session-loading" role="status">Đang kiểm tra phiên đăng nhập…</div>;
+
+  // An email link must work even when this browser still has another user's session.
+  if (["/account/activation-request", "/account/forgot-password",
+    "/account/activate", "/account/reset-password"].includes(location.pathname)) return <AccountAccessPage
+      signedInAs={context?.display_name || null}
+      onPasswordUpdated={context ? signOut : undefined} />;
+
+  // Not connected — show the branded login screen.
   if (!context) {
-    return (
-      <div
-        className="flex items-center justify-center"
-        style={{ minHeight: "100dvh", background: "var(--neutral-50)" }}
-      >
-        <div style={{ width: "100%", maxWidth: 420, padding: "var(--space-4)" }}>
-          {/* Brand */}
-          <div
-            className="flex items-center justify-center gap-3"
-            style={{ marginBottom: "var(--space-8)" }}
-          >
-            <div
-              className="sidebar__brand-mark"
-              style={{ width: 48, height: 48, fontSize: 24 }}
-            >
-              K
-            </div>
-            <div>
-              <div style={{ font: "var(--text-h1)", color: "var(--neutral-900)" }}>
-                KLTN
-              </div>
-              <div className="text-body-sm text-muted">
-                Hệ thống Quản lý Khóa luận
-              </div>
-            </div>
-          </div>
-
-          {/* Login card */}
-          <div className="card">
-            <div className="card-body">
-              <h2 style={{ marginBottom: "var(--space-1)" }}>Đăng nhập</h2>
-              <p
-                className="text-body-sm text-muted"
-                style={{ marginBottom: "var(--space-5)" }}
-              >
-                Dùng tài khoản đã được cấp. Bản thử nghiệm dùng email giả lập trong kltn_dev.
-              </p>
-
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void signIn();
-                }}
-              >
-                <div
-                  className="input-group"
-                  style={{ marginBottom: "var(--space-4)" }}
-                >
-                  <label htmlFor="login-email">Email</label>
-                  <input
-                    id="login-email"
-                    className="input"
-                    type="email"
-                    autoComplete="username"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="sv1@demo.test"
-                    autoFocus
-                  />
-                </div>
-                <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
-                  <label htmlFor="login-password">Mật khẩu</label>
-                  <input id="login-password" className="input" type="password"
-                    autoComplete="current-password" value={password}
-                    onChange={(event) => setPassword(event.target.value)} />
-                </div>
-                <button
-                  className="btn btn-primary"
-                  disabled={loading || !email.trim() || !password}
-                  style={{ width: "100%" }}
-                >
-                  <LogIn size={16} />
-                  {loading ? "Đang đăng nhập…" : "Đăng nhập"}
-                </button>
-              </form>
-
-              {error && (
-                <div
-                  className="alert alert-danger"
-                  role="alert"
-                  style={{ marginTop: "var(--space-4)" }}
-                >
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <p
-            className="text-caption text-muted"
-            style={{ textAlign: "center", marginTop: "var(--space-4)" }}
-          >
-            Giao diện thử nghiệm · Chỉ dùng tài khoản giả lập trong môi trường phát triển.
-          </p>
-        </div>
-      </div>
-    );
+    return <LoginPage email={email} password={password} loading={loading} error={error}
+      onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={() => void signIn()}
+      onDemoSignIn={(key) => void signInDemo(key)} />;
   }
 
   // Connected — show app shell with routes
+  const workflowAccess = context.base_role === "STUDENT" || context.base_role === "LECTURER";
   return (
     <AppShell context={context} onLogout={() => void signOut()}>
-      <Routes>
+      {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
+      <Suspense fallback={<p role="status">Đang tải trang…</p>}><Routes key={noticeRevision}>
         <Route
           path="/"
           element={<WorkspacePage context={context} />}
         />
+        <Route path="/account" element={<AccountPage context={context} onPasswordChanged={() => {
+          setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
+        }} />} />
+        <Route path="/notifications" element={<NotificationsPage userId={context.user_id} />} />
+        <Route path="/activity" element={<ActivityPage context={context} />} />
+        <Route path="/administration" element={context.actions.includes("account:manage") ?
+          <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers" element={context.base_role === "ADMIN" ? <LecturersPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/rounds" element={context.base_role === "ADMIN" ?
+          <RoundsPage context={context} /> : <Navigate to="/" replace />} />
+        <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
+          <RosterPage context={context} /> : <Navigate to="/" replace />} />
         <Route
           path="/topics"
-          element={
+          element={(workflowAccess || context.base_role === "ADMIN") ?
             <TopicsPage userId={context.user_id} context={context} />
-          }
+            : <Navigate to="/" replace />}
         />
         <Route
           path="/registrations"
-          element={
+          element={workflowAccess ?
             <RegistrationsPage userId={context.user_id} context={context} />
-          }
+            : <Navigate to="/" replace />}
         />
+        <Route path="/theses" element={workflowAccess ? <ThesesPage context={context} /> : <Navigate to="/" replace />} />
+        <Route path="/proposals" element={workflowAccess ? <ThesesPage context={context} section="proposal" /> : <Navigate to="/" replace />} />
+        <Route path="/progress" element={workflowAccess ? <ThesesPage context={context} section="progress" /> : <Navigate to="/" replace />} />
+        <Route path="/submissions" element={workflowAccess ? <SubmissionsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/forms" element={<SchoolFormsPage context={context}/>} />
+        <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
+        <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers/:lecturerId" element={workflowAccess ?
+          <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
         <Route
           path="/ai"
-          element={<AIPage userId={context.user_id} />}
+          element={workflowAccess ? <AIPage userId={context.user_id} /> : <Navigate to="/" replace />}
         />
         <Route
           path="/theses/:thesisId"
-          element={<ThesisViewPage userId={context.user_id} />}
+          element={workflowAccess ? <ThesisViewPage context={context} /> : <Navigate to="/" replace />}
         />
-
-        {/* Placeholder routes — Phase 2+ */}
-        <Route path="/rounds" element={<PlaceholderPage title="Đợt & Năm học" description="Quản lý đợt KLTN và policy theo năm học" />} />
-        <Route path="/eligibility" element={<PlaceholderPage title="Điều kiện SV" description="Snapshot tín chỉ/GPA và xác nhận theo đợt" />} />
-        <Route path="/proposals" element={<PlaceholderPage title="Đề cương" description="Timeline version/review đề cương" />} />
-        <Route path="/progress" element={<PlaceholderPage title="Tiến độ" description="Milestone, report/review, thay đổi" />} />
-        <Route path="/documents" element={<PlaceholderPage title="Tài liệu" description="Upload tài liệu, version history, kiểm tra tương đồng" />} />
-        <Route path="/councils" element={<PlaceholderPage title="Hội đồng & Phiên" description="Hội đồng bảo vệ và phiên chấm" />} />
-        <Route path="/reviews" element={<PlaceholderPage title="Nhận xét" description="Nhận xét GVHD/GVPB theo Mẫu 7/8" />} />
-        <Route path="/scoring" element={<PlaceholderPage title="Chấm điểm" description="Rubric theo Mẫu 6, điểm cá nhân" />} />
-        <Route path="/minutes" element={<PlaceholderPage title="Biên bản" description="Biên bản bảo vệ Mẫu 9" />} />
-        <Route path="/archive" element={<PlaceholderPage title="Kho & Báo cáo" description="Tìm kiếm và tra cứu tài liệu kho" />} />
-        <Route path="/similarity" element={<PlaceholderPage title="Tìm tương đồng" description="Tìm đề tài tương đồng trong kho" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes></Suspense>
     </AppShell>
   );
 }

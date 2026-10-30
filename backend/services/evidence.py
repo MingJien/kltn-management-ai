@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from backend.api.auth import _same_app_origin
 from backend.db.models import entities as m
-from backend.services.registration import get_registration, profile, registration_out
+from backend.services.registration import get_registration, profile, registration_out, may_upload_evidence
+from backend.services import file_scanner
 
 MAX_BYTES = 5 * 1024 * 1024
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
             m.RegistrationMember.student_id == student.id, m.RegistrationMember.active.is_(True)))
         if not member:
             raise HTTPException(404, "Registration not found")
-        if reg.state not in {"DRAFT", "RETURNED"}:
+        if not may_upload_evidence(reg, member):
             raise HTTPException(409, "Evidence is locked after submission")
         # One bounded file per member. A PDF may contain multiple supporting pages.
         from urllib.parse import unquote
@@ -70,12 +71,23 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
         file = m.StoredFile(id=uuid4(), storage_key="registration/" + key, original_name=name,
             media_type=mime, byte_size=size, sha256=hashlib.sha256(content).hexdigest(), scan_state="QUARANTINED")
         session.add(file)
+        file_scanner.scan(file, written_path)
         session.flush()
+        previous_file_id = member.evidence_file_id
+        previous_file = session.get(m.StoredFile, previous_file_id) if previous_file_id else None
         member.evidence_file_id = file.id
         reg.row_version += 1
         session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="REGISTRATION_EVIDENCE_UPLOADED",
             resource_type="registration", resource_id=reg.id, after_hash=file.sha256,
             occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+        if previous_file:
+            # Replacing a link never deletes the old file or its metadata; the audit
+            # row keeps which stored file the member previously pointed at.
+            session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="REGISTRATION_EVIDENCE_REPLACED",
+                resource_type="registration", resource_id=reg.id,
+                reason=f"previous_stored_file={previous_file.id}; current_stored_file={file.id}",
+                before_hash=previous_file.sha256, after_hash=file.sha256,
+                occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
         session.flush()
         result = registration_out(session, reg)
         session.commit()
@@ -83,21 +95,60 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
     except Exception:
         session.rollback()
         if written_path and written_path.is_file():
-            written_path.unlink()
+            try:
+                written_path.unlink()
+            except OSError:
+                pass  # The integrity check reports the orphan instead of hiding the original error.
         raise
 
 
-def download_evidence(session: Session, user: m.UserAccount, registration_id: UUID, student_id: UUID):
+def _visible_file(session: Session, user: m.UserAccount, registration_id: UUID, student_id: UUID):
     get_registration(session, user, registration_id)  # Authorize group/receiver/head before accessing file.
+    if user.base_role == "STUDENT":
+        student = profile(session, user, "STUDENT")
+        active_membership = session.scalar(select(m.RegistrationMember.id).where(
+            m.RegistrationMember.registration_id == registration_id,
+            m.RegistrationMember.student_id == student.id,
+            m.RegistrationMember.active.is_(True),
+        ))
+        if not active_membership and student_id != student.id:
+            raise HTTPException(404, "Evidence unavailable")
     member = session.scalar(select(m.RegistrationMember).where(m.RegistrationMember.registration_id == registration_id,
         m.RegistrationMember.student_id == student_id))
     file = session.get(m.StoredFile, member.evidence_file_id) if member and member.evidence_file_id else None
-    if not file or file.scan_state in {"INFECTED", "FAILED"} or not file.storage_key.startswith("registration/"):
+    if not file or not file.storage_key.startswith("registration/"):
         raise HTTPException(404, "Evidence unavailable")
     root = storage_root()
     path = (root / file.storage_key.removeprefix("registration/")).resolve()
     if path.parent != root or not path.is_file():
         raise HTTPException(404, "Evidence unavailable")
+    return file, path
+
+
+def rescan_evidence(session: Session, user: m.UserAccount, registration_id: UUID, student_id: UUID):
+    # Same visibility as download, including active group membership. Scanning
+    # never unlocks replacement of a submitted file or changes its contents.
+    file, path = _visible_file(session, user, registration_id, student_id)
+    file = session.scalar(select(m.StoredFile).where(m.StoredFile.id == file.id).with_for_update())
+    if file.scan_state == "INFECTED":
+        raise HTTPException(409, "Tệp nhiễm mã độc; không thể tải hoặc sử dụng làm minh chứng")
+    if file.scan_state != "CLEAN":
+        file_scanner.require_available()
+        file_scanner.scan(file, path)
+        session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="REGISTRATION_EVIDENCE_SCANNED",
+            resource_type="registration", resource_id=registration_id, reason=file.scan_state,
+            after_hash=file.sha256, occurred_at=datetime.now(timezone.utc), correlation_id=uuid4()))
+        session.flush()
+    result = get_registration(session, user, registration_id)
+    session.commit()
+    return result
+
+
+def download_evidence(session: Session, user: m.UserAccount, registration_id: UUID, student_id: UUID):
+    file, path = _visible_file(session, user, registration_id, student_id)
+    if file.scan_state != "CLEAN":
+        raise HTTPException(409, "Minh chứng chưa quét an toàn hoặc không an toàn; chưa thể tải xuống. "
+            "Xem trạng thái tệp và chọn quét lại nếu khả dụng.")
     # Forced attachment: never render unscanned PDFs/images as active application content.
     return FileResponse(path, media_type="application/octet-stream", filename=file.original_name,
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})

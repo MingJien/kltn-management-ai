@@ -1,118 +1,86 @@
 # Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI
 
-Repository này chứa sản phẩm phân tích và thiết kế cùng mã nguồn phát triển: PostgreSQL, FastAPI, React và thử nghiệm truy xuất AI trên dữ liệu giả lập. PostgreSQL là nguồn dữ liệu nghiệp vụ chính; AI chỉ hỗ trợ tra cứu và tương đồng, không tự chấm đạo văn. Chưa phải hệ thống production; không có hồ sơ sinh viên hoặc 7 KLTN thật trong Git.
+Ứng dụng React, FastAPI và PostgreSQL quản lý tài khoản, đề tài, đăng ký khóa luận, GVHD, tiến độ và tài liệu. Chatbot AI hiện ở mức prototype, dùng dữ liệu giả.
 
-## Nên mở gì trước?
+## CSDL hiện hành
 
-| Muốn xem | Tệp |
-| --- | --- |
-| Quyết định nghiệp vụ đã chốt | [Quyết định thiết kế 25/09](docs/decisions/quyet-dinh-du-an-2026-09-25.md), [giải đáp GVHD](docs/requirements/18-cau-hoi-gvhd-mapping.md) |
-| Phạm vi ưu tiên sau góp ý GV 03/10 | [CSDL lõi 32 bảng và thứ tự triển khai](docs/design/database-scope-review.md) |
-| Nghiệp vụ, vai trò, use case, quyền | [Yêu cầu](docs/requirements/business-requirements.md), [quy tắc](docs/requirements/business-rules.md), [quy trình](docs/requirements/business-process.md), [use case](docs/requirements/use-case-catalog.md), [phân quyền](docs/requirements/permission-matrix.md) |
-| CSDL và ý nghĩa bảng/cột | [ERD tổng thể](docs/design/erd.md), [ERD theo 6 cụm](docs/design/erd-clusters/README.md), [từ điển dữ liệu](docs/design/data-dictionary.md), [rubric Mẫu 6](docs/design/rubric-mau-6.md), [quy tắc dữ liệu](docs/design/database-rules.md), [đối chiếu quyết định với CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) |
-| Tệp CSDL PostgreSQL | [CSDL lõi 32 bảng để GV xem](database/core/kltn-core-schema.sql), [cách dựng riêng](database/core/README.md); [schema đầy đủ 62 bảng để tham khảo](database/kltn-schema-consolidated.sql), [baseline đầy đủ](database/kltn-db-baseline.sql), [cách phân biệt](database/README.md). Hai tệp SQL thao tác pgAdmin (`kltn-ai-workbench.sql`, `kltn-ai-updates.sql`) chỉ lưu trên máy. |
-| Cập nhật CSDL **đã có bảng** | [Alembic migrations](backend/migrations/versions/) từ 0001 đến 0011; **không chạy lại file SQL tạo mới** |
-| API và giao diện | [FastAPI](backend/api/main.py), [OpenAPI runtime](docs/prototype/openapi-runtime.json), [thiết kế API toàn miền](docs/design/openapi.yaml), [React](frontend/src/App.tsx), [wireframe](docs/design/wireframes.md), [quyết định đăng nhập email/mật khẩu](docs/design/local-auth.md) |
-| AI và biểu mẫu | [Prototype AI](docs/ai/prototype.md), [thiết kế tương đồng](docs/ai/similarity-design.md), [thiết kế xuất biểu mẫu](docs/design/xuat-bieu-mau.md) |
-| Kiểm chứng | [Minh chứng prototype](docs/evidence/prototype-validation.md), [ma trận truy vết](docs/design/traceability-matrix.md) |
+PostgreSQL `kltn_management`, Alembic head `20261028_0015`: **39 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
 
-## Trạng thái thực tế
+Tiến độ có khung xem PDF và ghim nhận xét theo đúng lần nộp. Ghim nháp tự lưu riêng cho GV; khi gửi kết quả mới hiện cho SV. Trang, thu phóng, vị trí cuộn và nhận xét tổng quát đang viết được khôi phục trên cùng trình duyệt/tài khoản. DOCX/TXT nhận xét theo mục và đoạn trích.
 
-- Ngày 04/10, hai database local ở PostgreSQL 17.11 đang ở revision `20261004_0011`, **63 bảng vật lý/622 cột** (`62 bảng mô hình/621 cột` cộng `alembic_version`). `kltn_ai` là database mô hình đầy đủ; `kltn_dev` là database phát triển có dữ liệu giả. `eligibility_snapshot` giữ tỷ lệ tín chỉ và GPA khi có nguồn đối chiếu, cùng kết quả theo đợt/người xác nhận; không lưu tình trạng kỷ luật hoặc án tích chi tiết. Đăng nhập email/mật khẩu với Argon2id và cookie phiên đã có runtime cho năm tài khoản giả trong `kltn_dev`; chưa có đăng ký tài khoản và email xác minh dùng thật.
-- Theo góp ý GV, đã tách [file CSDL lõi 32 bảng](database/core/kltn-core-schema.sql): 25 bảng nền, 4 bảng giữ FK/góp ý, 2 bảng lịch sử tên/audit và 1 bảng yêu cầu bổ sung của luồng đã chạy. File đã chạy trong schema PostgreSQL tạm và được đối chiếu bằng `pg_dump --schema-only`: **32 PK/69 FK**; schema tạm đã xóa. **Database `kltn_core` chưa được tạo trên máy**. Runtime vẫn chạy trên `kltn_dev` có mô hình đầy đủ 62 bảng. [Phạm vi mới](docs/design/database-scope-review.md) phân biệt bản lõi và bản đầy đủ; chưa có migration riêng cho database lõi. Mã đề tài theo năm, yêu cầu bổ sung và minh chứng đã nối vào runtime.
-- Corpus giờ phân biệt KLTN đang quản lý, tài liệu học thuật nhập và nguồn chính thức. KLTN cũ không cần tạo Thesis/Sinh viên giả. Test DB-01..45 PASS, gồm COMMENT_ONLY, baseline Mẫu 6, giới hạn tín chỉ/GPA và ràng buộc tài khoản local.
-- API và React hiện có luồng GV tạo/sửa/gửi đề tài → TBM đúng bộ môn duyệt/trả/từ chối → SV lập nhóm 1–3 → từng thành viên tự xác nhận → nhóm trưởng gửi → GV tiếp nhận chấp nhận/từ chối. Quyền, trạng thái, phiên bản khi quyết định, lịch sử tên đề tài và audit được kiểm ở backend. Từ `SUBMITTED` thành viên bị khóa. API chốt thành Thesis/AdvisorAssignment do TBM vẫn có từ prototype trước nhưng ngoài mốc triển khai này.
-- React có màn đăng nhập email, đề tài, đăng ký nhóm/xác nhận từng thành viên/quyết định, chi tiết khóa luận và tìm đề tài/tra cứu nguồn. TypeScript/Vite build và 24 test backend PASS ngày 04/10; test dữ liệu giả trong transaction rollback trên PostgreSQL. Browser đã kiểm GV tạo → TBM sửa tên/duyệt → SV1 lập nhóm → SV2 tự xác nhận → SV1 gửi → GV chấp nhận, có tải minh chứng PDF. AI trả nguồn dữ liệu giả ở chế độ `RETRIEVAL_ONLY`, chưa gọi Gemini.
-- FastEmbed pretrained + Qdrant local truy xuất được corpus giả lập có source_type/provenance; RAG trả citation ở chế độ RETRIEVAL_ONLY. **Gemini bị khóa ở backend** cho đến khi có bộ lọc chỉ gửi câu hỏi đã lọc và quy định/tài liệu đã công bố. Không có kết luận chất lượng AI trên 7 KLTN hoặc ngưỡng 90% đã chốt.
-- Mẫu 9 đã được thiết kế hai chữ ký Chủ tịch + Thư ký; **chưa PASS xuất đúng mẫu** vì chưa có mẫu trắng. Baseline rubric dự án theo Mẫu 6: 2/4/4, thưởng tối đa 1, tổng không quá 10; CSDL vẫn DRAFT vì runtime chấm thật chưa triển khai. Đăng nhập demo local đã chạy nhưng chưa có cấp tài khoản từ danh sách Khoa, xác minh email hay khôi phục mật khẩu. OIDC scaffold cũ chưa kết nối Trường; xuất biểu mẫu, similarity toàn văn và các use case còn lại chưa chạy hoàn chỉnh.
-- Docker daemon hiện không chạy; Qdrant **local mode** đã chạy. Qdrant service trong compose chưa được kiểm tra.
+Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng ký và Mẫu 3 về Đề cương. Nộp bản sửa trong cùng hồ sơ giữ nguyên các phiên bản cũ. Tải bản gốc và xuất bản đã duyệt có footer để ký là hai thao tác riêng; lịch sử xuất hiển thị người xuất, mã và thời điểm theo từng phiên bản. Mẫu 1 có footer bản nộp, chưa xác nhận Khoa duyệt.
 
-## Còn phải hoàn thiện trước bản nộp cuối
+## Tình hình hiện tại
 
-| Phần việc | Trạng thái hiện tại | Việc cần có để gọi là đã chạy hoàn chỉnh |
-| --- | --- | --- |
-| Đề tài và đăng ký | GV tạo/duyệt/đăng ký/chấp nhận đã kiểm browser. Có thêm SV tự đề xuất → TBM xác nhận GV → GV quyết định; kiểm tự động và browser trên dữ liệu giả. | Runtime vẫn dùng `kltn_dev` đầy đủ; nếu chuyển sang database lõi riêng cần migration/configuration riêng. |
-| Điều kiện, chấm điểm, Mẫu 9 | Có mô hình; baseline Mẫu 6 đã chốt (2/4/4, thưởng ≤1, tổng ≤10), rubric DB đang DRAFT; hợp đồng hai chữ ký. | Xây quyền xác nhận, runtime chấm và khóa từ chữ ký đầu; xuất đúng Mẫu 9 trắng đã kiểm; gán version rubric/policy cho đợt thật. |
-| AI và kho tài liệu | Đã nạp/truy xuất corpus giả bằng FastEmbed + Qdrant local; similarity chỉ advisory. | Kiểm thử có phép trên tập tài liệu phù hợp, đánh giá sai số và quyền; chỉ bật chính sách ngưỡng nếu Khoa phê duyệt. |
-| Đăng nhập và vận hành | Demo có login email/mật khẩu Argon2id, cookie phiên, logout và kiểm quyền backend. Năm tài khoản giả nằm ở `kltn_dev`. | Cấp tài khoản từ danh sách SV/GV đã xác thực, gửi xác minh email, khôi phục mật khẩu, giới hạn thử sai dùng chung nhiều tiến trình trước khi vận hành thật. |
+- Cuốn báo cáo KLTN trước bảo vệ có hạn REPORT riêng và phiên bản, tách khỏi báo cáo tiến độ theo mốc. Kiểm tra tương đồng chưa triển khai. Mẫu 1a/1b vẫn nộp tại Hồ sơ đăng ký.
+- Chuông gửi thông báo theo đúng người liên quan, phản hồi cho cả nhóm; bấm thông báo nạp dữ liệu mới kể cả khi đang ở chính trang đó. Quyền được kiểm lại trước khi xem thông báo riêng. SV/GV/TBM/Admin đều tra cứu đề tài đã công bố, không được mở hồ sơ riêng chỉ nhờ biết liên kết.
 
-Danh sách này mô tả **chức năng chưa được kiểm chứng**, không phải câu hỏi nghiệp vụ chưa quyết định. Khi có mã nguồn và kết quả test cho một mục, cập nhật README cùng [minh chứng](docs/evidence/prototype-validation.md); không giữ nhãn “chưa chạy” sau khi đã chứng minh xong.
+- Kho “Biểu mẫu và tài liệu Khoa” quản lý theo đợt: người được giao quyền tải PDF/DOCX/XLSX (tối đa 25 MB), quét ClamAV, lưu nháp, xem trước rồi phát hành hoặc thu hồi. Từng phiên bản giữ nguyên tệp, nguồn và lý do cập nhật. SV chỉ thấy mẫu 1a/1b–5; GV thấy toàn bộ bộ mẫu. Danh sách đã điền (ví dụ Mẫu 4) là tài liệu công bố riêng, chỉ người thuộc đợt xem được; không tự nhập danh sách vào tài khoản. Admin cấp/thu hồi quyền `FORM_MANAGER`, không mặc nhiên duyệt nghiệp vụ.
 
-## Chạy trên máy phát triển
+- Quản trị nhập danh sách GV bằng Excel bốn cột (Mã GV, Họ tên, Email, Mã bộ môn), xem trước lỗi và xác nhận tạo tài khoản chờ kích hoạt. Có chọn từng người/chọn tất cả theo kết quả tìm kiếm để gửi link riêng, trạng thái và lịch sử gửi từng GV; tải tệp và tạo theo danh sách chưa tự gửi email.
+- Nhật ký trên UI ghi nhận người thao tác, thời điểm, hồ sơ, lý do và căn cứ/số văn bản. Admin tra cứu toàn hệ thống hoặc mở lịch sử từng tài khoản; SV xem hồ sơ của mình; GV/TBM xem đúng phần được phân công và phạm vi bộ môn. Có tìm kiếm, lọc thao tác/ngày và phân trang; nhật ký cũ vẫn được giữ.
+- UI/API có quản lý tài khoản và phân quyền, danh sách sinh viên đủ điều kiện; luồng tạo/duyệt đề tài, đăng ký cá nhân hoặc nhóm, xác nhận thành viên và giảng viên tiếp nhận/từ chối. Khi giảng viên chấp nhận, hệ thống tạo hồ sơ khóa luận, thành viên và GVHD chính trong cùng giao dịch.
+- Mẫu 1a/1b được nộp theo phiên bản trong hồ sơ đăng ký trước tiếp nhận; bản xuất có footer ghi rõ bản nộp, chưa xác nhận Khoa duyệt. Khi nhóm, tên đề tài hoặc GV đề xuất đổi, phải nộp bản mới để xuất; bản cũ vẫn được giữ.
+- Trong hồ sơ khóa luận có thông tin GVHD và lịch sử phân công; nộp đề cương theo phiên bản, nhận xét và chốt; tạo mốc tiến độ cho đợt, nộp báo cáo, GVHD xác nhận hoặc yêu cầu sửa. Nộp trễ vẫn được nhận khi mốc còn mở và được đánh dấu `!` màu đỏ; người điều phối có thể gia hạn cả đợt kèm lý do và lịch sử, kể cả mở nhận lại mốc đã đóng. Chỉ phiên bản mốc mới nhất được mở lại.
+- Báo cáo có minh chứng được gửi cùng một giao dịch; không lưu báo cáo dở dang khi tải tệp thất bại. Trước hạn SV được tự nộp phiên bản sửa nếu GV chưa phản hồi; sau hạn/đóng nhận chỉ nộp lại khi GVHD yêu cầu sửa. Báo cáo tiến độ và minh chứng riêng chỉ nhóm SV/GVHD xem; TBM quản lý mốc chung, không đọc nội dung riêng.
+- Mẫu 2 (kế hoạch), Mẫu 3 (đề cương) lấy từ `docs/BieuMau`. SV nộp các bản đã điền theo phiên bản; GVHD phản hồi/duyệt, TBM chốt đề cương. Bản đã duyệt xuất PDF/DOCX để ký ngoài có footer góc trái dưới: địa chỉ hệ thống, mã số, thời điểm xuất; tệp gốc giữ nguyên.
+- Hạn theo từng loại tài liệu áp dụng cho toàn đợt, có lịch sử thiết lập/gia hạn/đóng/mở nhận lại trên UI. ClamAV quét tệp thật; tệp lỗi quét hoặc chưa quét sạch bị chặn tải/duyệt. Hồ sơ khóa luận có nút làm mới dữ liệu và giữ bản nháp chưa gửi.
+- Cuốn báo cáo KLTN dùng loại tài liệu `REPORT`: Khoa đặt hạn riêng theo đợt như các loại khác, SV nộp PDF/DOCX và từng phiên bản được giữ nguyên để đối chiếu tương đồng về sau. Đối chiếu tương đồng chưa triển khai; khi có, kết quả chỉ để tham khảo, không tự chặn nộp hay bảo vệ. Báo cáo tiến độ hàng tuần vẫn nộp ở mốc Tiến độ, không dùng hồ sơ này.
+- Chuông thông báo trong web gửi đúng người theo từng thao tác: SV nộp đề cương, báo cáo tiến độ, tài liệu hoặc Mẫu 1a/1b chỉ tới GVHD/GV tiếp nhận của đúng hồ sơ; GV phân công góp ý chéo tới đúng GV được phân công; GVHD/TBM/Trưởng khoa chốt đề cương tới SV, GVHD và TBM liên quan; thao tác tài khoản tới chính tài khoản đó. Thông báo chỉ hiện trong web cho người nhận, không gửi email và không lộ cho SV/GV/TBM khác.
+- Minh chứng đăng ký cũng được quét ClamAV khi tải lên; UI hiển thị trạng thái, có quét lại nếu lỗi/chưa quét và chỉ cho tải tệp sạch. Bản in PDF dành vùng footer riêng để giữ nội dung gốc; hồ sơ GV hiển thị mã, bộ môn và Khoa theo đúng phạm vi.
 
-**1. Cấu hình riêng trên máy.** PostgreSQL 17 cần có database trống hoặc database dự án hiện có. Sao chép `.env.example` thành `.env` rồi điền mật khẩu/cổng thực tế; `.env` bị Gitignore. Trên máy này, `DATABASE_URL` hiện kết nối `kltn_ai` tại `127.0.0.1:5432`; Docker Compose mẫu dùng cổng **5433**. Lệnh seed đặt `KLTN_ENV=development` chỉ cho tiến trình đó; `tools.run_demo_api` tự chọn `kltn_dev` và dùng đăng nhập email. Không bật `KLTN_DEV_AUTH` trong vận hành thật.
+Kiểm chứng tại `D:\KLTN` ngày 27/10/2026: 121 kiểm thử backend; 25 kiểm thử UI (19 tích hợp thật, 6 phản hồi UI có API mô phỏng); frontend build và kiểm tra schema drift đạt. Kiểm thử dùng PostgreSQL/ClamAV thật, dữ liệu giả trong schema riêng, không gửi SMTP thật. Mẫu 1a/1b, 2, 3 xuất từ UI đã được render bằng Word và kiểm tra footer từng trang.
 
-**2. Cài và nâng CSDL.** Tại thư mục gốc dự án:
+Hội đồng/lịch bảo vệ, chấm điểm và biên bản chưa hoàn thiện. Chatbot chưa kết nối Gemini.
+
+## Chạy local
+
+Tạo `.env` từ `.env.example`, đặt `DATABASE_URL` trỏ đúng `kltn_management`, rồi cài dependencies. Ứng dụng và Alembic dùng cổng trong `DATABASE_URL`; `POSTGRES_PORT` chỉ là cổng xuất ra máy khi chạy PostgreSQL bằng Docker Compose. Nếu dùng PostgreSQL đã cài trên máy, không cần chạy container.
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 .\.venv\Scripts\python.exe -m alembic upgrade head
-.\.venv\Scripts\python.exe -m backend.db.validate_schema
 ```
 
-Để dựng database mới, mở `database/kltn-db-baseline.sql` và chạy toàn bộ file trên **database mới, trống**. Để xem bảng/cột/khóa, dùng các truy vấn chỉ đọc trong `database/kltn-ai-workbench.sql`. Với database đã có bảng, dùng Alembic migration trong `backend/migrations/versions/`; không chạy lại file baseline.
-
-**3. Tạo dữ liệu demo tùy chọn.** Lệnh dưới đây luôn nhắm `kltn_dev`, kể cả khi `.env` đang trỏ `kltn_ai`. Chỉ chạy trên database phát triển:
-
-```powershell
-$env:KLTN_ENV = 'development'
-try {
-    .\.venv\Scripts\python.exe -m tools.seed_demo --execute --database kltn_dev --create-credentials
-} finally {
-    Remove-Item Env:KLTN_ENV -ErrorAction SilentlyContinue
-}
-```
-
-`KLTN_ENV` chỉ tồn tại trong lần chạy này. Lần đầu clone dùng `--create-credentials` tạo tệp tài khoản ngẫu nhiên nếu tệp chưa có; không ghi đè tệp hiện có. Seed **đọc** năm email/mật khẩu từ `database/tai-khoan-demo.local.csv` chỉ có trên máy, bị Gitignore; chạy lại sẽ áp dụng đúng nội dung file và làm mới thời gian đợt, không tự tạo mật khẩu khác. Mở file này để sao chép tài khoản demo. Bộ test tự tạo dữ liệu giả trong transaction rồi rollback.
-
-**4. Chạy API và React** trong hai terminal riêng.
-
-Terminal 1 — backend API dùng dữ liệu demo từ `kltn_dev` (không đổi `.env`):
+Chạy API và giao diện ở hai terminal:
 
 ```powershell
 .\.venv\Scripts\python.exe -m tools.run_demo_api
 ```
-
-Terminal 2 — giao diện React (chạy `npm ci` lần đầu hoặc khi lockfile đổi):
 
 ```powershell
 npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Chạy API và giao diện ở hai terminal riêng. Tiến trình API tự chọn `kltn_dev`, tắt UUID header cho demo và dùng `tmp/qdrant-prototype` nếu chưa cấu hình Qdrant service. Trước lần thử AI đầu tiên, chạy bước 5 để tạo chỉ mục corpus giả. Mở `http://localhost:5173` hoặc `http://127.0.0.1:5173`; giao diện mặc định gọi API bằng **cùng hostname** với tab đang mở để cookie đăng nhập hoạt động. Nhập email và mật khẩu trong [file demo chỉ lưu trên máy](database/tai-khoan-demo.local.csv). Lần lượt đăng nhập GV đề xuất, TBM và SV1/SV2 để đi hết luồng. Bộ test tự động bật UUID header riêng trong môi trường TEST; giao diện không dùng UUID.
+Mở `http://localhost:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Trên máy phát triển, `KLTN_DEMO_MODE=true` trong `.env` hiện lựa chọn SV/GV/TBM giả lập tại trang đăng nhập; tài khoản kích hoạt qua email vẫn đăng nhập bằng mật khẩu.
 
-```sql
-SELECT ua.id AS uuid_dev,
-       ua.base_role,
-       COALESCE(sp.student_code, lp.lecturer_code) AS ma_nguoi_dung,
-       COALESCE(sp.display_name, lp.display_name) AS ho_ten
-FROM user_account AS ua
-LEFT JOIN student_profile AS sp ON sp.user_id = ua.id
-LEFT JOIN lecturer_profile AS lp ON lp.user_id = ua.id
-WHERE ua.external_subject LIKE 'synthetic-demo-%'
-ORDER BY ua.base_role, ma_nguoi_dung;
-```
+Windows đã cài ClamAV tại `C:\Program Files\ClamAV` và cấu hình `C:\ProgramData\ClamAV\clamd.conf` chỉ nghe `127.0.0.1:3310`: `run_demo_api` tự khởi động/reuse daemon. Cập nhật chữ ký bằng `freshclam.exe`; nếu bộ quét chưa sẵn sàng, hệ thống giữ tệp cách ly và báo trạng thái thật.
 
-UUID trong truy vấn là khóa nội bộ để đối chiếu khi cần, không dùng đăng nhập. [Trạng thái vòng đời tài khoản](docs/design/local-auth.md) phân biệt demo đã chạy với phần cần có trước khi cấp tài khoản thật. Swagger ở `http://localhost:8000/docs`. Header UUID chỉ được backend chấp nhận trong DEV/TEST.
-
-**5. Thử AI không có Docker.** Đặt `QDRANT_LOCAL_PATH=tmp/qdrant-prototype` và bỏ/để trống `QDRANT_URL` trong `.env`, rồi chạy:
+## Kiểm tra
 
 ```powershell
-.\.venv\Scripts\python.exe -m tools.index_corpus --manifest data/manifests/synthetic-corpus.json --root data --local-path tmp/qdrant-prototype
+.\.venv\Scripts\python.exe -m tools.validate_official_database
+.\.venv\Scripts\python.exe -m pytest tests/test_print_copy.py tests/test_proposal_export.py -q
+npm run build --prefix frontend
+$env:KLTN_E2E_ALLOW_ISOLATED_SCHEMA = 'true'
+.\.venv\Scripts\python.exe -m tools.run_e2e
 ```
 
-Đây là corpus **giả lập**. Với corpus được phép dùng thật, giữ file/manifest ngoài Git và dùng `--persist-metadata` để đồng bộ RepositoryItem/SearchIndexMetadata vào PostgreSQL trước khi index Qdrant. Không đưa tài liệu thật, key, mật khẩu, dữ liệu cá nhân lên Git.
+`run_e2e` yêu cầu ClamAV thật và tạo schema kiểm thử ngẫu nhiên riêng trong `kltn_management`; chỉ dọn schema do chính lượt kiểm tạo, không sửa dữ liệu `public`. Để kiểm bản in chính thức, máy chạy test cần các tệp Mẫu 2/Mẫu 3 trong `docs/BieuMau` (hoặc `KLTN_OFFICIAL_TEMPLATE_DIR`). Kiểm thử dùng tài khoản/tài liệu giả và không gửi SMTP thật.
 
-## Cấu trúc để nộp
+## Tài liệu chính
 
-`backend/`: API, service, AI, model và migrations; `frontend/`: React; `database/`: SQL dựng mới; `docs/requirements,design,ai,decisions,references,evidence,prototype/`: sản phẩm phân tích, thiết kế và minh chứng; `tests/`: kiểm tra tự động; `data/sample,manifests/`: dữ liệu **giả**. `source/raw/` và file thao tác cá nhân luôn ở máy, không thuộc bộ source nộp.
+- [API hiện hành](docs/design/api-design.md) · [OpenAPI sinh từ FastAPI](docs/design/openapi.yaml)
+- [ERD hiện hành](docs/design/erd-kltn-management.md) · [ERD theo cụm](docs/design/erd-clusters/README.md)
+- [Từ điển dữ liệu](docs/design/database-dictionary.md)
+- [Quy trình đăng ký](docs/design/registration-workflow.md)
+- [Minh chứng cấu trúc CSDL](docs/evidence/official-db-validation.md)
 
-Các quyết định nghiệp vụ hiện tại nằm trong [tài liệu quyết định](docs/decisions/quyet-dinh-du-an-2026-09-25.md); [đối chiếu CSDL](docs/design/doi-chieu-quyet-dinh-csdl.md) cho biết mỗi quyết định được lưu ở đâu. Prototype runtime chỉ chạy các luồng đã nêu trên; quyền xác nhận, chấm thật, Mẫu 9 và similarity toàn văn vẫn cần triển khai/kiểm chứng. Khi Khoa ban hành chính sách mới, cập nhật bằng revision, không sửa lịch sử.
+Repository không chứa dữ liệu thật hay cấu hình bí mật. Nội dung AI thử nghiệm dùng corpus giả cục bộ; việc gửi tài liệu cho dịch vụ AI cần theo chính sách của Khoa/Trường.
 
-### Đăng ký theo loại đề tài
+Khung xem và nhận xét trên tệp dùng chung cho tiến độ, tài liệu và đề cương: PDF ghim theo trang, DOCX/TXT theo đoạn/dòng; nháp tự lưu và góp ý gắn đúng phiên bản. Tài liệu/đề cương hiện bản mới nhất, các bản cũ nằm trong lịch sử thu gọn và vẫn xem/tải được theo quyền.
 
-- Đề tài GV: chọn trong danh sách đã duyệt, mở form cá nhân/nhóm theo sức chứa. Một SV đại diện lập nhóm; mọi thành viên phải tự xác nhận trước khi gửi.
-- Đề tài SV: chọn **Tự đề xuất đề tài**, điền đề xuất và GV mong muốn, lập đăng ký rồi gửi bộ môn. TBM sửa tên nếu cần và xác nhận/chọn GV cùng bộ môn; GV được từ chối có lý do.
-- Minh chứng từng thành viên: PDF/PNG/JPEG ≤5 MB, tải trước khi gửi; chỉ người được phép truy cập hồ sơ mới tải được. Tệp giữ trên máy, không gửi AI; chưa có antivirus nên lưu trạng thái QUARANTINED và chỉ tải dạng attachment.
+GV có thể đính kèm tối đa 5 bản PDF/DOCX phản hồi cho đúng phiên bản SV đã nộp (10 MB/tệp, quét ClamAV). Nhận xét chung và ghim tự lưu nháp trên máy chủ; chỉ công bố khi bấm “Hoàn thành và gửi góp ý”. SV xem tệp phản hồi ngay trên web, gồm nhận xét Word/Track Changes và nhận xét PDF phổ biến. Link trong góp ý bấm mở được; hình/bảng/biểu đồ phức tạp nên gửi trong PDF.

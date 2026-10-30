@@ -8,23 +8,31 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from backend.api.auth import authentication_mode, oidc_is_configured
-from backend.api import auth
+from backend.api.auth import allowed_frontend_origins, authentication_mode, oidc_is_configured
+from backend.api import account, auth
 from backend.api.dependencies import current_user
 
 
 class FakeSession:
     def __init__(self, user):
         self.user = user
+        self.added = []
+        self.committed = False
 
     def scalar(self, _statement):
         return self.user
+
+    def add(self, item):
+        self.added.append(item)
+
+    def commit(self):
+        self.committed = True
 
 
 def request_with_session(user_id: str | None = None) -> Request:
     scope = {"type": "http", "headers": [], "method": "GET", "path": "/", "query_string": b"", "session": {}}
     if user_id is not None:
-        scope["session"] = {"user_id": user_id}
+        scope["session"] = {"user_id": user_id, "credential_version": 1, "csrf_token": "test-csrf-token"}
     return Request(scope)
 
 
@@ -47,9 +55,16 @@ def test_auth_mode_requires_complete_oidc_and_session_config(monkeypatch):
     assert authentication_mode() == "university_oidc"
 
 
+def test_production_cors_uses_only_the_configured_frontend(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "production")
+    monkeypatch.setenv("KLTN_FRONTEND_URL", "https://kltn.example/")
+    assert allowed_frontend_origins() == ["https://kltn.example"]
+    assert not auth._same_app_origin(request_with_session())
+
+
 def test_oidc_session_maps_to_internal_account(monkeypatch):
     user_id = uuid4()
-    user = object()
+    user = SimpleNamespace(row_version=1)
     monkeypatch.setenv("KLTN_ENV", "production")
     monkeypatch.setenv("KLTN_DEV_AUTH", "false")
     result = current_user(request_with_session(str(user_id)), FakeSession(user), dev_user_id=None)
@@ -69,6 +84,14 @@ def test_production_ignores_development_uuid_header(monkeypatch):
     assert error.value.status_code == 401
 
 
+def test_development_uuid_header_cannot_replace_demo_login(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_DEV_AUTH", "true")
+    with pytest.raises(HTTPException) as error:
+        current_user(request_with_session(), FakeSession(object()), dev_user_id=str(uuid4()))
+    assert error.value.status_code == 401
+
+
 def test_development_uuid_header_remains_test_only(monkeypatch):
     user = object()
     monkeypatch.setenv("KLTN_ENV", "test")
@@ -82,14 +105,19 @@ class FakeOIDCClient:
 
 
 def test_oidc_callback_links_only_an_existing_account(monkeypatch):
-    account = SimpleNamespace(id=uuid4())
+    account = SimpleNamespace(id=uuid4(), row_version=1)
     monkeypatch.setattr(auth, "_oidc_client", FakeOIDCClient)
     monkeypatch.setenv("KLTN_FRONTEND_URL", "https://kltn.example")
     request = request_with_session()
-    response = asyncio.run(auth.callback(request, FakeSession(account)))
+    session = FakeSession(account)
+    response = asyncio.run(auth.callback(request, session))
     assert response.status_code == 303
     assert response.headers["location"] == "https://kltn.example/?login=success"
-    assert request.session == {"user_id": str(account.id)}
+    assert request.session["user_id"] == str(account.id)
+    assert request.session["credential_version"] == 1
+    assert request.session["csrf_token"]
+    assert session.committed and session.added[0].action == "ACCOUNT_SIGNED_IN"
+    assert session.added[0].resource_id == account.id
 
 
 def test_oidc_callback_refuses_unlinked_account(monkeypatch):
@@ -98,3 +126,16 @@ def test_oidc_callback_refuses_unlinked_account(monkeypatch):
     response = asyncio.run(auth.callback(request, FakeSession(None)))
     assert response.status_code == 403
     assert request.session == {}
+
+
+def test_account_reset_link_preserves_configured_frontend_origin(monkeypatch):
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_FRONTEND_URL", "http://127.0.0.1:5173/")
+    monkeypatch.setattr(account, "make_token", lambda user, purpose: "test-token")
+    sent = []
+    monkeypatch.setattr(account, "send_account_link", lambda recipient, subject, body: sent.append(body))
+
+    account._mail_link(SimpleNamespace(email="student@example.test"), "reset")
+
+    assert sent
+    assert "http://127.0.0.1:5173/account/reset-password?token=test-token" in sent[0]

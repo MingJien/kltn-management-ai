@@ -20,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
@@ -51,6 +51,17 @@ class Department(UuidPrimaryKeyMixin, TimestampMixin, Base):
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
 
 
+class DepartmentMajor(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """Allowed major codes for a department; one department may offer many majors."""
+
+    __tablename__ = "department_major"
+    __table_args__ = (UniqueConstraint("department_id", "code"),)
+    department_id: Mapped[uuid.UUID] = fk("department.id")
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+
+
 class UserAccount(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "user_account"
     __table_args__ = (
@@ -71,12 +82,21 @@ class UserAccount(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
 
 class StudentProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "student_profile"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["department_id", "major_code"],
+            ["department_major.department_id", "department_major.code"],
+            ondelete="RESTRICT",
+        ),
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.id", ondelete="RESTRICT"), nullable=False, unique=True
     )
     student_code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     department_id: Mapped[uuid.UUID] = fk("department.id")
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    class_name: Mapped[Optional[str]] = mapped_column(String(100))
+    major_code: Mapped[Optional[str]] = mapped_column(String(32))
 
 
 class LecturerProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -148,42 +168,23 @@ class ThesisRound(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class RoundPolicy(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "round_policy"
-    __table_args__ = (
-        UniqueConstraint("round_id", "policy_type", "version"),
-        CheckConstraint("version > 0", name="version_positive"),
-        CheckConstraint("state IN ('DRAFT','ACTIVE','RETIRED')", name="state"),
-        CheckConstraint("state <> 'ACTIVE' OR effective_at IS NOT NULL", name="active_has_effective_at"),
-    )
-    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
-    policy_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    config_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-    effective_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
 class ResourceAssignment(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "resource_assignment"
     __table_args__ = (
         CheckConstraint(
             "(CASE WHEN round_id IS NULL THEN 0 ELSE 1 END + "
-            "CASE WHEN thesis_id IS NULL THEN 0 ELSE 1 END + "
-            "CASE WHEN council_id IS NULL THEN 0 ELSE 1 END) = 1",
+            "CASE WHEN thesis_id IS NULL THEN 0 ELSE 1 END) = 1",
             name="exactly_one_resource",
         ),
         CheckConstraint("state IN ('ACTIVE','REVOKED','EXPIRED')", name="state"),
         CheckConstraint("effective_to IS NULL OR effective_to > effective_from", name="effective_window"),
         Index("uq_resource_assignment_round_scope", "assignment_type", "user_id", "round_id", unique=True, postgresql_where=text("round_id IS NOT NULL AND state = 'ACTIVE'")),
         Index("uq_resource_assignment_thesis_scope", "assignment_type", "user_id", "thesis_id", unique=True, postgresql_where=text("thesis_id IS NOT NULL AND state = 'ACTIVE'")),
-        Index("uq_resource_assignment_council_scope", "assignment_type", "user_id", "council_id", unique=True, postgresql_where=text("council_id IS NOT NULL AND state = 'ACTIVE'")),
     )
     assignment_type: Mapped[str] = mapped_column(String(50), nullable=False)
     user_id: Mapped[uuid.UUID] = fk("user_account.id")
     round_id: Mapped[Optional[uuid.UUID]] = fk("thesis_round.id", nullable=True)
     thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
-    council_id: Mapped[Optional[uuid.UUID]] = fk("council.id", nullable=True)
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
@@ -217,39 +218,6 @@ class EligibilitySnapshot(UuidPrimaryKeyMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class EligibilityException(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "eligibility_exception"
-    snapshot_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("eligibility_snapshot.id", ondelete="RESTRICT"), nullable=False, unique=True
-    )
-    official_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    granted_by: Mapped[uuid.UUID] = fk("user_account.id")
-    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class LecturerExpertise(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "lecturer_expertise"
-    __table_args__ = (
-        UniqueConstraint("lecturer_id", "version"),
-        CheckConstraint("version > 0", name="version_positive"),
-        CheckConstraint("state IN ('DRAFT','SELF_DECLARED','VERIFIED','REJECTED')", name="state"),
-    )
-    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    labels: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-    verified_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
-    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
-class ExpertiseEvidence(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "expertise_evidence"
-    expertise_id: Mapped[uuid.UUID] = fk("lecturer_expertise.id")
-    evidence_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    reference: Mapped[str] = mapped_column(String(500), nullable=False)
-
-
 class Topic(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "topic"
     __table_args__ = (
@@ -269,6 +237,9 @@ class Topic(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
     decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    archived_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    archive_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class TopicTitleVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -305,6 +276,7 @@ class TopicRegistration(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     __tablename__ = "topic_registration"
     __table_args__ = (
         UniqueConstraint("id", "round_id"),
+        CheckConstraint("expected_member_count BETWEEN 1 AND 3", name="expected_member_count"),
         CheckConstraint(
             "state IN ('DRAFT','SUBMITTED','LECTURER_ACCEPTED','LECTURER_REJECTED','RETURNED','FINALIZED','CANCELLED')",
             name="state",
@@ -313,6 +285,7 @@ class TopicRegistration(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
     topic_id: Mapped[uuid.UUID] = fk("topic.id")
     created_by: Mapped[uuid.UUID] = fk("student_profile.id")
+    expected_member_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     lecturer_decided_by: Mapped[Optional[uuid.UUID]] = fk("lecturer_profile.id", nullable=True)
@@ -475,6 +448,45 @@ class StoredFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     scanned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class OfficialForm(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "official_form"
+    __table_args__ = (
+        UniqueConstraint("round_id", "code"),
+        CheckConstraint("document_kind IN ('FORM','PUBLICATION')", name="document_kind"),
+        CheckConstraint("audience IN ('STUDENT_AND_LECTURER','LECTURER')", name="audience"),
+        CheckConstraint("state IN ('ACTIVE','ARCHIVED')", name="state"),
+    )
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    document_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    audience: Mapped[str] = mapped_column(String(30), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
+    created_by: Mapped[uuid.UUID] = fk("user_account.id")
+
+
+class OfficialFormVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "official_form_version"
+    __table_args__ = (
+        UniqueConstraint("official_form_id", "version_no"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')", name="state"),
+        CheckConstraint("(published_at IS NULL) = (published_by IS NULL)", name="publisher_pair"),
+        CheckConstraint("state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL", name="published_stamp"),
+        CheckConstraint("state != 'DRAFT' OR published_at IS NULL", name="draft_stamp"),
+        Index("uq_official_form_current", "official_form_id", unique=True, postgresql_where=text("state = 'PUBLISHED'")),
+    )
+    official_form_id: Mapped[uuid.UUID] = fk("official_form.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    uploaded_by: Mapped[uuid.UUID] = fk("user_account.id")
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    change_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    published_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
 class Proposal(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "proposal"
     __table_args__ = (
@@ -502,6 +514,7 @@ class ProposalVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
     stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
@@ -557,6 +570,21 @@ class ProgressMilestone(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Bas
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
+class DocumentDeadline(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "document_deadline"
+    __table_args__ = (
+        UniqueConstraint("round_id", "document_type"),
+        CheckConstraint("document_type IN ('PROPOSAL','PLAN','REPORT','SUPPORTING')", name="document_type"),
+        CheckConstraint("state IN ('OPEN','CLOSED')", name="state"),
+    )
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    document_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN", server_default="OPEN")
+    set_by: Mapped[uuid.UUID] = fk("user_account.id")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class ProgressReport(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "progress_report"
     __table_args__ = (
@@ -571,6 +599,7 @@ class ProgressReport(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     reported_ratio: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
     evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
@@ -587,39 +616,39 @@ class ProgressReview(UuidPrimaryKeyMixin, TimestampMixin, Base):
     comment: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class TopicChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "topic_change_request"
+class ProgressReviewAnnotation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "progress_review_annotation"
     __table_args__ = (
-        CheckConstraint(
-            "state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')",
-            name="state",
-        ),
-        CheckConstraint("proposed_topic_id IS NOT NULL OR proposed_title IS NOT NULL", name="target_present"),
+        CheckConstraint("state IN ('DRAFT','PUBLISHED')", name="state"),
+        CheckConstraint("page_number IS NULL OR page_number BETWEEN 1 AND 10000", name="page_number"),
+        CheckConstraint("(x IS NULL AND y IS NULL) OR (page_number IS NOT NULL AND x IS NOT NULL AND y IS NOT NULL AND x BETWEEN 0 AND 1 AND y BETWEEN 0 AND 1)", name="coordinates"),
+        CheckConstraint("(state = 'DRAFT' AND published_at IS NULL) OR (state = 'PUBLISHED' AND published_at IS NOT NULL AND length(trim(comment)) > 0)", name="publication"),
+        Index("ix_progress_review_annotation_report_reviewer", "progress_report_id", "reviewer_id", "state"),
+        Index("ix_progress_review_annotation_document_reviewer", "document_version_id", "reviewer_id", "state"),
+        Index("ix_progress_review_annotation_proposal_reviewer", "proposal_version_id", "reviewer_id", "state"),
+        CheckConstraint("num_nonnulls(progress_report_id, document_version_id, proposal_version_id) = 1", name="one_target"),
+        CheckConstraint("annotation_kind IN ('PIN','SUMMARY','ATTACHMENT')", name="annotation_kind"),
+        CheckConstraint("(annotation_kind = 'ATTACHMENT' AND attachment_file_id IS NOT NULL) OR (annotation_kind IN ('PIN','SUMMARY') AND attachment_file_id IS NULL)", name="attachment_kind"),
+        CheckConstraint("annotation_kind = 'PIN' OR (page_number IS NULL AND x IS NULL AND y IS NULL)", name="kind_coordinates"),
+        Index("uq_review_summary_progress", "progress_report_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL")),
+        Index("uq_review_summary_document", "document_version_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL")),
+        Index("uq_review_summary_proposal", "proposal_version_id", "reviewer_id", unique=True, postgresql_where=text("annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL")),
     )
-    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
-    requested_by: Mapped[uuid.UUID] = fk("student_profile.id")
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    proposed_topic_id: Mapped[Optional[uuid.UUID]] = fk("topic.id", nullable=True)
-    proposed_title: Mapped[Optional[str]] = mapped_column(String(500))
-    advisor_reviewed_by: Mapped[Optional[uuid.UUID]] = fk("lecturer_profile.id", nullable=True)
-    advisor_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    department_decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
-    department_decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    state: Mapped[str] = mapped_column(String(30), nullable=False, default="SUBMITTED", server_default="SUBMITTED")
-
-
-class ExternalProcedureOutcome(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "external_procedure_outcome"
-    __table_args__ = (
-        CheckConstraint("outcome_type IN ('WITHDRAWAL','EXTENSION')", name="outcome_type"),
-        UniqueConstraint("thesis_id", "outcome_type", "official_ref"),
-    )
-    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
-    outcome_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    official_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
-    recorded_by: Mapped[uuid.UUID] = fk("user_account.id")
+    progress_report_id: Mapped[Optional[uuid.UUID]] = fk("progress_report.id", nullable=True)
+    document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
+    proposal_version_id: Mapped[Optional[uuid.UUID]] = fk("proposal_version.id", nullable=True)
+    reviewer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    annotation_kind: Mapped[str] = mapped_column(String(20), nullable=False, default="PIN", server_default="PIN")
+    attachment_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    page_number: Mapped[Optional[int]] = mapped_column(Integer)
+    x: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 7))
+    y: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 7))
+    location_label: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
+    quoted_text: Mapped[str] = mapped_column(String(1000), nullable=False, default="", server_default="")
+    comment: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class Document(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
@@ -650,408 +679,32 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
     submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
-class SimilarityPolicy(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "similarity_policy"
+class RegistrationFormVersion(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "registration_form_version"
     __table_args__ = (
-        UniqueConstraint("round_id", "version_no"),
+        UniqueConstraint("registration_id", "version_no"),
         CheckConstraint("version_no > 0", name="version_positive"),
-        CheckConstraint("decision_mode IN ('ADVISORY','GATE')", name="decision_mode"),
-        CheckConstraint("state IN ('DRAFT','ACTIVE','RETIRED')", name="state"),
-        CheckConstraint("threshold_value IS NULL OR threshold_value >= 0", name="threshold_nonnegative"),
+        CheckConstraint("form_code IN ('1A','1B')", name="form_code"),
+        CheckConstraint("length(content_sha256) = 64 AND length(registration_fingerprint) = 64", name="hash_length"),
     )
-    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    metric_code: Mapped[Optional[str]] = mapped_column(String(100))
-    threshold_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6))
-    decision_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="ADVISORY", server_default="ADVISORY")
-    config_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-
-
-class SimilarityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "similarity_check"
-    __table_args__ = (
-        CheckConstraint("state IN ('QUEUED','RUNNING','COMPLETED','FAILED')", name="state"),
-    )
-    document_version_id: Mapped[uuid.UUID] = fk("document_version.id")
-    policy_id: Mapped[Optional[uuid.UUID]] = fk("similarity_policy.id", nullable=True)
-    metric_code: Mapped[str] = mapped_column(String(100), nullable=False)
-    lexical_coverage_pct: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 3))
-    semantic_candidate_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6))
-    business_status: Mapped[Optional[str]] = mapped_column(String(40))
-    model_version: Mapped[Optional[str]] = mapped_column(String(100))
-    index_version: Mapped[Optional[str]] = mapped_column(String(100))
-    corpus_snapshot: Mapped[Optional[str]] = mapped_column(String(200))
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="QUEUED", server_default="QUEUED")
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
-class SimilarityMatch(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "similarity_match"
-    __table_args__ = (
-        CheckConstraint("input_start >= 0 AND input_end > input_start", name="input_range"),
-    )
-    check_id: Mapped[uuid.UUID] = fk("similarity_check.id")
-    source_repository_item_id: Mapped[Optional[uuid.UUID]] = fk("repository_item.id", nullable=True)
-    source_document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
-    source_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    input_start: Mapped[int] = mapped_column(Integer, nullable=False)
-    input_end: Mapped[int] = mapped_column(Integer, nullable=False)
-    matched_text_hash: Mapped[Optional[str]] = mapped_column(String(64))
-    lexical_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6))
-    semantic_score: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6))
-
-
-class Council(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "council"
-    __table_args__ = (
-        UniqueConstraint("round_id", "code"),
-        CheckConstraint("state IN ('IMPORTED','VALIDATED','ACTIVE','CLOSED')", name="state"),
-    )
-    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
-    department_id: Mapped[uuid.UUID] = fk("department.id")
-    code: Mapped[str] = mapped_column(String(50), nullable=False)
-    decision_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    decision_date: Mapped[date] = mapped_column(Date, nullable=False)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="IMPORTED", server_default="IMPORTED")
-
-
-class CouncilMember(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "council_member"
-    __table_args__ = (
-        UniqueConstraint("council_id", "lecturer_id"),
-        UniqueConstraint("council_id", "role_code", "role_slot"),
-        CheckConstraint("role_code IN ('CHAIR','SECRETARY','REVIEWER','MEMBER')", name="role_code"),
-        CheckConstraint("role_slot BETWEEN 1 AND 2", name="role_slot"),
-        CheckConstraint("active IN (true,false)", name="active_boolean"),
-    )
-    council_id: Mapped[uuid.UUID] = fk("council.id")
-    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
-    role_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    role_slot: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
-    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
-
-
-class DefenseSession(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "defense_session"
-    __table_args__ = (
-        UniqueConstraint("council_id", "code"),
-        CheckConstraint(
-            "state IN ('SCHEDULED','ATTENDANCE_OPEN','READY','POSTPONED','SCORING','FINALIZED','CLOSED')",
-            name="state",
-        ),
-    )
-    council_id: Mapped[uuid.UUID] = fk("council.id")
-    code: Mapped[str] = mapped_column(String(50), nullable=False)
-    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    location: Mapped[str] = mapped_column(String(255), nullable=False)
-    state: Mapped[str] = mapped_column(String(30), nullable=False, default="SCHEDULED", server_default="SCHEDULED")
-
-
-class SessionThesis(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "session_thesis"
-    __table_args__ = (
-        UniqueConstraint("session_id", "thesis_id"),
-        UniqueConstraint("session_id", "order_no"),
-        CheckConstraint("order_no > 0", name="order_positive"),
-    )
-    session_id: Mapped[uuid.UUID] = fk("defense_session.id")
-    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
-    order_no: Mapped[int] = mapped_column(Integer, nullable=False)
-
-
-class CouncilAttendance(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "council_attendance"
-    __table_args__ = (UniqueConstraint("session_id", "council_member_id"),)
-    session_id: Mapped[uuid.UUID] = fk("defense_session.id")
-    council_member_id: Mapped[uuid.UUID] = fk("council_member.id")
-    present: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    recorded_by: Mapped[uuid.UUID] = fk("user_account.id")
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    note: Mapped[Optional[str]] = mapped_column(Text)
-
-
-class DefenseEligibilityCheck(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "defense_eligibility_check"
-    __table_args__ = (
-        CheckConstraint("result IN ('ELIGIBLE','NOT_ELIGIBLE','PENDING_POLICY')", name="result"),
-    )
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
-    advisor_review_id: Mapped[Optional[uuid.UUID]] = fk("advisor_review.id", nullable=True)
-    discipline_result: Mapped[str] = mapped_column(String(40), nullable=False)
-    completion_result: Mapped[str] = mapped_column(String(40), nullable=False)
-    advisor_result: Mapped[str] = mapped_column(String(40), nullable=False)
-    local_policy_result: Mapped[Optional[str]] = mapped_column(String(40))
-    similarity_result: Mapped[Optional[str]] = mapped_column(String(40))
-    result: Mapped[str] = mapped_column(String(30), nullable=False)
-    reason: Mapped[Optional[str]] = mapped_column(Text)
-    checked_by: Mapped[uuid.UUID] = fk("user_account.id")
-
-
-class AdvisorReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "advisor_review"
-    __table_args__ = (
-        UniqueConstraint("advisor_assignment_id", "thesis_member_id", "version_no"),
-        CheckConstraint("version_no > 0", name="version_positive"),
-        CheckConstraint("defense_recommendation IN ('ALLOW','DENY')", name="defense_recommendation"),
-    )
-    advisor_assignment_id: Mapped[uuid.UUID] = fk("advisor_assignment.id")
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    document_version_id: Mapped[uuid.UUID] = fk("document_version.id")
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    attitude: Mapped[str] = mapped_column(Text, nullable=False)
-    content_response: Mapped[str] = mapped_column(Text, nullable=False)
-    presentation: Mapped[str] = mapped_column(Text, nullable=False)
-    defense_recommendation: Mapped[str] = mapped_column(String(20), nullable=False)
-
-
-class ReviewerReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "reviewer_review"
-    __table_args__ = (
-        UniqueConstraint("reviewer_assignment_id", "thesis_member_id", "version_no"),
-        CheckConstraint("version_no > 0", name="version_positive"),
-    )
-    reviewer_assignment_id: Mapped[uuid.UUID] = fk("reviewer_assignment.id")
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    document_version_id: Mapped[uuid.UUID] = fk("document_version.id")
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    presentation: Mapped[str] = mapped_column(Text, nullable=False)
-    research_quality: Mapped[str] = mapped_column(Text, nullable=False)
-    contribution: Mapped[str] = mapped_column(Text, nullable=False)
-    questions: Mapped[str] = mapped_column(Text, nullable=False)
-    overall: Mapped[str] = mapped_column(Text, nullable=False)
-
-
-class RubricTemplate(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "rubric_template"
-    __table_args__ = (
-        UniqueConstraint("code", "version_no"),
-        CheckConstraint("version_no > 0", name="version_positive"),
-        CheckConstraint("state IN ('DRAFT','ACTIVE','RETIRED')", name="state"),
-    )
-    code: Mapped[str] = mapped_column(String(50), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    source_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-
-
-class RubricCriterion(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "rubric_criterion"
-    __table_args__ = (
-        UniqueConstraint("rubric_template_id", "code"),
-        UniqueConstraint("rubric_template_id", "order_no"),
-        CheckConstraint("max_points > 0 AND max_points <= 10", name="max_points"),
-        CheckConstraint("order_no > 0", name="order_positive"),
-        CheckConstraint("criterion_type IN ('GROUP','NORMAL','BONUS')", name="criterion_type"),
-        CheckConstraint("criterion_type <> 'BONUS' OR max_points <= 1", name="bonus_max"),
-        CheckConstraint("parent_id IS NULL OR parent_id <> id", name="not_self_parent"),
-    )
-    rubric_template_id: Mapped[uuid.UUID] = fk("rubric_template.id")
-    parent_id: Mapped[Optional[uuid.UUID]] = fk("rubric_criterion.id", nullable=True)
-    code: Mapped[str] = mapped_column(String(50), nullable=False)
-    label: Mapped[str] = mapped_column(String(500), nullable=False)
-    max_points: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
-    criterion_type: Mapped[str] = mapped_column(String(20), nullable=False, default="NORMAL", server_default="NORMAL")
-    order_no: Mapped[int] = mapped_column(Integer, nullable=False)
-
-
-class RubricAssignment(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "rubric_assignment"
-    __table_args__ = (
-        CheckConstraint(
-            "(round_id IS NOT NULL AND session_id IS NULL) OR "
-            "(round_id IS NULL AND session_id IS NOT NULL)",
-            name="exactly_one_scope",
-        ),
-        CheckConstraint("state IN ('ACTIVE','LOCKED','RETIRED')", name="state"),
-    )
-    rubric_template_id: Mapped[uuid.UUID] = fk("rubric_template.id")
-    round_id: Mapped[Optional[uuid.UUID]] = fk("thesis_round.id", nullable=True)
-    session_id: Mapped[Optional[uuid.UUID]] = fk("defense_session.id", nullable=True)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
-
-
-class BonusEvidence(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "bonus_evidence"
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    evidence_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    reference: Mapped[str] = mapped_column(String(500), nullable=False)
-    stored_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
-
-
-class Evaluation(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "evaluation"
-    __table_args__ = (
-        UniqueConstraint("session_id", "evaluator_member_id", "thesis_member_id"),
-        CheckConstraint("status IN ('DRAFT','SUBMITTED','CORRECTED','LOCKED')", name="status"),
-        CheckConstraint("total_points >= 0 AND total_points <= 10", name="total_points"),
-        CheckConstraint("bonus_points >= 0 AND bonus_points <= 1", name="bonus_points"),
-        CheckConstraint("bonus_points <= total_points", name="bonus_within_total"),
-    )
-    session_id: Mapped[uuid.UUID] = fk("defense_session.id")
-    evaluator_member_id: Mapped[uuid.UUID] = fk("council_member.id")
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    rubric_assignment_id: Mapped[uuid.UUID] = fk("rubric_assignment.id")
-    total_points: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False, default=0, server_default="0")
-    bonus_points: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False, default=0, server_default="0")
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    correction_reason: Mapped[Optional[str]] = mapped_column(Text)
-
-
-class EvaluationItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "evaluation_item"
-    __table_args__ = (
-        UniqueConstraint("evaluation_id", "criterion_id"),
-        CheckConstraint("points >= 0", name="points_nonnegative"),
-    )
-    evaluation_id: Mapped[uuid.UUID] = fk("evaluation.id")
-    criterion_id: Mapped[uuid.UUID] = fk("rubric_criterion.id")
-    points: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
-    comment: Mapped[Optional[str]] = mapped_column(Text)
-    bonus_evidence_id: Mapped[Optional[uuid.UUID]] = fk("bonus_evidence.id", nullable=True)
-
-
-class FinalResult(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "final_result"
-    __table_args__ = (
-        UniqueConstraint("session_id", "thesis_member_id"),
-        CheckConstraint("average_score >= 0 AND average_score <= 10", name="average_score"),
-        CheckConstraint("bonus_average >= 0 AND bonus_average <= 1", name="bonus_average"),
-        CheckConstraint("final_score >= 0 AND final_score <= 10", name="final_score"),
-        CheckConstraint("scorer_count > 0", name="scorer_count"),
-        CheckConstraint("calculation_version > 0", name="calculation_version"),
-    )
-    session_id: Mapped[uuid.UUID] = fk("defense_session.id")
-    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
-    scorer_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    average_score: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
-    bonus_average: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
-    final_score: Mapped[Decimal] = mapped_column(Numeric(3, 1), nullable=False)
-    calculation_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class CouncilMinute(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "council_minute"
-    __table_args__ = (
-        UniqueConstraint("session_id", "minute_no"),
-        CheckConstraint(
-            "state IN ('DRAFT','EXPORTED','PRINTED','SIGNED','LOCKED','VOID','REPLACED')",
-            name="state",
-        ),
-    )
-    session_id: Mapped[uuid.UUID] = fk("defense_session.id")
-    minute_no: Mapped[str] = mapped_column(String(100), nullable=False)
-    current_version_no: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-    printed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    signed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
-class MinuteVersion(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "minute_version"
-    __table_args__ = (
-        UniqueConstraint("minute_id", "version_no"),
-        CheckConstraint("version_no > 0", name="version_positive"),
-        CheckConstraint("state IN ('DRAFT','EXPORTED','VOID','PRINTED','SIGNED')", name="state"),
-        CheckConstraint("replacement_for_id IS NULL OR replacement_for_id <> id", name="not_self_replacement"),
-    )
-    minute_id: Mapped[uuid.UUID] = fk("council_minute.id")
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    registration_id: Mapped[uuid.UUID] = fk("topic_registration.id")
     stored_file_id: Mapped[uuid.UUID] = fk("stored_file.id")
-    generated_by: Mapped[uuid.UUID] = fk("user_account.id")
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
-    replacement_for_id: Mapped[Optional[uuid.UUID]] = fk("minute_version.id", nullable=True)
-    void_reason: Mapped[Optional[str]] = mapped_column(Text)
-
-
-class MinuteSignature(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "minute_signature"
-    __table_args__ = (UniqueConstraint("minute_version_id", "signer_member_id"),)
-    minute_version_id: Mapped[uuid.UUID] = fk("minute_version.id")
-    signer_member_id: Mapped[uuid.UUID] = fk("council_member.id")
-    signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    signature_ref: Mapped[Optional[str]] = mapped_column(String(500))
-
-
-class RepositoryItem(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
-    __tablename__ = "repository_item"
-    __table_args__ = (
-        CheckConstraint("visibility IN ('INTERNAL','PUBLISHED','REVOKED')", name="visibility"),
-        Index("ix_repository_item_source_type_visibility", "source_type", "visibility"),
-        UniqueConstraint("external_source_id"),
-        CheckConstraint("origin_type IN ('MANAGED_THESIS','IMPORTED_DOCUMENT','OFFICIAL_SOURCE')", name="origin_type"),
-        CheckConstraint("source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','REGULATION','FORM','GUIDELINE','SYNTHETIC_TEST')", name="source_type"),
-        CheckConstraint(
-            "(origin_type = 'MANAGED_THESIS' AND source_type = 'THESIS' AND thesis_id IS NOT NULL AND published_document_version_id IS NOT NULL) OR "
-            "(origin_type = 'IMPORTED_DOCUMENT' AND source_type IN ('THESIS','CAPSTONE_PROJECT','TERM_PROJECT','COURSE_PROJECT','SYNTHETIC_TEST') AND thesis_id IS NULL AND published_document_version_id IS NULL) OR "
-            "(origin_type = 'OFFICIAL_SOURCE' AND source_type IN ('REGULATION','FORM','GUIDELINE') AND thesis_id IS NULL AND published_document_version_id IS NULL)",
-            name="origin_source_consistency",
-        ),
-        CheckConstraint("source_ref IS NOT NULL OR source_url IS NOT NULL OR stored_file_id IS NOT NULL OR published_document_version_id IS NOT NULL", name="has_source_reference"),
-        CheckConstraint("source_url IS NULL OR source_url LIKE 'https://%'", name="source_url_https"),
-    )
-    thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
-    published_document_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("document_version.id", ondelete="RESTRICT"), nullable=True, unique=True
-    )
-    stored_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
-    origin_type: Mapped[str] = mapped_column(String(30), nullable=False, default="MANAGED_THESIS", server_default="MANAGED_THESIS")
-    external_source_id: Mapped[Optional[str]] = mapped_column(String(200))
-    source_ref: Mapped[Optional[str]] = mapped_column(String(500))
-    source_url: Mapped[Optional[str]] = mapped_column(String(1000))
-    provenance: Mapped[Optional[str]] = mapped_column(Text)
-    source_version: Mapped[Optional[str]] = mapped_column(String(100))
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    abstract: Mapped[Optional[str]] = mapped_column(Text)
-    keywords: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="THESIS", server_default="THESIS")
-    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="INTERNAL", server_default="INTERNAL")
-    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
-class SearchIndexMetadata(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "search_index_metadata"
-    __table_args__ = (
-        UniqueConstraint("repository_item_id", "index_name", "index_version"),
-        CheckConstraint("state IN ('PENDING','INDEXED','FAILED','REMOVED')", name="state"),
-    )
-    repository_item_id: Mapped[uuid.UUID] = fk("repository_item.id")
-    document_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
-    index_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    index_version: Mapped[str] = mapped_column(String(100), nullable=False)
-    embedding_model: Mapped[Optional[str]] = mapped_column(String(150))
-    chunking_version: Mapped[Optional[str]] = mapped_column(String(100))
-    external_point_namespace: Mapped[Optional[str]] = mapped_column(String(200))
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING", server_default="PENDING")
-    indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-
-
-class RetrievalAudit(UuidPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "retrieval_audit"
-    __table_args__ = (
-        CheckConstraint("outcome IN ('ANSWERED','NO_EVIDENCE','DEPENDENCY_FAILED','DENIED')", name="outcome"),
-    )
-    user_id: Mapped[uuid.UUID] = fk("user_account.id")
-    question_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    authorized_scope_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    retrieved_item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-    provider: Mapped[Optional[str]] = mapped_column(String(100))
-    model_version: Mapped[Optional[str]] = mapped_column(String(100))
-    outcome: Mapped[str] = mapped_column(String(30), nullable=False)
-    correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    submitted_by: Mapped[uuid.UUID] = fk("student_profile.id")
+    form_code: Mapped[str] = mapped_column(String(2), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    registration_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class AuditEvent(UuidPrimaryKeyMixin, Base):
     __tablename__ = "audit_event"
+    __table_args__ = (Index("ix_audit_event_occurred_id", "occurred_at", "id"),)
     actor_id: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -1059,5 +712,44 @@ class AuditEvent(UuidPrimaryKeyMixin, Base):
     before_hash: Mapped[Optional[str]] = mapped_column(String(64))
     after_hash: Mapped[Optional[str]] = mapped_column(String(64))
     reason: Mapped[Optional[str]] = mapped_column(Text)
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     correlation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+
+
+class UserNotification(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    """A short in-web notice addressed to one account.
+
+    Older proposal/registration notices are keyed by registration; later thesis and
+    account notices may instead carry thesis/subject/message/url. No separate table.
+    """
+    __tablename__ = "user_notification"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','PROPOSAL_REVIEWED','PROPOSAL_FINALIZED',"
+            "'REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED',"
+            "'MILESTONE_OPENED','MILESTONE_EXTENDED','MILESTONE_REOPENED','MILESTONE_CLOSED',"
+            "'DOCUMENT_DEADLINE_SET','DOCUMENT_DEADLINE_EXTENDED','DOCUMENT_DEADLINE_REOPENED','DOCUMENT_DEADLINE_CLOSED',"
+            "'PROGRESS_SUBMITTED','PROGRESS_CONFIRMED','PROGRESS_REVISION_REQUIRED','PROGRESS_COMMENT',"
+            "'DOCUMENT_SUBMITTED','DOCUMENT_ACCEPTED','DOCUMENT_REVISION_REQUESTED',"
+            "'WORK_SUBMITTED','WORK_APPROVED','WORK_REVISION_REQUIRED',"
+            "'ACCOUNT_LOCKED','ACCOUNT_UNLOCKED','ACCOUNT_DISABLED','ACCOUNT_RESTORED',"
+            "'ACCOUNT_LINK_REISSUED','ACCOUNT_EMAIL_CORRECTED',"
+            "'REGISTRATION_FORM_SUBMITTED','PROPOSAL_REVIEWER_ASSIGNED',"
+            "'PROGRESS_REVIEWER_ASSIGNED','PROPOSAL_DEAN_CONFIRMED','WORKFLOW_NOTICE')",
+            name="kind",
+        ),
+        Index("ix_user_notification_recipient_created", "recipient_user_id", "created_at"),
+        Index("ix_user_notification_thesis_created", "thesis_id", "created_at"),
+    )
+    recipient_user_id: Mapped[uuid.UUID] = fk("user_account.id")
+    actor_user_id: Mapped[uuid.UUID] = fk("user_account.id")
+    registration_id: Mapped[Optional[uuid.UUID]] = fk("topic_registration.id", nullable=True)
+    thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
+    subject_type: Mapped[Optional[str]] = mapped_column(String(40))
+    subject_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    message: Mapped[Optional[str]] = mapped_column(Text)
+    url: Mapped[Optional[str]] = mapped_column(String(300))
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
