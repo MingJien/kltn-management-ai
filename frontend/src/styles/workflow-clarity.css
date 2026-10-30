@@ -31,8 +31,8 @@ details > summary { cursor:pointer; line-height:1.6; font-weight: 600; padding:8
 
 .table-container { border:1px solid var(--neutral-200); border-radius:12px; background:#fff; }
 .table-container > table { border-collapse:collapse; text-align:left; }
-.table-container th { background:var(--primary-50); color:var(--primary-800); font-size:13px; border-bottom:1px solid var(--primary-200); }
-.table-container td { font-size:14px; line-height:1.6; border-bottom:1px solid var(--neutral-100); }
+.table-container th { background:var(--primary-50); color:var(--primary-800); font-size:12px; font-weight:700; letter-spacing:0.03em; border-bottom:1px solid var(--primary-200); }
+.table-container td { font-size:13px; line-height:1.6; border-bottom:1px solid var(--neutral-100); }
 .table-container tbody tr:last-child td { border-bottom:0; }
 .table-container tbody tr:hover { background:var(--neutral-50); }
 .school-forms-page > .card label { display:grid; gap:8px; font-size:13px; font-weight: 600; }

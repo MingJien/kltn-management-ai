@@ -103,6 +103,10 @@ def can_view(session, user, notice):
         return True
     if kind == "account":
         return user.id == identifier or user.base_role == "ADMIN"
+    if kind == "defense":
+        from backend.services.evaluation import permissions
+        thesis = session.get(m.Thesis, identifier)
+        return bool(thesis and "evaluation:view" in permissions(session, user, thesis))
     if kind == "thesis":
         thesis = session.get(m.Thesis, identifier)
         if thesis is None:

@@ -35,7 +35,7 @@
 .review-pin--selected { outline: 3px solid #32cabb70; z-index: 6; }
 .review-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-left: 1px solid #dfebeb; }
 .review-sidebar-top { padding: 20px 18px 15px; border-bottom: 1px solid #edf1f1; }
-.review-sidebar-top h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; color: #123d4d; }
+.review-sidebar-top h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #123d4d; }
 .review-sidebar-top h3 span { margin-left: auto; min-width: 25px; text-align: center; padding: 3px 7px; border-radius: 8px; background: #e6f5f0; color: #0f7469; font-size: 12px; }
 .review-sidebar-top p { color: #68828b; font-size: 12px; line-height: 1.6; margin: 0; }
 .review-add-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }

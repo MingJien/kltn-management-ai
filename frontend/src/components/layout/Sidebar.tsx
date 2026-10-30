@@ -117,10 +117,10 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
               <NavLink to={progressPath} title={collapsed ? "Báo cáo tiến độ" : undefined} className={() => "sidebar__item " + (isProgressActive ? "sidebar__item--active" : "")}
                 onClick={onClose}><ClipboardList aria-hidden="true" /><span>Báo cáo tiến độ</span></NavLink>
             </SidebarGroup>
-            <SidebarGroup label="BẢO VỆ VÀ ĐÁNH GIÁ" active={["council", "defense", "evaluation", "results"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed} defaultOpen={false}>
+            <SidebarGroup label="BẢO VỆ VÀ ĐÁNH GIÁ" active={pathname.startsWith("/evaluation") || ["council", "defense", "results"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed} defaultOpen={true}>
+              <NavLink to="/evaluation" title={collapsed ? "Phản biện & điều kiện bảo vệ" : undefined} className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><ClipboardList aria-hidden="true"/><span>Phản biện & điều kiện bảo vệ</span></NavLink>
               <PlannedLink id="council" collapsed={collapsed} icon={<UsersRound aria-hidden="true" />} onClose={onClose} />
               <PlannedLink id="defense" collapsed={collapsed} icon={<CalendarDays aria-hidden="true" />} onClose={onClose} />
-              <PlannedLink id="evaluation" collapsed={collapsed} icon={<ClipboardList aria-hidden="true" />} onClose={onClose} />
               <PlannedLink id="results" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
             </SidebarGroup>
             <SidebarGroup label="THỬ NGHIỆM AI" active={pathname === "/ai" || ["repository", "chatbot", "similarity"].some(id => pathname === `/planned/${id}`)} collapsed={collapsed}>

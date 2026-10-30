@@ -4,13 +4,15 @@
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic head `20261028_0015`: **39 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
+PostgreSQL `kltn_management`, Alembic head `20261030_0017`: **41 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
 
 Tiến độ có khung xem PDF và ghim nhận xét theo đúng lần nộp. Ghim nháp tự lưu riêng cho GV; khi gửi kết quả mới hiện cho SV. Trang, thu phóng, vị trí cuộn và nhận xét tổng quát đang viết được khôi phục trên cùng trình duyệt/tài khoản. DOCX/TXT nhận xét theo mục và đoạn trích.
 
 Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng ký và Mẫu 3 về Đề cương. Nộp bản sửa trong cùng hồ sơ giữ nguyên các phiên bản cũ. Tải bản gốc và xuất bản đã duyệt có footer để ký là hai thao tác riêng; lịch sử xuất hiển thị người xuất, mã và thời điểm theo từng phiên bản. Mẫu 1 có footer bản nộp, chưa xác nhận Khoa duyệt.
 
 ## Tình hình hiện tại
+
+- **NV6 tuần 1** có UI/API phân công, thu hồi, gia hạn phản biện; nhận xét GVHD Mẫu 7/GVPB Mẫu 8 theo từng sinh viên và đúng bản báo cáo. Nháp riêng, xuất phiếu đã điền để ký, quét bản ký trước khi gửi; phiếu đã gửi giữ nguyên và bản sửa có lý do. TBM xét ba điều kiện cấp Trường theo căn cứ, lưu lịch sử và gửi thông báo đúng tài khoản. Nhóm chỉ sẵn sàng bảo vệ khi mọi thành viên đủ điều kiện. [Luồng bàn giao](docs/design/nv6-review-defense-workflow.md) · [Kiểm chứng và giới hạn](docs/evidence/nv6-week1-validation.md).
 
 - Cuốn báo cáo KLTN trước bảo vệ có hạn REPORT riêng và phiên bản, tách khỏi báo cáo tiến độ theo mốc. Kiểm tra tương đồng chưa triển khai. Mẫu 1a/1b vẫn nộp tại Hồ sơ đăng ký.
 - Chuông gửi thông báo theo đúng người liên quan, phản hồi cho cả nhóm; bấm thông báo nạp dữ liệu mới kể cả khi đang ở chính trang đó. Quyền được kiểm lại trước khi xem thông báo riêng. SV/GV/TBM/Admin đều tra cứu đề tài đã công bố, không được mở hồ sơ riêng chỉ nhờ biết liên kết.
@@ -29,7 +31,7 @@ Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng
 - Chuông thông báo trong web gửi đúng người theo từng thao tác: SV nộp đề cương, báo cáo tiến độ, tài liệu hoặc Mẫu 1a/1b chỉ tới GVHD/GV tiếp nhận của đúng hồ sơ; GV phân công góp ý chéo tới đúng GV được phân công; GVHD/TBM/Trưởng khoa chốt đề cương tới SV, GVHD và TBM liên quan; thao tác tài khoản tới chính tài khoản đó. Thông báo chỉ hiện trong web cho người nhận, không gửi email và không lộ cho SV/GV/TBM khác.
 - Minh chứng đăng ký cũng được quét ClamAV khi tải lên; UI hiển thị trạng thái, có quét lại nếu lỗi/chưa quét và chỉ cho tải tệp sạch. Bản in PDF dành vùng footer riêng để giữ nội dung gốc; hồ sơ GV hiển thị mã, bộ môn và Khoa theo đúng phạm vi.
 
-Kiểm chứng tại `D:\KLTN` ngày 27/10/2026: 121 kiểm thử backend; 25 kiểm thử UI (19 tích hợp thật, 6 phản hồi UI có API mô phỏng); frontend build và kiểm tra schema drift đạt. Kiểm thử dùng PostgreSQL/ClamAV thật, dữ liệu giả trong schema riêng, không gửi SMTP thật. Mẫu 1a/1b, 2, 3 xuất từ UI đã được render bằng Word và kiểm tra footer từng trang.
+Kiểm chứng NV6 ngày 30/10/2026 dùng dữ liệu giả trong schema riêng, không gửi SMTP thật: bộ backend, build frontend và kiểm tra schema drift; ba kịch bản NV6 tích hợp Chromium/API/PostgreSQL/ClamAV, mobile và accessibility. Phiếu Mẫu 7/8 được xuất và render bằng Word để kiểm tra bố cục. Bộ UI cũ chạy gộp chưa đạt toàn bộ; số liệu và ca lỗi được nêu rõ trong [minh chứng](docs/evidence/nv6-week1-validation.md), không dùng kết quả lịch sử thay kết quả hiện hành.
 
 Hội đồng/lịch bảo vệ, chấm điểm và biên bản chưa hoàn thiện. Chatbot chưa kết nối Gemini.
 
@@ -54,7 +56,7 @@ npm ci --prefix frontend
 npm run dev --prefix frontend
 ```
 
-Mở `http://localhost:5173` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
+Mở `http://127.0.0.1:1573` và dùng cùng hostname này cho liên kết trong email để giữ đúng phiên đăng nhập. Chọn **Bảo vệ và đánh giá → Phản biện & điều kiện bảo vệ** để vào NV6. Mật khẩu và cấu hình thư thật chỉ nằm trong máy local, không có trong repository.
 Trên máy phát triển, `KLTN_DEMO_MODE=true` trong `.env` hiện lựa chọn SV/GV/TBM giả lập tại trang đăng nhập; tài khoản kích hoạt qua email vẫn đăng nhập bằng mật khẩu.
 
 Windows đã cài ClamAV tại `C:\Program Files\ClamAV` và cấu hình `C:\ProgramData\ClamAV\clamd.conf` chỉ nghe `127.0.0.1:3310`: `run_demo_api` tự khởi động/reuse daemon. Cập nhật chữ ký bằng `freshclam.exe`; nếu bộ quét chưa sẵn sàng, hệ thống giữ tệp cách ly và báo trạng thái thật.
@@ -77,7 +79,8 @@ $env:KLTN_E2E_ALLOW_ISOLATED_SCHEMA = 'true'
 - [ERD hiện hành](docs/design/erd-kltn-management.md) · [ERD theo cụm](docs/design/erd-clusters/README.md)
 - [Từ điển dữ liệu](docs/design/database-dictionary.md)
 - [Quy trình đăng ký](docs/design/registration-workflow.md)
-- [Minh chứng cấu trúc CSDL](docs/evidence/official-db-validation.md)
+- [Luồng phản biện và xét điều kiện NV6](docs/design/nv6-review-defense-workflow.md)
+- [Minh chứng NV6 và CSDL hiện hành](docs/evidence/nv6-week1-validation.md)
 
 Repository không chứa dữ liệu thật hay cấu hình bí mật. Nội dung AI thử nghiệm dùng corpus giả cục bộ; việc gửi tài liệu cho dịch vụ AI cần theo chính sách của Khoa/Trường.
 

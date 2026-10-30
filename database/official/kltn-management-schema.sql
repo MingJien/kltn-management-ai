@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261029_0016.
--- 39 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261030_0017.
+-- 41 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -632,6 +632,9 @@ CREATE TABLE reviewer_assignment (
 	assigned_by UUID NOT NULL,
 	assigned_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	state VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL,
+	due_at TIMESTAMP WITH TIME ZONE,
+	assignment_reason TEXT,
+	source_reference VARCHAR(500),
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
@@ -772,17 +775,17 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
+CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
+
+CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
+
+CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
+
 CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
 
 CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
 CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
-
-CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
-
-CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
-
-CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
 
 CREATE TABLE official_form (
 	round_id UUID NOT NULL,
@@ -833,6 +836,72 @@ CREATE TABLE official_form_version (
 );
 
 CREATE UNIQUE INDEX uq_official_form_current ON official_form_version (official_form_id) WHERE state = 'PUBLISHED';
+
+CREATE TABLE thesis_review (
+	thesis_id UUID NOT NULL,
+	thesis_member_id UUID NOT NULL,
+	lecturer_id UUID NOT NULL,
+	advisor_assignment_id UUID,
+	reviewer_assignment_id UUID,
+	report_version_id UUID NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	version_no INTEGER NOT NULL,
+	sections JSONB NOT NULL,
+	thesis_completed BOOLEAN,
+	allow_defense BOOLEAN,
+	signed_file_id UUID,
+	source_reference VARCHAR(500),
+	revision_reason TEXT NOT NULL,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_review PRIMARY KEY (id),
+	CONSTRAINT uq_thesis_review_thesis_member_id_lecturer_id_kind_version_no UNIQUE (thesis_member_id, lecturer_id, kind, version_no),
+	CONSTRAINT ck_thesis_review_kind CHECK (kind IN ('ADVISOR','REVIEWER')),
+	CONSTRAINT ck_thesis_review_state CHECK (state IN ('DRAFT','SUBMITTED')),
+	CONSTRAINT ck_thesis_review_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_thesis_review_assignment_matches_kind CHECK ((kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)),
+	CONSTRAINT ck_thesis_review_submitted_has_signed_copy CHECK (state = 'DRAFT' OR (signed_file_id IS NOT NULL AND submitted_at IS NOT NULL)),
+	CONSTRAINT fk_thesis_review_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_thesis_member_id_thesis_member FOREIGN KEY(thesis_member_id) REFERENCES thesis_member (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_lecturer_id_lecturer_profile FOREIGN KEY(lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_advisor_assignment_id_advisor_assignment FOREIGN KEY(advisor_assignment_id) REFERENCES advisor_assignment (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_reviewer_assignment_id_reviewer_assignment FOREIGN KEY(reviewer_assignment_id) REFERENCES reviewer_assignment (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_signed_file_id_stored_file FOREIGN KEY(signed_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_thesis_review_thesis_member ON thesis_review (thesis_id, thesis_member_id);
+
+CREATE TABLE defense_eligibility_check (
+	thesis_id UUID NOT NULL,
+	thesis_member_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	report_version_id UUID,
+	advisor_review_id UUID,
+	discipline_status VARCHAR(30) NOT NULL,
+	source_reference VARCHAR(500) NOT NULL,
+	reason TEXT NOT NULL,
+	state VARCHAR(20) NOT NULL,
+	checked_by UUID NOT NULL,
+	checked_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	id UUID NOT NULL,
+	CONSTRAINT pk_defense_eligibility_check PRIMARY KEY (id),
+	CONSTRAINT uq_defense_eligibility_check_thesis_member_id_version_no UNIQUE (thesis_member_id, version_no),
+	CONSTRAINT ck_defense_eligibility_check_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_defense_eligibility_check_discipline_status CHECK (discipline_status IN ('CLEAR','WARNING_OR_HIGHER','UNKNOWN')),
+	CONSTRAINT ck_defense_eligibility_check_state CHECK (state IN ('ELIGIBLE','BLOCKED')),
+	CONSTRAINT fk_defense_eligibility_check_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_eligibility_check_thesis_member_id_thesis_member FOREIGN KEY(thesis_member_id) REFERENCES thesis_member (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_eligibility_check_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_eligibility_check_advisor_review_id_thesis_review FOREIGN KEY(advisor_review_id) REFERENCES thesis_review (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_eligibility_check_checked_by_user_account FOREIGN KEY(checked_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_defense_eligibility_check_thesis_member ON defense_eligibility_check (thesis_id, thesis_member_id);
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

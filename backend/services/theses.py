@@ -87,6 +87,10 @@ def rights(session, user, thesis):
             result.update({"view", "proposal:view", "proposal:comment"})
         if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=thesis.round_id):
             result.update({"view", "milestone:manage"})
+    from backend.services.evaluation import permissions
+    evaluation_actions = permissions(session, user, thesis)
+    if evaluation_actions:
+        result.update(evaluation_actions | {"view"})
     return result
 
 
@@ -155,8 +159,11 @@ def list_theses(session, user):
             m.ReviewerAssignment.lecturer_id == lecturer.id,
             m.ReviewerAssignment.review_scope == "PROPOSAL",
             m.ReviewerAssignment.state == "ACTIVE")
+        thesis_reviews = select(m.ReviewerAssignment.thesis_id).where(
+            m.ReviewerAssignment.lecturer_id == lecturer.id,
+            m.ReviewerAssignment.review_scope == "THESIS", m.ReviewerAssignment.state == "ACTIVE")
         query = select(m.Thesis).where(or_(m.Thesis.department_id.in_(heads), m.Thesis.id.in_(advisors),
-            m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews)))
+            m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews), m.Thesis.id.in_(thesis_reviews)))
     else:
         return []
     return [workspace_out(session, user, row) for row in session.scalars(query.order_by(m.Thesis.created_at.desc(), m.Thesis.id)).all()]

@@ -12,6 +12,14 @@ from tools.validate_official_database import main as validate_official_database
 
 def main() -> None:
     load_local_env()
+    # Keep local activation/reset links and print footers on the same origin as Vite.
+    # Preserve any non-default URL explicitly configured for another local deployment.
+    legacy_local_origins = {"http://localhost:5173", "http://127.0.0.1:5173"}
+    local_frontend = "http://127.0.0.1:1573"
+    for key in ("KLTN_FRONTEND_URL", "KLTN_PUBLIC_URL"):
+        configured = os.getenv(key, "").strip().rstrip("/")
+        if not configured or configured in legacy_local_origins:
+            os.environ[key] = local_frontend
     os.environ["DATABASE_URL"] = database_url()
     validate_official_database()
     from backend.services.file_scanner import start_local_daemon

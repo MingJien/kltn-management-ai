@@ -119,6 +119,11 @@ def visibility(session, user):
     scopes["topic_registration"] |= registrations
     scopes["registration"] |= registrations  # Earlier evidence events used this resource name.
     scopes["thesis"] |= full_theses
+    check_query = select(m.DefenseEligibilityCheck.id).where(m.DefenseEligibilityCheck.thesis_id.in_(full_theses))
+    if user.base_role == "STUDENT":
+        own_members = select(m.ThesisMember.id).join(m.StudentProfile, m.StudentProfile.id == m.ThesisMember.student_id).where(m.StudentProfile.user_id == user.id)
+        check_query = check_query.where(m.DefenseEligibilityCheck.thesis_member_id.in_(own_members))
+    scopes["defense_eligibility_check"] |= set(session.scalars(check_query))
     all_theses = full_theses | proposal_theses | progress_theses
     rounds |= _ids(session, m.Thesis.round_id, m.Thesis.id.in_(all_theses))
     proposals = _ids(session, m.Proposal.id, m.Proposal.thesis_id.in_(full_theses | proposal_theses))

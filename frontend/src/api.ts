@@ -358,6 +358,16 @@ export async function downloadOfficialTemplate(templateId: string, filename: str
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export async function exportThesisReview(thesisId:string, reviewId:string, version:number) {
+  const response=await fetch(`${baseUrl}/api/v1/theses/${thesisId}/evaluation/reviews/${reviewId}/print-copy`, {
+    method:"POST",credentials:"include",headers:{"If-Match":String(version),...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
+  anchor.href=url;anchor.download=(response.headers.get("X-Document-Code")||"phieu-nhan-xet")+".docx";anchor.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 async function downloadFormTemplate(kind: "plan" | "proposal", name: string, roundId?: string) {
   const response = await fetch(`${baseUrl}/api/v1/form-templates/${kind}${roundId ? `?round_id=${roundId}` : ""}`, {credentials: "include"});
   if (!response.ok) {

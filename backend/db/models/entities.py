@@ -20,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
@@ -431,6 +431,9 @@ class ReviewerAssignment(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Ba
     assigned_by: Mapped[uuid.UUID] = fk("user_account.id")
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    assignment_reason: Mapped[Optional[str]] = mapped_column(Text)
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
 
 
 class StoredFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -682,6 +685,59 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     due_at_at_submission: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
+
+
+class ThesisReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    """Mẫu 7/8, per student and immutable report version; submitted rows are immutable."""
+    __tablename__ = "thesis_review"
+    __table_args__ = (
+        UniqueConstraint("thesis_member_id", "lecturer_id", "kind", "version_no"),
+        CheckConstraint("kind IN ('ADVISOR','REVIEWER')", name="kind"),
+        CheckConstraint("state IN ('DRAFT','SUBMITTED')", name="state"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("(kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)", name="assignment_matches_kind"),
+        CheckConstraint("state = 'DRAFT' OR (signed_file_id IS NOT NULL AND submitted_at IS NOT NULL)", name="submitted_has_signed_copy"),
+        Index("ix_thesis_review_thesis_member", "thesis_id", "thesis_member_id"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
+    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    advisor_assignment_id: Mapped[Optional[uuid.UUID]] = fk("advisor_assignment.id", nullable=True)
+    reviewer_assignment_id: Mapped[Optional[uuid.UUID]] = fk("reviewer_assignment.id", nullable=True)
+    report_version_id: Mapped[uuid.UUID] = fk("document_version.id")
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    sections: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    thesis_completed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    allow_defense: Mapped[Optional[bool]] = mapped_column(Boolean)
+    signed_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
+    revision_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseEligibilityCheck(UuidPrimaryKeyMixin, Base):
+    """Append-only school eligibility decision, separately recorded for each student."""
+    __tablename__ = "defense_eligibility_check"
+    __table_args__ = (
+        UniqueConstraint("thesis_member_id", "version_no"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("discipline_status IN ('CLEAR','WARNING_OR_HIGHER','UNKNOWN')", name="discipline_status"),
+        CheckConstraint("state IN ('ELIGIBLE','BLOCKED')", name="state"),
+        Index("ix_defense_eligibility_check_thesis_member", "thesis_id", "thesis_member_id"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    report_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
+    advisor_review_id: Mapped[Optional[uuid.UUID]] = fk("thesis_review.id", nullable=True)
+    discipline_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    checked_by: Mapped[uuid.UUID] = fk("user_account.id")
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class RegistrationFormVersion(UuidPrimaryKeyMixin, Base):

@@ -52,7 +52,7 @@ def initial_ddl() -> list[str]:
         for statement in statements
         if (match := re.match(r"^CREATE\s+TABLE\s+(\w+)\b", statement, re.IGNORECASE))
     ]
-    initial_tables = SELECTED_TABLES - {"user_notification", "department_major", "document_deadline", "registration_form_version", "progress_review_annotation", "official_form", "official_form_version"}
+    initial_tables = SELECTED_TABLES - {"user_notification", "department_major", "document_deadline", "registration_form_version", "progress_review_annotation", "official_form", "official_form_version", "thesis_review", "defense_eligibility_check"}
     if len(tables) != len(initial_tables) or set(tables) != initial_tables:
         raise RuntimeError(
             "Initial migration does not match the official selection: "
@@ -127,7 +127,9 @@ def initial_ddl() -> list[str]:
     annotation_table = target_metadata.tables["progress_review_annotation"]
     statements.append(str(CreateTable(annotation_table).compile(dialect=postgresql.dialect())).strip() + ";")
     statements.extend(str(CreateIndex(index).compile(dialect=postgresql.dialect())).strip() + ";" for index in annotation_table.indexes)
-    for name in ("official_form", "official_form_version"):
+    reviewer_index = next(i for i, statement in enumerate(statements) if statement.startswith("CREATE TABLE reviewer_assignment ("))
+    statements[reviewer_index] = str(CreateTable(target_metadata.tables["reviewer_assignment"]).compile(dialect=postgresql.dialect())).strip() + ";"
+    for name in ("official_form", "official_form_version", "thesis_review", "defense_eligibility_check"):
         table = target_metadata.tables[name]
         statements.append(str(CreateTable(table).compile(dialect=postgresql.dialect())).strip() + ";")
         statements.extend(str(CreateIndex(index).compile(dialect=postgresql.dialect())).strip() + ";" for index in table.indexes)

@@ -21,6 +21,8 @@ import ThesesPage from "./pages/ThesesPage";
 import SubmissionsPage from "./pages/SubmissionsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
+const EvaluationsPage = lazy(() => import("./pages/EvaluationsPage"));
+const EvaluationPage = lazy(() => import("./pages/EvaluationPage"));
 import { plannedPages, type PlannedPageId } from "./plannedPages";
 const AIPage = lazy(() => import("./pages/AIPage"));
 
@@ -171,6 +173,9 @@ function App() {
         <Route path="/submissions" element={workflowAccess ? <SubmissionsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/forms" element={<SchoolFormsPage context={context}/>} />
         <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
+        <Route path="/evaluation" element={workflowAccess ? <EvaluationsPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/evaluation/:thesisId" element={workflowAccess ? <EvaluationPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/planned/evaluation" element={<Navigate to="/evaluation" replace/>}/>
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
         <Route path="/lecturers/:lecturerId" element={workflowAccess ?
           <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />

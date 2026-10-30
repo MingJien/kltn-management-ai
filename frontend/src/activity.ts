@@ -5,6 +5,10 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  THESIS_REVIEWER_ASSIGNED: "Phân công phản biện khóa luận", THESIS_REVIEWER_REVOKED: "Thu hồi phân công phản biện",
+  THESIS_REVIEW_DEADLINE_EXTENDED: "Gia hạn gửi nhận xét phản biện", THESIS_REVIEW_SUBMITTED: "Gửi nhận xét Mẫu 7/8",
+  THESIS_REVIEW_EXPORTED: "Xuất phiếu nhận xét đã điền để ký",
+  DEFENSE_ELIGIBILITY_CHECKED: "Xét điều kiện dự bảo vệ", DEFENSE_ELIGIBILITY_REOPENED: "Mở xét lại điều kiện bảo vệ",
   OFFICIAL_FORM_CREATED: "Tạo danh mục biểu mẫu Khoa", OFFICIAL_FORM_METADATA_UPDATED: "Cập nhật danh mục biểu mẫu",
   OFFICIAL_FORM_VERSION_UPLOADED: "Tải phiên bản biểu mẫu lên kho", OFFICIAL_FORM_PUBLISHED: "Phát hành biểu mẫu",
   OFFICIAL_FORM_WITHDRAWN: "Thu hồi phiên bản biểu mẫu", OFFICIAL_FORM_BOOTSTRAPPED: "Khởi tạo mẫu Khoa",

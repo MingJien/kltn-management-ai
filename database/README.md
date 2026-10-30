@@ -1,6 +1,6 @@
 # PostgreSQL `kltn_management`
 
-The application database uses 33 business tables and `alembic_version`. Current Alembic head is `20261021_0003`.
+The application database uses 41 business tables and `alembic_version`. Current Alembic head is `20261030_0017`. NV6 adds version-bound Mẫu 7/8 reviews and per-student defense eligibility history.
 
 | File | Purpose |
 | --- | --- |

@@ -83,7 +83,11 @@ def allowed_frontend_origins() -> list[str]:
     if os.getenv("KLTN_ENV") == "production":
         return [configured] if configured else []
     return list(dict.fromkeys(origin for origin in (
-        "http://localhost:5173", "http://127.0.0.1:5173", configured,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:1573",
+        "http://127.0.0.1:1573",
+        configured,
     ) if origin))
 
 

@@ -29,3 +29,6 @@ include = ["backend*"]
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.27,<1", "openapi-spec-validator>=0.7,<1", "Pillow>=10,<13"]
 sso = ["Authlib>=1.8,<2", "httpx2>=1,<2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
