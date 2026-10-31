@@ -1,4 +1,5 @@
-# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI — Khoa Công nghệ và Kỹ thuật, ĐH Đồng Tháp
+# Hệ thống quản lý khóa luận tốt nghiệp tích hợp chatbot AI 
+(Khoa Công nghệ và Kỹ thuật, ĐH Đồng Tháp)
 
 ## Hiện trạng
 
