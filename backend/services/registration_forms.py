@@ -43,6 +43,10 @@ def rows(session, reg):
 def can_submit(session, user, reg):
     if user.base_role != "STUDENT" or reg.state not in {"DRAFT", "RETURNED", "SUBMITTED"}:
         return False
+    from backend.services.registration import confirmed_student_ids
+    student = profile(session, user, "STUDENT")
+    if student.id not in confirmed_student_ids(session, reg.round_id, [student.id]):
+        return False
     round_ = session.get(m.ThesisRound, reg.round_id)
     return round_.state == "OPEN" and round_.opens_at <= now() <= round_.closes_at
 

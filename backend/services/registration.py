@@ -129,6 +129,7 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
         receiver = receivers.get(topic.receiving_lecturer_id)
         thesis = theses.get(reg.id)
         reg_members = [item for item in members if item.registration_id == reg.id]
+        eligible_members = confirmed_student_ids(session, reg.round_id, [item.student_id for item in reg_members])
         result.append(RegistrationOut(
         id=reg.id, topic_id=reg.topic_id, round_id=reg.round_id, state=reg.state, row_version=reg.row_version,
         expected_member_count=reg.expected_member_count, submitted_at=reg.submitted_at,
@@ -142,7 +143,7 @@ def registrations_out(session: Session, registrations: list[m.TopicRegistration]
             consent_status=item.consent_status,
             evidence_file_name=files[item.evidence_file_id].original_name if item.evidence_file_id else None,
             evidence_scan_state=files[item.evidence_file_id].scan_state if item.evidence_file_id else None,
-            can_upload_evidence=may_upload_evidence(reg, item),
+            can_upload_evidence=may_upload_evidence(reg, item) and item.student_id in eligible_members,
             can_withdraw=may_withdraw(reg, item, acceptance_times.get(reg.id)),
         ) for item in reg_members],
         lecturer_decided_at=reg.lecturer_decided_at,

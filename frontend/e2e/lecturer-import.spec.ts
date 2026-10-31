@@ -19,7 +19,7 @@ test("Excel GV: xem trước → tạo riêng, chưa gửi → chọn/bỏ chọ
     await page.getByLabel("Mật khẩu", {exact: true}).fill(accounts.admin.password);
     await page.getByRole("button", {name: "Đăng nhập", exact: true}).click();
     await expect(page.getByRole("heading", {name: "Tổng quan", exact: true})).toBeVisible();
-    await page.goto("/administration");
+    await page.goto("/lecturers");
     const region = page.getByRole("region", {name: "Nhập và mời danh sách giảng viên"});
     await expect(region.getByRole("heading", {name: "Nhập danh sách giảng viên bằng Excel"})).toBeVisible();
     const downloadPromise = page.waitForEvent("download");
@@ -43,6 +43,10 @@ test("Excel GV: xem trước → tạo riêng, chưa gửi → chọn/bỏ chọ
     await region.getByLabel("Tìm GV để gửi link").fill("DEMO-GV-");
     await expect(region.getByRole("row")).toHaveCount(4);
     const selectAll = region.getByLabel(/Chọn tất cả GV có thể gửi trong kết quả tìm kiếm/);
+    await region.getByRole("button", {name: "Chọn tất cả GV có thể gửi", exact: true}).click();
+    await expect(region.getByRole("button", {name: "Gửi link cho GV đã chọn (3)", exact: true})).toBeEnabled();
+    await region.getByRole("button", {name: "Bỏ chọn tất cả", exact: true}).click();
+    await expect(region.getByRole("button", {name: "Gửi link cho GV đã chọn (0)", exact: true})).toBeDisabled();
     await selectAll.check();
     await expect(region.getByRole("button", {name: "Gửi link cho GV đã chọn (3)", exact: true})).toBeEnabled();
     await selectAll.uncheck();
@@ -61,6 +65,9 @@ test("Excel GV: xem trước → tạo riêng, chưa gửi → chọn/bỏ chọ
     expect(contents.some(text => text.startsWith("To: gv02@demo.test"))).toBe(false);
     const activationMail = contents.find(text => text.startsWith("To: gv01@demo.test"))!;
     expect(activationMail).toBeTruthy();
+    expect(activationMail).toContain("Xin chào giảng viên Lê Quang Huy");
+    expect(activationMail).toContain("Email đăng nhập: gv01@demo.test");
+    expect(activationMail).toContain("Đây là liên kết kích hoạt tài khoản giảng viên của bạn");
     await row2.getByRole("button", {name: "Gửi link cho DEMO-GV-002", exact: true}).click();
     await expect(region.getByText("Đã xử lý 1 người: 1 gửi thành công, 0 chưa gửi được. Xem kết quả từng dòng.")).toBeVisible();
     await page.reload();

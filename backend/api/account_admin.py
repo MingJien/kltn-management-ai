@@ -13,7 +13,7 @@ from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.account import _audit, _mail_link, _student_can_activate
+from backend.api.account import _account_display_name, _account_identifier, _audit, _mail_link, _mail_recipient, _student_can_activate
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
 from backend.services.passwords import unusable_password
@@ -289,7 +289,7 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
 @router.get("/users/directory")
 def users_directory(search: str = "", category: Literal[
         "ALL", "STUDENT", "LECTURER", "ADMIN", "LECTURER_WITH_DUTIES"] = "ALL",
-        additional_role: str = "", offset: int = 0, limit: int = 20,
+        additional_role: str = "", account_status: Literal["ALL", "PENDING", "ACTIVE", "LOCKED", "DISABLED"] = "ALL", offset: int = 0, limit: int = 20,
         user: m.UserAccount = Depends(current_user),
         session: Session = Depends(get_session)) -> dict:
     """Admin account directory with real, currently effective lecturer duties."""
@@ -300,12 +300,13 @@ def users_directory(search: str = "", category: Literal[
         raise HTTPException(422, "Invalid paging range")
     return build_account_directory(
         session, search=search, category=category, additional_role=additional_role,
-        offset=offset, limit=limit,
+        offset=offset, limit=limit, account_status=account_status,
     )
 
 
 @router.get("/users")
 def users(search: str = "", offset: int = 0, limit: int = 100,
+          account_status: Literal["ALL", "PENDING", "ACTIVE", "LOCKED", "DISABLED"] = "ALL",
           user: m.UserAccount = Depends(current_user),
           session: Session = Depends(get_session)) -> list[dict]:
     rounds = _managed_rounds(session, user) if user.base_role != "ADMIN" else []
@@ -320,6 +321,12 @@ def users(search: str = "", offset: int = 0, limit: int = 100,
         query = query.where(m.UserAccount.id.in_(select(m.StudentProfile.user_id)
             .join(m.EligibilitySnapshot, m.EligibilitySnapshot.student_id == m.StudentProfile.id)
             .where(m.EligibilitySnapshot.round_id.in_(rounds))))
+    if account_status == "PENDING":
+        query = query.where(m.UserAccount.status == "DISABLED", m.UserAccount.email_verified_at.is_(None))
+    elif account_status == "DISABLED":
+        query = query.where(m.UserAccount.status == "DISABLED", m.UserAccount.email_verified_at.is_not(None))
+    elif account_status != "ALL":
+        query = query.where(m.UserAccount.status == account_status)
     if search.strip():
         term = search.strip().lower()
         query = query.where(or_(func.lower(m.UserAccount.email).contains(term),
@@ -330,7 +337,8 @@ def users(search: str = "", offset: int = 0, limit: int = 100,
         student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == row.id)) if row.base_role == "STUDENT" else None
         result.append({"id": str(row.id), "email": row.email, "base_role": row.base_role,
             "status": row.status, "verified": row.email_verified_at is not None,
-            "student_code": student.student_code if student else None})
+            "student_code": student.student_code if student else None,
+            "display_name": student.display_name if student else row.email})
     return result
 
 
@@ -386,7 +394,7 @@ def invite_lecturer(payload: LecturerInvite, user: m.UserAccount = Depends(curre
         session.rollback()
         raise HTTPException(409, "Lecturer code or email was assigned concurrently") from exc
     try:
-        _mail_link(account, "activate")
+        _mail_link(_mail_recipient(account, profile.display_name, "staff", profile.lecturer_code), "activate")
         delivered = True
     except Exception:
         # The account remains unverified. Staff can request a fresh activation link.
@@ -582,7 +590,7 @@ def reissue_link(user_id: UUID, payload: AccountChangeReason,
         message="Khoa đã cấp lại liên kết đăng nhập cho tài khoản của bạn qua email đang lưu.")
     session.commit()
     try:
-        _mail_link(target, purpose)
+        _mail_link(_mail_recipient(target, _account_display_name(session, target), "staff", _account_identifier(session, target)), purpose)
         delivered = True
     except Exception:
         delivered = False
@@ -643,7 +651,7 @@ def correct_student_email(user_id: UUID, payload: StudentEmailCorrection,
     delivered = False
     if target.status == "DISABLED" and _student_can_activate(session, student) and mail_delivery_ready():
         try:
-            _mail_link(target, "activate")
+            _mail_link(_mail_recipient(target, student.display_name, "staff", student.student_code), "activate")
             delivered = True
         except Exception:
             pass
@@ -675,7 +683,7 @@ def correct_staff_email(user_id: UUID, payload: StaffEmailCorrection,
     delivered = False
     if target.status == "DISABLED" and mail_delivery_ready():
         try:
-            _mail_link(target, "activate")
+            _mail_link(_mail_recipient(target, _account_display_name(session, target), "staff", _account_identifier(session, target)), "activate")
             delivered = True
         except Exception:
             pass

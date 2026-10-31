@@ -49,7 +49,7 @@ export default function RegistrationForms({row,userId,onChanged,defaultOpen=fals
             onChange={event=>setFile(event.target.files?.[0]||null)}/>
           {file && !valid && <p role="alert">Chọn PDF/DOCX không rỗng, tối đa 20 MB.</p>}
           <button className="btn btn-primary" disabled={busy||!valid}>{busy?"Đang lưu và quét tệp…":"Nộp phiên bản đơn"}</button>
-        </form> : <p className="text-body-sm text-muted">Đã hết hạn hoặc hồ sơ không còn ở bước nộp đơn. Các bản đã nộp vẫn được lưu để đối chiếu.</p>}
+        </form> : <p className="text-body-sm text-muted">Chưa thể nộp: kiểm tra điều kiện tham gia đợt, hạn nhận và trạng thái hồ sơ. Các bản đã nộp vẫn được lưu để đối chiếu.</p>}
         {forms.versions.length===0 && <p>Chưa có tệp đơn đăng ký được nộp.</p>}
         {forms.versions.map(version=><section key={version.id} className="core-version stack">
           <strong>Mẫu {version.form_code.toLowerCase()} · phiên bản {version.version_no} · {version.file_name}</strong>

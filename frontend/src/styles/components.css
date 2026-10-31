@@ -55,9 +55,9 @@
 .activity-item__text {white-space:pre-wrap;overflow-wrap:anywhere;}
 @media(max-width:1000px){.activity-filters{grid-template-columns:1fr 1fr;}}
 @media(max-width:600px){.activity-filters{grid-template-columns:1fr;}}
-.account-table {width:100%; border-collapse:collapse; font:var(--text-body-sm);}
-.account-table th,.account-table td {padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--border-color); text-align:left;}
-.account-table th {position:sticky; top:0; background:#fff;}
+.account-table {min-width:100%; width:max-content; border-collapse:collapse; font:var(--text-body-sm);}
+.account-table th,.account-table td {padding:10px 14px; border-bottom:1px solid var(--border-color); text-align:left; white-space:nowrap; vertical-align:middle;}
+.account-table th {position:sticky; top:0; background:#f8fafc; font-weight:600; z-index:2;}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1792,4 +1792,170 @@ input[type="file"].input {
   background: var(--neutral-150);
   color: var(--neutral-900);
   border-color: var(--neutral-300);
+}
+
+
+
+
+/* ── Smooth Scrollbar Styling ── */
+
+.table-scroll::-webkit-scrollbar,
+
+.member-picker::-webkit-scrollbar {
+
+  width: 8px;
+
+  height: 8px;
+
+}
+
+
+
+.table-scroll::-webkit-scrollbar-thumb,
+
+.member-picker::-webkit-scrollbar-thumb {
+
+  background: var(--neutral-200);
+
+  border-radius: var(--radius-full);
+
+  border: 2px solid #fff;
+
+}
+
+
+
+.table-scroll::-webkit-scrollbar-thumb:hover,
+
+.member-picker::-webkit-scrollbar-thumb:hover {
+
+  background: var(--neutral-300);
+
+}
+
+
+
+
+
+/* ── Print Styles ── */
+
+@media print {
+
+  .sidebar, .app-shell__sidebar, .header, .app-shell__header,
+
+  .sidebar-overlay, .btn, .header__right {
+
+    display: none !important;
+
+  }
+
+
+  .app-shell__main {
+
+    margin-left: 0 !important;
+
+  }
+
+
+  .app-shell__content {
+
+    padding: 0 !important;
+
+  }
+
+}
+
+
+
+
+
+/* ── Form Label Consistency ── */
+
+.dialog .input-group label {
+
+  color: var(--neutral-700);
+
+  font-weight: 600;
+
+}
+
+
+
+.dialog .input-group__hint {
+
+  color: var(--neutral-500);
+
+}
+
+
+
+
+
+/* ── File Input Enhancement ── */
+
+input[type="file"].input {
+
+  cursor: pointer;
+
+  font-size: 13px;
+
+  color: var(--neutral-600);
+
+}
+
+
+
+input[type="file"].input::file-selector-button {
+
+  height: 28px;
+
+  padding: 0 var(--space-3);
+
+  margin-right: var(--space-3);
+
+  border: 1px solid var(--neutral-200);
+
+  border-radius: var(--radius-sm);
+
+  background: var(--neutral-50);
+
+  color: var(--neutral-700);
+
+  font: 600 12px/28px var(--font-sans);
+
+  cursor: pointer;
+
+  transition: background var(--duration-fast) var(--ease-standard);
+
+}
+
+
+
+input[type="file"].input::file-selector-button:hover {
+
+  background: var(--neutral-100);
+
+}
+
+/* ── Stable Action Buttons (Anti-layout-shift on bulk toggle) ── */
+.btn-bulk-toggle {
+  min-width: 220px;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-bulk-submit {
+  min-width: 200px;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .btn-bulk-toggle,
+  .btn-bulk-submit {
+    min-width: 100%;
+    width: 100%;
+  }
 }

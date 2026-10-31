@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -54,17 +55,78 @@ def _request_guard(request: Request, identifier: str) -> None:
         _record_failure(key)
 
 
-def _mail_link(user: m.UserAccount, purpose: str) -> None:
+@dataclass(frozen=True)
+class AccountMailRecipient:
+    """Capture the account and profile at request time for background email."""
+    id: UUID
+    email: str
+    row_version: int
+    base_role: str
+    display_name: str | None = None
+    identifier: str | None = None
+    initiated_by: str = "self"
+
+
+def _mail_recipient(user: m.UserAccount, display_name: str | None, initiated_by: str,
+                    identifier: str | None = None) -> AccountMailRecipient:
+    return AccountMailRecipient(id=user.id, email=user.email, row_version=user.row_version,
+        base_role=user.base_role, display_name=display_name, identifier=identifier, initiated_by=initiated_by)
+
+
+def _account_display_name(session: Session, user: m.UserAccount) -> str | None:
+    profile_type = {"STUDENT": m.StudentProfile, "LECTURER": m.LecturerProfile}.get(user.base_role)
+    if profile_type is None:
+        return None
+    profile = session.scalar(select(profile_type).where(profile_type.user_id == user.id))
+    return profile.display_name if profile else None
+
+
+def _account_identifier(session: Session, user: m.UserAccount) -> str | None:
+    if user.base_role == "STUDENT":
+        profile = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == user.id))
+        return profile.student_code if profile else None
+    if user.base_role == "LECTURER":
+        profile = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == user.id))
+        return profile.lecturer_code if profile else None
+    return None
+
+
+def _mail_link(user: AccountMailRecipient, purpose: str) -> None:
     frontend = frontend_origin()
     if os.getenv("KLTN_ENV") == "production" and not frontend.startswith("https://"):
         raise RuntimeError("Account links require an HTTPS frontend")
     token = make_token(user, purpose)
     path = "activate" if purpose == "activate" else "reset-password"
-    subject = "Kích hoạt tài khoản KLTN" if purpose == "activate" else "Đặt lại mật khẩu KLTN"
-    send_account_link(user.email, subject,
-        f"Mở liên kết để {'kích hoạt tài khoản' if purpose == 'activate' else 'đặt lại mật khẩu'}:\n"
-        f"{frontend}/account/{path}?token={token}\n\n"
-        "Nếu bạn không yêu cầu, hãy bỏ qua email này. Liên kết chỉ dùng một lần và có thời hạn.\n")
+    role = {"STUDENT": "sinh viên", "LECTURER": "giảng viên"}.get(getattr(user, "base_role", ""), "")
+    name = (getattr(user, "display_name", None) or "").strip()
+    greeting = f"Xin chào {role + ' ' if role else ''}{name}," if name else "Xin chào,"
+    role_text = f" {role}" if role else ""
+    staff = getattr(user, "initiated_by", "self") == "staff"
+    if purpose == "activate":
+        subject = f"Kích hoạt tài khoản{role_text} - Hệ thống quản lý KLTN"
+        intro = f"Đây là liên kết kích hoạt tài khoản{role_text} của bạn trên Hệ thống quản lý khóa luận tốt nghiệp."
+        action = "kích hoạt tài khoản và đặt mật khẩu"
+        after = "Sau khi kích hoạt, bạn có thể đăng nhập để sử dụng hệ thống."
+        lifetime = "24 giờ"
+    else:
+        subject = "Đặt lại mật khẩu - Hệ thống quản lý KLTN"
+        intro = ("Quản trị viên đã gửi liên kết đặt lại mật khẩu tài khoản của bạn."
+                 if staff else "Hệ thống đã nhận yêu cầu đặt lại mật khẩu tài khoản của bạn.")
+        action = "đặt lại mật khẩu"
+        after = "Sau khi đặt lại mật khẩu, hãy đăng nhập bằng mật khẩu mới."
+        lifetime = "30 phút"
+    identifier = getattr(user, "identifier", None)
+    code_label = {"STUDENT": "MSSV", "LECTURER": "Mã giảng viên"}.get(getattr(user, "base_role", ""))
+    code_line = f"{code_label}: {identifier}\n" if purpose == "activate" and identifier and code_label else ""
+    body = (f"{greeting}\n\n{intro}\n\n"
+            f"Email đăng nhập: {user.email}\n"
+            f"{code_line}"
+            f"Mở liên kết sau để {action}:\n{frontend}/account/{path}?token={token}\n\n"
+            f"Liên kết có hiệu lực {lifetime} và chỉ dùng một lần. {after}\n\n"
+            "Nếu bạn không nhận biết yêu cầu này, không chia sẻ liên kết và hãy liên hệ bộ phận quản lý KLTN.\n\n"
+            "Hệ thống quản lý khóa luận tốt nghiệp\n"
+            "Khoa Công nghệ và Kỹ thuật - Trường Đại học Đồng Tháp\n")
+    send_account_link(user.email, subject, body)
 
 
 def _mail_ready() -> None:
@@ -103,12 +165,12 @@ def activation_request(payload: ActivationRequest, request: Request, tasks: Back
         student = session.scalar(select(m.StudentProfile).where(
             m.StudentProfile.user_id == user.id, m.StudentProfile.student_code == identifier))
         if student and _student_can_activate(session, student):
-            tasks.add_task(_mail_link, user, "activate")
+            tasks.add_task(_mail_link, _mail_recipient(user, student.display_name, "self", student.student_code), "activate")
     elif user and user.base_role == "LECTURER":
         lecturer = session.scalar(select(m.LecturerProfile).where(
             m.LecturerProfile.user_id == user.id, m.LecturerProfile.lecturer_code == identifier))
         if lecturer:
-            tasks.add_task(_mail_link, user, "activate")
+            tasks.add_task(_mail_link, _mail_recipient(user, lecturer.display_name, "self", lecturer.lecturer_code), "activate")
     return {"message": GENERIC_LINK_MESSAGE}
 
 
@@ -148,7 +210,7 @@ def password_reset_request(payload: EmailRequest, request: Request, tasks: Backg
         func.lower(m.UserAccount.email) == email, m.UserAccount.status == "ACTIVE",
         m.UserAccount.email_verified_at.is_not(None)))
     if user:
-        tasks.add_task(_mail_link, user, "reset")
+        tasks.add_task(_mail_link, _mail_recipient(user, _account_display_name(session, user), "self"), "reset")
     return {"message": GENERIC_LINK_MESSAGE}
 
 

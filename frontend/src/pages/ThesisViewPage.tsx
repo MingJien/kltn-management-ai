@@ -94,6 +94,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     <PageHeader title={{overview:"Khóa luận & GVHD",submissions:"Hồ sơ nộp & xét duyệt",progress:"Báo cáo tiến độ"}[section] || "Hồ sơ khóa luận"} description={`${thesis.title} · ${thesis.round_label}`}>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
+    {context.base_role === "STUDENT" && active && !thesis.actions.includes("document:submit") && <p className="alert alert-warning" role="status">Quyền tham gia đợt của bạn đã bị thu hồi. Bạn vẫn xem được hồ sơ; các thao tác nộp/sửa được tạm dừng. Liên hệ Khoa nếu cần khôi phục.</p>}
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
     <div className="core-toolbar">
       <div className="core-toolbar__tabs" role="tablist" aria-label="Phân hệ hồ sơ khóa luận">

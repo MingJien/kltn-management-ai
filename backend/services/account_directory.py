@@ -167,6 +167,7 @@ def build_account_directory(
     additional_role: str,
     offset: int,
     limit: int,
+    account_status: str = "ALL",
 ) -> dict:
     """Return one row per account, with tabs/counts and current additional duties."""
     rows = session.execute(
@@ -219,6 +220,9 @@ def build_account_directory(
     filtered = []
     for row in rows:
         user_roles = roles_by_user.get(row.id, [])
+        state = "PENDING" if row.status == "DISABLED" and row.email_verified_at is None else row.status
+        if account_status != "ALL" and state != account_status:
+            continue
         if category == "STUDENT" and row.base_role != "STUDENT":
             continue
         if category == "LECTURER" and row.base_role != "LECTURER":

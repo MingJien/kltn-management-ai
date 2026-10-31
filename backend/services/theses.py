@@ -87,6 +87,13 @@ def rights(session, user, thesis):
             result.update({"view", "proposal:view", "proposal:comment"})
         if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=thesis.round_id):
             result.update({"view", "milestone:manage"})
+    if user.base_role == "STUDENT":
+        latest = session.scalar(select(m.EligibilitySnapshot).where(
+            m.EligibilitySnapshot.student_id == student.id,
+            m.EligibilitySnapshot.round_id == thesis.round_id,
+        ).order_by(m.EligibilitySnapshot.version.desc()).limit(1))
+        if latest is not None and latest.state == "REJECTED":
+            result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit"})
     return result
 
 
@@ -99,6 +106,8 @@ def thesis_access(session, user, thesis_id, *, action="view", lock=False, write=
         raise HTTPException(404, "Không tìm thấy khóa luận trong phạm vi của bạn")
     if action not in rights(session, user, thesis):
         raise HTTPException(403, "Bạn không có quyền thực hiện thao tác này trên khóa luận")
+    if write and user.base_role == "STUDENT" and "document:submit" not in rights(session, user, thesis):
+        raise HTTPException(403, "Quyền tham gia đợt đã bị thu hồi. Bạn vẫn được xem hồ sơ nhưng không thể nộp hoặc sửa nội dung.")
     if write and thesis.state not in EDITABLE:
         raise HTTPException(409, "Khóa luận đã khóa các thao tác thực hiện")
     return thesis

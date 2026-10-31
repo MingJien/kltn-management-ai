@@ -134,8 +134,8 @@ export default function LecturerImport({userId, departments, refreshVersion, onC
       </details>
       {preview ? <div className="preview-box stack">
         <p className="preview-box__title" role="status">Kết quả xem trước: {preview.valid_count}/{preview.count} dòng hợp lệ.{!preview.can_import ? " Sửa tất cả dòng lỗi trong Excel rồi tải lại tệp." : " Chưa có tài khoản nào được tạo."}</p>
-        <div className="table-scroll" role="region" aria-label="Kết quả kiểm tra tệp giảng viên" tabIndex={0} style={{maxHeight: 400}}><table className="account-table" style={{minWidth: 880}}><thead><tr><th>Dòng</th><th>Mã GV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Kết quả kiểm tra</th></tr></thead>
-          <tbody>{preview.rows.map(row => <tr key={row.line}><td>{row.line}</td><td>{row.lecturer_code}</td><td>{row.display_name}</td><td>{row.email}</td><td>{row.department_code} · {row.department_name}</td>
+        <div className="table-scroll" role="region" aria-label="Kết quả kiểm tra tệp giảng viên" tabIndex={0} style={{maxHeight: 400}}><table className="account-table"><thead><tr><th className="table-col-index">Dòng</th><th>Mã GV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Kết quả kiểm tra</th></tr></thead>
+          <tbody>{preview.rows.map(row => <tr key={row.line}><td className="table-col-index">{row.line}</td><td className="table-col-code">{row.lecturer_code}</td><td>{row.display_name}</td><td>{row.email}</td><td>{row.department_code} · {row.department_name}</td>
             <td>{row.errors.length ? <ul className="text-danger">{row.errors.map(text => <li key={text}>{text}</li>)}</ul> : "Hợp lệ"}</td></tr>)}</tbody></table></div>
         <div className="preview-box__confirm">
           <label className="checkbox-label"><input type="checkbox" checked={confirmed} disabled={!preview.can_import || busy} onChange={e => setConfirmed(e.target.checked)} /> Tôi đã đối chiếu danh sách và xác nhận tạo {preview.count} tài khoản GV chờ kích hoạt.</label>
@@ -159,11 +159,11 @@ export default function LecturerImport({userId, departments, refreshVersion, onC
         <span className="import-step__filters-spacer" />
         <button className="btn btn-secondary" disabled={busy || sending} onClick={() => void reload().then(() => setError("")).catch(cause => setError(errorMessage(cause)))}><RefreshCw size={16} aria-hidden="true" /> Làm mới danh sách GV</button>
       </div>
-      <div className="table-scroll import-step__table" role="region" aria-label="Danh sách tài khoản giảng viên" tabIndex={0}><table className="account-table" style={{minWidth: 980}}><thead><tr><th>Chọn</th><th>Mã GV · Họ tên</th><th>Email</th><th>Bộ môn</th><th>Tài khoản</th><th>Trạng thái gửi</th><th>Thao tác</th></tr></thead>
+      <div className="table-scroll import-step__table" role="region" aria-label="Danh sách tài khoản giảng viên" tabIndex={0}><table className="account-table"><thead><tr><th style={{ width: 44, textAlign: "center" }}><input ref={selectRef} type="checkbox" aria-label="Chọn hoặc bỏ chọn tất cả GV" title={allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả GV có thể gửi"} checked={allSelected} disabled={!candidates.length || sending || busy} onChange={e => setSelected(e.target.checked ? new Set(candidates.map(row => row.user_id)) : new Set())} /></th><th>Mã GV · Họ tên</th><th>Email</th><th>Bộ môn</th><th>Tài khoản</th><th>Trạng thái gửi</th><th>Thao tác</th></tr></thead>
         <tbody>{visible.map(row => <tr key={row.user_id}>
           <td><input type="checkbox" aria-label={`Chọn GV ${row.lecturer_code}`} checked={selected.has(row.user_id)} disabled={!row.can_send || sending || busy} onChange={e => setSelected(old => {const next = new Set(old); if (e.target.checked) next.add(row.user_id); else next.delete(row.user_id); return next;})} /></td>
           <td style={{minWidth: 175}}><strong>{row.lecturer_code}</strong><div>{row.display_name}</div></td>
-          <td style={{minWidth: 180, maxWidth: 250, overflowWrap: "anywhere"}}>{row.email}</td>
+          <td>{row.email}</td>
           <td style={{minWidth: 150}}>{row.department_code}<div className="text-caption">{row.department_name}</div></td>
           <td>{row.account_status === "ACTIVE" ? "Đang hoạt động" : row.account_status === "LOCKED" ? "Đã khóa" : row.mail_status === "BLOCKED" ? "Vô hiệu hóa" : "Chờ kích hoạt"}</td><td><span>{mailLabel(row)}</span>{row.last_attempt_at ? <div className="text-caption">{new Date(row.last_attempt_at).toLocaleString("vi-VN")}</div> : null}
             {row.retry_at && !row.can_send && row.mail_status !== "ACTIVATED" && row.mail_status !== "BLOCKED" ? <div className="text-caption">Có thể gửi lại sau {new Date(row.retry_at).toLocaleTimeString("vi-VN")}; bấm làm mới khi đến giờ.</div> : null}
@@ -175,11 +175,25 @@ export default function LecturerImport({userId, departments, refreshVersion, onC
         <p role="status" aria-live="polite" className="import-step__status">{progress || `${matching.length} GV trong danh sách; đã chọn ${selectedCandidates.length} người.`}</p>
       </div>
       <div className="import-step__actions">
+        <button
+          type="button"
+          className="btn btn-secondary btn-bulk-toggle"
+          disabled={!candidates.length || sending || busy}
+          onClick={() => {
+            if (allSelected) {
+              setSelected(new Set());
+            } else {
+              setSelected(new Set(candidates.map(row => row.user_id)));
+            }
+          }}
+        >
+          {allSelected ? "Bỏ chọn tất cả" : "Chọn tất cả GV có thể gửi"}
+        </button>
         <div className="pagination import-step__pagination">
           <button className="btn btn-secondary" disabled={currentPage === 0 || sending} onClick={() => setPage(currentPage - 1)}>Trang GV trước</button>
           <span>Trang {currentPage + 1}/{pageCount}</span><button className="btn btn-secondary" disabled={currentPage + 1 >= pageCount || sending} onClick={() => setPage(currentPage + 1)}>Trang GV sau</button>
         </div>
-        <button className="btn btn-primary" disabled={!selectedCandidates.length || !directory.mail_ready || busy || sending} onClick={() => void sendLinks(selectedCandidates.map(row => row.user_id))}><Send size={16} aria-hidden="true" /> Gửi link cho GV đã chọn ({selectedCandidates.length})</button>
+        <button className="btn btn-primary btn-bulk-submit" disabled={!selectedCandidates.length || !directory.mail_ready || busy || sending} onClick={() => void sendLinks(selectedCandidates.map(row => row.user_id))}><Send size={16} aria-hidden="true" /> Gửi link cho GV đã chọn ({selectedCandidates.length})</button>
       </div>
     </div>
   </section>;

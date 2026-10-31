@@ -226,6 +226,8 @@ def import_roster(session: Session, user: m.UserAccount, round_id: UUID,
                 m.EligibilitySnapshot.student_id == student.id,
                 m.EligibilitySnapshot.round_id == round_id,
             ).order_by(m.EligibilitySnapshot.version.desc()).limit(1).with_for_update())
+            if latest and latest.state == "REJECTED":
+                raise HTTPException(409, f"Sinh viên {row.student_code} đã bị thu hồi quyền tham gia. Hãy dùng Khôi phục quyền tham gia với căn cứ mới trước khi nhập lại; Excel không tự hoàn tác thu hồi.")
             if latest and latest.state == "CONFIRMED":
                 skipped += 1
                 continue
@@ -241,6 +243,9 @@ def import_roster(session: Session, user: m.UserAccount, round_id: UUID,
             reason=f"Tạo {created} tài khoản; xác nhận {added} sinh viên; giữ nguyên {skipped} dòng đã có",
             occurred_at=now, correlation_id=uuid4()))
         session.commit()
+    except HTTPException:
+        session.rollback()
+        raise
     except IntegrityError as exc:
         session.rollback()
         raise HTTPException(409, "A concurrent import changed the roster; preview and retry") from exc
