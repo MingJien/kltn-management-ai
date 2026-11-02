@@ -16,11 +16,12 @@ SELECTED_TABLES = frozenset(
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
-        "thesis_review", "defense_eligibility_check",
+        "thesis_review", "defense_eligibility_check", "lecturer_profile_change",
     }
 )
 
 TABLE_INFO = {
+    "lecturer_profile_change": ("Yêu cầu cập nhật hồ sơ giảng viên", "Nháp riêng, gửi TBM duyệt, công bố và lịch sử xử lý theo phiên bản"),
     "thesis_review": ("Phiếu nhận xét KLTN Mẫu 7 và Mẫu 8", "Nháp riêng và phiếu đã ký theo sinh viên, phân công và bản báo cáo"),
     "official_form": ("Danh mục biểu mẫu và tài liệu Khoa theo đợt", "Phân loại, phạm vi và đối tượng xem tài liệu Khoa"),
     "official_form_version": ("Phiên bản tệp biểu mẫu và tài liệu Khoa", "Bản nháp, phát hành, thu hồi và lịch sử tệp đã quét"),

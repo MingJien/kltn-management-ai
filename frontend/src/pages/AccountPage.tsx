@@ -4,8 +4,9 @@ import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
 import PasswordField from "../components/ui/PasswordField";
+import LecturerSelfProfile from "../components/domain/LecturerSelfProfile";
 
-export default function AccountPage({context, onPasswordChanged}: {context:Context; onPasswordChanged:()=>void}) {
+export default function AccountPage({context, onPasswordChanged,onProfileChanged}: {context:Context; onPasswordChanged:()=>void;onProfileChanged?:()=>Promise<void>}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -25,6 +26,7 @@ export default function AccountPage({context, onPasswordChanged}: {context:Conte
   }
 
   return <><PageHeader title="Tài khoản của tôi" description="Thông tin định danh và bảo vệ tài khoản" />
+    {context.base_role==="LECTURER"&&<LecturerSelfProfile context={context} onProfileChanged={onProfileChanged}/>}
     <div className="grid grid-auto">
       <section className="card"><div className="card-body stack"><h2>Thông tin cá nhân</h2>
         <p><strong>Họ tên:</strong> {context.display_name}</p>

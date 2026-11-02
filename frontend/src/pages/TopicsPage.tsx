@@ -1,3 +1,4 @@
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CalendarDays, ClipboardCheck, FileText, Plus, UserRound, Users } from "lucide-react";
@@ -19,11 +20,7 @@ function roundDisplay(label: string) {
   return {year: match?.[1] || label, period: match?.[2] || ""};
 }
 
-function LecturerLink({id, name, canOpen=true}: {id: string | null; name: string | null; canOpen?:boolean}) {
-  if (!canOpen && name) return <span>{name}</span>;
-  return id && name ? <Link className="lecturer-link" to={`/lecturers/${id}`} state={{name}}>{name}</Link>
-    : <span className="text-muted">Chờ bộ môn chọn</span>;
-}
+
 
 export default function TopicsPage({userId, context}: {userId: string; context: Context}) {
   const navigate = useNavigate();
@@ -220,7 +217,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
             </div>
             <div className="topic-card__facts">
               <div className="topic-card__fact"><UserRound size={17} aria-hidden="true" /><span><small>{topic.proposer_type === "STUDENT" && topic.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</small>
-                <LecturerLink canOpen={!admin && topic.department_id===context.department_id} id={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
+                <LecturerProfileLink userId={userId} lecturerId={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
               <div className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
                 <Users size={17} aria-hidden="true" /><span><small>Sinh viên</small><strong>{topic.registered_member_count}/{topic.max_students} SV</strong></span>
               </div>
@@ -256,7 +253,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
         <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>
           <p>{selected.description || "Chưa có mô tả."}</p></section>
         <div className="topic-detail-content__facts">
-          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerLink canOpen={!admin && selected.department_id===context.department_id} id={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
+          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerProfileLink userId={userId} lecturerId={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
           <div><span>Sinh viên</span><strong>{selected.registered_member_count}/{selected.max_students} SV</strong></div>
         </div>
         <section className="topic-detail-content__section"><h3>Kỹ năng và yêu cầu</h3>

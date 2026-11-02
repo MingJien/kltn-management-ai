@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261030_0017.
--- 41 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261102_0018.
+-- 42 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -185,14 +185,22 @@ CREATE TABLE lecturer_profile (
 	lecturer_code VARCHAR(32) NOT NULL,
 	department_id UUID NOT NULL,
 	display_name VARCHAR(255) NOT NULL,
+	profile_data JSONB DEFAULT '{}'::jsonb NOT NULL,
+	avatar_file_id UUID,
+	profile_verified_at TIMESTAMP WITH TIME ZONE,
+	profile_verified_by UUID,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
 	CONSTRAINT pk_lecturer_profile PRIMARY KEY (id),
+	CONSTRAINT ck_lecturer_profile_profile_data_object CHECK (jsonb_typeof(profile_data) = 'object'),
 	CONSTRAINT uq_lecturer_profile_user_id UNIQUE (user_id),
 	CONSTRAINT fk_lecturer_profile_user_id_user_account FOREIGN KEY(user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
 	CONSTRAINT uq_lecturer_profile_lecturer_code UNIQUE (lecturer_code),
-	CONSTRAINT fk_lecturer_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT
+	CONSTRAINT fk_lecturer_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_avatar_file_id_stored_file FOREIGN KEY(avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_profile_verified_by_user_account FOREIGN KEY(profile_verified_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE progress_milestone (
@@ -714,9 +722,9 @@ CREATE TABLE user_notification (
 	CONSTRAINT fk_user_notification_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
 );
 
-CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
-
 CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
+
+CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
 
 CREATE TABLE registration_form_version (
         registration_id UUID NOT NULL,
@@ -775,17 +783,17 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
-CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
-
-CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
-
-CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
-
 CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
+
+CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
 
 CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
 CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
+
+CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
+
+CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
 
 CREATE TABLE official_form (
 	round_id UUID NOT NULL,
@@ -902,6 +910,41 @@ CREATE TABLE defense_eligibility_check (
 );
 
 CREATE INDEX ix_defense_eligibility_check_thesis_member ON defense_eligibility_check (thesis_id, thesis_member_id);
+
+CREATE TABLE lecturer_profile_change (
+	lecturer_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	base_profile_version INTEGER NOT NULL,
+	proposed_data JSONB NOT NULL,
+	original_data JSONB NOT NULL,
+	avatar_file_id UUID,
+	original_avatar_file_id UUID,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	submission_note TEXT,
+	submitted_at TIMESTAMP WITH TIME ZONE,
+	reviewed_by UUID,
+	reviewed_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_lecturer_profile_change PRIMARY KEY (id),
+	CONSTRAINT uq_lecturer_profile_change_lecturer_id_version_no UNIQUE (lecturer_id, version_no),
+	CONSTRAINT ck_lecturer_profile_change_version_positive CHECK (version_no > 0 AND base_profile_version > 0),
+	CONSTRAINT ck_lecturer_profile_change_state CHECK (state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')),
+	CONSTRAINT ck_lecturer_profile_change_data_objects CHECK (jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'),
+	CONSTRAINT ck_lecturer_profile_change_submitted_timestamp CHECK (state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL),
+	CONSTRAINT ck_lecturer_profile_change_decision_recorded CHECK (state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)),
+	CONSTRAINT fk_lecturer_profile_change_lecturer_id_lecturer_profile FOREIGN KEY(lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_avatar_file_id_stored_file FOREIGN KEY(avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_original_avatar_file_id_stored_file FOREIGN KEY(original_avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_reviewed_by_user_account FOREIGN KEY(reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_lecturer_profile_change_open ON lecturer_profile_change (lecturer_id) WHERE state IN ('DRAFT','SUBMITTED');
+
+CREATE INDEX ix_lecturer_profile_change_state_created ON lecturer_profile_change (state, created_at);
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

@@ -1,6 +1,6 @@
 # API hiện hành
 
-Ứng dụng dùng PostgreSQL `kltn_management` ở revision Alembic `20261030_0017`. [OpenAPI công bố](openapi.yaml) được sinh trực tiếp từ các route FastAPI, cùng nội dung với `/openapi.json` và `/docs` khi chạy backend. Tệp này chỉ mô tả endpoint đã có mã nguồn.
+Ứng dụng dùng PostgreSQL `kltn_management` ở revision Alembic `20261102_0018`. [OpenAPI công bố](openapi.yaml) được sinh trực tiếp từ các route FastAPI, cùng nội dung với `/openapi.json` và `/docs` khi chạy backend. Tệp này chỉ mô tả endpoint đã có mã nguồn.
 
 ## Nhóm chức năng đã có API
 
@@ -30,3 +30,7 @@ Danh sách dùng `GET /api/v1/evaluations` với tìm kiếm và phân trang. T�
 TBM thao tác trong bộ môn; GVHD và GVPB chỉ viết đúng phiếu theo phân công của mình. ADMIN không có quyền duyệt nghiệp vụ mặc định. Người phản biện chỉ tải cuốn báo cáo qua route NV6, không được xem tiến độ hay tài liệu riêng khác. Nháp chỉ người viết xem; SV chỉ đọc phiếu đã gửi và kết quả xét của chính mình. Thông báo không cấp thêm quyền truy cập.
 
 Điều kiện bảo vệ gồm tình trạng kỷ luật theo nguồn đối chiếu, GVHD xác nhận hoàn thành và văn bản đồng ý bảo vệ đã ký. Mỗi kết quả xét giữ bản báo cáo và Mẫu 7 làm căn cứ; bản khác làm kết quả cũ cần xét lại. Không thêm ngưỡng điểm, điều kiện phản biện hay tương đồng vào điều kiện cấp Trường. Chi tiết vận hành tại [luồng NV6](nv6-review-defense-workflow.md).
+
+## Hồ sơ giảng viên
+
+Danh bạ `GET /lecturer-directory` có tìm kiếm không dấu, lọc bộ môn và phân trang. `GET /lecturer-profiles/{id}` trả hồ sơ đã công bố; chỉ chủ hồ sơ/quản trị/người duyệt đúng phạm vi thấy email đăng nhập và số điện thoại không công khai. `GET /account/lecturer-profile` trả bản đang hiển thị, yêu cầu đang mở và lịch sử riêng. GV tạo nháp tại `/account/lecturer-profile/changes`, sửa, tải ảnh, gửi hoặc rút qua `/lecturer-profile-changes/{id}`. Mọi thao tác ghi kiểm `If-Match`. `GET /lecturer-profile-reviews` và endpoint quyết định chỉ dành cho TBM/Trưởng khoa đúng phạm vi; cấm tự duyệt. `PUT /lecturer-directory/{id}/identity` chỉ ADMIN, bắt buộc lý do và căn cứ; không tự cấp chức vụ hoặc đổi email. Chi tiết và bằng chứng tại [hồ sơ GV](../evidence/lecturer-profile-validation.md).

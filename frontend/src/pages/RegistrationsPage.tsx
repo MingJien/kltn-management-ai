@@ -1,3 +1,4 @@
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ClipboardList, Info, X } from "lucide-react";
@@ -125,7 +126,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
           {me && !me.active ? <p className="alert alert-info">Bạn đã rút khỏi đăng ký này. Hồ sơ được giữ để đối chiếu lịch sử.</p> : null}
           <dl className="registration-summary">
             <dt>{row.proposer_type === "STUDENT" && row.topic_state !== "APPROVED" ? "GV được SV đề xuất" : "GV tiếp nhận"}</dt>
-            <dd>{row.receiving_lecturer_name || "Chờ bộ môn chọn"}</dd>
+            <dd><LecturerProfileLink userId={context.user_id} lecturerId={row.receiving_lecturer_id} name={row.receiving_lecturer_name||"Chờ bộ môn chọn"}/></dd>
             <dt>Thành viên</dt><dd>{activeCount}/{row.expected_member_count} SV</dd>
             {row.submitted_at ? <><dt>Đã gửi</dt><dd>{new Date(row.submitted_at).toLocaleString("vi-VN")}</dd></> : null}
             {row.lecturer_decided_at ? <><dt>GV xét</dt><dd>{new Date(row.lecturer_decided_at).toLocaleString("vi-VN")}</dd></> : null}

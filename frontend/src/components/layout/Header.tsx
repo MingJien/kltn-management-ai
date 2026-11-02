@@ -23,6 +23,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/administration": "Quản trị",
   "/rounds": "Đợt KLTN",
   "/roster": "Danh sách sinh viên",
+  "/lecturers": "Danh sách giảng viên",
+  "/lecturer-profile-reviews": "Duyệt hồ sơ giảng viên",
   "/ai": "Tra cứu thử nghiệm",
   "/notifications": "Thông báo",
   "/activity": "Nhật ký hoạt động",
@@ -40,7 +42,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
   const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
   const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
     ? plannedPages[plannedId as PlannedPageId].title
-    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/evaluation/") ? "Hồ sơ phản biện & điều kiện" : location.pathname.startsWith("/theses/") ? (new URLSearchParams(location.search).get("section") === "progress" ? "Báo cáo tiến độ" : ["submissions","proposal","documents"].includes(new URLSearchParams(location.search).get("section") || "") ? "Hồ sơ nộp & xét duyệt" : "Khóa luận & GVHD") : "Trang");
+    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên" : location.pathname.startsWith("/evaluation/") ? "Hồ sơ phản biện & điều kiện" : location.pathname.startsWith("/theses/") ? (new URLSearchParams(location.search).get("section") === "progress" ? "Báo cáo tiến độ" : ["submissions","proposal","documents"].includes(new URLSearchParams(location.search).get("section") || "") ? "Hồ sơ nộp & xét duyệt" : "Khóa luận & GVHD") : "Trang");
 
   return (
     <header className="app-shell__header">

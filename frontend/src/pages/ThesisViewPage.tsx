@@ -1,3 +1,4 @@
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
@@ -144,7 +145,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     {message && <div className="alert alert-success" role="status">{message}</div>}
     {busy && <p role="status">{refreshing ? "Đang tải dữ liệu mới…" : "Đang lưu và cập nhật hồ sơ…"}</p>}
     {section === "overview" && <div className="stack">
-      <section className="thesis-identity card"><div className="card-body"><span className="section-eyebrow">HỒ SƠ ĐANG LÀM VIỆC</span><h2>{thesis.title}</h2><p>{thesis.round_label}</p><div className="flex gap-3" style={{flexWrap:"wrap"}}><span>{thesis.members.length} sinh viên</span><span>GVHD: <strong>{thesis.advisor_name || "Chưa phân công"}</strong></span><Status value={thesis.state}/></div></div></section><div className="workspace-overview-grid">
+      <section className="thesis-identity card"><div className="card-body"><span className="section-eyebrow">HỒ SƠ ĐANG LÀM VIỆC</span><h2>{thesis.title}</h2><p>{thesis.round_label}</p><div className="flex gap-3" style={{flexWrap:"wrap"}}><span>{thesis.members.length} sinh viên</span><span>GVHD: <strong><LecturerProfileLink userId={context.user_id} lecturerId={thesis.advisor_lecturer_id} name={thesis.advisor_name}/></strong></span><Status value={thesis.state}/></div></div></section><div className="workspace-overview-grid">
         <div className="card">
           <div className="card-body stack">
             <h2 style={{margin: 0, fontSize: "16px", fontWeight: 650}}>Nhóm sinh viên thực hiện</h2>
@@ -167,7 +168,7 @@ function ThesisWorkspace({context}: {context: Context}) {
             <h2 style={{margin: 0, fontSize: "16px", fontWeight: 650}}>Giảng viên hướng dẫn chính thức</h2>
             {thesis.advisor_history.map(item => (
               <div className="core-review" key={item.id}>
-                <strong>{item.display_name}</strong> · <Status value={item.state} label={item.state === "ACTIVE" ? "Đang hướng dẫn" : undefined} />
+                <strong><LecturerProfileLink userId={context.user_id} lecturerId={item.lecturer_id} name={item.display_name}/></strong> · <Status value={item.state} label={item.state === "ACTIVE" ? "Đang hướng dẫn" : undefined} />
                 <p className="text-body-sm text-muted" style={{margin: "4px 0 0"}}>Từ {formatDate(item.effective_from)}{item.effective_to ? ` đến ${formatDate(item.effective_to)}` : ""}</p>
               </div>
             ))}

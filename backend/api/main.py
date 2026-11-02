@@ -19,6 +19,7 @@ from backend.api.core import router as thesis_workspace_router
 from backend.api.activity import router as activity_router
 from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
+from backend.api.lecturer_profiles import router as lecturer_profiles_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, RejectedProposalResolution, MemberResponse,
@@ -74,6 +75,7 @@ app.include_router(thesis_workspace_router)
 app.include_router(activity_router)
 app.include_router(school_forms_router)
 app.include_router(evaluation_router)
+app.include_router(lecturer_profiles_router)
 
 
 @app.get("/api/v1/notifications", response_model=NotificationSummaryOut)
@@ -186,6 +188,12 @@ def context(
         m.DepartmentMajor.department_id == profile_department_id,
         m.DepartmentMajor.code == student.major_code,
         m.DepartmentMajor.active.is_(True))) if student and student.major_code else None
+    from backend.services.lecturer_profiles import scopes, avatar_url
+    if student or lecturer or user.base_role=="ADMIN":actions.append("lecturer:directory_view")
+    if lecturer:
+        actions.append("lecturer:profile_edit")
+        departments,faculties=scopes(session,user)
+        if departments or faculties:actions.append("lecturer:profile_review")
     return ContextOut(
         user_id=user.id, base_role=user.base_role,
         student_id=student.id if student else None,
@@ -200,6 +208,7 @@ def context(
         major_code=student.major_code if student else None,
         major_name=profile_major.name if profile_major else None,
         lecturer_code=lecturer.lecturer_code if lecturer else None,
+        avatar_url=avatar_url(lecturer) if lecturer else None,
         lecturer_duties=lecturer_duties_for_user(session, user.id) if lecturer else [],
         csrf_token=csrf_token,
         can_change_password=bool(user.email_verified_at and user.password_hash and user.password_hash.startswith("$argon2")),

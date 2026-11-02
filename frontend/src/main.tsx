@@ -15,6 +15,7 @@ import "./styles/admin.css";
 import "./styles/workflow-clarity.css";
 import "./styles/signature.css";
 import "./styles/evaluation.css";
+import "./styles/lecturer-profile.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

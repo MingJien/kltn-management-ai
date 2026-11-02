@@ -99,14 +99,46 @@ class StudentProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     major_code: Mapped[Optional[str]] = mapped_column(String(32))
 
 
-class LecturerProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class LecturerProfile(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "lecturer_profile"
+    __table_args__ = (CheckConstraint("jsonb_typeof(profile_data) = 'object'", name="profile_data_object"),)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.id", ondelete="RESTRICT"), nullable=False, unique=True
     )
     lecturer_code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     department_id: Mapped[uuid.UUID] = fk("department.id")
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    profile_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    profile_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    profile_verified_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+
+
+class LecturerProfileChange(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "lecturer_profile_change"
+    __table_args__ = (
+        UniqueConstraint("lecturer_id", "version_no"),
+        CheckConstraint("version_no > 0 AND base_profile_version > 0", name="version_positive"),
+        CheckConstraint("state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')", name="state"),
+        CheckConstraint("jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'", name="data_objects"),
+        CheckConstraint("state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL", name="submitted_timestamp"),
+        CheckConstraint("state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)", name="decision_recorded"),
+        Index("uq_lecturer_profile_change_open", "lecturer_id", unique=True, postgresql_where=text("state IN ('DRAFT','SUBMITTED')")),
+        Index("ix_lecturer_profile_change_state_created", "state", "created_at"),
+    )
+    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_profile_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    proposed_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    original_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    original_avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    submission_note: Mapped[Optional[str]] = mapped_column(Text)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class OrganizationalPosition(UuidPrimaryKeyMixin, TimestampMixin, Base):

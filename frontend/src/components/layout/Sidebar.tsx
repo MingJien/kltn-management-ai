@@ -6,6 +6,7 @@ import { request } from "../../api";
 import { plannedPages, type PlannedPageId } from "../../plannedPages";
 import { roleLabel } from "./roleLabel";
 import { initialsOf } from "./initials";
+import LecturerAvatar from "../domain/LecturerAvatar";
 
 function SidebarGroup({label, active, collapsed, defaultOpen = true, children}: {label: string; active: boolean; collapsed: boolean; defaultOpen?: boolean; children: ReactNode}) {
   const [open, setOpen] = useState(active ? true : defaultOpen);
@@ -103,6 +104,7 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
           {context.base_role === "ADMIN" && <SidebarGroup label="DANH SÁCH ĐỀ TÀI" active={pathname === "/topics"} collapsed={collapsed}><NavLink to="/topics" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FileText aria-hidden="true"/><span>Đề tài đã công bố</span></NavLink></SidebarGroup>}
           {workflowAccess ? <>
             <SidebarGroup label="ĐỀ TÀI VÀ ĐĂNG KÝ" active={["/topics", "/registrations", "/planned/changes"].includes(pathname)} collapsed={collapsed}>
+              <NavLink to="/lecturers" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><UsersRound aria-hidden="true"/><span>Danh sách giảng viên</span></NavLink>
               <NavLink to="/topics" title={collapsed ? topicLabel : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
                 onClick={onClose}><FileText aria-hidden="true" /><span>{topicLabel}</span></NavLink>
               <NavLink to="/registrations" title={collapsed ? "Đăng ký" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
@@ -146,14 +148,15 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
               onClick={onClose}><ShieldCheck aria-hidden="true" /><span>Danh sách sinh viên</span></NavLink>
           </SidebarGroup> : null}
           <SidebarGroup label="TÀI KHOẢN" active={pathname === "/account" || pathname === "/planned/expertise"} collapsed={collapsed}>
+            {context.actions.includes("lecturer:profile_review")&&<NavLink to="/lecturer-profile-reviews" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><ShieldCheck aria-hidden="true"/><span>Duyệt hồ sơ giảng viên</span></NavLink>}
             <NavLink to="/account" title={collapsed ? "Thông tin của tôi" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><UserRound aria-hidden="true" /><span>Thông tin của tôi</span></NavLink>
-            {context.base_role === "LECTURER" ? <PlannedLink id="expertise" collapsed={collapsed} icon={<BookOpen aria-hidden="true" />} onClose={onClose} /> : null}
+            {context.base_role === "LECTURER" ? <NavLink to="/account?section=lecturer-profile" className="sidebar__item" onClick={onClose}><BookOpen aria-hidden="true"/><span>Hồ sơ chuyên môn của tôi</span></NavLink> : null}
           </SidebarGroup>
         </nav>
         <div className="sidebar__footer">
           <Link to="/account" className="sidebar__user" aria-label="Quản lý tài khoản" title="Quản lý tài khoản" onClick={onClose}>
-            <span className="sidebar__avatar" aria-hidden="true">{initialsOf(context.display_name)}</span>
+            <span className="sidebar__avatar" aria-hidden="true">{context.base_role==="LECTURER"?<LecturerAvatar url={context.avatar_url} name={context.display_name} size="sm"/>:initialsOf(context.display_name)}</span>
             <span className="sidebar__user-info"><span className="sidebar__user-name">{context.display_name}</span>
               <span className="sidebar__user-role">{roleLabel(context)}</span></span>
           </Link>

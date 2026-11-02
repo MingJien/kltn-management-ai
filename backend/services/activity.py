@@ -119,6 +119,11 @@ def visibility(session, user):
     scopes["topic_registration"] |= registrations
     scopes["registration"] |= registrations  # Earlier evidence events used this resource name.
     scopes["thesis"] |= full_theses
+    from backend.services.lecturer_profiles import scopes as profile_scopes
+    profile_departments,profile_faculties=profile_scopes(session,user)
+    profile_ids=select(m.LecturerProfile.id).join(m.Department,m.Department.id==m.LecturerProfile.department_id).where(
+        or_(m.LecturerProfile.user_id==user.id,m.LecturerProfile.department_id.in_(profile_departments),m.Department.faculty_id.in_(profile_faculties)))
+    scopes["lecturer_profile_change"] |= _ids(session,m.LecturerProfileChange.id,m.LecturerProfileChange.lecturer_id.in_(profile_ids),m.LecturerProfileChange.state!="DRAFT")
     check_query = select(m.DefenseEligibilityCheck.id).where(m.DefenseEligibilityCheck.thesis_id.in_(full_theses))
     if user.base_role == "STUDENT":
         own_members = select(m.ThesisMember.id).join(m.StudentProfile, m.StudentProfile.id == m.ThesisMember.student_id).where(m.StudentProfile.user_id == user.id)

@@ -16,6 +16,7 @@ export type Context = {
   major_code: string | null;
   major_name: string | null;
   lecturer_code: string | null;
+  avatar_url?: string | null;
   lecturer_duties: {code: string; label: string; scope: string | null}[];
   csrf_token: string | null;
   can_change_password: boolean;
@@ -130,6 +131,7 @@ export async function downloadRegistrationForm(registrationId:string,version:Reg
 // Local dev uses Vite proxy so UI and API share one origin and session cookie.
 const baseUrl = import.meta.env.VITE_API_URL
   || (import.meta.env.DEV ? "" : `${window.location.protocol}//${window.location.hostname}:8000`);
+export const apiAssetUrl = (path:string) => baseUrl + path;
 let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {

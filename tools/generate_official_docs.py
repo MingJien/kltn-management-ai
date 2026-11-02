@@ -18,6 +18,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DESIGN = ROOT / "docs/design"
 
 COLUMN_VI = {
+    "profile_data": "Thông tin chuyên môn và liên hệ đã duyệt", "avatar_file_id": "Ảnh đại diện đã chuẩn hóa và quét",
+    "profile_verified_at": "Thời điểm duyệt hồ sơ", "profile_verified_by": "Người duyệt hồ sơ",
+    "base_profile_version": "Phiên bản hồ sơ gốc khi lập yêu cầu", "proposed_data": "Thông tin đề nghị cập nhật",
+    "original_data": "Thông tin trước cập nhật", "original_avatar_file_id": "Ảnh trước cập nhật",
+    "submission_note": "Nội dung đề nghị và căn cứ", "decision_reason": "Lý do duyệt hoặc trả lại",
     "archived_at": "Thời điểm ngừng dùng đề tài cho đăng ký mới", "archived_by": "Người ngừng dùng đề tài", "archive_reason": "Lý do ngừng dùng đề tài",
     "sections": "Các mục nhận xét theo Mẫu 7 hoặc Mẫu 8", "kind": "Loại phiếu hoặc thông báo",
     "advisor_assignment_id": "Phân công GVHD gắn với phiếu", "report_version_id": "Bản cuốn báo cáo được nhận xét",
@@ -101,6 +106,7 @@ COLUMN_VI = {
 }
 
 EXAMPLES = {
+    "lecturer_profile_change": "GV DEMO gửi cập nhật học vị, chuyên môn và ảnh; TBM đối chiếu trước–sau, duyệt rồi mới công bố. Phiếu trả lại được lập bản mới để sửa, không xóa lịch sử.",
     "thesis_review": "GVHD lưu nháp Mẫu 7 riêng cho SV DEMO theo báo cáo v2; xuất phiếu để ký, tải bản ký đã quét sạch rồi gửi. Bản sửa lập phiếu phiên bản mới.",
     "defense_eligibility_check": "TBM đối chiếu nguồn kỷ luật và Mẫu 7 đã ký theo báo cáo hiện hành của SV DEMO; mỗi lần xét lưu căn cứ, người xét và kết quả riêng, không áp dụng cho thành viên khác.",
     "official_form": "Khoa tạo danh mục Mẫu 2 của đợt DEMO; Mẫu 4 trắng và danh sách SV đã chốt nằm ở hai danh mục khác nhau.",

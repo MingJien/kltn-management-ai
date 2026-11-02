@@ -5,6 +5,9 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  LECTURER_PROFILE_SUBMITTED: "Gửi cập nhật hồ sơ giảng viên", LECTURER_PROFILE_APPROVED: "Duyệt hồ sơ giảng viên",
+  LECTURER_PROFILE_RETURNED: "Yêu cầu bổ sung hồ sơ giảng viên", LECTURER_PROFILE_WITHDRAWN: "Rút cập nhật hồ sơ giảng viên",
+  LECTURER_IDENTITY_CORRECTED: "Đối chiếu và sửa định danh giảng viên",
   THESIS_REVIEWER_ASSIGNED: "Phân công phản biện khóa luận", THESIS_REVIEWER_REVOKED: "Thu hồi phân công phản biện",
   THESIS_REVIEW_DEADLINE_EXTENDED: "Gia hạn gửi nhận xét phản biện", THESIS_REVIEW_SUBMITTED: "Gửi nhận xét Mẫu 7/8",
   THESIS_REVIEW_EXPORTED: "Xuất phiếu nhận xét đã điền để ký",

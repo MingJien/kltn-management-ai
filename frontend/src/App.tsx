@@ -17,6 +17,7 @@ import LecturersPage from "./pages/LecturersPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
 import LecturerProfilePage from "./pages/LecturerProfilePage";
+import LecturerProfileReviewsPage from "./pages/LecturerProfileReviewsPage";
 import ThesesPage from "./pages/ThesesPage";
 import SubmissionsPage from "./pages/SubmissionsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
@@ -143,14 +144,15 @@ function App() {
           path="/"
           element={<WorkspacePage context={context} />}
         />
-        <Route path="/account" element={<AccountPage context={context} onPasswordChanged={() => {
+        <Route path="/account" element={<AccountPage context={context} onProfileChanged={restore} onPasswordChanged={() => {
           setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
         }} />} />
         <Route path="/notifications" element={<NotificationsPage userId={context.user_id} />} />
         <Route path="/activity" element={<ActivityPage context={context} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
           <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
-        <Route path="/lecturers" element={context.base_role === "ADMIN" ? <LecturersPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/lecturers" element={<LecturersPage context={context}/>}/>
+        <Route path="/lecturer-profile-reviews" element={context.actions.includes("lecturer:profile_review") ? <LecturerProfileReviewsPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/rounds" element={context.base_role === "ADMIN" ?
           <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
@@ -177,8 +179,7 @@ function App() {
         <Route path="/evaluation/:thesisId" element={workflowAccess ? <EvaluationPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/planned/evaluation" element={<Navigate to="/evaluation" replace/>}/>
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
-        <Route path="/lecturers/:lecturerId" element={workflowAccess ?
-          <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers/:lecturerId" element={<LecturerProfilePage userId={context.user_id} />} />
         <Route
           path="/ai"
           element={workflowAccess ? <AIPage userId={context.user_id} /> : <Navigate to="/" replace />}

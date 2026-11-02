@@ -1,6 +1,6 @@
 # ERD CSDL chính thức `kltn_management`
 
-Sơ đồ chứa 41 bảng nghiệp vụ của revision `20261030_0017`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).
+Sơ đồ chứa 42 bảng nghiệp vụ của revision `20261102_0018`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).
 
 ```mermaid
 erDiagram
@@ -60,6 +60,15 @@ erDiagram
     lecturer_profile {
         uuid user_id FK
         uuid department_id FK
+        uuid avatar_file_id FK
+        uuid profile_verified_by FK
+        uuid id PK
+    }
+    lecturer_profile_change {
+        uuid lecturer_id FK
+        uuid avatar_file_id FK
+        uuid original_avatar_file_id FK
+        uuid reviewed_by FK
         uuid id PK
     }
     member_work_assignment {
@@ -254,8 +263,14 @@ erDiagram
     user_account o|--o{ eligibility_snapshot : confirmed_by
     thesis_round ||--o{ eligibility_snapshot : round_id
     student_profile ||--o{ eligibility_snapshot : student_id
+    stored_file o|--o{ lecturer_profile : avatar_file_id
     department ||--o{ lecturer_profile : department_id
+    user_account o|--o{ lecturer_profile : profile_verified_by
     user_account ||--o{ lecturer_profile : user_id
+    stored_file o|--o{ lecturer_profile_change : avatar_file_id
+    lecturer_profile ||--o{ lecturer_profile_change : lecturer_id
+    stored_file o|--o{ lecturer_profile_change : original_avatar_file_id
+    user_account o|--o{ lecturer_profile_change : reviewed_by
     lecturer_profile o|--o{ member_work_assignment : reviewed_by
     thesis_member ||--o{ member_work_assignment : thesis_member_id
     user_account ||--o{ official_form : created_by

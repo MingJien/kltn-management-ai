@@ -103,6 +103,13 @@ def can_view(session, user, notice):
         return True
     if kind == "account":
         return user.id == identifier or user.base_role == "ADMIN"
+    if kind == "lecturer_profile_change":
+        from backend.services.lecturer_profiles import request_access
+        try:
+            request_access(session,user,identifier)
+            return True
+        except HTTPException:
+            return False
     if kind == "defense":
         from backend.services.evaluation import permissions
         thesis = session.get(m.Thesis, identifier)

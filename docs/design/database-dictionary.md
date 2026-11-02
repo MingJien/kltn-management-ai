@@ -1,6 +1,6 @@
 # Từ điển dữ liệu CSDL chính thức `kltn_management`
 
-Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.
+Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0018`; 42 bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.
 
 `NULL` ở đây là ràng buộc vật lý. Mọi hành động quan trọng còn chịu kiểm tra quyền/trạng thái trong service và audit. Ví dụ đều là dữ liệu giả.
 
@@ -33,7 +33,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 ## 02. `advisor_assignment` — Phân công giảng viên hướng dẫn
 
 **Mục đích và lý do tồn tại:** GVHD chính thức và lịch sử thay đổi. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công giảng viên hướng dẫn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** GVHD chính thức và lịch sử thay đổi; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
+**Use case/API/service:** GVHD chính thức và lịch sử thay đổi; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/lecturer_profiles.py`, `backend/services/registration.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Trưởng bộ môn chốt GVHD; GV được đề cử có quyền nhận/từ chối thay đổi; SV và GVHD xem trong phạm vi khóa luận.
 **Tình huống giả:** Khi GV chấp nhận nhóm DEMO, một phân công GVHD chính được tạo trong cùng giao dịch với khóa luận và thành viên.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -121,7 +121,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 ## 05. `department` — Bộ môn
 
 **Mục đích và lý do tồn tại:** Phạm vi quyền và hồ sơ. Nếu bỏ, mất dữ liệu/quan hệ riêng của bộ môn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Phạm vi quyền và hồ sơ; `backend/api/account_admin.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/lecturer_roster.py`, `backend/services/review_form_export.py`, `backend/services/roster.py`, `backend/services/theses.py`.
+**Use case/API/service:** Phạm vi quyền và hồ sơ; `backend/api/account_admin.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/lecturer_profiles.py`, `backend/services/lecturer_roster.py`, `backend/services/review_form_export.py`, `backend/services/roster.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Admin kỹ thuật quản lý dữ liệu tổ chức; quyền nghiệp vụ chỉ áp dụng cho bộ môn tương ứng.
 **Tình huống giả:** Bộ môn CNTT-DEMO thuộc Khoa CNKT-DEMO.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -257,7 +257,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 ## 10. `eligibility_snapshot` — Kết quả điều kiện đăng ký
 
 **Mục đích và lý do tồn tại:** Xác nhận đủ điều kiện theo đợt. Nếu bỏ, mất dữ liệu/quan hệ riêng của kết quả điều kiện đăng ký hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`.
+**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Người Khoa được giao ELIGIBILITY_IMPORTER/VERIFIER theo đợt; SV chỉ xem kết quả của mình.
 **Tình huống giả:** Khoa xác nhận SV-DEMO đủ điều kiện đợt chính theo danh sách nguồn; quyết định đặc biệt tạo snapshot v2 có số quyết định Hiệu trưởng.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -289,7 +289,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 ## 11. `faculty` — Khoa
 
 **Mục đích và lý do tồn tại:** Cấp trên của bộ môn và phạm vi Trưởng khoa. Nếu bỏ, mất dữ liệu/quan hệ riêng của khoa hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Cấp trên của bộ môn và phạm vi Trưởng khoa; `backend/api/main.py`, `backend/services/account_directory.py`, `backend/services/review_form_export.py`.
+**Use case/API/service:** Cấp trên của bộ môn và phạm vi Trưởng khoa; `backend/api/main.py`, `backend/services/account_directory.py`, `backend/services/lecturer_profiles.py`, `backend/services/review_form_export.py`.
 **Vai trò thao tác:** Admin kỹ thuật quản lý dữ liệu Khoa; Trưởng khoa chỉ có quyền theo phân công chức vụ còn hiệu lực.
 **Tình huống giả:** Khoa CNKT-DEMO quản lý Bộ môn CNTT-DEMO.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -313,7 +313,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 ## 12. `lecturer_profile` — Hồ sơ giảng viên
 
 **Mục đích và lý do tồn tại:** Đề xuất, tiếp nhận, hướng dẫn và xét duyệt. Nếu bỏ, mất dữ liệu/quan hệ riêng của hồ sơ giảng viên hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Đề xuất, tiếp nhận, hướng dẫn và xét duyệt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/core.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/lecturer_roster.py`, `backend/services/notifications.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/review_form_export.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Đề xuất, tiếp nhận, hướng dẫn và xét duyệt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/core.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/lecturer_profiles.py`, `backend/services/lecturer_roster.py`, `backend/services/notifications.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/review_form_export.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** GV xem/cập nhật hồ sơ của mình theo API; Admin quản lý tài khoản, không thay GV duyệt đề tài.
 **Tình huống giả:** GV-DEMO có tài khoản riêng và thuộc Bộ môn CNTT-DEMO.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -325,17 +325,57 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 | `lecturer_code` | Mã giảng viên | `VARCHAR(32)` | Không | `—` | Mã giảng viên; phục vụ đề xuất, tiếp nhận, hướng dẫn và xét duyệt. |
 | `department_id` | Mã bộ môn | `UUID` | Không | `—` | Mã bộ môn; liên kết tới `department.id`, giữ toàn vẹn tham chiếu. |
 | `display_name` | Họ tên hiển thị | `VARCHAR(255)` | Không | `—` | Họ tên hiển thị; phục vụ đề xuất, tiếp nhận, hướng dẫn và xét duyệt. |
+| `profile_data` | Thông tin chuyên môn và liên hệ đã duyệt | `JSONB` | Không | `'{}'::jsonb` | Thông tin chuyên môn và liên hệ đã duyệt; phục vụ đề xuất, tiếp nhận, hướng dẫn và xét duyệt. |
+| `avatar_file_id` | Ảnh đại diện đã chuẩn hóa và quét | `UUID` | Cho phép | `—` | Ảnh đại diện đã chuẩn hóa và quét; liên kết tới `stored_file.id`, giữ toàn vẹn tham chiếu. |
+| `profile_verified_at` | Thời điểm duyệt hồ sơ | `TIMESTAMP WITH TIME ZONE` | Cho phép | `—` | Thời điểm duyệt hồ sơ; phục vụ đề xuất, tiếp nhận, hướng dẫn và xét duyệt. |
+| `profile_verified_by` | Người duyệt hồ sơ | `UUID` | Cho phép | `—` | Người duyệt hồ sơ; liên kết tới `user_account.id`, giữ toàn vẹn tham chiếu. |
 | `id` | Khóa chính UUID | `UUID` | Không | `Ứng dụng sinh UUID` | Định danh ổn định của bản ghi; các bảng khác có thể tham chiếu bằng FK. |
 | `created_at` | Thời điểm tạo | `TIMESTAMP WITH TIME ZONE` | Không | `now()` | Thời điểm tạo; dùng đối chiếu trình tự và audit. |
 | `updated_at` | Thời điểm cập nhật | `TIMESTAMP WITH TIME ZONE` | Không | `now()` | Thời điểm cập nhật; dùng đối chiếu trình tự và audit. |
+| `row_version` | Số phiên bản bản ghi | `INTEGER` | Không | `1` | Số phiên bản bản ghi; giữ lịch sử hoặc chống ghi đè khi xử lý đồng thời. |
 
 **PK:** `id`.
-**FK và quan hệ:** `department_id` → `department.id`; `user_id` → `user_account.id`.
+**FK và quan hệ:** `avatar_file_id` → `stored_file.id`; `department_id` → `department.id`; `profile_verified_by` → `user_account.id`; `user_id` → `user_account.id`.
 **UNIQUE:** `lecturer_code`; `user_id`.
-**CHECK:** Không có CHECK riêng.
+**CHECK:** `ck_lecturer_profile_profile_data_object`: `jsonb_typeof(profile_data) = 'object'`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 13. `member_work_assignment` — Phân công việc thành viên
+## 13. `lecturer_profile_change` — Yêu cầu cập nhật hồ sơ giảng viên
+
+**Mục đích và lý do tồn tại:** Nháp riêng, gửi TBM duyệt, công bố và lịch sử xử lý theo phiên bản. Nếu bỏ, mất dữ liệu/quan hệ riêng của yêu cầu cập nhật hồ sơ giảng viên hoặc không còn kiểm được lịch sử và quyền liên quan.
+**Use case/API/service:** Nháp riêng, gửi TBM duyệt, công bố và lịch sử xử lý theo phiên bản; `backend/services/activity.py`, `backend/services/lecturer_profiles.py`.
+**Vai trò thao tác:** Chỉ actor được API/service cấp quyền theo vai trò, bộ môn/đợt/KLTN; Admin không mặc nhiên duyệt nghiệp vụ.
+**Tình huống giả:** GV DEMO gửi cập nhật học vị, chuyên môn và ảnh; TBM đối chiếu trước–sau, duyệt rồi mới công bố. Phiếu trả lại được lập bản mới để sửa, không xóa lịch sử.
+**Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
+**Vì sao không gộp/xóa:** Bản ghi có định danh, ràng buộc và vòng đời riêng; gộp vào bảng liên quan sẽ mất quan hệ một-nhiều hoặc quyền kiểm soát.
+
+| Cột SQL | Tên tiếng Việt | Kiểu PostgreSQL | NULL | Default | Công dụng/ý nghĩa |
+|---|---|---|---|---|---|
+| `lecturer_id` | Mã giảng viên | `UUID` | Không | `—` | Mã giảng viên; liên kết tới `lecturer_profile.id`, giữ toàn vẹn tham chiếu. |
+| `version_no` | Số phiên bản | `INTEGER` | Không | `—` | Số phiên bản; giữ lịch sử hoặc chống ghi đè khi xử lý đồng thời. |
+| `base_profile_version` | Phiên bản hồ sơ gốc khi lập yêu cầu | `INTEGER` | Không | `—` | Phiên bản hồ sơ gốc khi lập yêu cầu; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `proposed_data` | Thông tin đề nghị cập nhật | `JSONB` | Không | `—` | Thông tin đề nghị cập nhật; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `original_data` | Thông tin trước cập nhật | `JSONB` | Không | `—` | Thông tin trước cập nhật; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `avatar_file_id` | Ảnh đại diện đã chuẩn hóa và quét | `UUID` | Cho phép | `—` | Ảnh đại diện đã chuẩn hóa và quét; liên kết tới `stored_file.id`, giữ toàn vẹn tham chiếu. |
+| `original_avatar_file_id` | Ảnh trước cập nhật | `UUID` | Cho phép | `—` | Ảnh trước cập nhật; liên kết tới `stored_file.id`, giữ toàn vẹn tham chiếu. |
+| `state` | Trạng thái nghiệp vụ | `VARCHAR(20)` | Không | `DRAFT` | Trạng thái nghiệp vụ; điều khiển chuyển trạng thái và giới hạn thao tác theo quy trình. |
+| `submission_note` | Nội dung đề nghị và căn cứ | `TEXT` | Cho phép | `—` | Nội dung đề nghị và căn cứ; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `submitted_at` | Thời điểm nộp | `TIMESTAMP WITH TIME ZONE` | Cho phép | `—` | Thời điểm nộp; dùng đối chiếu trình tự và audit. |
+| `reviewed_by` | Mã người nhận xét | `UUID` | Cho phép | `—` | Mã người nhận xét; liên kết tới `user_account.id`, giữ toàn vẹn tham chiếu. |
+| `reviewed_at` | Thời điểm nhận xét | `TIMESTAMP WITH TIME ZONE` | Cho phép | `—` | Thời điểm nhận xét; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `decision_reason` | Lý do quyết định | `TEXT` | Cho phép | `—` | Lý do quyết định; phục vụ nháp riêng, gửi tbm duyệt, công bố và lịch sử xử lý theo phiên bản. |
+| `id` | Khóa chính UUID | `UUID` | Không | `Ứng dụng sinh UUID` | Định danh ổn định của bản ghi; các bảng khác có thể tham chiếu bằng FK. |
+| `created_at` | Thời điểm tạo | `TIMESTAMP WITH TIME ZONE` | Không | `now()` | Thời điểm tạo; dùng đối chiếu trình tự và audit. |
+| `updated_at` | Thời điểm cập nhật | `TIMESTAMP WITH TIME ZONE` | Không | `now()` | Thời điểm cập nhật; dùng đối chiếu trình tự và audit. |
+| `row_version` | Số phiên bản bản ghi | `INTEGER` | Không | `1` | Số phiên bản bản ghi; giữ lịch sử hoặc chống ghi đè khi xử lý đồng thời. |
+
+**PK:** `id`.
+**FK và quan hệ:** `avatar_file_id` → `stored_file.id`; `lecturer_id` → `lecturer_profile.id`; `original_avatar_file_id` → `stored_file.id`; `reviewed_by` → `user_account.id`.
+**UNIQUE:** `lecturer_id, version_no`.
+**CHECK:** `ck_lecturer_profile_change_data_objects`: `jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'`; `ck_lecturer_profile_change_decision_recorded`: `state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)`; `ck_lecturer_profile_change_state`: `state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')`; `ck_lecturer_profile_change_submitted_timestamp`: `state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL`; `ck_lecturer_profile_change_version_positive`: `version_no > 0 AND base_profile_version > 0`.
+**Index:** `ix_lecturer_profile_change_state_created` (lecturer_profile_change.state, lecturer_profile_change.created_at); `uq_lecturer_profile_change_open` (lecturer_profile_change.lecturer_id) UNIQUE.
+
+## 14. `member_work_assignment` — Phân công việc thành viên
 
 **Mục đích và lý do tồn tại:** Tiến độ cá nhân và nhận xét GVHD. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công việc thành viên hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tiến độ cá nhân và nhận xét GVHD; `backend/api/core.py`, `backend/services/progress.py`.
@@ -365,7 +405,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_member_work_assignment_state`: `state IN ('DRAFT','SUBMITTED','APPROVED','REVISION_REQUIRED')`; `ck_member_work_assignment_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 14. `official_form` — Danh mục biểu mẫu và tài liệu Khoa theo đợt
+## 15. `official_form` — Danh mục biểu mẫu và tài liệu Khoa theo đợt
 
 **Mục đích và lý do tồn tại:** Phân loại, phạm vi và đối tượng xem tài liệu Khoa. Nếu bỏ, mất dữ liệu/quan hệ riêng của danh mục biểu mẫu và tài liệu khoa theo đợt hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Phân loại, phạm vi và đối tượng xem tài liệu Khoa; `backend/services/activity.py`, `backend/services/school_forms.py`, `backend/services/workflow_notices.py`.
@@ -394,7 +434,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_official_form_audience`: `audience IN ('STUDENT_AND_LECTURER','LECTURER')`; `ck_official_form_document_kind`: `document_kind IN ('FORM','PUBLICATION')`; `ck_official_form_state`: `state IN ('ACTIVE','ARCHIVED')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 15. `official_form_version` — Phiên bản tệp biểu mẫu và tài liệu Khoa
+## 16. `official_form_version` — Phiên bản tệp biểu mẫu và tài liệu Khoa
 
 **Mục đích và lý do tồn tại:** Bản nháp, phát hành, thu hồi và lịch sử tệp đã quét. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiên bản tệp biểu mẫu và tài liệu khoa hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Bản nháp, phát hành, thu hồi và lịch sử tệp đã quét; `backend/services/school_forms.py`.
@@ -425,10 +465,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_official_form_version_draft_stamp`: `state != 'DRAFT' OR published_at IS NULL`; `ck_official_form_version_published_stamp`: `state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL`; `ck_official_form_version_publisher_pair`: `(published_at IS NULL) = (published_by IS NULL)`; `ck_official_form_version_state`: `state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')`; `ck_official_form_version_version_positive`: `version_no > 0`.
 **Index:** `uq_official_form_current` (official_form_version.official_form_id) UNIQUE.
 
-## 16. `organizational_position` — Chức vụ tổ chức
+## 17. `organizational_position` — Chức vụ tổ chức
 
 **Mục đích và lý do tồn tại:** Quyền Trưởng bộ môn/Trưởng khoa. Nếu bỏ, mất dữ liệu/quan hệ riêng của chức vụ tổ chức hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Quyền Trưởng bộ môn/Trưởng khoa; `backend/services/account_directory.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/theses.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Quyền Trưởng bộ môn/Trưởng khoa; `backend/services/account_directory.py`, `backend/services/lecturer_profiles.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/theses.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** Admin kỹ thuật quản lý mã chức vụ; chỉ phân công position_assignment có hiệu lực mới cấp quyền nghiệp vụ.
 **Tình huống giả:** Mã DEPARTMENT_HEAD đại diện chức vụ Trưởng bộ môn.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -448,10 +488,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_organizational_position_code`: `code IN ('DEPARTMENT_HEAD','FACULTY_DEAN')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 17. `position_assignment` — Phân công chức vụ
+## 18. `position_assignment` — Phân công chức vụ
 
 **Mục đích và lý do tồn tại:** Quyền theo bộ môn/khoa và thời gian. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công chức vụ hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Quyền theo bộ môn/khoa và thời gian; `backend/services/account_directory.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/theses.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Quyền theo bộ môn/khoa và thời gian; `backend/services/account_directory.py`, `backend/services/lecturer_profiles.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/theses.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** Admin quản trị phân công có căn cứ; Trưởng bộ môn/Trưởng khoa thực thi quyền trong phạm vi hiệu lực.
 **Tình huống giả:** GV-DEMO được phân công Trưởng bộ môn CNTT-DEMO trong một khoảng hiệu lực.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -477,7 +517,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_position_assignment_effective_window`: `effective_to IS NULL OR effective_to > effective_from`; `ck_position_assignment_exactly_one_scope`: `(faculty_id IS NOT NULL AND department_id IS NULL) OR (faculty_id IS NULL AND department_id IS NOT NULL)`; `ck_position_assignment_state`: `state IN ('ACTIVE','REVOKED','EXPIRED')`.
 **Index:** `uq_position_assignment_department_scope` (position_assignment.lecturer_id, position_assignment.position_id, position_assignment.department_id) UNIQUE; `uq_position_assignment_faculty_scope` (position_assignment.lecturer_id, position_assignment.position_id, position_assignment.faculty_id) UNIQUE.
 
-## 18. `progress_milestone` — Mốc tiến độ
+## 19. `progress_milestone` — Mốc tiến độ
 
 **Mục đích và lý do tồn tại:** Lịch theo đợt KLTN. Nếu bỏ, mất dữ liệu/quan hệ riêng của mốc tiến độ hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Lịch theo đợt KLTN; `backend/services/progress.py`.
@@ -507,7 +547,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_progress_milestone_expected_ratio`: `expected_ratio IS NULL OR (expected_ratio >= 0 AND expected_ratio <= 100)`; `ck_progress_milestone_source_type`: `source_type IN ('ROUND_POLICY','STUDENT_PLAN')`; `ck_progress_milestone_state`: `state IN ('DRAFT','OPEN','CLOSED','CANCELLED')`; `ck_progress_milestone_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 19. `progress_report` — Báo cáo tiến độ
+## 20. `progress_report` — Báo cáo tiến độ
 
 **Mục đích và lý do tồn tại:** Bản nộp theo phiên bản. Nếu bỏ, mất dữ liệu/quan hệ riêng của báo cáo tiến độ hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Bản nộp theo phiên bản; `backend/api/account_admin.py`, `backend/api/core.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`.
@@ -538,7 +578,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_progress_report_reported_ratio`: `reported_ratio IS NULL OR (reported_ratio >= 0 AND reported_ratio <= 100)`; `ck_progress_report_state`: `state IN ('DRAFT','SUBMITTED','CONFIRMED','REVISION_REQUIRED')`; `ck_progress_report_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 20. `progress_review` — Nhận xét tiến độ
+## 21. `progress_review` — Nhận xét tiến độ
 
 **Mục đích và lý do tồn tại:** GVHD xác nhận, GV khác chỉ góp ý. Nếu bỏ, mất dữ liệu/quan hệ riêng của nhận xét tiến độ hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** GVHD xác nhận, GV khác chỉ góp ý; `backend/services/progress.py`, `backend/services/progress_annotations.py`.
@@ -563,7 +603,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_progress_review_decision`: `decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 21. `progress_review_annotation` — Ghim nhận xét theo phiên bản tệp
+## 22. `progress_review_annotation` — Ghim nhận xét theo phiên bản tệp
 
 **Mục đích và lý do tồn tại:** Ghim, nhận xét chung và tệp GV phản hồi; nháp riêng theo đúng phiên bản, chỉ công bố cùng quyết định phản hồi. Nếu bỏ, mất dữ liệu/quan hệ riêng của ghim nhận xét theo phiên bản tệp hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Ghim, nhận xét chung và tệp GV phản hồi; nháp riêng theo đúng phiên bản, chỉ công bố cùng quyết định phản hồi; `backend/services/progress_annotations.py`.
@@ -600,7 +640,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_progress_review_annotation_annotation_kind`: `annotation_kind IN ('PIN','SUMMARY','ATTACHMENT')`; `ck_progress_review_annotation_attachment_kind`: `(annotation_kind = 'ATTACHMENT' AND attachment_file_id IS NOT NULL) OR (annotation_kind IN ('PIN','SUMMARY') AND attachment_file_id IS NULL)`; `ck_progress_review_annotation_coordinates`: `(x IS NULL AND y IS NULL) OR (page_number IS NOT NULL AND x IS NOT NULL AND y IS NOT NULL AND x BETWEEN 0 AND 1 AND y BETWEEN 0 AND 1)`; `ck_progress_review_annotation_kind_coordinates`: `annotation_kind = 'PIN' OR (page_number IS NULL AND x IS NULL AND y IS NULL)`; `ck_progress_review_annotation_one_target`: `num_nonnulls(progress_report_id, document_version_id, proposal_version_id) = 1`; `ck_progress_review_annotation_page_number`: `page_number IS NULL OR page_number BETWEEN 1 AND 10000`; `ck_progress_review_annotation_publication`: `(state = 'DRAFT' AND published_at IS NULL) OR (state = 'PUBLISHED' AND published_at IS NOT NULL AND length(trim(comment)) > 0)`; `ck_progress_review_annotation_state`: `state IN ('DRAFT','PUBLISHED')`.
 **Index:** `ix_progress_review_annotation_document_reviewer` (progress_review_annotation.document_version_id, progress_review_annotation.reviewer_id, progress_review_annotation.state); `ix_progress_review_annotation_proposal_reviewer` (progress_review_annotation.proposal_version_id, progress_review_annotation.reviewer_id, progress_review_annotation.state); `ix_progress_review_annotation_report_reviewer` (progress_review_annotation.progress_report_id, progress_review_annotation.reviewer_id, progress_review_annotation.state); `uq_review_summary_document` (progress_review_annotation.document_version_id, progress_review_annotation.reviewer_id) UNIQUE; `uq_review_summary_progress` (progress_review_annotation.progress_report_id, progress_review_annotation.reviewer_id) UNIQUE; `uq_review_summary_proposal` (progress_review_annotation.proposal_version_id, progress_review_annotation.reviewer_id) UNIQUE.
 
-## 22. `proposal` — Hồ sơ đề cương
+## 23. `proposal` — Hồ sơ đề cương
 
 **Mục đích và lý do tồn tại:** Trạng thái xét duyệt đề cương. Nếu bỏ, mất dữ liệu/quan hệ riêng của hồ sơ đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Trạng thái xét duyệt đề cương; `backend/services/activity.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/theses.py`.
@@ -625,7 +665,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_proposal_state`: `state IN ('DRAFT','SUBMITTED','UNDER_REVIEW','REVISION_REQUIRED','ADVISOR_CONFIRMED','DEPARTMENT_FINALIZED','DEAN_CONFIRMED','PRINT_READY')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 23. `proposal_review` — Nhận xét đề cương
+## 24. `proposal_review` — Nhận xét đề cương
 
 **Mục đích và lý do tồn tại:** Ý kiến GVHD và người được giao góp ý. Nếu bỏ, mất dữ liệu/quan hệ riêng của nhận xét đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Ý kiến GVHD và người được giao góp ý; `backend/services/progress_annotations.py`, `backend/services/proposals.py`.
@@ -651,7 +691,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_proposal_review_decision`: `decision IN ('COMMENT','REVISION_REQUIRED','CONFIRM')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 24. `proposal_version` — Phiên bản đề cương
+## 25. `proposal_version` — Phiên bản đề cương
 
 **Mục đích và lý do tồn tại:** Bản nộp đề cương bất biến. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiên bản đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Bản nộp đề cương bất biến; `backend/services/activity.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`.
@@ -679,7 +719,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_proposal_version_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 25. `registration_form_version` — Phiên bản đơn đăng ký Mẫu 1a/1b
+## 26. `registration_form_version` — Phiên bản đơn đăng ký Mẫu 1a/1b
 
 **Mục đích và lý do tồn tại:** Tệp nộp bất biến trước tiếp nhận; đối chiếu thành viên và xuất bản nộp có footer, không tự xác nhận Khoa duyệt. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiên bản đơn đăng ký mẫu 1a/1b hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tệp nộp bất biến trước tiếp nhận; đối chiếu thành viên và xuất bản nộp có footer, không tự xác nhận Khoa duyệt; `backend/services/registration_forms.py`.
@@ -706,7 +746,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_registration_form_version_form_code`: `form_code IN ('1A','1B')`; `ck_registration_form_version_hash_length`: `length(content_sha256) = 64 AND length(registration_fingerprint) = 64`; `ck_registration_form_version_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 26. `registration_member` — Thành viên đăng ký
+## 27. `registration_member` — Thành viên đăng ký
 
 **Mục đích và lý do tồn tại:** Tự xác nhận nhóm và chống trùng đợt. Nếu bỏ, mất dữ liệu/quan hệ riêng của thành viên đăng ký hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tự xác nhận nhóm và chống trùng đợt; `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/evidence.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
@@ -736,10 +776,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_registration_member_consent_consistency`: `(consent_status = 'PENDING' AND responded_by_user_id IS NULL AND responded_at IS NULL) OR (consent_status IN ('ACCEPTED','DECLINED') AND responded_by_user_id IS NOT NULL AND responded_at IS NOT NULL)`.
 **Index:** `uq_registration_member_one_coordinator` (registration_member.registration_id) UNIQUE; `uq_registration_member_student_round_active` (registration_member.student_id, registration_member.round_id) UNIQUE.
 
-## 27. `resource_assignment` — Phân công quyền theo tài nguyên
+## 28. `resource_assignment` — Phân công quyền theo tài nguyên
 
 **Mục đích và lý do tồn tại:** Người xác nhận điều kiện/điều phối/góp ý theo đợt hoặc KLTN. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công quyền theo tài nguyên hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Người xác nhận điều kiện/điều phối/góp ý theo đợt hoặc KLTN; `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/progress.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
+**Use case/API/service:** Người xác nhận điều kiện/điều phối/góp ý theo đợt hoặc KLTN; `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/lecturer_profiles.py`, `backend/services/progress.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Admin quản trị phân công có căn cứ; người được giao chỉ thao tác đúng tài nguyên.
 **Tình huống giả:** Khoa giao ELIGIBILITY_VERIFIER cho GV-DEMO đúng đợt; quyền tự hết khi thu hồi.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -765,10 +805,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_resource_assignment_effective_window`: `effective_to IS NULL OR effective_to > effective_from`; `ck_resource_assignment_exactly_one_resource`: `(CASE WHEN round_id IS NULL THEN 0 ELSE 1 END + CASE WHEN thesis_id IS NULL THEN 0 ELSE 1 END) = 1`; `ck_resource_assignment_state`: `state IN ('ACTIVE','REVOKED','EXPIRED')`.
 **Index:** `uq_resource_assignment_round_scope` (resource_assignment.assignment_type, resource_assignment.user_id, resource_assignment.round_id) UNIQUE; `uq_resource_assignment_thesis_scope` (resource_assignment.assignment_type, resource_assignment.user_id, resource_assignment.thesis_id) UNIQUE.
 
-## 28. `reviewer_assignment` — Phân công góp ý đề cương và phản biện KLTN
+## 29. `reviewer_assignment` — Phân công góp ý đề cương và phản biện KLTN
 
 **Mục đích và lý do tồn tại:** Người phản biện, căn cứ phân công và hạn gửi nhận xét. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công góp ý đề cương và phản biện kltn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Người phản biện, căn cứ phân công và hạn gửi nhận xét; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/proposals.py`, `backend/services/theses.py`.
+**Use case/API/service:** Người phản biện, căn cứ phân công và hạn gửi nhận xét; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/lecturer_profiles.py`, `backend/services/proposals.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Trưởng bộ môn phân công giảng viên góp ý; chỉ người được giao và người trong hồ sơ xem.
 **Tình huống giả:** TBM giao GV khác GVHD góp ý đúng hồ sơ đề cương DEMO.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -797,7 +837,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_reviewer_assignment_exactly_one_subject`: `(proposal_id IS NOT NULL AND thesis_id IS NULL) OR (proposal_id IS NULL AND thesis_id IS NOT NULL)`; `ck_reviewer_assignment_review_scope`: `review_scope IN ('PROPOSAL','THESIS')`; `ck_reviewer_assignment_scope_matches_subject`: `(review_scope = 'PROPOSAL' AND proposal_id IS NOT NULL) OR (review_scope = 'THESIS' AND thesis_id IS NOT NULL)`; `ck_reviewer_assignment_state`: `state IN ('ACTIVE','COMPLETED','REVOKED')`.
 **Index:** `uq_reviewer_assignment_proposal` (reviewer_assignment.lecturer_id, reviewer_assignment.proposal_id) UNIQUE; `uq_reviewer_assignment_thesis` (reviewer_assignment.lecturer_id, reviewer_assignment.thesis_id) UNIQUE.
 
-## 29. `signature_confirmation` — Xác nhận chữ ký đề cương
+## 30. `signature_confirmation` — Xác nhận chữ ký đề cương
 
 **Mục đích và lý do tồn tại:** Ghi phiên bản và căn cứ chốt đề cương. Nếu bỏ, mất dữ liệu/quan hệ riêng của xác nhận chữ ký đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Ghi phiên bản và căn cứ chốt đề cương; `backend/services/proposals.py`.
@@ -824,10 +864,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_signature_confirmation_proposal_version_positive`: `proposal_version_no > 0`; `ck_signature_confirmation_signature_type`: `signature_type IN ('DEPARTMENT_FINALIZATION','DEAN_CONFIRMATION')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 30. `stored_file` — Tệp lưu trữ
+## 31. `stored_file` — Tệp lưu trữ
 
 **Mục đích và lý do tồn tại:** Checksum và metadata tệp đề cương, tiến độ, tài liệu. Nếu bỏ, mất dữ liệu/quan hệ riêng của tệp lưu trữ hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Checksum và metadata tệp đề cương, tiến độ, tài liệu; `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/evidence.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/school_forms.py`.
+**Use case/API/service:** Checksum và metadata tệp đề cương, tiến độ, tài liệu; `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/evidence.py`, `backend/services/lecturer_profiles.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/school_forms.py`.
 **Vai trò thao tác:** Chỉ service tài liệu/đề cương/minh chứng ghi metadata; tải file qua API kiểm quyền, không truy cập storage trực tiếp.
 **Tình huống giả:** Tệp đề cương DEMO lưu khóa nội bộ và SHA-256, không tạo URL công khai.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -852,7 +892,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_stored_file_byte_size_positive`: `byte_size > 0`; `ck_stored_file_scan_state`: `scan_state IN ('QUARANTINED','CLEAN','INFECTED','FAILED')`.
 **Index:** `ix_stored_file_sha256` (stored_file.sha256).
 
-## 31. `student_profile` — Hồ sơ sinh viên
+## 32. `student_profile` — Hồ sơ sinh viên
 
 **Mục đích và lý do tồn tại:** Điều kiện, đề xuất và đăng ký. Nếu bỏ, mất dữ liệu/quan hệ riêng của hồ sơ sinh viên hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Điều kiện, đề xuất và đăng ký; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/core.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/notifications.py`, `backend/services/progress.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/review_form_export.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
@@ -879,7 +919,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** Không có CHECK riêng.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 32. `thesis` — Khóa luận
+## 33. `thesis` — Khóa luận
 
 **Mục đích và lý do tồn tại:** Hồ sơ sau khi chốt đăng ký. Nếu bỏ, mất dữ liệu/quan hệ riêng của khóa luận hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Hồ sơ sau khi chốt đăng ký; `backend/api/account_admin.py`, `backend/api/core.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/notifications.py`, `backend/services/progress_annotations.py`, `backend/services/registration.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
@@ -907,7 +947,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_thesis_state`: `state IN ('ACTIVE','PROPOSAL_APPROVED','IN_PROGRESS','EXTENDED','WITHDRAWN','READY_FOR_DEFENSE','DEFENDED','COMPLETED','ARCHIVED')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 33. `thesis_member` — Thành viên khóa luận
+## 34. `thesis_member` — Thành viên khóa luận
 
 **Mục đích và lý do tồn tại:** Tư cách thành viên chính thức. Nếu bỏ, mất dữ liệu/quan hệ riêng của thành viên khóa luận hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tư cách thành viên chính thức; `backend/api/core.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/notifications.py`, `backend/services/progress.py`, `backend/services/registration.py`, `backend/services/review_form_export.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
@@ -934,7 +974,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** Không có CHECK riêng.
 **Index:** `uq_thesis_member_one_coordinator` (thesis_member.thesis_id) UNIQUE.
 
-## 34. `thesis_review` — Phiếu nhận xét KLTN Mẫu 7 và Mẫu 8
+## 35. `thesis_review` — Phiếu nhận xét KLTN Mẫu 7 và Mẫu 8
 
 **Mục đích và lý do tồn tại:** Nháp riêng và phiếu đã ký theo sinh viên, phân công và bản báo cáo. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiếu nhận xét kltn mẫu 7 và mẫu 8 hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Nháp riêng và phiếu đã ký theo sinh viên, phân công và bản báo cáo; `backend/services/evaluation.py`.
@@ -972,7 +1012,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_thesis_review_assignment_matches_kind`: `(kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)`; `ck_thesis_review_kind`: `kind IN ('ADVISOR','REVIEWER')`; `ck_thesis_review_state`: `state IN ('DRAFT','SUBMITTED')`; `ck_thesis_review_submitted_has_signed_copy`: `state = 'DRAFT' OR (signed_file_id IS NOT NULL AND submitted_at IS NOT NULL)`; `ck_thesis_review_version_positive`: `version_no > 0`.
 **Index:** `ix_thesis_review_thesis_member` (thesis_review.thesis_id, thesis_review.thesis_member_id).
 
-## 35. `thesis_round` — Đợt KLTN
+## 36. `thesis_round` — Đợt KLTN
 
 **Mục đích và lý do tồn tại:** Đợt chính/bổ sung và thời hạn. Nếu bỏ, mất dữ liệu/quan hệ riêng của đợt kltn hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Đợt chính/bổ sung và thời hạn; `backend/api/account_admin.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/deadlines.py`, `backend/services/evaluation.py`, `backend/services/progress.py`, `backend/services/proposal_export.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
@@ -1000,10 +1040,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_thesis_round_round_type`: `round_type IN ('MAIN','SUPPLEMENTARY')`; `ck_thesis_round_state`: `state IN ('DRAFT','OPEN','CLOSED','ARCHIVED')`; `ck_thesis_round_time_window`: `closes_at > opens_at`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 36. `topic` — Đề tài
+## 37. `topic` — Đề tài
 
 **Mục đích và lý do tồn tại:** Đề xuất và xét duyệt. Nếu bỏ, mất dữ liệu/quan hệ riêng của đề tài hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Đề xuất và xét duyệt; `backend/api/account_admin.py`, `backend/api/main.py`, `backend/services/activity.py`, `backend/services/notifications.py`, `backend/services/proposal_export.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/school_forms.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Đề xuất và xét duyệt; `backend/api/account_admin.py`, `backend/api/main.py`, `backend/services/activity.py`, `backend/services/lecturer_profiles.py`, `backend/services/notifications.py`, `backend/services/proposal_export.py`, `backend/services/registration.py`, `backend/services/registration_forms.py`, `backend/services/school_forms.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** GV hoặc SV đề xuất; Trưởng bộ môn đúng phạm vi xét duyệt.
 **Tình huống giả:** GV-DEMO đề xuất đề tài TOP-DEMO, TBM duyệt rồi SV đăng ký.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -1037,7 +1077,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_topic_max_students`: `max_students BETWEEN 1 AND 3`; `ck_topic_proposer_type`: `proposer_type IN ('LECTURER','STUDENT')`; `ck_topic_state`: `state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','REJECTED','LOCKED')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 37. `topic_registration` — Đăng ký đề tài
+## 38. `topic_registration` — Đăng ký đề tài
 
 **Mục đích và lý do tồn tại:** Tiếp nhận và chốt nhóm. Nếu bỏ, mất dữ liệu/quan hệ riêng của đăng ký đề tài hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tiếp nhận và chốt nhóm; `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/evidence.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
@@ -1070,7 +1110,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_topic_registration_expected_member_count`: `expected_member_count BETWEEN 1 AND 3`; `ck_topic_registration_state`: `state IN ('DRAFT','SUBMITTED','LECTURER_ACCEPTED','LECTURER_REJECTED','RETURNED','FINALIZED','CANCELLED')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 38. `topic_requirement` — Yêu cầu mong muốn của đề tài
+## 39. `topic_requirement` — Yêu cầu mong muốn của đề tài
 
 **Mục đích và lý do tồn tại:** Thông tin để GV xét phù hợp, không thay điều kiện chính thức. Nếu bỏ, mất dữ liệu/quan hệ riêng của yêu cầu mong muốn của đề tài hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Thông tin để GV xét phù hợp, không thay điều kiện chính thức; `backend/services/topics.py`.
@@ -1096,7 +1136,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_topic_requirement_enforcement_desired`: `enforcement = 'DESIRED'`; `ck_topic_requirement_preferred_gpa`: `preferred_gpa IS NULL OR (preferred_gpa >= 0 AND preferred_gpa <= 4)`; `ck_topic_requirement_requirement_type`: `requirement_type IN ('PREFERRED_GPA','SKILL','TECHNOLOGY','KNOWLEDGE','OTHER')`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 39. `topic_title_version` — Lịch sử tên đề tài
+## 40. `topic_title_version` — Lịch sử tên đề tài
 
 **Mục đích và lý do tồn tại:** Tên ổn định theo phiên bản và audit. Nếu bỏ, mất dữ liệu/quan hệ riêng của lịch sử tên đề tài hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Tên ổn định theo phiên bản và audit; `backend/services/topics.py`.
@@ -1122,10 +1162,10 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_topic_title_version_version_positive`: `version_no > 0`.
 **Index:** Chỉ index PK/UNIQUE do PostgreSQL tạo.
 
-## 40. `user_account` — Tài khoản người dùng
+## 41. `user_account` — Tài khoản người dùng
 
 **Mục đích và lý do tồn tại:** Đăng nhập, khóa tài khoản và vai trò nền. Nếu bỏ, mất dữ liệu/quan hệ riêng của tài khoản người dùng hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Đăng nhập, khóa tài khoản và vai trò nền; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/dependencies.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/account_tokens.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/evidence.py`, `backend/services/lecturer_roster.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Đăng nhập, khóa tài khoản và vai trò nền; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/dependencies.py`, `backend/api/lecturer_import.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/account_directory.py`, `backend/services/account_tokens.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/evidence.py`, `backend/services/lecturer_profiles.py`, `backend/services/lecturer_roster.py`, `backend/services/notifications.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`, `backend/services/topics.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** Admin kỹ thuật quản lý trạng thái; chính chủ đăng nhập; không cấp quyền duyệt nghiệp vụ cho Admin.
 **Tình huống giả:** Tài khoản demo SV-DEMO đăng nhập bằng email đã xác minh và bị chặn khi LOCKED.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -1150,7 +1190,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261030_0017`; 41 bảng 
 **CHECK:** `ck_user_account_base_role`: `base_role IN ('ADMIN','LECTURER','STUDENT')`; `ck_user_account_email_normalized`: `email IS NULL OR email = lower(email)`; `ck_user_account_identity_present`: `external_subject IS NOT NULL OR email IS NOT NULL`; `ck_user_account_local_credentials_pair`: `(email IS NULL AND password_hash IS NULL) OR (email IS NOT NULL AND password_hash IS NOT NULL)`; `ck_user_account_status`: `status IN ('ACTIVE','LOCKED','DISABLED')`.
 **Index:** `uq_user_account_email_lower` (lower(email)) UNIQUE.
 
-## 41. `user_notification` — Thông báo người dùng
+## 42. `user_notification` — Thông báo người dùng
 
 **Mục đích và lý do tồn tại:** Thông báo đề xuất và đăng ký theo người nhận. Nếu bỏ, mất dữ liệu/quan hệ riêng của thông báo người dùng hoặc không còn kiểm được lịch sử và quyền liên quan.
 **Use case/API/service:** Thông báo đề xuất và đăng ký theo người nhận; `backend/services/notifications.py`, `backend/services/workflow_notices.py`.
