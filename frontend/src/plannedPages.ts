@@ -1,5 +1,5 @@
 export const plannedPages = {
-  changes: {title: "Đổi đề tài, rút và gia hạn", description: "Theo dõi yêu cầu điều chỉnh khóa luận và quyết định có căn cứ."},
+  changes: {title: "Đổi đề tài & gia hạn", description: "Theo dõi yêu cầu điều chỉnh khóa luận và quyết định có căn cứ."},
   reports: {title: "Báo cáo và thống kê", description: "Tổng hợp số liệu theo đợt, tiến độ, bảo vệ và kết quả."},
   expertise: {title: "Chuyên môn giảng viên", description: "Khai báo chuyên môn và ghi nhận kết quả xác minh theo thẩm quyền."},
   council: {title: "Hội đồng bảo vệ", description: "Quản lý thành viên hội đồng và phân công khóa luận bảo vệ."},

@@ -41,12 +41,16 @@ type AccountDirectory = {
 };
 type Assignment = { id: string; round_id: string; round_code: string; user_id: string; email: string; assignment_type: string };
 
+type AdministrationSection = "accounts" | "assignments";
+
 export default function AdministrationPage({
   context,
   onPermissionsChanged,
+  section = "accounts",
 }: {
   context: Context;
   onPermissionsChanged: () => Promise<void>;
+  section?: AdministrationSection;
 }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -85,6 +89,7 @@ export default function AdministrationPage({
   const isAdmin = context.base_role === "ADMIN";
 
   const assignmentDescriptions: Record<string, string> = {
+    REVIEW_RECORDS_MANAGER: "Được tiếp nhận và ghi nhận bản giấy Mẫu 7–8 trong đợt được giao. Không được sửa nhận xét, phân công phản biện hoặc xét điều kiện thay TBM.",
     FORM_MANAGER: "Được thêm, cập nhật, phát hành và thu hồi biểu mẫu/tài liệu Khoa của đợt được giao; không có quyền duyệt đề tài hoặc gia hạn mốc.",
     ELIGIBILITY_IMPORTER:
       "Được nhập danh sách chính thức của Khoa; sinh viên được ghi nhận đủ điều kiện ngay. Sinh viên vẫn phải kích hoạt tài khoản trước khi gửi đăng ký.",
@@ -98,11 +103,11 @@ export default function AdministrationPage({
 
   const eligibleStaff = (a: Account, task: string) =>
     a.status === "ACTIVE" &&
-    (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
+    (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" || task === "REVIEW_RECORDS_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
 
   function changeKind(next: string) {
     setKind(next);
-    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && next !== "FORM_MANAGER") {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
+    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && !["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(next)) {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
     if (userId && !staffAccounts.some((a) => a.id === userId && eligibleStaff(a, next))) {
       setUserId("");
       setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
@@ -218,12 +223,23 @@ export default function AdministrationPage({
   return (
     <div className="admin-page">
       <PageHeader
-        title="Quản trị tài khoản & Phân công"
-        description="Cấp quyền truy cập, kiểm soát trạng thái tài khoản và phân công nhiệm vụ theo đợt khóa luận"
+        title={section === "accounts" ? (isAdmin ? "Quản lý tài khoản" : "Tài khoản sinh viên theo đợt") : "Phân công theo đợt"}
+        description={section === "accounts"
+          ? "Tìm kiếm tài khoản, theo dõi trạng thái và xử lý hỗ trợ truy cập."
+          : "Giao hoặc thu hồi nhiệm vụ KLTN theo từng đợt, kèm căn cứ và lịch sử."}
       />
 
       <div className="stack">
-        <Link className="btn btn-secondary" to="/forms">Mở quản lý biểu mẫu và tài liệu Khoa</Link>
+        {isAdmin && <nav className="admin-page__quick-links" aria-label="Lối tắt quản trị">
+          {section === "accounts" && <>
+            <Link className="btn btn-secondary" to="/lecturers">Danh sách giảng viên · Nhập Excel</Link>
+            <Link className="btn btn-secondary" to="/rounds">Quản lý đợt KLTN</Link>
+          </>}
+          {section === "assignments" && <>
+            <Link className="btn btn-secondary" to="/positions">Chức vụ TBM và phạm vi duyệt</Link>
+            <Link className="btn btn-secondary" to="/forms">Kho biểu mẫu và tài liệu Khoa</Link>
+          </>}
+        </nav>}
         {error ? (
           <p role="alert" className="alert alert-danger" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <AlertTriangle size={18} aria-hidden="true" /> {error}
@@ -235,11 +251,10 @@ export default function AdministrationPage({
           </p>
         ) : null}
 
-        {isAdmin ? <Link className="btn btn-secondary" to="/lecturers">Mở danh sách GV · Nhập Excel · Gửi link kích hoạt</Link> : null}
         {isAdmin && (
-          <div className="admin-grid-top">
+          <div className="admin-grid-top admin-grid-top--single">
             {/* CARD 1: MỜI GIẢNG VIÊN */}
-            <section className="card admin-card">
+            {section === "accounts" && (<section className="card admin-card">
               <div className="admin-card__header">
                 <div className="admin-card__title-group">
                   <div className="admin-card__icon">
@@ -328,10 +343,10 @@ export default function AdministrationPage({
                   </button>
                 </form>
               </div>
-            </section>
+            </section>)}
 
             {/* CARD 2: PHÂN CÔNG THEO ĐỢT */}
-            <section className="card admin-card">
+            {section === "assignments" && (<section className="card admin-card">
               <div className="admin-card__header">
                 <div className="admin-card__title-group">
                   <div className="admin-card__icon admin-card__icon--info">
@@ -378,7 +393,7 @@ export default function AdministrationPage({
                     <select className="input" required value={roundId} onChange={(e) => setRoundId(e.target.value)}>
                       <option value="">Chọn đợt khóa luận áp dụng</option>
                       {rounds
-                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (kind === "FORM_MANAGER" && r.state === "CLOSED"))
+                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(kind) && r.state === "CLOSED"))
                         .map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.code} · {r.state}
@@ -433,6 +448,7 @@ export default function AdministrationPage({
                       <option value="ELIGIBILITY_VERIFIER">Điều chỉnh/thu hồi điều kiện</option>
                       <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
                       <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
+                      <option value="REVIEW_RECORDS_MANAGER">Tiếp nhận hồ sơ phản biện (cán bộ/thư ký)</option>
                       <option value="FORM_MANAGER">Quản lý biểu mẫu và tài liệu Khoa</option>
                     </select>
                   </label>
@@ -463,12 +479,12 @@ export default function AdministrationPage({
                   </button>
                 </form>
               </div>
-            </section>
+            </section>)}
           </div>
         )}
 
         {/* CARD 3: PHÂN CÔNG ĐANG HIỆU LỰC */}
-        {isAdmin && (
+        {section === "assignments" && isAdmin && (
           <section className="card admin-card">
             <div className="admin-card__header">
               <div className="admin-card__title-group">
@@ -538,7 +554,7 @@ export default function AdministrationPage({
                         </span>
                         <span className={`badge ${dutyClass} assignment-item__duty`}>
                           <Briefcase size={12} aria-hidden="true" />
-                          {a.assignment_type === "FORM_MANAGER" ? "Quản lý biểu mẫu và tài liệu Khoa" : a.assignment_type === "ELIGIBILITY_VERIFIER"
+                          {a.assignment_type === "REVIEW_RECORDS_MANAGER" ? "Tiếp nhận hồ sơ phản biện" : a.assignment_type === "FORM_MANAGER" ? "Quản lý biểu mẫu và tài liệu Khoa" : a.assignment_type === "ELIGIBILITY_VERIFIER"
                             ? "Điều chỉnh/thu hồi điều kiện"
                             : a.assignment_type === "ACCOUNT_MANAGER"
                             ? "Quản lý tài khoản SV"
@@ -580,7 +596,7 @@ export default function AdministrationPage({
         )}
 
         {/* CARD 4: DANH SÁCH TÀI KHOẢN */}
-        <section className="card admin-card">
+        {section === "accounts" && (<section className="card admin-card">
           <div className="admin-card__header">
             <div className="admin-card__title-group">
               <div className="admin-card__icon">
@@ -1225,7 +1241,7 @@ export default function AdministrationPage({
                 );
               })()}
           </div>
-        </section>
+        </section>)}
       </div>
     </div>
   );

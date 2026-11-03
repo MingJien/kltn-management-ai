@@ -1,3 +1,4 @@
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
@@ -94,6 +95,8 @@ function ThesisWorkspace({context}: {context: Context}) {
     <PageHeader title={{overview:"Khóa luận & GVHD",submissions:"Hồ sơ nộp & xét duyệt",progress:"Báo cáo tiến độ"}[section] || "Hồ sơ khóa luận"} description={`${thesis.title} · ${thesis.round_label}`}>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
+    {active && <Link className="btn btn-secondary" to={`/withdrawals?thesis=${thesis.id}`}>Đơn xin thôi thực hiện KLTN</Link>}
+    {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}
     {context.base_role === "STUDENT" && active && !thesis.actions.includes("document:submit") && <p className="alert alert-warning" role="status">Quyền tham gia đợt của bạn đã bị thu hồi. Bạn vẫn xem được hồ sơ; các thao tác nộp/sửa được tạm dừng. Liên hệ Khoa nếu cần khôi phục.</p>}
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
     <div className="core-toolbar">
@@ -144,7 +147,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     {message && <div className="alert alert-success" role="status">{message}</div>}
     {busy && <p role="status">{refreshing ? "Đang tải dữ liệu mới…" : "Đang lưu và cập nhật hồ sơ…"}</p>}
     {section === "overview" && <div className="stack">
-      <section className="thesis-identity card"><div className="card-body"><span className="section-eyebrow">HỒ SƠ ĐANG LÀM VIỆC</span><h2>{thesis.title}</h2><p>{thesis.round_label}</p><div className="flex gap-3" style={{flexWrap:"wrap"}}><span>{thesis.members.length} sinh viên</span><span>GVHD: <strong>{thesis.advisor_name || "Chưa phân công"}</strong></span><Status value={thesis.state}/></div></div></section><div className="workspace-overview-grid">
+      <section className="thesis-identity card"><div className="card-body"><span className="section-eyebrow">HỒ SƠ ĐANG LÀM VIỆC</span><h2>{thesis.title}</h2><p>{thesis.round_label}</p><div className="flex gap-3" style={{flexWrap:"wrap"}}><span>{thesis.members.length} sinh viên</span><span>GVHD: <strong><LecturerProfileLink userId={context.user_id} lecturerId={thesis.advisor_lecturer_id} name={thesis.advisor_name}/></strong></span><Status value={thesis.state}/></div></div></section><div className="workspace-overview-grid">
         <div className="card">
           <div className="card-body stack">
             <h2 style={{margin: 0, fontSize: "16px", fontWeight: 650}}>Nhóm sinh viên thực hiện</h2>
@@ -167,7 +170,7 @@ function ThesisWorkspace({context}: {context: Context}) {
             <h2 style={{margin: 0, fontSize: "16px", fontWeight: 650}}>Giảng viên hướng dẫn chính thức</h2>
             {thesis.advisor_history.map(item => (
               <div className="core-review" key={item.id}>
-                <strong>{item.display_name}</strong> · <Status value={item.state} label={item.state === "ACTIVE" ? "Đang hướng dẫn" : undefined} />
+                <strong><LecturerProfileLink userId={context.user_id} lecturerId={item.lecturer_id} name={item.display_name}/></strong> · <Status value={item.state} label={item.state === "ACTIVE" ? "Đang hướng dẫn" : undefined} />
                 <p className="text-body-sm text-muted" style={{margin: "4px 0 0"}}>Từ {formatDate(item.effective_from)}{item.effective_to ? ` đến ${formatDate(item.effective_to)}` : ""}</p>
               </div>
             ))}

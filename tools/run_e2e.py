@@ -129,7 +129,7 @@ def main() -> int:
                 base_role='ADMIN', status='ACTIVE')
             session.add(admin)
             accounts['admin'] = {'email':admin.email, 'password':admin_password}
-            for key in ('proposalPeer','race1','race2','race3','proposalFlow','returnFlow','auditSv1','auditSv2','auditSv3','nv5Student','nv5Outsider','annotationStudent','formStudent','formMember'):
+            for key in ('proposalPeer','race1','race2','race3','proposalFlow','returnFlow','auditSv1','auditSv2','auditSv3','nv5Student','nv5Outsider','annotationStudent','formStudent','formMember','nv6Student','nv6Member','nv6Outsider'):
                 password = secrets.token_urlsafe(20)
                 email = key.lower() + '@e2e.test'
                 user = m.UserAccount(id=uuid4(),email=email,password_hash=hash_password(password),
@@ -144,6 +144,13 @@ def main() -> int:
                 accounts[key] = {'email':email,'password':password}
         private_engine.dispose()
         env['KLTN_E2E_ACCOUNTS_JSON'] = json.dumps(accounts)
+        # A synthetic, parseable PDF for NV6 report and manual-signature workflow QA.
+        from pypdf import PdfWriter
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        synthetic_pdf = directory / 'synthetic-nv6.pdf'
+        writer.write(synthetic_pdf)
+        env['KLTN_E2E_NV6_FILE'] = str(synthetic_pdf)
         # Read the actual faculty templates and fill a synthetic local copy for print QA.
         # The original templates are never written to, and copies stay Git-ignored.
         from backend.services.form_templates import template_available, official_template, official_template_by_id

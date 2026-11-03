@@ -63,9 +63,9 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
       <button className="btn btn-destructive" disabled={busy || withdrawReason.trim().length < 3}>Rút hồ sơ này</button>
     </form></details>}
     {latest?.state === "REVISION_REQUESTED" && thesis.actions.includes("document:submit") && <div className="alert alert-info">
-      <strong>GVHD yêu cầu sửa bản v{latest.version_no}.</strong> Chọn tệp sửa ngay trong hồ sơ này để tạo bản v{latest.version_no + 1}; bản cũ và nhận xét vẫn được giữ. Không cần tạo hồ sơ tài liệu khác.
+      <strong>Hồ sơ yêu cầu cập nhật bản v{latest.version_no}.</strong> Chọn tệp sửa ngay trong hồ sơ này để tạo bản v{latest.version_no + 1}; bản cũ và nhận xét vẫn được giữ. Không cần tạo hồ sơ tài liệu khác.
     </div>}
-    {canSubmit && doc.versions[0]?.state !== "FINAL" && <details className="submission-update" open={!latest || latest.state === "REVISION_REQUESTED"}><summary>{latest?.state === "REVISION_REQUESTED" ? "Nộp bản sửa theo yêu cầu GVHD" : latest ? "Nộp bản cập nhật mới" : "Nộp phiên bản đầu tiên"}</summary><form className="core-form" aria-labelledby={`document-upload-heading-${doc.id}`} onSubmit={async event => {
+    {canSubmit && doc.versions[0]?.state !== "FINAL" && <details className="submission-update" open={!latest || latest.state === "REVISION_REQUESTED"}><summary>{latest?.state === "REVISION_REQUESTED" ? "Nộp bản sửa theo yêu cầu cập nhật" : latest ? "Nộp bản cập nhật mới" : "Nộp phiên bản đầu tiên"}</summary><form className="core-form" aria-labelledby={`document-upload-heading-${doc.id}`} onSubmit={async event => {
       event.preventDefault();
       const form = event.currentTarget;
       if (file && validFileType && await run(() => uploadDocument(thesis.id, doc, userId, file), "Đã lưu phiên bản mới.")) {
@@ -73,7 +73,7 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
         form.reset();
       }
     }}>
-      <h4 id={`document-upload-heading-${doc.id}`}>{latest?.state === "REVISION_REQUESTED" ? `Nộp bản sửa v${latest.version_no + 1} theo yêu cầu GVHD` : latest ? `Cập nhật bằng phiên bản v${latest.version_no + 1}` : "Nộp phiên bản đầu tiên"}</h4>
+      <h4 id={`document-upload-heading-${doc.id}`}>{latest?.state === "REVISION_REQUESTED" ? `Nộp bản sửa v${latest.version_no + 1} theo yêu cầu cập nhật` : latest ? `Cập nhật bằng phiên bản v${latest.version_no + 1}` : "Nộp phiên bản đầu tiên"}</h4>
       <label htmlFor={`file-${doc.id}`}>Nộp phiên bản mới ({officialFile ? "PDF, DOCX" : "PDF, DOCX, TXT"}; tối đa 10 MB)</label>
       <input className="input" id={`file-${doc.id}`} type="file" accept={officialFile ? ".pdf,.docx" : ".pdf,.docx,.txt"} required disabled={busy}
         onChange={event => setFile(event.target.files?.[0] || null)} />
@@ -166,7 +166,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
     <div className="submission-heading"><div><span className="section-eyebrow">{kind === "PLAN" ? "KẾ HOẠCH CỦA NHÓM" : kind === "REPORT" ? "BẢN BÁO CÁO HOÀN CHỈNH" : "TỆP HỖ TRỢ HỒ SƠ"}</span><h2>{heading}</h2><p>{kind === "PLAN"
       ? "Một kế hoạch chung cho đề tài. Nộp bản đã điền; GVHD nhận xét, yêu cầu sửa hoặc tiếp nhận."
       : kind === "REPORT" ? "Nộp cuốn báo cáo trước bảo vệ. Đây là bản báo cáo hoàn chỉnh, khác với báo cáo tiến độ định kỳ."
-      : "Nộp tài liệu tham khảo, kết quả khảo sát, thiết kế hoặc hướng dẫn sử dụng. Minh chứng báo cáo định kỳ nằm tại Báo cáo tiến độ."}</p></div>
+      : "Nộp khi GVHD yêu cầu tệp hỗ trợ như kết quả khảo sát, thiết kế, dữ liệu thử hoặc hướng dẫn sử dụng. Đây là phần bổ sung tùy nhu cầu của đề tài; minh chứng báo cáo tuần nộp tại Báo cáo tiến độ."}</p></div>
       {kind === "PLAN" && <button type="button" className="btn btn-secondary" disabled={busy} onClick={async () => {
         setTemplateError(""); try {await downloadPlanTemplate(thesis.round_id);} catch (cause) {setTemplateError(String(cause));}
       }}>Tải mẫu áp dụng · Mẫu 2</button>}

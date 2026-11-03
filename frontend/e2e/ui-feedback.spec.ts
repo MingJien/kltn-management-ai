@@ -27,7 +27,7 @@ test("UI: lý do sửa email nằm trong form riêng; đổi nhiệm vụ giữ 
     if (path === "/admin/rounds") return [{id:"round",code:"UI-ROUND",state:"OPEN"}];
     if (path.endsWith("/contact-email")) {emailPayload=body;return {activation_sent:false};}
   });
-  await page.goto("/administration");
+  await page.goto("/administration/assignments");
   await page.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("ELIGIBILITY_VERIFIER");
   await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption("gv");
   await page.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");

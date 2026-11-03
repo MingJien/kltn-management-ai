@@ -1,3 +1,6 @@
+function responseFileName(response:Response,fallback:string) {
+  return decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1]||fallback);
+}
 import { ApiError, apiMessage } from "./errors";
 
 export type Context = {
@@ -16,6 +19,7 @@ export type Context = {
   major_code: string | null;
   major_name: string | null;
   lecturer_code: string | null;
+  avatar_url?: string | null;
   lecturer_duties: {code: string; label: string; scope: string | null}[];
   csrf_token: string | null;
   can_change_password: boolean;
@@ -123,13 +127,14 @@ export async function downloadRegistrationForm(registrationId:string,version:Reg
     method:printCopy?"POST":"GET",credentials:"include",headers:{...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})}});
   if(!response.ok) {const body=await response.json().catch(()=>null);throw new Error(body?.detail||`HTTP ${response.status}`);}
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");link.href=url;
-  link.download=printCopy?`${response.headers.get("X-Document-Code")||"don-dang-ky"}.${version.file_name.split(".").pop()}`:version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // Local dev uses Vite proxy so UI and API share one origin and session cookie.
 const baseUrl = import.meta.env.VITE_API_URL
   || (import.meta.env.DEV ? "" : `${window.location.protocol}//${window.location.hostname}:8000`);
+export const apiAssetUrl = (path:string) => baseUrl + path;
 let sessionCsrfToken: string | null = null;
 
 export function evidenceUrl(registrationId: string, studentId: string) {
@@ -320,7 +325,7 @@ export async function downloadProposal(thesisId: string, version: Proposal["vers
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `de-cuong-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -358,6 +363,16 @@ export async function downloadOfficialTemplate(templateId: string, filename: str
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export async function exportThesisReview(thesisId:string, reviewId:string, version:number) {
+  const response=await fetch(`${baseUrl}/api/v1/theses/${thesisId}/evaluation/reviews/${reviewId}/print-copy`, {
+    method:"POST",credentials:"include",headers:{"If-Match":String(version),...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
+  anchor.href=url;anchor.download=decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1] || (response.headers.get("X-Document-Code")||"phieu-nhan-xet")+".docx");anchor.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 async function downloadFormTemplate(kind: "plan" | "proposal", name: string, roundId?: string) {
   const response = await fetch(`${baseUrl}/api/v1/form-templates/${kind}${roundId ? `?round_id=${roundId}` : ""}`, {credentials: "include"});
   if (!response.ok) {
@@ -387,7 +402,7 @@ export async function downloadDocument(thesisId: string, doc: ThesisDocument, ve
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `ban-in-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -403,6 +418,28 @@ export type ChatResult = {
   provider_status: "NOT_CONFIGURED";
 };
 
-export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean};
+export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean;can_export_list:boolean};
+
+export async function exportRoundMau04(roundId:string) {
+  const response=await fetch(`${baseUrl}/api/v1/school-forms/rounds/${encodeURIComponent(roundId)}/mau-04`,{
+    method:"POST",credentials:"include",headers:sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");
+  link.href=url;link.download="danh-sach-sv-gvhd-mau-04.xlsx";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 export type SchoolFormVersion = {id:string;version_no:number;row_version:number;state:string;file_name:string;byte_size:number;scan_state:string;uploaded_at:string;uploaded_by_name:string;source_reference:string;change_reason:string;published_at:string|null};
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};
+
+
+export async function downloadWithdrawal(identifier:string,printCopy:boolean) {
+  const response=await fetch(`${baseUrl}/api/v1/withdrawals/${identifier}/${printCopy?"print-copy":"signed-copy"}`,{
+    method:printCopy?"POST":"GET",credentials:"include",
+    headers:printCopy&&sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
+  anchor.href=url;anchor.download=printCopy?(response.headers.get("X-Document-Code")||"phieu-xin-thoi")+".docx":
+    decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=utf-8''([^;]+)/i)?.[1]||"don-co-xac-nhan");
+  anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}

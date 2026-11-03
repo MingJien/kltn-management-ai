@@ -1,8 +1,10 @@
+import WorkflowSteps from "../components/domain/WorkflowSteps";
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CalendarDays, ClipboardCheck, FileText, Plus, UserRound, Users } from "lucide-react";
-import type { Context, Lecturer, OpenRound, Registration, Topic } from "../api";
-import { request, uploadEvidence } from "../api";
+import type { Context, Lecturer, OpenRound, Registration, SchoolFormRound, Topic } from "../api";
+import { exportRoundMau04, request, uploadEvidence } from "../api";
 import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import TopicDescriptionPreview from "../components/domain/TopicDescriptionPreview";
@@ -19,11 +21,7 @@ function roundDisplay(label: string) {
   return {year: match?.[1] || label, period: match?.[2] || ""};
 }
 
-function LecturerLink({id, name, canOpen=true}: {id: string | null; name: string | null; canOpen?:boolean}) {
-  if (!canOpen && name) return <span>{name}</span>;
-  return id && name ? <Link className="lecturer-link" to={`/lecturers/${id}`} state={{name}}>{name}</Link>
-    : <span className="text-muted">Chờ bộ môn chọn</span>;
-}
+
 
 export default function TopicsPage({userId, context}: {userId: string; context: Context}) {
   const navigate = useNavigate();
@@ -31,6 +29,8 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const focusedTopicId = new URLSearchParams(location.search).get("focus");
   const [topics, setTopics] = useState<Topic[]>([]);
   const [rounds, setRounds] = useState<OpenRound[]>([]);
+  const [exportRounds,setExportRounds]=useState<SchoolFormRound[]>([]);
+  const [exportRoundId,setExportRoundId]=useState("");
   const [roundsLoaded, setRoundsLoaded] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [lecturersLoading, setLecturersLoading] = useState(true);
@@ -53,6 +53,16 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const student = context.base_role === "STUDENT";
   const admin = context.base_role === "ADMIN";
   const head = context.actions.includes("topic:department_decide");
+  useEffect(()=>{
+    if (!admin && !context.actions.includes("progress:coordinate")) {setExportRounds([]);return;}
+    const controller=new AbortController();
+    void request<SchoolFormRound[]>("/school-forms/access",userId,{signal:controller.signal}).then(rows=>{
+      if(controller.signal.aborted)return;
+      const allowed=rows.filter(row=>row.can_export_list);setExportRounds(allowed);
+      setExportRoundId(previous=>allowed.some(row=>row.id===previous)?previous:allowed[0]?.id || "");
+    }).catch(cause=>{if(!controller.signal.aborted)setMessage(errorMessage(cause));});
+    return()=>controller.abort();
+  },[userId,admin,context.actions.includes("progress:coordinate")]);
   const path = "/topics?" + new URLSearchParams({limit:String(PAGE_SIZE), offset:String(page * PAGE_SIZE), search, view, sort});
   const reload = useCallback(async () => setTopics(await request<Topic[]>(path, userId)), [path, userId]);
   const loadLecturers = useCallback(async (signal?: AbortSignal) => {
@@ -143,6 +153,12 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
       description={admin ? "Danh sách đề tài đã công bố để tra cứu. Hồ sơ đăng ký, bài nộp và phản hồi riêng vẫn theo đúng quyền." : student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
+    {exportRounds.length>0 && <section className="card" aria-label="Xuất danh sách KLTN"><div className="card-body stack">
+      <h2>Danh sách sinh viên và GVHD thực hiện KLTN</h2>
+      <p>Xuất Excel theo khung “Nộp ds” của Mẫu 4, lấy thành viên đang tham gia và GVHD chính thức tại thời điểm tải. Đây là danh sách thực hiện KLTN, khác với danh mục đề tài chào đăng ký.</p>
+      <div className="flex gap-2" style={{flexWrap:"wrap",alignItems:"end"}}><label>Đợt xuất danh sách<select className="input" value={exportRoundId} disabled={busy} onChange={event=>setExportRoundId(event.target.value)}>{exportRounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+      <button type="button" className="btn btn-secondary" disabled={busy || !exportRoundId} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}>Tải danh sách SV và GVHD theo Mẫu 4</button></div>
+    </div></section>}
     <div className="topic-toolbar">
       <div className="topic-toolbar__search">
         <input aria-label="Tìm đề tài" className="input" maxLength={200} placeholder="Tìm theo mã, tên đề tài hoặc GV..."
@@ -220,7 +236,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
             </div>
             <div className="topic-card__facts">
               <div className="topic-card__fact"><UserRound size={17} aria-hidden="true" /><span><small>{topic.proposer_type === "STUDENT" && topic.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</small>
-                <LecturerLink canOpen={!admin && topic.department_id===context.department_id} id={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
+                <LecturerProfileLink userId={userId} lecturerId={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
               <div className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
                 <Users size={17} aria-hidden="true" /><span><small>Sinh viên</small><strong>{topic.registered_member_count}/{topic.max_students} SV</strong></span>
               </div>
@@ -250,13 +266,13 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
         <div className="topic-detail-content__intro"><span>{selected.round_label}</span>
           <span className={selected.proposer_type === "STUDENT" ? "topic-card__proposer topic-card__proposer--student" : "topic-card__proposer topic-card__proposer--lecturer"}>
             {selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
-          <ThesisStatusBadge state={selected.state} /></div>
+          <ThesisStatusBadge state={selected.state} /></div><WorkflowSteps steps={["Soạn đề xuất","TBM xét duyệt","Mở đăng ký"]} current={["APPROVED","LOCKED"].includes(selected.state)?2:selected.state==="SUBMITTED"?1:0}/>
         {selected.archived_at && <p className="alert alert-warning">Đề tài đã ngừng sử dụng: {selected.archive_reason}. Hồ sơ đã liên kết vẫn được giữ nguyên.</p>}
         <TopicLifecycle key={selected.id+"-"+selected.row_version} topic={selected} context={context} onChanged={async()=>{closeDetail();setSelected(null);await reload();setMessage("Đã cập nhật đề tài và ghi nhật ký.");}}/>
         <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>
           <p>{selected.description || "Chưa có mô tả."}</p></section>
         <div className="topic-detail-content__facts">
-          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerLink canOpen={!admin && selected.department_id===context.department_id} id={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
+          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerProfileLink userId={userId} lecturerId={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
           <div><span>Sinh viên</span><strong>{selected.registered_member_count}/{selected.max_students} SV</strong></div>
         </div>
         <section className="topic-detail-content__section"><h3>Kỹ năng và yêu cầu</h3>

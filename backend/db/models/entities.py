@@ -20,7 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
@@ -99,14 +99,46 @@ class StudentProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     major_code: Mapped[Optional[str]] = mapped_column(String(32))
 
 
-class LecturerProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
+class LecturerProfile(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "lecturer_profile"
+    __table_args__ = (CheckConstraint("jsonb_typeof(profile_data) = 'object'", name="profile_data_object"),)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("user_account.id", ondelete="RESTRICT"), nullable=False, unique=True
     )
     lecturer_code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     department_id: Mapped[uuid.UUID] = fk("department.id")
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    profile_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    profile_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    profile_verified_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+
+
+class LecturerProfileChange(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "lecturer_profile_change"
+    __table_args__ = (
+        UniqueConstraint("lecturer_id", "version_no"),
+        CheckConstraint("version_no > 0 AND base_profile_version > 0", name="version_positive"),
+        CheckConstraint("state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')", name="state"),
+        CheckConstraint("jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'", name="data_objects"),
+        CheckConstraint("state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL", name="submitted_timestamp"),
+        CheckConstraint("state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)", name="decision_recorded"),
+        Index("uq_lecturer_profile_change_open", "lecturer_id", unique=True, postgresql_where=text("state IN ('DRAFT','SUBMITTED')")),
+        Index("ix_lecturer_profile_change_state_created", "state", "created_at"),
+    )
+    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_profile_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    proposed_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    original_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    original_avatar_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    submission_note: Mapped[Optional[str]] = mapped_column(Text)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class OrganizationalPosition(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -159,6 +191,7 @@ class ThesisRound(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
         CheckConstraint("round_type IN ('MAIN','SUPPLEMENTARY')", name="round_type"),
         CheckConstraint("state IN ('DRAFT','OPEN','CLOSED','ARCHIVED')", name="state"),
         CheckConstraint("closes_at > opens_at", name="time_window"),
+        CheckConstraint("(execution_starts_on IS NULL AND execution_start_reference IS NULL) OR (execution_starts_on IS NOT NULL AND execution_start_reference IS NOT NULL AND length(trim(execution_start_reference)) >= 5)", name="execution_start_pair"),
     )
     academic_year_id: Mapped[uuid.UUID] = fk("academic_year.id")
     code: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -166,6 +199,9 @@ class ThesisRound(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     opens_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+
+    execution_starts_on: Mapped[Optional[date]] = mapped_column(Date)
+    execution_start_reference: Mapped[Optional[str]] = mapped_column(String(500))
 
 
 class ResourceAssignment(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
@@ -431,6 +467,9 @@ class ReviewerAssignment(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Ba
     assigned_by: Mapped[uuid.UUID] = fk("user_account.id")
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE", server_default="ACTIVE")
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    assignment_reason: Mapped[Optional[str]] = mapped_column(Text)
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
 
 
 class StoredFile(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -535,7 +574,7 @@ class SignatureConfirmation(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("signature_type IN ('DEPARTMENT_FINALIZATION','DEAN_CONFIRMATION')", name="signature_type"),
         CheckConstraint("proposal_version_no > 0", name="proposal_version_positive"),
-        UniqueConstraint("proposal_id", "signature_type"),
+        UniqueConstraint("proposal_id", "proposal_version_no", "signature_type", name="uq_signature_confirmation_proposal_version_type"),
         ForeignKeyConstraint(
             ["proposal_id", "proposal_version_no"],
             ["proposal_version.proposal_id", "proposal_version.version_no"],
@@ -684,6 +723,64 @@ class DocumentVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base)
     state: Mapped[str] = mapped_column(String(30), nullable=False, default="DRAFT", server_default="DRAFT")
 
 
+class ThesisReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    """Mẫu 7/8, per student and immutable report version; submitted rows are immutable."""
+    __tablename__ = "thesis_review"
+    __table_args__ = (
+        UniqueConstraint("thesis_member_id", "lecturer_id", "kind", "version_no"),
+        CheckConstraint("kind IN ('ADVISOR','REVIEWER')", name="kind"),
+        CheckConstraint("state IN ('DRAFT','SUBMITTED')", name="state"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("(kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)", name="assignment_matches_kind"),
+        CheckConstraint("state = 'DRAFT' OR submitted_at IS NOT NULL", name="submitted_metadata"),
+        CheckConstraint("(paper_confirmed_by IS NULL AND paper_confirmed_at IS NULL AND paper_reference IS NULL AND paper_export_code IS NULL) OR (state = 'SUBMITTED' AND paper_confirmed_by IS NOT NULL AND paper_confirmed_at IS NOT NULL AND length(trim(paper_reference)) >= 5 AND paper_export_code IS NOT NULL)", name="paper_receipt_metadata"),
+        Index("ix_thesis_review_thesis_member", "thesis_id", "thesis_member_id"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
+    lecturer_id: Mapped[uuid.UUID] = fk("lecturer_profile.id")
+    advisor_assignment_id: Mapped[Optional[uuid.UUID]] = fk("advisor_assignment.id", nullable=True)
+    reviewer_assignment_id: Mapped[Optional[uuid.UUID]] = fk("reviewer_assignment.id", nullable=True)
+    report_version_id: Mapped[uuid.UUID] = fk("document_version.id")
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    sections: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    thesis_completed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    allow_defense: Mapped[Optional[bool]] = mapped_column(Boolean)
+    signed_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    paper_reference: Mapped[Optional[str]] = mapped_column(String(500))
+    paper_export_code: Mapped[Optional[str]] = mapped_column(String(100))
+    paper_confirmed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    paper_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    source_reference: Mapped[Optional[str]] = mapped_column(String(500))
+    revision_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseEligibilityCheck(UuidPrimaryKeyMixin, Base):
+    """Append-only school eligibility decision, separately recorded for each student."""
+    __tablename__ = "defense_eligibility_check"
+    __table_args__ = (
+        UniqueConstraint("thesis_member_id", "version_no"),
+        CheckConstraint("version_no > 0", name="version_positive"),
+        CheckConstraint("discipline_status IN ('CLEAR','WARNING_OR_HIGHER','UNKNOWN')", name="discipline_status"),
+        CheckConstraint("state IN ('ELIGIBLE','BLOCKED')", name="state"),
+        Index("ix_defense_eligibility_check_thesis_member", "thesis_id", "thesis_member_id"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    report_version_id: Mapped[Optional[uuid.UUID]] = fk("document_version.id", nullable=True)
+    advisor_review_id: Mapped[Optional[uuid.UUID]] = fk("thesis_review.id", nullable=True)
+    discipline_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    checked_by: Mapped[uuid.UUID] = fk("user_account.id")
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class RegistrationFormVersion(UuidPrimaryKeyMixin, Base):
     __tablename__ = "registration_form_version"
     __table_args__ = (
@@ -753,3 +850,32 @@ class UserNotification(UuidPrimaryKeyMixin, TimestampMixin, Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class ThesisWithdrawalRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "thesis_withdrawal_request"
+    __table_args__ = (
+        CheckConstraint("state IN ('SUBMITTED','ADVISOR_CONFIRMED','RETURNED','CANCELLED','RECORDED','NOT_GRANTED')", name="state"),
+        CheckConstraint("length(trim(reason)) >= 10", name="reason"),
+        CheckConstraint("jsonb_typeof(application_data) = 'object'", name="application_data"),
+        CheckConstraint("state NOT IN ('ADVISOR_CONFIRMED','RETURNED','RECORDED','NOT_GRANTED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)", name="advisor_stamp"),
+        CheckConstraint("state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND evidence_file_id IS NOT NULL AND effective_on IS NOT NULL)", name="outcome_stamp"),
+        Index("uq_withdrawal_member_open", "thesis_id", "student_id", unique=True, postgresql_where=text("state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED')")),
+        Index("ix_withdrawal_student_state", "student_id", "state"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    student_id: Mapped[uuid.UUID] = fk("student_profile.id")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    application_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    execution_starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    state: Mapped[str] = mapped_column(String(25), nullable=False, default="SUBMITTED", server_default="SUBMITTED")
+    advisor_reviewed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    advisor_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    advisor_comment: Mapped[Optional[str]] = mapped_column(Text)
+    evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    official_reference: Mapped[Optional[str]] = mapped_column(String(500))
+    outcome_note: Mapped[Optional[str]] = mapped_column(Text)
+    effective_on: Mapped[Optional[date]] = mapped_column(Date)
+    recorded_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

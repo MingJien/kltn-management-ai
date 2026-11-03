@@ -28,6 +28,16 @@
   align-items: stretch;
 }
 
+.admin-grid-top--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-page__quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 960px) {
   .admin-grid-top {
     grid-template-columns: 1fr;
@@ -101,8 +111,8 @@
 .admin-card__title {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--neutral-900);
   letter-spacing: -0.015em;
 }
@@ -283,7 +293,7 @@
   background: #ffffff;
   border-color: var(--neutral-300);
   border-radius: var(--radius-sm);
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .admin-search-wrap .input:focus {
@@ -329,7 +339,7 @@
   gap: 8px;
   font-weight: 600;
   color: var(--neutral-800);
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .admin-reason-status {
@@ -466,7 +476,7 @@
 .account-item__email {
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--neutral-900);
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
@@ -561,7 +571,7 @@
   padding-inline: 8px;
   white-space: nowrap;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   height: 34px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--neutral-200);
@@ -685,7 +695,7 @@
 
 .assignment-item__email {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--neutral-900);
   overflow-wrap: anywhere;
   display: inline-flex;
@@ -864,7 +874,7 @@
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -879,7 +889,7 @@
   border-color: var(--primary-600);
   background: var(--primary-50);
   color: var(--primary-900);
-  font-weight: 650;
+  font-weight: 600;
   box-shadow: 0 0 0 1.5px var(--primary-600);
 }
 
@@ -906,7 +916,7 @@
 .account-item__display-name {
   color: var(--neutral-700);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .account-item__duties {
@@ -961,7 +971,7 @@
 
 .lecturer-import__intro p:not(.text-caption) {
   color: var(--neutral-700);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .import-step {
@@ -1085,7 +1095,7 @@
 
 .preview-box__confirm .checkbox-label {
   padding: 0;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .import-step__filters {
@@ -1140,7 +1150,7 @@
 
 .import-step__footerbar .checkbox-label {
   padding: 0;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .import-step__status {
@@ -1171,7 +1181,7 @@
 .import-step__pagination span {
   color: var(--neutral-500);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 @media (max-width: 720px) {
@@ -1196,4 +1206,41 @@
   .import-step__actions .btn-primary {
     margin-left: 0;
   }
+}
+
+
+
+
+/* ── Responsive Admin Metrics ── */
+
+@media (max-width: 860px) {
+
+  .admin-metrics {
+
+    grid-auto-flow: row;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  }
+
+}
+
+
+
+@media (max-width: 480px) {
+
+  .admin-metrics {
+
+    grid-template-columns: 1fr;
+
+  }
+
+
+
+  .account-list__actions {
+
+    grid-template-columns: repeat(2, 1fr);
+
+  }
+
 }

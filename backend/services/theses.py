@@ -94,6 +94,10 @@ def rights(session, user, thesis):
         ).order_by(m.EligibilitySnapshot.version.desc()).limit(1))
         if latest is not None and latest.state == "REJECTED":
             result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit"})
+    from backend.services.evaluation import permissions
+    evaluation_actions = permissions(session, user, thesis)
+    if evaluation_actions:
+        result.update(evaluation_actions | {"view"})
     return result
 
 
@@ -158,14 +162,17 @@ def list_theses(session, user):
         resources = select(m.ResourceAssignment.thesis_id).where(m.ResourceAssignment.user_id == user.id,
             m.ResourceAssignment.assignment_type == "PROGRESS_REVIEWER", effective(m.ResourceAssignment))
         rounds = select(m.ResourceAssignment.round_id).where(m.ResourceAssignment.user_id == user.id,
-            m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR", effective(m.ResourceAssignment))
+            m.ResourceAssignment.assignment_type.in_(["KLTN_COORDINATOR","REVIEW_RECORDS_MANAGER"]), effective(m.ResourceAssignment))
         proposal_reviews = select(m.Proposal.thesis_id).join(m.ReviewerAssignment,
             m.ReviewerAssignment.proposal_id == m.Proposal.id).where(
             m.ReviewerAssignment.lecturer_id == lecturer.id,
             m.ReviewerAssignment.review_scope == "PROPOSAL",
             m.ReviewerAssignment.state == "ACTIVE")
+        thesis_reviews = select(m.ReviewerAssignment.thesis_id).where(
+            m.ReviewerAssignment.lecturer_id == lecturer.id,
+            m.ReviewerAssignment.review_scope == "THESIS", m.ReviewerAssignment.state == "ACTIVE")
         query = select(m.Thesis).where(or_(m.Thesis.department_id.in_(heads), m.Thesis.id.in_(advisors),
-            m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews)))
+            m.Thesis.round_id.in_(rounds), m.Thesis.id.in_(proposal_reviews), m.Thesis.id.in_(thesis_reviews)))
     else:
         return []
     return [workspace_out(session, user, row) for row in session.scalars(query.order_by(m.Thesis.created_at.desc(), m.Thesis.id)).all()]

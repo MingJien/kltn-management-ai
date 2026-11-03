@@ -4,6 +4,7 @@ import { UserRound, KeyRound, LogOut } from "lucide-react";
 import type { Context } from "../../api";
 import { roleLabel } from "./roleLabel";
 import { initialsOf } from "./initials";
+import LecturerAvatar from "../domain/LecturerAvatar";
 
 interface ProfilePopupProps {
   context: Context;
@@ -41,14 +42,14 @@ export default function ProfilePopup({ context, onLogout }: ProfilePopupProps) {
         aria-haspopup="dialog"
         onClick={() => setOpen((prev) => !prev)}
       >
-        <UserRound size={19} aria-hidden="true" />
+        {context.base_role==="LECTURER"?<LecturerAvatar url={context.avatar_url} name={context.display_name} size="xs"/>:<UserRound size={19} aria-hidden="true" />}
       </button>
 
       {open && (
         <section className="profile-popup" role="dialog" aria-label="Hồ sơ cá nhân">
           <div className="profile-popup__header">
             <span className="header__avatar profile-popup__avatar" aria-hidden="true">
-              {initialsOf(context.display_name)}
+              {context.base_role==="LECTURER"?<LecturerAvatar url={context.avatar_url} name={context.display_name} size="md"/>:initialsOf(context.display_name)}
             </span>
             <div className="profile-popup__title-group">
               <strong className="profile-popup__name">{context.display_name}</strong>

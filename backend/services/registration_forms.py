@@ -178,7 +178,7 @@ def print_copy(session, user, registration_id, version_id):
         f"code={code}; version={item.version_no}; version_id={item.id}; receipt_only; exported_at={instant.isoformat()}",
         before_hash=item.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, mime, code, suffix, instant)
+    return _print_response(result, mime, code, suffix, instant, filename="Don-dang-ky-"+form_code+"-v"+str(item.version_no)+"-"+file.original_name)
 
 
 def print_history(session, user, registration_id, version_id):

@@ -12,11 +12,41 @@ from sqlalchemy.dialects import postgresql
 
 from backend.db.metadata import target_metadata
 from tools.official_schema import SELECTED_TABLES, TABLE_INFO
+from tools.validate_official_database import HEAD
 
 ROOT = Path(__file__).resolve().parents[1]
 DESIGN = ROOT / "docs/design"
 
 COLUMN_VI = {
+    "execution_starts_on": "Ngày bắt đầu thực hiện theo kế hoạch Khoa",
+    "execution_start_reference": "Căn cứ xác định ngày bắt đầu",
+    "application_data": "Bản chụp thông tin đơn tại thời điểm gửi",
+    "advisor_reviewed_by": "Người xác nhận của GVHD", "advisor_reviewed_at": "Thời điểm GVHD xác nhận / trả lại",
+    "advisor_comment": "Ý kiến xác nhận hoặc trả lại của GVHD",
+    "official_reference": "Số / căn cứ kết quả xử lý ngoài hệ thống", "outcome_note": "Nội dung kết quả bên ngoài",
+    "effective_on": "Ngày kết quả có hiệu lực", "recorded_by": "Người ghi nhận kết quả bên ngoài",
+    "recorded_at": "Thời điểm ghi nhận kết quả bên ngoài",
+    "profile_data": "Thông tin chuyên môn và liên hệ đã duyệt", "avatar_file_id": "Ảnh đại diện đã chuẩn hóa và quét",
+    "profile_verified_at": "Thời điểm duyệt hồ sơ", "profile_verified_by": "Người duyệt hồ sơ",
+    "base_profile_version": "Phiên bản hồ sơ gốc khi lập yêu cầu", "proposed_data": "Thông tin đề nghị cập nhật",
+    "original_data": "Thông tin trước cập nhật", "original_avatar_file_id": "Ảnh trước cập nhật",
+    "submission_note": "Nội dung đề nghị và căn cứ", "decision_reason": "Lý do duyệt hoặc trả lại",
+    "archived_at": "Thời điểm ngừng dùng đề tài cho đăng ký mới", "archived_by": "Người ngừng dùng đề tài", "archive_reason": "Lý do ngừng dùng đề tài",
+    "sections": "Các mục nhận xét theo Mẫu 7 hoặc Mẫu 8", "kind": "Loại phiếu hoặc thông báo",
+    "advisor_assignment_id": "Phân công GVHD gắn với phiếu", "report_version_id": "Bản cuốn báo cáo được nhận xét",
+    "signed_file_id": "Tệp bản nhận xét đã ký", "thesis_completed": "GVHD xác nhận hoàn thành KLTN",
+    "allow_defense": "GVHD đồng ý cho bảo vệ", "revision_reason": "Lý do lập phiếu hoặc bản sửa",
+    "discipline_status": "Tình trạng kỷ luật đã đối chiếu", "advisor_review_id": "Mẫu 7 được dùng để xét điều kiện",
+    "checked_by": "Người xét điều kiện", "checked_at": "Thời điểm xét điều kiện", "assignment_reason": "Lý do phân công phản biện",
+    "subject_type":"Loại đối tượng của thông báo", "subject_id":"Mã đối tượng của thông báo",
+    "event_code": "Mã sự kiện nghiệp vụ tạo thông báo", "message": "Nội dung thông báo theo đối tượng", "url": "Đường dẫn nội bộ tới đúng hồ sơ",
+    "official_form_id": "Mã danh mục biểu mẫu/tài liệu Khoa", "document_kind": "Phân loại biểu mẫu trắng hoặc tài liệu công bố", "audience": "Đối tượng được xem", "uploaded_by": "Tài khoản tải tệp lên", "published_by": "Tài khoản phát hành", "change_reason": "Lý do cập nhật phiên bản",
+    "page_number": "Số trang của tệp PDF", "x": "Tọa độ ngang chuẩn hóa từ 0 đến 1",
+    "y": "Tọa độ dọc chuẩn hóa từ 0 đến 1", "location_label": "Tiêu đề mục hoặc mô tả vị trí cần sửa",
+    "quoted_text": "Đoạn trích được nhận xét", "published_at": "Thời điểm gửi ghim cho nhóm sinh viên",
+    "source_reference": "Căn cứ hoặc mã/số văn bản nguồn của thao tác",
+    "set_by": "Người ban hành hoặc cập nhật hạn nộp",
+    "form_code": "Loại đơn Mẫu 1a/1b", "registration_fingerprint": "Mã đối chiếu thành viên, tên đề tài và GV đề xuất khi nộp",
     "academic_year_id": "Mã năm học", "action": "Hành động", "active": "Còn hiệu lực",
     "actor_id": "Mã người thao tác", "after_hash": "Mã băm sau thay đổi",
     "assigned_at": "Thời điểm phân công", "assigned_by": "Mã người phân công",
@@ -53,7 +83,7 @@ COLUMN_VI = {
     "official_ref": "Tham chiếu văn bản chính thức", "opens_at": "Thời điểm mở",
     "original_name": "Tên tệp gốc", "passed_credit_ratio": "Tỷ lệ tín chỉ đạt",
     "password_hash": "Mã băm mật khẩu", "position_id": "Mã chức vụ",
-    "preferred_gpa": "GPA mong muốn", "progress_report_id": "Mã báo cáo tiến độ",
+    "preferred_gpa": "GPA mong muốn", "progress_report_id": "Mã báo cáo tiến độ", "document_version_id": "Mã phiên bản tài liệu", "annotation_kind": "Loại nội dung phản hồi", "attachment_file_id": "Mã tệp giảng viên đính kèm",
     "proposal_id": "Mã hồ sơ đề cương", "proposal_version_id": "Mã phiên bản đề cương",
     "proposal_version_no": "Số phiên bản đề cương", "proposer_type": "Loại người đề xuất",
     "proposer_user_id": "Mã tài khoản đề xuất", "reason": "Lý do hoặc căn cứ",
@@ -84,9 +114,18 @@ COLUMN_VI = {
 }
 
 EXAMPLES = {
+    "thesis_withdrawal_request": 'SV-DEMO-01 xin thôi trong 02 tuần; GVHD xác nhận; điều phối đối chiếu bản ký và căn cứ bên ngoài để ghi nhận. SV-DEMO-02 tiếp tục cùng đề tài, nộp đề cương v2 để duyệt lại.',
+    "lecturer_profile_change": "GV DEMO gửi cập nhật học vị, chuyên môn và ảnh; TBM đối chiếu trước–sau, duyệt rồi mới công bố. Phiếu trả lại được lập bản mới để sửa, không xóa lịch sử.",
+    "thesis_review": "GVHD lưu nháp Mẫu 7 riêng cho SV DEMO theo báo cáo v2; xuất phiếu để ký, tải bản ký đã quét sạch rồi gửi. Bản sửa lập phiếu phiên bản mới.",
+    "defense_eligibility_check": "TBM đối chiếu nguồn kỷ luật và Mẫu 7 đã ký theo báo cáo hiện hành của SV DEMO; mỗi lần xét lưu căn cứ, người xét và kết quả riêng, không áp dụng cho thành viên khác.",
+    "official_form": "Khoa tạo danh mục Mẫu 2 của đợt DEMO; Mẫu 4 trắng và danh sách SV đã chốt nằm ở hai danh mục khác nhau.",
+    "official_form_version": "Cán bộ được giao FORM_MANAGER nộp bản Mẫu 2 v2, quét sạch rồi phát hành; v1 giữ trong lịch sử. Danh sách XLSX đã chốt chỉ SV/GV của đúng đợt đọc được.",
+    "progress_review_annotation": "GVHD ghim góp ý ở trang 2 của minh chứng lần nộp 1, tự lưu nháp riêng; khi yêu cầu sửa, SV xem đúng ghim của v1 rồi nộp v2 mà ghim không bị dịch sang tệp mới.",
+    "document_deadline": "Khoa đặt hạn Mẫu 2 cho đợt DEMO; sau khi đóng có thể gia hạn và mở nhận lại, giữ nhãn trễ cũ.",
+    "registration_form_version": "Nhóm DEMO nộp Mẫu 1b v1 rồi sửa thành v2 trước tiếp nhận; bản in v2 ghi rõ bản nộp chưa xác nhận Khoa duyệt.",
     "academic_year": "Tạo năm học giả DEMO-2026-2027 để mở đợt KLTN chính.",
-    "advisor_assignment": "Sau khi Bộ môn chốt nhóm DEMO, một GV được ghi là GVHD chính từ ngày bắt đầu; khi thay GV lưu thêm bản phân công mới.",
-    "audit_event": "Ghi actor, thời điểm và lý do khi TBM chốt đăng ký DEMO.",
+    "advisor_assignment": "Khi GV chấp nhận nhóm DEMO, một phân công GVHD chính được tạo trong cùng giao dịch với khóa luận và thành viên.",
+    "audit_event": "Ghi actor, thời điểm và lý do khi GV chấp nhận đăng ký DEMO và tạo khóa luận.",
     "department": "Bộ môn CNTT-DEMO thuộc Khoa CNKT-DEMO.",
     "department_major": "BM-KHMT chấp nhận ngành 7480101 và 7480208; mã ngành khác bị chặn khi nhập Excel.",
     "document": "Nhóm DEMO tạo hồ sơ báo cáo KLTN chỉ thành viên và GVHD được xem.",
@@ -99,7 +138,7 @@ EXAMPLES = {
     "position_assignment": "GV-DEMO được phân công Trưởng bộ môn CNTT-DEMO trong một khoảng hiệu lực.",
     "progress_milestone": "Đợt DEMO mở mốc báo cáo lần 2 với hạn theo kế hoạch Khoa đã duyệt.",
     "progress_report": "Nhóm DEMO nộp báo cáo mốc lần 2 v1; sửa thành v2 sau góp ý.",
-    "progress_review": "GV góp ý chéo ghi COMMENT_ONLY; GVHD chính mới ghi CONFIRM.",
+    "progress_review": "GVHD ghi nhận xét và CONFIRM hoặc yêu cầu sửa đúng lần nộp; COMMENT_ONLY còn trong ràng buộc để bảo toàn lịch sử cũ, không cấp quyền góp ý chéo tiến độ mới.",
     "proposal": "Khóa luận DEMO có một hồ sơ đề cương đang chờ GVHD xác nhận.",
     "proposal_review": "GVHD nhận xét đề cương v1 cần sửa; GV khác chỉ góp ý.",
     "proposal_version": "SV-DEMO nộp đề cương v2 PDF; v1 vẫn tải được và có mã băm riêng.",
@@ -113,16 +152,21 @@ EXAMPLES = {
     "thesis_member": "SV-DEMO-01 và SV-DEMO-02 thành thành viên chính thức sau chốt.",
     "thesis_round": "Năm học DEMO có đợt MAIN; SUPPLEMENTARY thêm khi Khoa mở.",
     "topic": "GV-DEMO đề xuất đề tài TOP-DEMO, TBM duyệt rồi SV đăng ký.",
-    "topic_registration": "Nhóm DEMO gửi đăng ký, GV tiếp nhận, TBM chốt; trạng thái cũ vẫn lưu.",
+    "topic_registration": "Nhóm DEMO gửi đăng ký; GV chấp nhận tạo khóa luận và GVHD chính thức; trạng thái và lịch sử được giữ.",
     "topic_requirement": "GV nêu kỹ năng Python là mong muốn; không tự chặn SV đủ điều kiện.",
     "topic_title_version": "TBM đổi tên TOP-DEMO ở v2, mã đề tài giữ nguyên.",
     "user_account": "Tài khoản demo SV-DEMO đăng nhập bằng email đã xác minh và bị chặn khi LOCKED.",
-    "user_notification": "SV-DEMO gửi đăng ký; GV nhận thông báo, xem hồ sơ rồi số chưa xem giảm.",
+    "user_notification": "SV nhóm DEMO nộp báo cáo tiến độ; chỉ GVHD đúng đề tài và thành viên nhóm nhận thông báo. GVHD phản hồi thì cả nhóm nhận. TBM nhận đề tài chờ duyệt, không nhận tiến độ riêng.",
 }
 
 SEPARATION = {
+    "thesis_withdrawal_request": 'Một sinh viên có thể gửi nhiều đơn bị trả lại/hủy trước khi có kết quả. Cần đối tượng và trạng thái để xử lý, không dùng audit_event thay hồ sơ. Đơn theo SV không đồng nghĩa xóa đề tài nhóm; application_data chỉ là snapshot nội dung đơn bất biến, các quan hệ nghiệp vụ vẫn dùng FK.',
+    "official_form": "Danh mục có mã, đợt, loại tài liệu và đối tượng xem ổn định; không lặp danh mục trong từng tệp hay nhầm tài liệu Khoa với bài SV nộp.",
+    "official_form_version": "Một danh mục có nhiều tệp bất biến và vòng đời nháp/phát hành/thu hồi riêng. stored_file chỉ lưu bytes/checksum/scan; không thay thế lịch sử phát hành nghiệp vụ.",
+    "progress_review_annotation": "Một kết quả phản hồi có nhiều vị trí cần sửa. Mỗi ghim liên kết đúng một bản tiến độ, tài liệu hoặc đề cương (CHECK one_target), cùng tệp bất biến. Loại PIN lưu vị trí, SUMMARY lưu nhận xét chung riêng của từng GV, ATTACHMENT liên kết một tệp phản hồi riêng đã quét trong stored_file. CHECK ràng buộc đúng loại; partial UNIQUE giới hạn một SUMMARY cho mỗi GV/phiên bản. Nháp riêng và góp ý đã gửi có vòng đời khác quyết định duyệt; không gộp danh sách một-nhiều vào JSON/text.",
+    "registration_form_version": "Đơn thuộc hồ sơ đăng ký trước khi có khóa luận. document_version thuộc khóa luận nên không thay thế được quan hệ này; mỗi bản tệp và dấu đối chiếu được giữ nguyên.",
     "academic_year": "Một năm học có nhiều đợt; không gộp lịch/loại đợt vào năm học.",
-    "advisor_assignment": "GV tiếp nhận đăng ký chưa phải GVHD chính thức; bảng này chỉ phát sinh sau khi TBM chốt và giữ lịch sử thay GV.",
+    "advisor_assignment": "GV chấp nhận đăng ký tạo ngay phân công GVHD chính thức cùng khóa luận trong một giao dịch; bảng giữ thời điểm và lịch sử phân công.",
     "audit_event": "Nhật ký nhiều sự kiện trên nhiều đối tượng; không thể thay bằng trạng thái cuối của từng bảng.",
     "document": "Một hồ sơ tài liệu có nhiều phiên bản; tách thông tin chung và bản nộp.",
     "department_major": "Một bộ môn quản lý nhiều ngành; cặp mã cần quan hệ và ràng buộc riêng, không thể dùng một cột department.major_code.",
@@ -147,6 +191,11 @@ SEPARATION = {
 }
 
 ROLE_GROUPS = {
+    "thesis_withdrawal_request": 'SV gửi / hủy đơn của mình trước xác nhận; GVHD chính xác nhận / trả lại. KLTN_COORDINATOR đúng đợt ghi nhận kết quả ngoài hệ thống kèm bản đơn sạch và căn cứ. Admin không tự có quyền nghiệp vụ; thành viên khác không đọc đơn riêng của người xin thôi.',
+    "official_form": "FORM_MANAGER được cấp rõ theo đợt mới quản lý. Admin không tự có quyền phát hành; SV/GV xem theo đối tượng và phạm vi đợt.",
+    "official_form_version": "FORM_MANAGER theo đợt tải/kiểm/phát hành/thu hồi. SV/GV chỉ xem bản đã phát hành và lịch sử hợp lệ, không xem nháp hoặc danh sách ngoài đợt.",
+    "progress_review_annotation": "GVHD/người góp ý được phân công tự lưu và sửa ghim nháp riêng trên bản hiện hành. Chỉ sau khi gửi kết quả, SV thành viên và người có quyền xem tài nguyên tương ứng mới thấy ghim. Không mở rộng quyền xác nhận cho người góp ý chéo.",
+    "registration_form_version": "SV đang trong nhóm nộp trước hạn tiếp nhận; nhóm, GV tiếp nhận và TBM đúng phạm vi được xem/tải/xuất bản nộp. Admin kỹ thuật không có quyền đọc mặc định.",
     "academic_year": "Admin kỹ thuật cấu hình năm học; người dùng được phân quyền xem đợt tương ứng.",
     "advisor_assignment": "Trưởng bộ môn chốt GVHD; GV được đề cử có quyền nhận/từ chối thay đổi; SV và GVHD xem trong phạm vi khóa luận.",
     "audit_event": "Service ghi khi có thao tác; Trưởng bộ môn đúng phạm vi xem lịch sử khóa luận.",
@@ -168,15 +217,15 @@ ROLE_GROUPS = {
     "proposal_review": "GVHD chính xác nhận hoặc yêu cầu sửa; GV được TBM giao chỉ COMMENT; SV thành viên xem.",
     "reviewer_assignment": "Trưởng bộ môn phân công giảng viên góp ý; chỉ người được giao và người trong hồ sơ xem.",
     "signature_confirmation": "Trưởng bộ môn chốt phiên bản; Trưởng khoa ghi tham chiếu bản giấy đã ký đúng phạm vi Khoa.",
-    "progress_report": "SV thành viên nộp; GVHD xác nhận; GV góp ý chéo chỉ COMMENT_ONLY.",
+    "progress_report": "SV trong nhóm nộp và xem; chỉ GVHD đúng đề tài nhận xét/xác nhận. TBM quản lý mốc chung không đọc nội dung tiến độ.",
     "progress_milestone": "Người điều phối KLTN được giao theo đợt quản lý mốc; SV/GV xem mốc khóa luận liên quan.",
-    "progress_review": "GVHD xác nhận/yêu cầu sửa; GV được giao góp ý chéo chỉ COMMENT_ONLY.",
+    "progress_review": "Chỉ GVHD chính nhận xét và xác nhận/yêu cầu sửa báo cáo tiến độ của nhóm mình.",
     "document": "SV thành viên nộp; GVHD xem/nhận xét; người ngoài phạm vi không xem.",
     "registration_member": "Từng sinh viên tự xác nhận tham gia; GV tiếp nhận và Trưởng bộ môn xem nhóm đúng phạm vi.",
     "stored_file": "Chỉ service tài liệu/đề cương/minh chứng ghi metadata; tải file qua API kiểm quyền, không truy cập storage trực tiếp.",
     "student_profile": "SV xem hồ sơ của mình; Khoa nhập và xác nhận nguồn danh sách theo phân công đợt.",
-    "thesis": "SV thành viên, GVHD, Trưởng bộ môn và người được giao xem đúng phạm vi; Trưởng bộ môn chốt tạo khóa luận.",
-    "thesis_member": "Chỉ phát sinh khi Trưởng bộ môn chốt đăng ký; SV/GV liên quan xem danh sách thành viên.",
+    "thesis": "SV thành viên, GVHD, Trưởng bộ môn và người được giao xem đúng phạm vi; GV tiếp nhận tạo khóa luận trong giao dịch; TBM có quyền theo dõi đúng bộ môn.",
+    "thesis_member": "Phát sinh khi GV chấp nhận đăng ký; SV/GV liên quan xem danh sách thành viên.",
     "thesis_round": "Admin kỹ thuật cấu hình đợt; Khoa xác nhận danh sách theo phân công; SV/GV xem đợt mở.",
     "topic_requirement": "GV đề xuất yêu cầu mong muốn; Trưởng bộ môn xét đề tài; SV xem trước khi đăng ký.",
     "topic_title_version": "GV/SV đề xuất thay tên theo quy trình; Trưởng bộ môn quyết định; mọi bên liên quan xem lịch sử.",
@@ -186,7 +235,7 @@ ROLE_GROUPS = {
 def make_dictionary() -> None:
     assert set(target_metadata.tables) == SELECTED_TABLES
     lines = ["# Từ điển dữ liệu CSDL chính thức `kltn_management`", "",
-        f"Sinh từ metadata SQLAlchemy của revision Alembic `20261021_0004`; {len(SELECTED_TABLES)} bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.",
+        f"Sinh từ metadata SQLAlchemy của revision Alembic `{HEAD}`; {len(SELECTED_TABLES)} bảng nghiệp vụ, không tính bảng quản lý revision `alembic_version`.",
         "", "`NULL` ở đây là ràng buộc vật lý. Mọi hành động quan trọng còn chịu kiểm tra quyền/trạng thái trong service và audit. Ví dụ đều là dữ liệu giả.", ""]
     for number, table in enumerate(sorted(target_metadata.tables.values(), key=lambda item: item.name), 1):
         title, function = TABLE_INFO[table.name]
@@ -242,7 +291,7 @@ def make_dictionary() -> None:
 def make_erd() -> None:
     assert set(target_metadata.tables) == SELECTED_TABLES
     lines = ["# ERD CSDL chính thức `kltn_management`", "",
-        f"Sơ đồ chứa {len(SELECTED_TABLES)} bảng nghiệp vụ của revision `20261021_0004`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).",
+        f"Sơ đồ chứa {len(SELECTED_TABLES)} bảng nghiệp vụ của revision `{HEAD}`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).",
         "", "```mermaid", "erDiagram"]
     for table in sorted(target_metadata.tables.values(), key=lambda item: item.name):
         lines.append(f"    {table.name} {{")

@@ -1,5 +1,9 @@
 import { X } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
+import {createPortal} from "react-dom";
+
+const dialogStack:symbol[]=[];
+let initialBodyOverflow="";
 
 interface DialogProps {
   open: boolean;
@@ -29,11 +33,14 @@ export default function Dialog({
 
   useEffect(() => {
     if (!open) return;
+    const token=Symbol("dialog");
+    if(!dialogStack.length)initialBodyOverflow=document.body.style.overflow;
+    dialogStack.push(token);
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
     const focusables = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]') || []).filter((node) => node.getClientRects().length > 0);
     focusables()[0]?.focus();
     const handleEsc = (e: KeyboardEvent) => {
+      if(dialogStack.at(-1)!==token)return;
       if (e.key === "Escape" && !busyRef.current) closeRef.current();
       if (e.key === "Tab") {
         const nodes = focusables();
@@ -46,17 +53,18 @@ export default function Dialog({
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleEsc);
-      document.body.style.overflow = previousOverflow;
+      const index=dialogStack.indexOf(token);if(index>=0)dialogStack.splice(index,1);
+      document.body.style.overflow = dialogStack.length?"hidden":initialBodyOverflow;
       previousFocus?.focus();
     };
   }, [open]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="dialog-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
+      onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget && !busy) onClose(); }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -77,6 +85,6 @@ export default function Dialog({
         <div className="dialog__body">{children}</div>
         {footer && <div className="dialog__footer">{footer}</div>}
       </div>
-    </div>
+    </div>,document.body
   );
 }

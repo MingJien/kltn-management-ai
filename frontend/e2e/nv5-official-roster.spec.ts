@@ -17,7 +17,7 @@ test("Danh sách chính thức đủ điều kiện ngay → kích hoạt email 
     const user=await(await page.request.get(api+"/me/context")).json();
     const rounds=await(await page.request.get(api+"/admin/rounds")).json();
     const round=rounds.find((r:{state:string})=>r.state==="OPEN");expect(round).toBeTruthy();
-    await page.goto(web+"/administration");
+    await page.goto(web+"/administration/assignments");
     await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
     await page.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("ELIGIBILITY_IMPORTER");
     await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(user.user_id);

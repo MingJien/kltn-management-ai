@@ -39,7 +39,9 @@ def confirmed_student_ids(session: Session, round_id: UUID, student_ids: list[UU
     ).group_by(m.EligibilitySnapshot.student_id).subquery()
     return set(session.scalars(select(m.EligibilitySnapshot.student_id).join(latest,
         (latest.c.student_id == m.EligibilitySnapshot.student_id) & (latest.c.version == m.EligibilitySnapshot.version))
-        .where(m.EligibilitySnapshot.round_id == round_id, m.EligibilitySnapshot.state == "CONFIRMED")).all())
+        .where(m.EligibilitySnapshot.round_id == round_id, m.EligibilitySnapshot.state == "CONFIRMED",
+            ~m.EligibilitySnapshot.student_id.in_(select(m.ThesisWithdrawalRequest.student_id).where(
+                m.ThesisWithdrawalRequest.state == "RECORDED")))).all())
 
 
 def valid_group(session: Session, topic: m.Topic, members: list[m.RegistrationMember]) -> bool:
@@ -163,6 +165,10 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
     if user.base_role != "STUDENT":
         fail(403, "Only students create a registration group")
     student = profile(session, user, "STUDENT")
+    if session.scalar(select(m.ThesisWithdrawalRequest.id).where(
+            m.ThesisWithdrawalRequest.student_id == student.id,
+            m.ThesisWithdrawalRequest.state == "RECORDED").limit(1)):
+        fail(409, "Bạn đã được ghi nhận thôi thực hiện KLTN; không được đăng ký lại theo khoản 6 Điều 4 QĐ2919. Liên hệ Khoa để đăng ký học phần thay thế.")
     members = data.member_student_ids or [student.id]
     if members != [student.id] or not data.confirm_creator:
         fail(422, "Students must register themselves and confirm their own participation")

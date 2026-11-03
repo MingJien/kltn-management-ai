@@ -51,7 +51,8 @@ def test_vietnamese_roster_template_imports_and_word_is_rejected():
                 / "danh-sach-sinh-vien-kltn-mau.xlsx")
     rows, _ = parse_roster(template.name, template.read_bytes())
     assert len(rows) == 4
-    assert rows[0].student_code == "002344444441"
+    assert rows[0].student_code == "SV-MAU-001"
+    assert rows[0].email.endswith("@example.invalid")
     assert rows[0].department_code == "BM-CNTT"
     csv_data = ("MSSV,Họ tên,Email,Mã bộ môn,Lớp,Mã ngành\n"
                 "SYN-004,Sinh viên mẫu,sv-mau@example.test,SYN-DEMO-DEP,CNTT-01,7480201\n").encode("utf-8-sig")

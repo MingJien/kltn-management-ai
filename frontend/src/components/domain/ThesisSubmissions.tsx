@@ -1,3 +1,4 @@
+import WorkflowSteps from "./WorkflowSteps";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Lecturer, ProgressReport, Proposal, Thesis, ThesisDocument } from "../../api";
@@ -39,7 +40,8 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
         {item.state && <Status value={item.state} />}
       </Link>)}
     </div>
-    <div className="submission-panel stack" key={selected}>
+    <div className="submission-panel stack" key={selected}>{["PLAN","PROPOSAL","REPORT"].includes(selected) && <WorkflowSteps steps={selected==="PROPOSAL"?["SV nộp đề cương","GVHD xác nhận","TBM chốt","Hoàn tất hồ sơ"]:["SV nộp tệp","GVHD xem / phản hồi","Tiếp nhận phiên bản"]}
+ current={selected==="PROPOSAL"?(["DEPARTMENT_FINALIZED","DEAN_CONFIRMED"].includes(proposal?.state||"")?3:proposal?.state==="ADVISOR_CONFIRMED"?2:["SUBMITTED","UNDER_REVIEW"].includes(proposal?.state||"")?1:0):docs.some(d=>d.document_type===selected && ["ACCEPTED","FINAL"].includes(d.versions[0]?.state||""))?2:docs.some(d=>d.document_type===selected && d.versions.length)?1:0}/> }
       {selected === "REGISTRATION" && (thesis.registration_id
         ? <RegistrationSubmission registrationId={thesis.registration_id} userId={userId} />
         : <p className="alert alert-info">Hồ sơ này chưa có liên kết đơn đăng ký. <Link to="/registrations">Xem hồ sơ đăng ký</Link></p>)}

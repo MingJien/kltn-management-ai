@@ -1,0 +1,18 @@
+.positions-page { max-width: 1500px; margin-inline: auto; }
+.positions-page > .alert-info { display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; }
+.positions-card { border: 1px solid #dce6ed; border-radius: 16px; box-shadow: 0 4px 18px rgba(25, 50, 65, .05); }
+.positions-card .card-body { padding: clamp(20px, 2.2vw, 30px); gap: 18px; }
+.positions-card h2 { display: flex; align-items: center; gap: 10px; color: #103b42; font-size: 1.2rem; line-height: 1.35; margin: 0; }
+.positions-card h2 svg { color: #087b71; flex: none; }
+.positions-card > .card-body > label { max-width: 380px; font-weight: 600; }
+.positions-card .table-container { border: 1px solid #e2eaf0; border-radius: 10px; }
+.positions-card .table th { background: #f3f8f8; color: #345565; }
+.positions-card .table td, .positions-card .table th { padding: 14px; vertical-align: top; }
+.positions-card details { margin-top: 10px; color: #375769; }
+.positions-card details summary { cursor: pointer; font-weight: 600; }
+.positions-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 22px; align-items: start; }
+.positions-form label { display: grid; gap: 7px; font-weight: 600; color: #203e4c; }
+.positions-form input, .positions-form select, .positions-form textarea { width: 100%; font-weight: 400; }
+.positions-form small, .positions-form p, .positions-form > div, .positions-form label:has(textarea) { grid-column: 1 / -1; }
+.positions-form small { color: #536e7c; margin-top: -6px; line-height: 1.45; }
+@media (max-width: 800px) { .positions-form { grid-template-columns: 1fr; } .positions-form small, .positions-form p, .positions-form > div, .positions-form label:has(textarea) { grid-column: auto; } }

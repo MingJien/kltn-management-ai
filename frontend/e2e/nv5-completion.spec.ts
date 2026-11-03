@@ -73,7 +73,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     expect((await admin.request.get(api+base)).status()).toBe(404);
 
     // Coordinator is assigned through the real administration form.
-    await admin.goto(web+"/administration");
+    await admin.goto(web+"/administration/assignments");
     const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
     await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
     await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");

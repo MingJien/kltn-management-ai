@@ -5,6 +5,22 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  WITHDRAWAL_SUBMITTED: "SV gửi đơn xin thôi", WITHDRAWAL_ADVISOR_CONFIRMED: "GVHD xác nhận đơn xin thôi",
+  WITHDRAWAL_RETURNED: "GVHD trả lại đơn xin thôi", WITHDRAWAL_CANCELLED: "Hủy yêu cầu xin thôi",
+  WITHDRAWAL_SIGNED_COPY_ADDED: "Bổ sung đơn có xác nhận", WITHDRAWAL_FILE_SCANNED: "Kiểm tra an toàn đơn xin thôi",
+  WITHDRAWAL_RECORDED: "Ghi nhận kết quả cho thôi KLTN", WITHDRAWAL_NOT_GRANTED: "Ghi nhận không chấp thuận xin thôi",
+  WITHDRAWAL_PRINT_EXPORTED: "Xuất đơn xin thôi để in", WITHDRAWAL_START_RECORDED: "Ghi nhận ngày bắt đầu thực hiện",
+  PROPOSAL_MEMBERSHIP_REVISION_REQUIRED: "Yêu cầu duyệt lại đề cương khi đổi thành viên",
+  DOCUMENT_MEMBERSHIP_REVISION_REQUIRED: "Yêu cầu cập nhật báo cáo khi đổi thành viên",
+  WITHDRAWAL_REVIEW_ASSIGNMENT_ENDED: "Kết thúc phân công do khóa luận không còn thành viên",
+  LECTURER_PROFILE_SUBMITTED: "Gửi cập nhật hồ sơ giảng viên", LECTURER_PROFILE_APPROVED: "Duyệt hồ sơ giảng viên",
+  LECTURER_PROFILE_RETURNED: "Yêu cầu bổ sung hồ sơ giảng viên", LECTURER_PROFILE_WITHDRAWN: "Rút cập nhật hồ sơ giảng viên",
+  LECTURER_IDENTITY_CORRECTED: "Đối chiếu và sửa định danh giảng viên",
+  THESIS_REVIEWER_ASSIGNED: "Phân công phản biện khóa luận", THESIS_REVIEWER_REVOKED: "Thu hồi phân công phản biện",
+  THESIS_REVIEW_DEADLINE_EXTENDED: "Gia hạn gửi nhận xét phản biện", THESIS_REVIEW_SUBMITTED: "Gửi nhận xét Mẫu 7/8",
+  THESIS_REVIEW_PAPER_RECEIVED: "Ghi nhận đã nhận bản giấy nhận xét",
+  THESIS_REVIEW_EXPORTED: "Xuất phiếu nhận xét đã điền để ký",
+  DEFENSE_ELIGIBILITY_CHECKED: "Xét điều kiện dự bảo vệ", DEFENSE_ELIGIBILITY_REOPENED: "Mở xét lại điều kiện bảo vệ",
   OFFICIAL_FORM_CREATED: "Tạo danh mục biểu mẫu Khoa", OFFICIAL_FORM_METADATA_UPDATED: "Cập nhật danh mục biểu mẫu",
   OFFICIAL_FORM_VERSION_UPLOADED: "Tải phiên bản biểu mẫu lên kho", OFFICIAL_FORM_PUBLISHED: "Phát hành biểu mẫu",
   OFFICIAL_FORM_WITHDRAWN: "Thu hồi phiên bản biểu mẫu", OFFICIAL_FORM_BOOTSTRAPPED: "Khởi tạo mẫu Khoa",
@@ -17,6 +33,8 @@ const actions: Record<string, string> = {
   ACCOUNT_DISABLED: "Vô hiệu hóa tài khoản", ACCOUNT_RESTORED: "Mở lại tài khoản", ACCOUNT_LINK_REISSUED: "Cấp lại liên kết",
   ACCOUNT_EMAIL_CORRECTED: "Đính chính email", PASSWORD_RESET: "Đặt lại mật khẩu", PASSWORD_CHANGED: "Đổi mật khẩu",
   LECTURER_INVITED: "Cấp tài khoản giảng viên", ROUND_CREATED: "Tạo đợt KLTN", ROUND_SCHEDULE_UPDATED: "Sửa lịch đợt",
+  LECTURER_PROFILE_SELF_CONFIRMED: "TBM tự xác nhận hồ sơ chuyên môn",
+  POSITION_ASSIGNED: "Ghi nhận bổ nhiệm chức vụ", POSITION_REPLACED: "Thay người giữ chức vụ", POSITION_REVOKED: "Thu hồi bổ nhiệm",
   ROUND_OPENED: "Mở đợt đăng ký", ROUND_CLOSED: "Đóng đợt đăng ký", ROUND_PERMISSION_GRANTED: "Phân công nhiệm vụ theo đợt",
   ROUND_PERMISSION_REVOKED: "Thu hồi nhiệm vụ theo đợt", ELIGIBILITY_ROSTER_IMPORTED: "Nhập danh sách sinh viên đủ điều kiện",
   ELIGIBILITY_SPECIAL_DECISION_RECORDED: "Ghi nhận quyết định đủ điều kiện", ELIGIBILITY_REVOKED: "Thu hồi kết quả đủ điều kiện",
@@ -57,7 +75,7 @@ const actions: Record<string, string> = {
   WORK_APPROVE: "Duyệt phân công công việc", WORK_REVISION_REQUIRED: "Yêu cầu sửa phân công công việc",
 };
 export const actionLabel = (code: string) => actions[code] || code.replaceAll("_", " ");
-export const resourceLabel = (code: string) => ({official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
+export const resourceLabel = (code: string) => ({thesis_withdrawal_request:"Đơn xin thôi KLTN", official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
   lecturer_profile: "Hồ sơ giảng viên", topic: "Đề tài", topic_registration: "Đăng ký", registration: "Đăng ký", thesis: "Khóa luận",
   round: "Đợt KLTN", thesis_round: "Đợt KLTN", resource_assignment: "Phân công", eligibility_snapshot: "Điều kiện đăng ký",
   document: "Tài liệu", document_version: "Phiên bản tài liệu", proposal: "Đề cương", proposal_version: "Phiên bản đề cương",

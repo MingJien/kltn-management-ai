@@ -1,3 +1,4 @@
+import PositionsPage from "./pages/PositionsPage";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorMessage } from "./errors";
@@ -17,10 +18,14 @@ import LecturersPage from "./pages/LecturersPage";
 import RosterPage from "./pages/RosterPage";
 import RoundsPage from "./pages/RoundsPage";
 import LecturerProfilePage from "./pages/LecturerProfilePage";
+import LecturerProfileReviewsPage from "./pages/LecturerProfileReviewsPage";
 import ThesesPage from "./pages/ThesesPage";
 import SubmissionsPage from "./pages/SubmissionsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
+const EvaluationsPage = lazy(() => import("./pages/EvaluationsPage"));
+const EvaluationPage = lazy(() => import("./pages/EvaluationPage"));
 import { plannedPages, type PlannedPageId } from "./plannedPages";
 const AIPage = lazy(() => import("./pages/AIPage"));
 
@@ -36,8 +41,10 @@ function App() {
   const [noticeRevision,setNoticeRevision] = useState("");
   useEffect(() => {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
+    labels["/withdrawals"] = "Xin thôi KLTN";
     labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
     labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
+    labels["/positions"] = "Chức vụ và phạm vi";
     labels["/activity"] = "Nhật ký hoạt động";
     const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
     const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
@@ -70,6 +77,33 @@ function App() {
     window.addEventListener("kltn:session-expired", expired);
     return () => window.removeEventListener("kltn:session-expired", expired);
   }, [restore]);
+
+  // Refresh only the permission context; keep the current page and unsaved form state.
+  useEffect(() => {
+    if (!context?.user_id) return;
+    const controller = new AbortController();
+    let pending = false;
+    const refreshPermissions = async () => {
+      if (pending || document.visibilityState !== "visible") return;
+      pending = true;
+      try {
+        const next = await request<Context>("/me/context", "", {signal: controller.signal});
+        if (!controller.signal.aborted) {
+          setSessionCsrfToken(next.csrf_token);
+          setContext(previous => previous?.user_id === next.user_id ? next : previous);
+        }
+      } catch (cause) {
+        if (!controller.signal.aborted && cause instanceof ApiError && cause.status === 401) {
+          setSessionCsrfToken(null); setContext(null);
+        }
+      } finally { pending = false; }
+    };
+    const refresh = () => { void refreshPermissions(); };
+    const timer = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [context?.user_id]);
 
   useEffect(() => {
     if (!location.state?.noticeId) return;
@@ -141,14 +175,18 @@ function App() {
           path="/"
           element={<WorkspacePage context={context} />}
         />
-        <Route path="/account" element={<AccountPage context={context} onPasswordChanged={() => {
+        <Route path="/account" element={<AccountPage context={context} onProfileChanged={restore} onPasswordChanged={() => {
           setSessionCsrfToken(null); setContext(null); setError("Mật khẩu đã đổi. Vui lòng đăng nhập lại."); navigate("/");
         }} />} />
         <Route path="/notifications" element={<NotificationsPage userId={context.user_id} />} />
         <Route path="/activity" element={<ActivityPage context={context} />} />
         <Route path="/administration" element={context.actions.includes("account:manage") ?
-          <AdministrationPage context={context} onPermissionsChanged={restore} /> : <Navigate to="/" replace />} />
-        <Route path="/lecturers" element={context.base_role === "ADMIN" ? <LecturersPage context={context}/> : <Navigate to="/" replace/>}/>
+          <AdministrationPage context={context} onPermissionsChanged={restore} section="accounts" /> : <Navigate to="/" replace />} />
+        <Route path="/administration/assignments" element={context.base_role === "ADMIN" && context.actions.includes("account:manage") ?
+          <AdministrationPage context={context} onPermissionsChanged={restore} section="assignments" /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers" element={<LecturersPage context={context}/>}/>
+        <Route path="/lecturer-profile-reviews" element={context.actions.includes("lecturer:profile_review") ? <LecturerProfileReviewsPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/positions" element={context.base_role === "ADMIN" ? <PositionsPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/rounds" element={context.base_role === "ADMIN" ?
           <RoundsPage context={context} /> : <Navigate to="/" replace />} />
         <Route path="/roster" element={context.actions.some(a=>a.startsWith("eligibility:")) ?
@@ -171,9 +209,13 @@ function App() {
         <Route path="/submissions" element={workflowAccess ? <SubmissionsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/forms" element={<SchoolFormsPage context={context}/>} />
         <Route path="/documents" element={workflowAccess ? <ThesesPage context={context} section="documents" /> : <Navigate to="/" replace />} />
+        <Route path="/review-records" element={context.actions.includes("evaluation:record") ? <EvaluationsPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/evaluation" element={workflowAccess ? <EvaluationsPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/evaluation/:thesisId" element={workflowAccess ? <EvaluationPage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/planned/evaluation" element={<Navigate to="/evaluation" replace/>}/>
+        <Route path="/withdrawals" element={workflowAccess ? <WithdrawalsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
-        <Route path="/lecturers/:lecturerId" element={workflowAccess ?
-          <LecturerProfilePage userId={context.user_id} /> : <Navigate to="/" replace />} />
+        <Route path="/lecturers/:lecturerId" element={<LecturerProfilePage userId={context.user_id} />} />
         <Route
           path="/ai"
           element={workflowAccess ? <AIPage userId={context.user_id} /> : <Navigate to="/" replace />}

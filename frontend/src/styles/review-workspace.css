@@ -10,7 +10,7 @@
 .review-save-status { display: inline-flex; gap: 7px; align-items: center; color: #dcfff6; font-size: 12px; max-width: 220px; }
 .review-body { display: grid; grid-template-columns: minmax(0, 1fr) 370px; min-height: 0; flex: 1; }
 .review-document { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #e9eef2; }
-.review-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #d9e4e7; background: #f8fbfc; }
+.review-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #d9e4e7; background: #f8fbfc; box-shadow: 0 1px 0 #d9e4e7; }
 .review-page-controls, .review-zoom-controls { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .review-page-controls input { width: 50px; text-align: center; border: 1px solid #cfdde2; padding: 5px 2px; border-radius: 6px; background: #fff; color: #163b4d; }
 .review-icon { display: inline-flex; padding: 6px; border: 0; border-radius: 6px; background: transparent; color: #325768; cursor: pointer; }
@@ -35,7 +35,7 @@
 .review-pin--selected { outline: 3px solid #32cabb70; z-index: 6; }
 .review-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-left: 1px solid #dfebeb; }
 .review-sidebar-top { padding: 20px 18px 15px; border-bottom: 1px solid #edf1f1; }
-.review-sidebar-top h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; color: #123d4d; }
+.review-sidebar-top h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #123d4d; }
 .review-sidebar-top h3 span { margin-left: auto; min-width: 25px; text-align: center; padding: 3px 7px; border-radius: 8px; background: #e6f5f0; color: #0f7469; font-size: 12px; }
 .review-sidebar-top p { color: #68828b; font-size: 12px; line-height: 1.6; margin: 0; }
 .review-add-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
@@ -44,7 +44,7 @@
 .review-note--selected { border-color: #39a597; box-shadow: 0 0 0 2px #b9e9dd50; }
 .review-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .review-note-heading small { font-size: 10px; color: #7b8f93; text-align: right; }
-.review-note-location { padding: 0; display: flex; align-items: center; gap: 7px; border: 0; background: none; font-size: 12px; font-weight: 650; color: #137568; cursor: pointer; text-align: left; }
+.review-note-location { padding: 0; display: flex; align-items: center; gap: 7px; border: 0; background: none; font-size: 12px; font-weight: 600; color: #137568; cursor: pointer; text-align: left; }
 .review-note-location > span { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: #e4f5ee; flex-shrink: 0; }
 .review-note-fields { display: grid; gap: 9px; }
 .review-note-fields label, .review-submit label { display: grid; gap: 5px; font-size: 11px; color: #527079; }

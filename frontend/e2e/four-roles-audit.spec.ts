@@ -101,9 +101,9 @@ test("Admin: Toggle ẩn/hiện mật khẩu, quản lý đợt KLTN, phân côn
     await dialog.getByRole("button", { name: "Đóng đợt" }).click();
     await expect(roundRow).toContainText("Đã đóng");
 
-    // 3. Phân công đợt & Quản lý tài khoản (/administration)
-    await page.goto(web + "/administration");
-    await expect(page.getByRole("heading", { name: "Quản trị tài khoản" })).toBeVisible();
+    // 3. Phân công theo đợt (/administration/assignments)
+    await page.goto(web + "/administration/assignments");
+    await expect(page.getByRole("heading", { name: "Phân công theo đợt" })).toBeVisible();
 
     // Phân công KLTN_COORDINATOR và ELIGIBILITY_VERIFIER cho giảng viên
     const assignmentCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Phân công theo đợt", exact: true }) });
@@ -272,7 +272,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
     const alreadyCoord = currentAssignments.some((a: { user_id: string; round_id: string; assignment_type: string }) =>
       a.user_id === lecturer.id && a.round_id === round.id && a.assignment_type === "KLTN_COORDINATOR");
     if (!alreadyCoord) {
-      await admin.page.goto(web + "/administration");
+      await admin.page.goto(web + "/administration/assignments");
       const assignment = admin.page.locator("section.card").filter({ has: admin.page.getByRole("heading", { name: "Phân công theo đợt", exact: true }) });
       await expect(assignment.locator("select").nth(0).locator(`option[value="${round.id}"]`)).toHaveCount(1);
       await expect(assignment.locator("select").nth(1).locator(`option[value="${lecturer.id}"]`)).toHaveCount(1);

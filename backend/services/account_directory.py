@@ -15,6 +15,7 @@ from backend.db.models import entities as m
 
 RESOURCE_ROLE_LABELS = {
     "FORM_MANAGER": "Quản lý biểu mẫu và tài liệu Khoa",
+    "REVIEW_RECORDS_MANAGER": "Tiếp nhận hồ sơ phản biện",
     "ELIGIBILITY_IMPORTER": "Nhập danh sách đủ điều kiện",
     "ELIGIBILITY_VERIFIER": "Điều chỉnh/thu hồi danh sách",
     "ACCOUNT_MANAGER": "Quản lý tài khoản sinh viên",

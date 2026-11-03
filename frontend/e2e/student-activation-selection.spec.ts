@@ -16,7 +16,7 @@ test('Admin chọn SV gửi link sau import, SV vẫn tự yêu cầu được',
     await page.getByLabel('Mật khẩu',{exact:true}).fill(accounts.admin.password);
     await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
     await expect(page.getByRole('heading',{name:'Tổng quan',exact:true})).toBeVisible();
-    await page.goto('/administration');
+    await page.goto('/administration/assignments');
     await page.getByRole('combobox',{name:'Đợt',exact:true}).selectOption({label:'SYN-DEMO · OPEN'});
     await page.getByLabel('Nhiệm vụ').selectOption('ELIGIBILITY_IMPORTER');
     await page.getByRole('combobox',{name:'Người được giao',exact:true}).selectOption({label:accounts.admin.email});
@@ -75,7 +75,7 @@ test('Admin chọn SV gửi link sau import, SV vẫn tự yêu cầu được',
     await page.getByRole('row').filter({hasText:'E2E-SEL-03'}).getByRole('button',{name:'Gửi link',exact:true}).click();
     await expect(page.getByText(/Đã xử lý 1 sinh viên: 1 yêu cầu gửi thành công/)).toBeVisible();
     // Actual UI: restore requires a new decision; it is distinct from account lock.
-    await page.goto('/administration');
+    await page.goto('/administration/assignments');
     await page.getByRole('combobox',{name:'Đợt',exact:true}).selectOption({label:'SYN-DEMO · OPEN'});
     await page.getByLabel('Nhiệm vụ').selectOption('ELIGIBILITY_VERIFIER');
     await page.getByRole('combobox',{name:'Người được giao',exact:true}).selectOption({label:accounts.admin.email});

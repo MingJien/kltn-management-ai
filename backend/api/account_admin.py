@@ -37,7 +37,7 @@ class LecturerInvite(BaseModel):
 class RoundAssignment(BaseModel):
     round_id: UUID
     user_id: UUID
-    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR|FORM_MANAGER)$")
+    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR|FORM_MANAGER|REVIEW_RECORDS_MANAGER)$")
     basis_ref: str = Field(min_length=3, max_length=500)
 
 
@@ -413,9 +413,9 @@ def grant_round_assignment(payload: RoundAssignment,
     round_ = session.get(m.ThesisRound, payload.round_id)
     if not target or target.status != "ACTIVE" or target.base_role not in {"ADMIN", "LECTURER"}:
         raise HTTPException(422, "An active staff account is required")
-    if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR"} and target.base_role != "LECTURER":
+    if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR", "REVIEW_RECORDS_MANAGER"} and target.base_role != "LECTURER":
         raise HTTPException(422, "Round account/progress coordination must be assigned to a lecturer")
-    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type == "FORM_MANAGER" else {"DRAFT", "OPEN"}
+    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type in {"FORM_MANAGER","REVIEW_RECORDS_MANAGER"} else {"DRAFT", "OPEN"}
     if not round_ or round_.state not in allowed_states:
         raise HTTPException(422, "Round is unavailable")
     existing = session.scalar(select(m.ResourceAssignment.id).where(
@@ -451,7 +451,7 @@ def round_assignments(user: m.UserAccount = Depends(current_user),
     rows = session.execute(select(
         m.ResourceAssignment.id, m.ResourceAssignment.round_id,
         m.ResourceAssignment.user_id, m.ResourceAssignment.assignment_type).where(
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER", "REVIEW_RECORDS_MANAGER"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE").order_by(m.ResourceAssignment.effective_from.desc()).limit(200)).all()
     return [{"id": str(row.id), "round_id": str(row.round_id),
@@ -470,7 +470,7 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
         m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.id == assignment_id).with_for_update()).one_or_none()
     if not assignment or assignment.state != "ACTIVE" or assignment.assignment_type not in {
-            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"}:
+            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER", "REVIEW_RECORDS_MANAGER"}:
         raise HTTPException(404, "Active assignment not found")
     session.execute(update(m.ResourceAssignment).where(
         m.ResourceAssignment.id == assignment_id).values(

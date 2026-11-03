@@ -65,6 +65,7 @@ class AccessOut(BaseModel):
     state:str
     can_manage:bool
     can_view_publications:bool
+    can_export_list:bool
 
 
 class BootstrapOut(BaseModel):
@@ -89,6 +90,12 @@ class SpreadsheetOut(BaseModel):
 @router.get("/access",response_model=list[AccessOut])
 def access(user=Depends(current_user),session=Depends(get_session)):
     return service.access(session,user)
+
+
+@router.post("/rounds/{round_id}/mau-04")
+def export_round_list(round_id:UUID,user=Depends(current_user),session=Depends(get_session)):
+    from backend.services.school_form_list_export import export_mau_04
+    return export_mau_04(session,user,round_id)
 
 
 @router.get("",response_model=list[FormOut])

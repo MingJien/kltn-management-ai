@@ -39,7 +39,7 @@
 
 .app-shell__content {
   flex: 1;
-  padding: 28px 36px 56px;
+  padding: var(--space-8) var(--space-10) var(--space-16);
   background: var(--neutral-50);
   min-width: 0;
   display: flex;

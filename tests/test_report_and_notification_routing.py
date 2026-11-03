@@ -43,7 +43,7 @@ def test_report_book_deadline_and_submission_notify_only_the_advisor(workspace):
 
     advisor = notices(client, users[3])
     assert any(item["message"].startswith("Synthetic student đã nộp Cuốn báo cáo KLTN")
-               and item["url"].endswith("?section=documents") for item in advisor)
+               and item["url"].endswith("?section=submissions&kind=REPORT") for item in advisor)
     # The thesis advisor alone receives the submission; other students/lecturers do not.
     assert not any("đã nộp Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[2]))
     assert not any("đã nộp Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[5]))

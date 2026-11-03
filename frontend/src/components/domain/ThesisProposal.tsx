@@ -34,6 +34,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
     <div className="card"><div className="card-body stack">
       <h2>Đề cương khóa luận</h2>
       <p className="text-body-sm text-muted">Soạn nội dung trên mẫu đề cương chính thức của Khoa, rồi nộp bản PDF/DOCX đã điền. Mỗi lần sửa và nộp lại tạo một phiên bản riêng. GVHD nhận xét, Trưởng bộ môn chốt. Hệ thống chỉ đọc mẫu gốc, không tự dựng mẫu thay thế.</p>
+      {proposal.state === "REVISION_REQUIRED" && <p className="alert alert-warning">Đề cương cần nộp phiên bản mới để duyệt lại. Khi nhóm thay đổi thành viên, cập nhật danh sách và phân công công việc trong bản mới; các bản đã nộp và xác nhận cũ vẫn được lưu theo phiên bản.</p>}
       <p className="text-body-sm"><strong>Hạn đề cương:</strong> {deadline ? `${formatDate(deadline.due_at)} · ${deadline.state === "OPEN" ? "đang nhận" : "đã đóng"}` : "Khoa chưa thiết lập — chưa nhận tệp"}</p>
       <p className="text-caption">Có thể tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
       <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {

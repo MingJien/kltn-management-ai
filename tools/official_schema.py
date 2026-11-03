@@ -16,10 +16,14 @@ SELECTED_TABLES = frozenset(
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
+        "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request",
     }
 )
 
 TABLE_INFO = {
+    "thesis_withdrawal_request": ("Yêu cầu xin thôi thực hiện KLTN", "Đơn theo từng SV, xác nhận GVHD và kết quả xử lý ngoài hệ thống; không xóa hồ sơ cũ"),
+    "lecturer_profile_change": ("Yêu cầu cập nhật hồ sơ giảng viên", "Nháp riêng, gửi TBM duyệt, công bố và lịch sử xử lý theo phiên bản"),
+    "thesis_review": ("Phiếu nhận xét KLTN Mẫu 7 và Mẫu 8", "Nháp riêng và phiếu đã ký theo sinh viên, phân công và bản báo cáo"),
     "official_form": ("Danh mục biểu mẫu và tài liệu Khoa theo đợt", "Phân loại, phạm vi và đối tượng xem tài liệu Khoa"),
     "official_form_version": ("Phiên bản tệp biểu mẫu và tài liệu Khoa", "Bản nháp, phát hành, thu hồi và lịch sử tệp đã quét"),
     "academic_year": ("Năm học", "Đợt và lịch KLTN"),
@@ -31,7 +35,7 @@ TABLE_INFO = {
     "council_attendance": ("Điểm danh hội đồng", "Giai đoạn bảo vệ"),
     "council_member": ("Thành viên hội đồng", "Giai đoạn bảo vệ"),
     "council_minute": ("Biên bản hội đồng", "Giai đoạn bảo vệ"),
-    "defense_eligibility_check": ("Kiểm tra điều kiện bảo vệ", "Giai đoạn bảo vệ"),
+    "defense_eligibility_check": ("Lịch sử xét điều kiện dự bảo vệ", "Ba điều kiện cấp Trường theo từng sinh viên và phiên bản căn cứ"),
     "defense_session": ("Phiên bảo vệ", "Giai đoạn bảo vệ"),
     "department": ("Bộ môn", "Phạm vi quyền và hồ sơ"),
     "department_major": ("Ngành thuộc bộ môn", "Đối chiếu cặp mã bộ môn–ngành khi nhập sinh viên"),
@@ -65,7 +69,7 @@ TABLE_INFO = {
     "repository_item": ("Tài liệu kho tra cứu", "Kho và AI giai đoạn sau"),
     "resource_assignment": ("Phân công quyền theo tài nguyên", "Người xác nhận điều kiện/điều phối/góp ý theo đợt hoặc KLTN"),
     "retrieval_audit": ("Nhật ký truy xuất AI", "AI giai đoạn sau"),
-    "reviewer_assignment": ("Phân công góp ý đề cương", "Giới hạn người góp ý theo hồ sơ"),
+    "reviewer_assignment": ("Phân công góp ý đề cương và phản biện KLTN", "Người phản biện, căn cứ phân công và hạn gửi nhận xét"),
     "reviewer_review": ("Nhận xét phản biện", "Giai đoạn bảo vệ"),
     "round_policy": ("Chính sách đợt", "Chưa có cấu hình chính sách được ban hành để chạy ở giai đoạn 1"),
     "rubric_assignment": ("Gán thang điểm", "Giai đoạn chấm điểm"),

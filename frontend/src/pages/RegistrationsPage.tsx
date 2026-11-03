@@ -1,3 +1,5 @@
+import WorkflowSteps from "../components/domain/WorkflowSteps";
+import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ClipboardList, Info, X } from "lucide-react";
@@ -109,7 +111,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
         const me = row.members.find((member) => member.student_id === context.student_id);
         const activeCount = row.members.filter((member) => member.active).length;
         const draft = ["DRAFT","RETURNED"].includes(row.state);
-        return <article className="card registration-card" key={row.id}><div className="card-body stack">
+        return <article className="card registration-card" key={row.id}><div className="card-body stack"><WorkflowSteps steps={["Lập hồ sơ / xác nhận nhóm","Gửi hồ sơ","GV tiếp nhận","Hồ sơ khóa luận"]} current={row.thesis_id?3:row.state==="LECTURER_ACCEPTED"?2:row.state==="SUBMITTED"?1:0}/>
           <div className="registration-card__heading"><div><span className="topic-code">{row.topic_code}</span>
             <h2 className="topic-card-title">{row.topic_title}</h2></div>
             {row.proposer_type === "STUDENT" && row.state === "SUBMITTED"
@@ -125,7 +127,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
           {me && !me.active ? <p className="alert alert-info">Bạn đã rút khỏi đăng ký này. Hồ sơ được giữ để đối chiếu lịch sử.</p> : null}
           <dl className="registration-summary">
             <dt>{row.proposer_type === "STUDENT" && row.topic_state !== "APPROVED" ? "GV được SV đề xuất" : "GV tiếp nhận"}</dt>
-            <dd>{row.receiving_lecturer_name || "Chờ bộ môn chọn"}</dd>
+            <dd><LecturerProfileLink userId={context.user_id} lecturerId={row.receiving_lecturer_id} name={row.receiving_lecturer_name||"Chờ bộ môn chọn"}/></dd>
             <dt>Thành viên</dt><dd>{activeCount}/{row.expected_member_count} SV</dd>
             {row.submitted_at ? <><dt>Đã gửi</dt><dd>{new Date(row.submitted_at).toLocaleString("vi-VN")}</dd></> : null}
             {row.lecturer_decided_at ? <><dt>GV xét</dt><dd>{new Date(row.lecturer_decided_at).toLocaleString("vi-VN")}</dd></> : null}

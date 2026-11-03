@@ -101,8 +101,27 @@ def can_view(session, user, notice):
         kind,identifier="thesis",notice.thesis_id
     if not kind:
         return True
+    if kind == "thesis_withdrawal_request":
+        from backend.services.withdrawals import can_view
+        item = session.get(m.ThesisWithdrawalRequest, identifier)
+        return bool(item and can_view(session, user, item))
+    if kind == "position_assignment":
+        assignment=session.get(m.PositionAssignment,identifier)
+        lecturer=session.get(m.LecturerProfile,assignment.lecturer_id) if assignment else None
+        return bool(lecturer and (lecturer.user_id==user.id or user.base_role=="ADMIN"))
     if kind == "account":
         return user.id == identifier or user.base_role == "ADMIN"
+    if kind == "lecturer_profile_change":
+        from backend.services.lecturer_profiles import request_access
+        try:
+            request_access(session,user,identifier)
+            return True
+        except HTTPException:
+            return False
+    if kind == "defense":
+        from backend.services.evaluation import permissions
+        thesis = session.get(m.Thesis, identifier)
+        return bool(thesis and "evaluation:view" in permissions(session, user, thesis))
     if kind == "thesis":
         thesis = session.get(m.Thesis, identifier)
         if thesis is None:

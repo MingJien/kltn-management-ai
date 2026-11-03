@@ -1,0 +1,42 @@
+.school-forms-page .school-form-actions-cell {
+  width: 1%;
+  min-width: 0;
+  white-space: nowrap;
+}
+.school-forms-page .school-form-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+}
+.school-forms-page .school-form-action-button {
+  display: inline-grid;
+  flex: 0 0 30px;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 9px;
+  color: #34516a;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.school-forms-page .school-form-action-button:hover:not(:disabled) {
+  color: #0e766e;
+  background: #e9f7f4;
+  box-shadow: 0 2px 7px rgb(15 118 110 / 12%);
+  transform: translateY(-1px);
+}
+.school-forms-page .school-form-action-button:focus-visible {
+  outline: 3px solid #68c9bc;
+  outline-offset: 2px;
+}
+.school-forms-page .school-form-action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-forms-page .school-form-action-button { transition: none; }
+}

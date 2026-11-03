@@ -244,6 +244,9 @@ async def upload_version(session, user, thesis_id, document_id, request, expecte
             kind="DOCUMENT_SUBMITTED",
             message=f"{student.display_name} đã nộp {label} — {item.title} (phiên bản {version.version_no}).",
             section="submissions&kind=" + item.document_type)
+        if item.document_type == "REPORT":
+            from backend.services.evaluation import report_submitted
+            report_submitted(session, user, thesis)
         result = document_out(session, item)
         session.commit()
         return result

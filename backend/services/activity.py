@@ -64,6 +64,8 @@ def visibility(session, user):
         label = "Tài khoản và hồ sơ được phân công"
         lecturer = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == user.id))
         if lecturer:
+            scopes["position_assignment"] |= _ids(session, m.PositionAssignment.id, m.PositionAssignment.lecturer_id == lecturer.id)
+        if lecturer:
             scopes["lecturer_profile"].add(lecturer.id)
             heads = {dep for dep in session.scalars(select(m.Department.id))
                      if _is_department_head(session, lecturer.id, dep)}
@@ -119,6 +121,16 @@ def visibility(session, user):
     scopes["topic_registration"] |= registrations
     scopes["registration"] |= registrations  # Earlier evidence events used this resource name.
     scopes["thesis"] |= full_theses
+    from backend.services.lecturer_profiles import scopes as profile_scopes
+    profile_departments,profile_faculties=profile_scopes(session,user)
+    profile_ids=select(m.LecturerProfile.id).join(m.Department,m.Department.id==m.LecturerProfile.department_id).where(
+        or_(m.LecturerProfile.user_id==user.id,m.LecturerProfile.department_id.in_(profile_departments),m.Department.faculty_id.in_(profile_faculties)))
+    scopes["lecturer_profile_change"] |= _ids(session,m.LecturerProfileChange.id,m.LecturerProfileChange.lecturer_id.in_(profile_ids),m.LecturerProfileChange.state!="DRAFT")
+    check_query = select(m.DefenseEligibilityCheck.id).where(m.DefenseEligibilityCheck.thesis_id.in_(full_theses))
+    if user.base_role == "STUDENT":
+        own_members = select(m.ThesisMember.id).join(m.StudentProfile, m.StudentProfile.id == m.ThesisMember.student_id).where(m.StudentProfile.user_id == user.id)
+        check_query = check_query.where(m.DefenseEligibilityCheck.thesis_member_id.in_(own_members))
+    scopes["defense_eligibility_check"] |= set(session.scalars(check_query))
     all_theses = full_theses | proposal_theses | progress_theses
     rounds |= _ids(session, m.Thesis.round_id, m.Thesis.id.in_(all_theses))
     proposals = _ids(session, m.Proposal.id, m.Proposal.thesis_id.in_(full_theses | proposal_theses))
@@ -131,6 +143,14 @@ def visibility(session, user):
         m.ProgressReport.thesis_id.in_(
             full_theses if user.base_role == "STUDENT" else (advisor_theses | progress_theses)))
     scopes["document_deadline"] |= _ids(session, m.DocumentDeadline.id, m.DocumentDeadline.round_id.in_(rounds))
+    from backend.services.withdrawals import can_view as withdrawal_visible
+    scopes["thesis_withdrawal_request"] |= {item.id for item in session.scalars(select(m.ThesisWithdrawalRequest))
+        if withdrawal_visible(session, user, item)}
+    from backend.services.evaluation import permissions as review_permissions,review_visible
+    for item in session.scalars(select(m.ThesisReview)):
+        thesis=session.get(m.Thesis,item.thesis_id)
+        if "evaluation:view" in review_permissions(session,user,thesis) and review_visible(session,user,thesis,item):
+            scopes["thesis_review"].add(item.id)
     clauses = [and_(m.AuditEvent.resource_type == kind, m.AuditEvent.resource_id.in_(ids))
                for kind, ids in scopes.items() if ids]
     # A reviewer sees only the portion assigned to them, even when the event is keyed by thesis.
@@ -235,6 +255,9 @@ def resource_labels(session, events, viewer):
     for event in events:
         ids[event.resource_type].add(event.resource_id)
     result = {}
+    for row in session.scalars(select(m.ThesisWithdrawalRequest).where(m.ThesisWithdrawalRequest.id.in_(ids["thesis_withdrawal_request"]))):
+        student = session.get(m.StudentProfile, row.student_id)
+        result["thesis_withdrawal_request", row.id] = f"Xin thôi KLTN · {student.student_code} · {student.display_name}"
     for kind, cls, attr in (("topic", m.Topic, "current_title"), ("thesis", m.Thesis, "current_title"),
                             ("round", m.ThesisRound, "code"), ("thesis_round", m.ThesisRound, "code"),
                             ("official_form", m.OfficialForm, "title")):
@@ -250,6 +273,8 @@ def resource_labels(session, events, viewer):
     for row in session.scalars(select(m.UserAccount).where(m.UserAccount.id.in_(accounts))):
         result["user_account", row.id] = names.get(row.id, "Tài khoản") + (
             f" · {row.email}" if viewer.base_role == "ADMIN" and row.email else "")
+    for row in session.execute(select(m.PositionAssignment.id, m.LecturerProfile.display_name, m.Department.name).join(m.LecturerProfile, m.LecturerProfile.id == m.PositionAssignment.lecturer_id).join(m.Department, m.Department.id == m.PositionAssignment.department_id).where(m.PositionAssignment.id.in_(ids["position_assignment"]))):
+        result["position_assignment", row.id] = f"Trưởng bộ môn · {row.name} · {row.display_name}"
     for row in session.scalars(select(m.StudentProfile).where(m.StudentProfile.id.in_(ids["student_profile"]))):
         result["student_profile", row.id] = f"{row.student_code} · {row.display_name}"
     for row in session.execute(select(m.DocumentVersion.id, m.DocumentVersion.version_no, m.Document.title)
