@@ -20,6 +20,7 @@ from backend.api.activity import router as activity_router
 from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
 from backend.api.lecturer_profiles import router as lecturer_profiles_router
+from backend.api.withdrawals import router as withdrawals_router
 from backend.api.dependencies import current_user, get_session
 from backend.api.schemas import (
     ContextOut, ErrorOut, HealthOut, LecturerDecision, RejectedProposalResolution, MemberResponse,
@@ -76,6 +77,7 @@ app.include_router(activity_router)
 app.include_router(school_forms_router)
 app.include_router(evaluation_router)
 app.include_router(lecturer_profiles_router)
+app.include_router(withdrawals_router)
 
 
 @app.get("/api/v1/notifications", response_model=NotificationSummaryOut)

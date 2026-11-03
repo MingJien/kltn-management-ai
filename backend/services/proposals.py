@@ -52,7 +52,11 @@ def proposal_out(session, thesis_id, proposal):
         m.ReviewerAssignment.proposal_id == proposal.id,
         m.ReviewerAssignment.state == "ACTIVE").order_by(m.ReviewerAssignment.assigned_at)).all()
     signed = set(session.scalars(select(m.SignatureConfirmation.signature_type).where(
-        m.SignatureConfirmation.proposal_id == proposal.id)).all())
+        m.SignatureConfirmation.proposal_id == proposal.id,
+        m.SignatureConfirmation.proposal_version_no == proposal.current_version_no)).all())
+
+    if proposal.state == "REVISION_REQUIRED":
+        signed = set()  # Prior signatures remain historical, not confirmation of the revised membership.
 
     def version_out(version):
         file = session.get(m.StoredFile, version.stored_file_id)

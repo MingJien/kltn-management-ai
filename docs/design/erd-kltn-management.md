@@ -1,6 +1,6 @@
 # ERD CSDL chính thức `kltn_management`
 
-Sơ đồ chứa 42 bảng nghiệp vụ của revision `20261102_0018`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).
+Sơ đồ chứa 43 bảng nghiệp vụ của revision `20261102_0019`; cột đầy đủ, CHECK/UNIQUE và giải nghĩa nằm trong [từ điển dữ liệu](database-dictionary.md).
 
 ```mermaid
 erDiagram
@@ -207,6 +207,14 @@ erDiagram
         uuid academic_year_id FK
         uuid id PK
     }
+    thesis_withdrawal_request {
+        uuid thesis_id FK
+        uuid student_id FK
+        uuid advisor_reviewed_by FK
+        uuid evidence_file_id FK
+        uuid recorded_by FK
+        uuid id PK
+    }
     topic {
         uuid round_id FK
         uuid receiving_lecturer_id FK
@@ -337,6 +345,11 @@ erDiagram
     thesis ||--o{ thesis_review : thesis_id
     thesis_member ||--o{ thesis_review : thesis_member_id
     academic_year ||--o{ thesis_round : academic_year_id
+    user_account o|--o{ thesis_withdrawal_request : advisor_reviewed_by
+    stored_file o|--o{ thesis_withdrawal_request : evidence_file_id
+    user_account o|--o{ thesis_withdrawal_request : recorded_by
+    student_profile ||--o{ thesis_withdrawal_request : student_id
+    thesis ||--o{ thesis_withdrawal_request : thesis_id
     user_account o|--o{ topic : archived_by
     user_account o|--o{ topic : decided_by
     department ||--o{ topic : department_id

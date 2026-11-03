@@ -5,6 +5,14 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  WITHDRAWAL_SUBMITTED: "SV gửi đơn xin thôi", WITHDRAWAL_ADVISOR_CONFIRMED: "GVHD xác nhận đơn xin thôi",
+  WITHDRAWAL_RETURNED: "GVHD trả lại đơn xin thôi", WITHDRAWAL_CANCELLED: "Hủy yêu cầu xin thôi",
+  WITHDRAWAL_SIGNED_COPY_ADDED: "Bổ sung đơn có xác nhận", WITHDRAWAL_FILE_SCANNED: "Kiểm tra an toàn đơn xin thôi",
+  WITHDRAWAL_RECORDED: "Ghi nhận kết quả cho thôi KLTN", WITHDRAWAL_NOT_GRANTED: "Ghi nhận không chấp thuận xin thôi",
+  WITHDRAWAL_PRINT_EXPORTED: "Xuất đơn xin thôi để in", WITHDRAWAL_START_RECORDED: "Ghi nhận ngày bắt đầu thực hiện",
+  PROPOSAL_MEMBERSHIP_REVISION_REQUIRED: "Yêu cầu duyệt lại đề cương khi đổi thành viên",
+  DOCUMENT_MEMBERSHIP_REVISION_REQUIRED: "Yêu cầu cập nhật báo cáo khi đổi thành viên",
+  WITHDRAWAL_REVIEW_ASSIGNMENT_ENDED: "Kết thúc phân công do khóa luận không còn thành viên",
   LECTURER_PROFILE_SUBMITTED: "Gửi cập nhật hồ sơ giảng viên", LECTURER_PROFILE_APPROVED: "Duyệt hồ sơ giảng viên",
   LECTURER_PROFILE_RETURNED: "Yêu cầu bổ sung hồ sơ giảng viên", LECTURER_PROFILE_WITHDRAWN: "Rút cập nhật hồ sơ giảng viên",
   LECTURER_IDENTITY_CORRECTED: "Đối chiếu và sửa định danh giảng viên",
@@ -63,7 +71,7 @@ const actions: Record<string, string> = {
   WORK_APPROVE: "Duyệt phân công công việc", WORK_REVISION_REQUIRED: "Yêu cầu sửa phân công công việc",
 };
 export const actionLabel = (code: string) => actions[code] || code.replaceAll("_", " ");
-export const resourceLabel = (code: string) => ({official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
+export const resourceLabel = (code: string) => ({thesis_withdrawal_request:"Đơn xin thôi KLTN", official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
   lecturer_profile: "Hồ sơ giảng viên", topic: "Đề tài", topic_registration: "Đăng ký", registration: "Đăng ký", thesis: "Khóa luận",
   round: "Đợt KLTN", thesis_round: "Đợt KLTN", resource_assignment: "Phân công", eligibility_snapshot: "Điều kiện đăng ký",
   document: "Tài liệu", document_version: "Phiên bản tài liệu", proposal: "Đề cương", proposal_version: "Phiên bản đề cương",

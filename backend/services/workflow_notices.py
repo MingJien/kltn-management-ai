@@ -101,6 +101,10 @@ def can_view(session, user, notice):
         kind,identifier="thesis",notice.thesis_id
     if not kind:
         return True
+    if kind == "thesis_withdrawal_request":
+        from backend.services.withdrawals import can_view
+        item = session.get(m.ThesisWithdrawalRequest, identifier)
+        return bool(item and can_view(session, user, item))
     if kind == "account":
         return user.id == identifier or user.base_role == "ADMIN"
     if kind == "lecturer_profile_change":

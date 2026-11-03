@@ -95,6 +95,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     <PageHeader title={{overview:"Khóa luận & GVHD",submissions:"Hồ sơ nộp & xét duyệt",progress:"Báo cáo tiến độ"}[section] || "Hồ sơ khóa luận"} description={`${thesis.title} · ${thesis.round_label}`}>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
+    {active && <Link className="btn btn-secondary" to={`/withdrawals?thesis=${thesis.id}`}>Đơn xin thôi thực hiện KLTN</Link>}
     {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
     <div className="core-toolbar">

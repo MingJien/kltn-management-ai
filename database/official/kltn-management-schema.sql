@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261102_0018.
--- 42 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261102_0019.
+-- 43 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -149,6 +149,8 @@ CREATE TABLE thesis_round (
 	opens_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	closes_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	execution_starts_on DATE,
+	execution_start_reference VARCHAR(500),
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
@@ -158,6 +160,7 @@ CREATE TABLE thesis_round (
 	CONSTRAINT ck_thesis_round_round_type CHECK (round_type IN ('MAIN','SUPPLEMENTARY')),
 	CONSTRAINT ck_thesis_round_state CHECK (state IN ('DRAFT','OPEN','CLOSED','ARCHIVED')),
 	CONSTRAINT ck_thesis_round_time_window CHECK (closes_at > opens_at),
+	CONSTRAINT ck_thesis_round_execution_start_pair CHECK ((execution_starts_on IS NULL AND execution_start_reference IS NULL) OR (execution_starts_on IS NOT NULL AND execution_start_reference IS NOT NULL AND length(trim(execution_start_reference)) >= 5)),
 	CONSTRAINT fk_thesis_round_academic_year_id_academic_year FOREIGN KEY(academic_year_id) REFERENCES academic_year (id) ON DELETE RESTRICT
 );
 
@@ -691,7 +694,7 @@ CREATE TABLE signature_confirmation (
 	CONSTRAINT pk_signature_confirmation PRIMARY KEY (id),
 	CONSTRAINT ck_signature_confirmation_signature_type CHECK (signature_type IN ('DEPARTMENT_FINALIZATION','DEAN_CONFIRMATION')),
 	CONSTRAINT ck_signature_confirmation_proposal_version_positive CHECK (proposal_version_no > 0),
-	CONSTRAINT uq_signature_confirmation_proposal_id_signature_type UNIQUE (proposal_id, signature_type),
+	CONSTRAINT uq_signature_confirmation_proposal_version_type UNIQUE (proposal_id, proposal_version_no, signature_type),
 	CONSTRAINT fk_signature_confirmation_proposal_version_pair FOREIGN KEY(proposal_id, proposal_version_no) REFERENCES proposal_version (proposal_id, version_no) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
@@ -722,9 +725,9 @@ CREATE TABLE user_notification (
 	CONSTRAINT fk_user_notification_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
 );
 
-CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
-
 CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
+
+CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
 
 CREATE TABLE registration_form_version (
         registration_id UUID NOT NULL,
@@ -783,17 +786,17 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
-CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
-
-CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
-
-CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
-
 CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
 
 CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
 
+CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
+
 CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
+
+CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
 CREATE TABLE official_form (
 	round_id UUID NOT NULL,
@@ -945,6 +948,44 @@ CREATE TABLE lecturer_profile_change (
 CREATE UNIQUE INDEX uq_lecturer_profile_change_open ON lecturer_profile_change (lecturer_id) WHERE state IN ('DRAFT','SUBMITTED');
 
 CREATE INDEX ix_lecturer_profile_change_state_created ON lecturer_profile_change (state, created_at);
+
+CREATE TABLE thesis_withdrawal_request (
+	thesis_id UUID NOT NULL,
+	student_id UUID NOT NULL,
+	reason TEXT NOT NULL,
+	application_data JSONB NOT NULL,
+	execution_starts_on DATE NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	state VARCHAR(25) DEFAULT 'SUBMITTED' NOT NULL,
+	advisor_reviewed_by UUID,
+	advisor_reviewed_at TIMESTAMP WITH TIME ZONE,
+	advisor_comment TEXT,
+	evidence_file_id UUID,
+	official_reference VARCHAR(500),
+	outcome_note TEXT,
+	effective_on DATE,
+	recorded_by UUID,
+	recorded_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_withdrawal_request PRIMARY KEY (id),
+	CONSTRAINT ck_thesis_withdrawal_request_state CHECK (state IN ('SUBMITTED','ADVISOR_CONFIRMED','RETURNED','CANCELLED','RECORDED','NOT_GRANTED')),
+	CONSTRAINT ck_thesis_withdrawal_request_reason CHECK (length(trim(reason)) >= 10),
+	CONSTRAINT ck_thesis_withdrawal_request_application_data CHECK (jsonb_typeof(application_data) = 'object'),
+	CONSTRAINT ck_thesis_withdrawal_request_advisor_stamp CHECK (state NOT IN ('ADVISOR_CONFIRMED','RETURNED','RECORDED','NOT_GRANTED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)),
+	CONSTRAINT ck_thesis_withdrawal_request_outcome_stamp CHECK (state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND evidence_file_id IS NOT NULL AND effective_on IS NOT NULL)),
+	CONSTRAINT fk_thesis_withdrawal_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_advisor_reviewed_by_user_account FOREIGN KEY(advisor_reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_withdrawal_student_state ON thesis_withdrawal_request (student_id, state);
+
+CREATE UNIQUE INDEX uq_withdrawal_member_open ON thesis_withdrawal_request (thesis_id, student_id) WHERE state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED');
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

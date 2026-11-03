@@ -418,3 +418,16 @@ export type ChatResult = {
 export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean};
 export type SchoolFormVersion = {id:string;version_no:number;row_version:number;state:string;file_name:string;byte_size:number;scan_state:string;uploaded_at:string;uploaded_by_name:string;source_reference:string;change_reason:string;published_at:string|null};
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};
+
+
+export async function downloadWithdrawal(identifier:string,printCopy:boolean) {
+  const response=await fetch(`${baseUrl}/api/v1/withdrawals/${identifier}/${printCopy?"print-copy":"signed-copy"}`,{
+    method:printCopy?"POST":"GET",credentials:"include",
+    headers:printCopy&&sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
+  anchor.href=url;anchor.download=printCopy?(response.headers.get("X-Document-Code")||"phieu-xin-thoi")+".docx":
+    decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=utf-8''([^;]+)/i)?.[1]||"don-co-xac-nhan");
+  anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}

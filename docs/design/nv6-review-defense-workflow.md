@@ -32,8 +32,32 @@ Thu hồi phân công mất quyền mở hồ sơ và tải tệp ngay ở API, 
 - Báo cáo hoặc Mẫu 7 mới: kết quả xét gắn bản cũ chuyển thành cần xét lại khi đọc. TBM và GVPB nhận thông báo báo cáo mới; thông báo nộp của nhóm/GVHD dùng luồng tài liệu hiện có.
 - Tệp bị thay đổi sau khi lưu: tải xuống đối chiếu kích thước và SHA-256, từ chối khi không khớp.
 
-## Cài đặt và kiểm chứng
+## Một sinh viên xin rút sau khi đề cương đã duyệt
 
-Dùng Alembic để nâng database hiện có lên `20261030_0017`; không chạy lại SQL init. Máy chủ cần PostgreSQL, ClamAV và hai mẫu DOCX chính thức do Khoa cung cấp (qua kho theo đợt hoặc `KLTN_OFFICIAL_TEMPLATE_DIR`). Mẫu nguồn, bản ký, tệp SV và cấu hình thật không thuộc repository. Hệ thống chưa xác thực chữ ký bằng chứng thư số; GV xác nhận bản đã ký theo quy trình ngoài hệ thống.
+**Thành viên còn lại tiếp tục đề tài cũ và GVHD cũ, cập nhật đề cương mới để phê duyệt lại. Không buộc chọn đề tài khác vì số thành viên giảm.** Bản đề cương cũ và các xác nhận đã có được giữ làm lịch sử, không áp dụng cho nhóm mới.
+
+| Vai trò | Thao tác trên UI | Kết quả |
+| --- | --- | --- |
+| ADMIN, khi cần thiết lập ban đầu | Quản trị hệ thống → Phân công theo đợt → giao Điều phối KLTN, có căn cứ | Tài khoản được giao mới ghi nhận kế hoạch và kết quả xin rút; TBM không tự có quyền điều phối nếu chưa được giao |
+| Điều phối đúng đợt | Đề tài và đăng ký → Xin thôi KLTN → Ngày bắt đầu theo kế hoạch Khoa | Ghi ngày bắt đầu và căn cứ; hệ thống tính 14 ngày theo giờ Việt Nam, gồm ngày bắt đầu. Có đơn rồi không sửa ngày để thay đổi hạn của hồ sơ |
+| SV xin rút | Xin thôi KLTN → Lập yêu cầu → nhập lý do và xác nhận hệ quả → Gửi đơn đến GVHD | Chỉ gửi đơn cá nhân; nhóm và quyền tham gia chưa thay đổi. Có thể hủy trước khi GVHD xác nhận |
+| GVHD chính | Mở thông báo hoặc Xin thôi KLTN → xem đơn → xác nhận hoặc trả lại, kèm ý kiến | Xác nhận GVHD chưa phải quyết định cho thôi; SV xuất phiếu để in/ký, nộp bản có xác nhận và xử lý bên ngoài theo hướng dẫn Khoa |
+| Điều phối đúng đợt | Mở đơn → đối chiếu bản có xác nhận đã quét sạch → Ghi nhận kết quả đã xử lý bên ngoài → nhập căn cứ, ngày và nội dung, tích xác nhận | Chỉ kết quả cho thôi đã ghi nhận mới ngừng quyền thành viên; không chấp thuận thì SV tiếp tục. Có kiểm phiên bản và ghi lịch sử |
+| Thành viên còn lại | Mở thông báo thay đổi nhóm → Mở đề cương để cập nhật / duyệt lại → nộp PDF/DOCX mới | Giữ mã khóa luận, đề tài, GVHD; chuyển người đại diện nếu cần. Cập nhật danh sách SV, phạm vi và phân công trong nội dung mới |
+| GVHD và TBM | Hồ sơ nộp & xét duyệt → Đề cương → GVHD xem tệp và xác nhận bản mới → TBM chốt | Mỗi xác nhận gắn đúng phiên bản. Không có thao tác xác nhận lại bản cũ thay cho nộp mới |
+| Thành viên còn lại | Cập nhật Cuốn báo cáo KLTN trong cùng hồ sơ | Nếu đã có bản cũ, hệ thống mở một lần nộp sửa kể cả khi bản cũ đã tiếp nhận hoặc hạn đã đóng; không tạo hồ sơ tài liệu thứ hai |
+| GVHD/GVPB, rồi TBM | Phản biện & điều kiện bảo vệ → lập phiếu theo bản báo cáo mới → xét điều kiện SV còn thực hiện | Tạm chặn lập/gửi phiếu và lưu xét điều kiện trong lúc thiếu đề cương được duyệt lại hoặc báo cáo cập nhật. Kết quả cũ chuyển cần xét lại, không bị xóa |
+
+Khi nhóm không còn thành viên, khóa luận chuyển Đã rút, đăng ký chuyển Đã hủy, phân công nhận xét kết thúc. Người đã rút vẫn xem đơn của mình nhưng mất quyền hồ sơ nhóm; thành viên còn lại và GVPB không đọc được đơn/lý do riêng của người xin rút.
+
+Thông báo ở biểu tượng chuông và trang **Thông báo**, có liên kết đến đúng đơn/hồ sơ; chỉ tài khoản còn quyền mới mở được nội dung. Đây là thông báo trong tài khoản, không phải email hay lời nhắc được lập lịch. Phiếu xin thôi xuất từ hệ thống hiện là bản đề nghị có mã để đối chiếu; không tự nhận là mẫu chính thức của Khoa.
+
+Nếu không có nút thao tác: kiểm tra phân công còn hiệu lực, ngày bắt đầu, thời hạn, quyền của tài khoản và trạng thái hồ sơ. Hồ sơ đã chốt đủ điều kiện phải được TBM **Mở xét lại hồ sơ** trước khi xử lý thay đổi nhóm. Quá 02 tuần đầu thì UI hướng dẫn liên hệ đơn vị phụ trách, không tự hủy đăng ký, đổi điểm hoặc tự tạo ngoại lệ hành chính. Việc ghi nhận kết quả dựa trên hồ sơ đã được đơn vị có thẩm quyền xử lý bên ngoài.
+
+## Cài đặt và kiểm chứng hiện hành
+
+Dùng Alembic để nâng database hiện có lên `20261102_0019`; không chạy lại SQL init. Máy chủ cần PostgreSQL, ClamAV và hai mẫu DOCX chính thức do Khoa cung cấp (qua kho theo đợt hoặc `KLTN_OFFICIAL_TEMPLATE_DIR`). Mẫu nguồn, bản ký, tệp SV và cấu hình thật không thuộc repository. Hệ thống chưa xác thực chữ ký bằng chứng thư số; GV xác nhận bản đã ký theo quy trình ngoài hệ thống.
 
 Kết quả chạy thật, lệnh tái kiểm và giới hạn kiểm chứng được ghi tại [minh chứng NV6](../evidence/nv6-week1-validation.md).
+
+Tái kiểm luồng thay đổi nhóm: [minh chứng tích hợp](../evidence/nv6-group-review-validation.md).

@@ -1,4 +1,15 @@
 .evaluation-page {max-width:1420px;margin:0 auto;--evaluation-border:var(--color-border,#dce3ec);}
+.withdrawal-page {max-width:1200px;margin:0 auto;min-width:0;}
+.withdrawal-page .card {min-width:0;overflow-wrap:anywhere;scroll-margin-top:100px;}
+.withdrawal-page .flex {flex-wrap:wrap;}
+.withdrawal-page ol {padding-left:24px;list-style:decimal;}
+.withdrawal-page ol[aria-label="Các bước xử lý"] {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));list-style-position:inside;padding-left:0!important;gap:8px;}
+.withdrawal-page ol[aria-label="Các bước xử lý"] li {margin:0;}
+.withdrawal-page .alert {display:block;}
+.withdrawal-page .alert>strong {display:block;}
+.withdrawal-page .alert>p {margin:8px 0;}
+.withdrawal-page li,.evaluation-note li {margin:8px 0;line-height:1.65;}
+.evaluation-note .flex {flex-wrap:wrap;}
 .evaluation-page .page-header {gap:20px;flex-wrap:wrap;}
 .evaluation-intro {display:flex;gap:18px;align-items:flex-start;background:var(--color-primary-50,#edf4ff);border:1px solid #dbe7f7;border-radius:16px;padding:22px;margin:20px 0;color:#26456e;}
 .evaluation-intro svg {flex-shrink:0;}.evaluation-intro p {margin:5px 0 0;line-height:1.6;}

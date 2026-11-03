@@ -18,6 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DESIGN = ROOT / "docs/design"
 
 COLUMN_VI = {
+    "execution_starts_on": "Ngày bắt đầu thực hiện theo kế hoạch Khoa",
+    "execution_start_reference": "Căn cứ xác định ngày bắt đầu",
+    "application_data": "Bản chụp thông tin đơn tại thời điểm gửi",
+    "advisor_reviewed_by": "Người xác nhận của GVHD", "advisor_reviewed_at": "Thời điểm GVHD xác nhận / trả lại",
+    "advisor_comment": "Ý kiến xác nhận hoặc trả lại của GVHD",
+    "official_reference": "Số / căn cứ kết quả xử lý ngoài hệ thống", "outcome_note": "Nội dung kết quả bên ngoài",
+    "effective_on": "Ngày kết quả có hiệu lực", "recorded_by": "Người ghi nhận kết quả bên ngoài",
+    "recorded_at": "Thời điểm ghi nhận kết quả bên ngoài",
     "profile_data": "Thông tin chuyên môn và liên hệ đã duyệt", "avatar_file_id": "Ảnh đại diện đã chuẩn hóa và quét",
     "profile_verified_at": "Thời điểm duyệt hồ sơ", "profile_verified_by": "Người duyệt hồ sơ",
     "base_profile_version": "Phiên bản hồ sơ gốc khi lập yêu cầu", "proposed_data": "Thông tin đề nghị cập nhật",
@@ -106,6 +114,7 @@ COLUMN_VI = {
 }
 
 EXAMPLES = {
+    "thesis_withdrawal_request": 'SV-DEMO-01 xin thôi trong 02 tuần; GVHD xác nhận; điều phối đối chiếu bản ký và căn cứ bên ngoài để ghi nhận. SV-DEMO-02 tiếp tục cùng đề tài, nộp đề cương v2 để duyệt lại.',
     "lecturer_profile_change": "GV DEMO gửi cập nhật học vị, chuyên môn và ảnh; TBM đối chiếu trước–sau, duyệt rồi mới công bố. Phiếu trả lại được lập bản mới để sửa, không xóa lịch sử.",
     "thesis_review": "GVHD lưu nháp Mẫu 7 riêng cho SV DEMO theo báo cáo v2; xuất phiếu để ký, tải bản ký đã quét sạch rồi gửi. Bản sửa lập phiếu phiên bản mới.",
     "defense_eligibility_check": "TBM đối chiếu nguồn kỷ luật và Mẫu 7 đã ký theo báo cáo hiện hành của SV DEMO; mỗi lần xét lưu căn cứ, người xét và kết quả riêng, không áp dụng cho thành viên khác.",
@@ -151,6 +160,7 @@ EXAMPLES = {
 }
 
 SEPARATION = {
+    "thesis_withdrawal_request": 'Một sinh viên có thể gửi nhiều đơn bị trả lại/hủy trước khi có kết quả. Cần đối tượng và trạng thái để xử lý, không dùng audit_event thay hồ sơ. Đơn theo SV không đồng nghĩa xóa đề tài nhóm; application_data chỉ là snapshot nội dung đơn bất biến, các quan hệ nghiệp vụ vẫn dùng FK.',
     "official_form": "Danh mục có mã, đợt, loại tài liệu và đối tượng xem ổn định; không lặp danh mục trong từng tệp hay nhầm tài liệu Khoa với bài SV nộp.",
     "official_form_version": "Một danh mục có nhiều tệp bất biến và vòng đời nháp/phát hành/thu hồi riêng. stored_file chỉ lưu bytes/checksum/scan; không thay thế lịch sử phát hành nghiệp vụ.",
     "progress_review_annotation": "Một kết quả phản hồi có nhiều vị trí cần sửa. Mỗi ghim liên kết đúng một bản tiến độ, tài liệu hoặc đề cương (CHECK one_target), cùng tệp bất biến. Loại PIN lưu vị trí, SUMMARY lưu nhận xét chung riêng của từng GV, ATTACHMENT liên kết một tệp phản hồi riêng đã quét trong stored_file. CHECK ràng buộc đúng loại; partial UNIQUE giới hạn một SUMMARY cho mỗi GV/phiên bản. Nháp riêng và góp ý đã gửi có vòng đời khác quyết định duyệt; không gộp danh sách một-nhiều vào JSON/text.",
@@ -181,6 +191,7 @@ SEPARATION = {
 }
 
 ROLE_GROUPS = {
+    "thesis_withdrawal_request": 'SV gửi / hủy đơn của mình trước xác nhận; GVHD chính xác nhận / trả lại. KLTN_COORDINATOR đúng đợt ghi nhận kết quả ngoài hệ thống kèm bản đơn sạch và căn cứ. Admin không tự có quyền nghiệp vụ; thành viên khác không đọc đơn riêng của người xin thôi.',
     "official_form": "FORM_MANAGER được cấp rõ theo đợt mới quản lý. Admin không tự có quyền phát hành; SV/GV xem theo đối tượng và phạm vi đợt.",
     "official_form_version": "FORM_MANAGER theo đợt tải/kiểm/phát hành/thu hồi. SV/GV chỉ xem bản đã phát hành và lịch sử hợp lệ, không xem nháp hoặc danh sách ngoài đợt.",
     "progress_review_annotation": "GVHD/người góp ý được phân công tự lưu và sửa ghim nháp riêng trên bản hiện hành. Chỉ sau khi gửi kết quả, SV thành viên và người có quyền xem tài nguyên tương ứng mới thấy ghim. Không mở rộng quyền xác nhận cho người góp ý chéo.",

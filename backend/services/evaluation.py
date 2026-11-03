@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 
 from backend.db.models import entities as m
-from backend.services import documents, file_scanner, workflow_notices as notices
+from backend.services import documents, file_scanner, membership_revision, workflow_notices as notices
 from backend.services.registration import _is_department_head, profile, row_version
 from backend.services.theses import audit, effective, now, primary_advisor
 
@@ -116,10 +116,11 @@ def requirements(session, current_report, review, discipline_status):
 
 
 def eligibility_out(session, thesis, member, current_report):
-    review = review_current(session, thesis, member, current_report)
+    blocked = membership_revision.blockers(session, thesis, current_report)
+    review = review_current(session, thesis, member, current_report) if not blocked else None
     check = last_check(session, member)
     conditions = requirements(session, current_report, review, check.discipline_status if check else "UNKNOWN")
-    fresh = bool(check and check.report_version_id == (current_report.id if current_report else None)
+    fresh = bool(not blocked and check and check.report_version_id == (current_report.id if current_report else None)
         and check.advisor_review_id == (review.id if review else None))
     state = "ELIGIBLE" if fresh and check.state == "ELIGIBLE" and all(x["met"] for x in conditions) else (
         "STALE" if check and not fresh else "BLOCKED" if check else "NOT_CHECKED")
@@ -236,6 +237,7 @@ def create_review(session, user, thesis_id, data, expected):
     row_version(expected, thesis.row_version)
     member = member_for(session, thesis, data.thesis_member_id)
     current = report(session, thesis)
+    membership_revision.ensure_ready(session, thesis, current)
     if not current or current.id != data.report_version_id:
         raise HTTPException(409, "Bản báo cáo đã thay đổi hoặc chưa được nộp; tải lại hồ sơ")
     documents.require_clean(session.get(m.StoredFile, current.stored_file_id), "viết phiếu nhận xét")
@@ -272,6 +274,7 @@ def editable_review(session, user, thesis_id, review_id, expected):
     if item.state != "DRAFT":
         raise HTTPException(409, "Phiếu đã gửi được giữ nguyên; tạo phiên bản mới kèm lý do để sửa")
     current = report(session, thesis)
+    membership_revision.ensure_ready(session, thesis, current)
     if not current or item.report_version_id != current.id:
         raise HTTPException(409, "Đã có bản báo cáo khác; tạo phiếu mới cho bản hiện hành")
     return thesis, item
@@ -401,6 +404,7 @@ def check_eligibility(session, user, thesis_id, data, expected):
     row_version(expected, thesis.row_version)
     member = member_for(session, thesis, data.thesis_member_id)
     current = report(session, thesis)
+    membership_revision.ensure_ready(session, thesis, current)
     review = review_current(session, thesis, member, current)
     if data.report_version_id != (current.id if current else None) or data.advisor_review_id != (review.id if review else None):
         raise HTTPException(409, "Báo cáo hoặc Mẫu 7 đã đổi; tải lại trước khi xét điều kiện")
@@ -455,6 +459,7 @@ def workspace(session, user, thesis_id):
     thesis = access(session, user, thesis_id)
     actions = permissions(session, user, thesis)
     current = report(session, thesis)
+    workflow_blockers = membership_revision.blockers(session, thesis, current)
     current_file = session.get(m.StoredFile, current.stored_file_id) if current else None
     visible_members = []
     for member in members(session, thesis):
@@ -472,7 +477,7 @@ def workspace(session, user, thesis_id):
         if not review_visible(session, user, thesis, item):
             continue
         editable = False
-        if item.state == "DRAFT" and (thesis.state in MUTABLE or (thesis.state == "READY_FOR_DEFENSE" and item.kind == "REVIEWER")) and current and item.report_version_id == current.id:
+        if not workflow_blockers and session.get(m.ThesisMember, item.thesis_member_id).active and item.state == "DRAFT" and (thesis.state in MUTABLE or (thesis.state == "READY_FOR_DEFENSE" and item.kind == "REVIEWER")) and current and item.report_version_id == current.id:
             try:
                 lecturer, assignment = writing_assignment(session, user, thesis, item.kind)
                 editable = item.lecturer_id == lecturer.id and assignment.id == (
@@ -515,7 +520,7 @@ def workspace(session, user, thesis_id):
                     and current and r.report_version_id == current.id for r in reviews) for member in members(session, thesis))),
             "reason": a.assignment_reason, "source_reference": a.source_reference,
             "revoked_reason": revocations[str(a.id)].reason if str(a.id) in revocations else None} for a in assignments(session, thesis)],
-        "candidates": candidates, "eligibility_history": history}
+        "candidates": candidates, "eligibility_history": history, "workflow_blockers": workflow_blockers}
 
 
 def report_submitted(session, user, thesis):

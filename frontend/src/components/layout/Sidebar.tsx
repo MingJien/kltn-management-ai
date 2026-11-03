@@ -103,12 +103,13 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
           </SidebarGroup>
           {context.base_role === "ADMIN" && <SidebarGroup label="DANH SÁCH ĐỀ TÀI" active={pathname === "/topics"} collapsed={collapsed}><NavLink to="/topics" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FileText aria-hidden="true"/><span>Đề tài đã công bố</span></NavLink></SidebarGroup>}
           {workflowAccess ? <>
-            <SidebarGroup label="ĐỀ TÀI VÀ ĐĂNG KÝ" active={["/topics", "/registrations", "/planned/changes"].includes(pathname)} collapsed={collapsed}>
+            <SidebarGroup label="ĐỀ TÀI VÀ ĐĂNG KÝ" active={["/topics", "/registrations", "/withdrawals", "/planned/changes"].includes(pathname)} collapsed={collapsed}>
               <NavLink to="/lecturers" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><UsersRound aria-hidden="true"/><span>Danh sách giảng viên</span></NavLink>
               <NavLink to="/topics" title={collapsed ? topicLabel : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
                 onClick={onClose}><FileText aria-hidden="true" /><span>{topicLabel}</span></NavLink>
               <NavLink to="/registrations" title={collapsed ? "Đăng ký" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
                 onClick={onClose}><ClipboardList aria-hidden="true" /><span>{context.base_role === "STUDENT" ? "Đăng ký của tôi" : "Hồ sơ đăng ký"}</span></NavLink>
+              <NavLink to="/withdrawals" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><FileText aria-hidden="true"/><span>Xin thôi KLTN</span></NavLink>
               <PlannedLink id="changes" collapsed={collapsed} icon={<FileText aria-hidden="true" />} onClose={onClose} />
             </SidebarGroup>
             <SidebarGroup label="HỒ SƠ KHÓA LUẬN" active={["/theses", "/submissions", "/proposals", "/progress", "/documents"].includes(pathname) || isThesisDetail} collapsed={collapsed}>

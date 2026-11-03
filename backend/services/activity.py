@@ -141,6 +141,9 @@ def visibility(session, user):
         m.ProgressReport.thesis_id.in_(
             full_theses if user.base_role == "STUDENT" else (advisor_theses | progress_theses)))
     scopes["document_deadline"] |= _ids(session, m.DocumentDeadline.id, m.DocumentDeadline.round_id.in_(rounds))
+    from backend.services.withdrawals import can_view as withdrawal_visible
+    scopes["thesis_withdrawal_request"] |= {item.id for item in session.scalars(select(m.ThesisWithdrawalRequest))
+        if withdrawal_visible(session, user, item)}
     clauses = [and_(m.AuditEvent.resource_type == kind, m.AuditEvent.resource_id.in_(ids))
                for kind, ids in scopes.items() if ids]
     # A reviewer sees only the portion assigned to them, even when the event is keyed by thesis.
@@ -245,6 +248,9 @@ def resource_labels(session, events, viewer):
     for event in events:
         ids[event.resource_type].add(event.resource_id)
     result = {}
+    for row in session.scalars(select(m.ThesisWithdrawalRequest).where(m.ThesisWithdrawalRequest.id.in_(ids["thesis_withdrawal_request"]))):
+        student = session.get(m.StudentProfile, row.student_id)
+        result["thesis_withdrawal_request", row.id] = f"Xin thôi KLTN · {student.student_code} · {student.display_name}"
     for kind, cls, attr in (("topic", m.Topic, "current_title"), ("thesis", m.Thesis, "current_title"),
                             ("round", m.ThesisRound, "code"), ("thesis_round", m.ThesisRound, "code"),
                             ("official_form", m.OfficialForm, "title")):

@@ -20,6 +20,7 @@ import LecturerProfilePage from "./pages/LecturerProfilePage";
 import LecturerProfileReviewsPage from "./pages/LecturerProfileReviewsPage";
 import ThesesPage from "./pages/ThesesPage";
 import SubmissionsPage from "./pages/SubmissionsPage";
+import WithdrawalsPage from "./pages/WithdrawalsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
 const EvaluationsPage = lazy(() => import("./pages/EvaluationsPage"));
@@ -39,6 +40,7 @@ function App() {
   const [noticeRevision,setNoticeRevision] = useState("");
   useEffect(() => {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
+    labels["/withdrawals"] = "Xin thôi KLTN";
     labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
     labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
     labels["/activity"] = "Nhật ký hoạt động";
@@ -178,6 +180,7 @@ function App() {
         <Route path="/evaluation" element={workflowAccess ? <EvaluationsPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/evaluation/:thesisId" element={workflowAccess ? <EvaluationPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/planned/evaluation" element={<Navigate to="/evaluation" replace/>}/>
+        <Route path="/withdrawals" element={workflowAccess ? <WithdrawalsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/planned/:feature" element={workflowAccess ? <ComingSoonPage /> : <Navigate to="/" replace />} />
         <Route path="/lecturers/:lecturerId" element={<LecturerProfilePage userId={context.user_id} />} />
         <Route
