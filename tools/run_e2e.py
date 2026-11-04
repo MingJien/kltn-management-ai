@@ -123,6 +123,11 @@ def main() -> int:
         with Session(private_engine) as session, session.begin():
             assert session.scalar(text('select current_schema()')) == schema
             now = datetime.now(timezone.utc)
+            if os.getenv('KLTN_E2E_SAMPLE_DEPARTMENT') == 'true':
+                # Use the public roster example codes only inside this disposable schema.
+                session.get(m.Faculty, seed_demo.uid('faculty')).name = 'Khoa Công nghệ và Kỹ thuật (giả lập)'
+                department = session.get(m.Department, seed_demo.uid('department'))
+                department.code, department.name = 'BM-CNTT', 'Công nghệ thông tin (giả lập)'
             admin_password = secrets.token_urlsafe(20)
             admin = m.UserAccount(id=uuid4(), email='admin@e2e.test',
                 password_hash=hash_password(admin_password), email_verified_at=now,
