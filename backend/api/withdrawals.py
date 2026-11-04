@@ -75,3 +75,20 @@ def download(identifier: UUID, user=Depends(current_user), session=Depends(trans
 @router.post("/withdrawals/{identifier}/print-copy")
 def print_copy(identifier: UUID, user=Depends(current_user), session=Depends(transaction)):
     return service.print_copy(session, user, identifier)
+
+
+@router.post("/withdrawals/{identifier}/outcome-evidence")
+async def outcome_upload(identifier: UUID, request: Request, if_match: int = Header(alias="If-Match", ge=1),
+                         user=Depends(current_user), session=Depends(transaction)):
+    return await service.upload_outcome(session, user, identifier, request, if_match)
+
+
+@router.get("/withdrawals/{identifier}/outcome-evidence")
+def outcome_download(identifier: UUID, user=Depends(current_user), session=Depends(transaction)):
+    return service.outcome_file_action(session, user, identifier)
+
+
+@router.post("/withdrawals/{identifier}/outcome-evidence/scan")
+def outcome_scan(identifier: UUID, if_match: int = Header(alias="If-Match", ge=1),
+                 user=Depends(current_user), session=Depends(transaction)):
+    return service.outcome_file_action(session, user, identifier, if_match)

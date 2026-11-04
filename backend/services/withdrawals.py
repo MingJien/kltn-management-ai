@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -81,6 +82,7 @@ def output(session, user, item):
         .order_by(m.AuditEvent.occurred_at, m.AuditEvent.id)).all()
     receipt_events = [h for h in history if h.action == "WITHDRAWAL_RECEIPT_RECORDED"]
     receipt = None
+    outcome_file = outcome_evidence(session, item)
     if receipt_events:
         event = receipt_events[-1]
         receipt = {**json.loads(event.reason), "recorded_at": event.occurred_at,
@@ -95,6 +97,9 @@ def output(session, user, item):
         "evidence_name": stored.original_name if stored else None,
         "scan_state": stored.scan_state if stored else None,
         "receipt": receipt,
+        "outcome_evidence": {"name":outcome_file.original_name,"scan_state":outcome_file.scan_state} if outcome_file else None,
+        "can_export": item.state == "ADVISOR_CONFIRMED",
+        "print_data": item.application_data,
         "can_cancel": user.id == student.user_id and item.state == "SUBMITTED",
         "can_confirm": is_advisor(session, user, thesis) and item.state == "SUBMITTED",
         "can_record": can_record(session, user, thesis) and item.state == "ADVISOR_CONFIRMED",
@@ -327,6 +332,10 @@ def record(session, user, identifier, data, expected):
         raise HTTPException(422, "Ngày kết quả phải từ ngày gửi đơn đến hôm nay")
     stored = session.get(m.StoredFile, item.evidence_file_id) if item.evidence_file_id else None
     documents.require_clean(stored, "ghi nhận kết quả xử lý đơn")
+    outcome_file = outcome_evidence(session, item)
+    if outcome_file:
+        documents.require_clean(outcome_file, "đối chiếu minh chứng kết quả")
+        documents.stored_download(session, SimpleNamespace(stored_file_id=outcome_file.id, content_sha256=outcome_file.sha256))
     # Check that the actual immutable bytes are still present and match the checksum.
     documents.stored_download(session, SimpleNamespace(stored_file_id=stored.id, content_sha256=stored.sha256))
     recipients = coordinators(session, thesis.round_id) | {session.get(m.StudentProfile, item.student_id).user_id}
@@ -344,6 +353,8 @@ def record(session, user, identifier, data, expected):
             m.RegistrationMember.student_id == item.student_id).with_for_update())
         if reg_member:
             reg_member.active, reg_member.is_coordinator = False, False
+            registration = session.get(m.TopicRegistration, thesis.registration_id)
+            registration.row_version += 1
         session.flush()
         remaining = session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis.id,
             m.ThesisMember.active.is_(True)).order_by(m.ThesisMember.joined_at, m.ThesisMember.id).with_for_update()).all()
@@ -373,7 +384,7 @@ def record(session, user, identifier, data, expected):
             # Allow one corrected report even after acceptance or deadline close.
             # Existing bytes, decisions and signed reviews stay in history.
             for document in session.scalars(select(m.Document).where(m.Document.thesis_id == thesis.id,
-                    m.Document.document_type == "REPORT", m.Document.state == "ACTIVE").with_for_update()):
+                    m.Document.document_type.in_(["PLAN", "REPORT"]), m.Document.state == "ACTIVE").with_for_update()):
                 latest = session.scalar(select(m.DocumentVersion).where(m.DocumentVersion.document_id == document.id)
                     .order_by(m.DocumentVersion.version_no.desc()).limit(1).with_for_update())
                 if latest:
@@ -420,6 +431,56 @@ def download(session, user, identifier):
 
 
 def print_copy(session, user, identifier):
-    # Preserve authorization even while the unapproved template is unavailable.
-    get(session, user, identifier)
-    raise HTTPException(409, "Mẫu đơn xin thôi KLTN đang chờ Khoa duyệt; tạm thời chưa hỗ trợ tải mẫu hoặc xuất bản in có footer.")
+    item = get(session, user, identifier, lock=True)
+    if item.state != "ADVISOR_CONFIRMED":
+        raise HTTPException(409, "Chỉ xuất đơn đang được GVHD xác nhận và chờ xử lý")
+    from backend.services.withdrawal_export import export
+    return export(session, user, item)
+
+
+def outcome_evidence(session, item):
+    event = session.scalar(select(m.AuditEvent).where(m.AuditEvent.resource_type == "thesis_withdrawal_request",
+        m.AuditEvent.resource_id == item.id, m.AuditEvent.action == "WITHDRAWAL_OUTCOME_FILE_ADDED")
+        .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id.desc()).limit(1))
+    return session.get(m.StoredFile, UUID(event.source_reference)) if event else None
+
+
+async def upload_outcome(session, user, identifier, request, expected):
+    path = None
+    try:
+        item = upload_access(session, user, identifier, expected)
+        if not can_record(session, user, session.get(m.Thesis, item.thesis_id)):
+            raise HTTPException(403, "Chỉ điều phối bổ sung minh chứng kết quả")
+        name, content, mime = await documents.read_upload(request)
+        if Path(name).suffix.lower() not in {".pdf", ".docx"}:
+            raise HTTPException(422, "Minh chứng kết quả phải là PDF/DOCX")
+        stored, digest, path = documents.persist_upload(session, name, content, mime)
+        session.flush()
+        file_scanner.scan(stored, path)
+        item.row_version += 1
+        audit(session, user, "WITHDRAWAL_OUTCOME_FILE_ADDED", "thesis_withdrawal_request", item.id,
+            name, after_hash=digest, source_reference=str(stored.id))
+        session.commit()
+        return output(session, user, item)
+    except Exception:
+        session.rollback()
+        if path and path.is_file():
+            path.unlink()
+        raise
+
+
+def outcome_file_action(session, user, identifier, expected=None):
+    item = get(session, user, identifier, lock=expected is not None)
+    stored = outcome_evidence(session, item)
+    if not stored:
+        raise HTTPException(404, "Chưa có minh chứng kết quả")
+    if expected is not None:
+        upload_access(session, user, identifier, expected)
+        if not can_record(session, user, session.get(m.Thesis, item.thesis_id)):
+            raise HTTPException(403, "Chỉ điều phối quét lại minh chứng kết quả")
+        file_scanner.scan(stored, documents.storage_root() / Path(stored.storage_key).name)
+        item.row_version += 1
+        audit(session, user, "WITHDRAWAL_OUTCOME_FILE_SCANNED", "thesis_withdrawal_request", item.id, stored.scan_state)
+        session.commit()
+        return output(session, user, item)
+    return documents.stored_download(session, SimpleNamespace(stored_file_id=stored.id, content_sha256=stored.sha256))

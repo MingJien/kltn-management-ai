@@ -1,7 +1,6 @@
 import {test,expect,type Page} from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
-import JSZip from "jszip";
 import AxeBuilder from "@axe-core/playwright";
 const accounts=JSON.parse(process.env.KLTN_E2E_ACCOUNTS_JSON||"{}");
 const api=`http://127.0.0.1:${process.env.KLTN_E2E_API_PORT||"8001"}/api/v1`;
@@ -9,7 +8,7 @@ async function login(page:Page,key:string){await page.goto("/");await page.getBy
 async function read(page:Page,url:string){const r=await page.request.get(api+url);expect(r.status(),await r.text()).toBe(200);return r.json();}
 async function post(page:Page,url:string,data?:unknown,version?:number){const auth=await read(page,"/me/context");const r=await page.request.post(api+url,{data,headers:{"X-CSRF-Token":auth.csrf_token,...(version?{"If-Match":String(version)}:{})}});expect(r.ok(),await r.text()).toBeTruthy();return r.json();}
 
-test("Xin thôi KLTN: SV gửi và in đơn, GVHD xác nhận, bản ký quét thật, Khoa ghi nhận, nhóm tiếp tục",async({browser})=>{
+test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 cho nhóm còn lại",async({browser})=>{
  test.setTimeout(180000);
  const contexts=await Promise.all(["admin","tbm","gv","nv5Student","nv5Outsider","sv1"].map(async key=>{const c=await browser.newContext();const p=await c.newPage();p.setDefaultTimeout(20000);await login(p,key);return {c,p};}));
  const [admin,tbm,gv,sv,peer,outsider]=contexts.map(x=>x.p);
@@ -26,7 +25,9 @@ test("Xin thôi KLTN: SV gửi và in đơn, GVHD xác nhận, bản ký quét t
   const tbmId=(await read(tbm,"/me/context")).user_id;
   const grants=await read(admin,"/admin/round-assignments");
   if(!grants.some((a:{round_id:string;user_id:string;assignment_type:string})=>a.round_id===round.id&&a.user_id===tbmId&&a.assignment_type==="KLTN_COORDINATOR")){
-  await admin.goto("/administration");
+  await admin.goto("/administration/assignments");
+  await expect.poll(async()=>new URL(admin.url()).pathname==="/"||await admin.getByRole("combobox",{name:"Đợt",exact:true}).isVisible()).toBe(true);
+  if(new URL(admin.url()).pathname==="/")await admin.goto("/administration");
   const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
   await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
   await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
@@ -64,23 +65,27 @@ test("Xin thôi KLTN: SV gửi và in đơn, GVHD xác nhận, bản ký quét t
   let item=(await read(sv,"/withdrawals")).requests[0];
   expect((await read(sv,`/theses/${id}`)).members).toHaveLength(2);
   await expect(sv.getByText("Chờ GVHD xác nhận",{exact:true})).toBeVisible();
-  const wait=sv.waitForEvent("download");await sv.getByRole("button",{name:"Xuất phiếu để in / ký",exact:true}).click();const download=await wait;
-  const output=path.join(process.env.KLTN_E2E_RUN_DIR!,"phieu-xin-thoi.docx");await download.saveAs(output);
-  const zip=await JSZip.loadAsync(await fs.readFile(output));
-  expect(await zip.file("word/footer1.xml")!.async("string")).toContain(item.code);
-  expect(await zip.file("word/document.xml")!.async("string")).toContain("học phần thay thế");
-  await gv.goto("/withdrawals");
+  await expect(sv.getByRole("button",{name:"Xuất phiếu để in / ký",exact:true})).toHaveCount(0);
+  await expect(sv.getByText(/Đang dùng mẫu đơn tạm chưa được Khoa duyệt/)).toBeVisible();
+  const csrf=await read(sv,"/me/context");
+  const unavailable=await sv.request.post(api+"/withdrawals/"+item.id+"/print-copy",{headers:{"X-CSRF-Token":csrf.csrf_token}});
+  expect(unavailable.status()).toBe(409);
+  expect((await unavailable.json()).detail).toContain("GVHD xác nhận");
+  await gv.goto("/notifications");
+  await gv.getByRole("button",{name:/đã gửi yêu cầu xin thôi KLTN/}).click();
   await gv.getByLabel("Ý kiến / lý do của GVHD",{exact:true}).fill("GVHD xác nhận đơn, SV nộp hồ sơ có chữ ký theo hướng dẫn Khoa.");
   await gv.getByRole("button",{name:"Gửi xác nhận của GVHD",exact:true}).click();
   await expect(gv.getByRole("status")).toContainText("GVHD đã xác nhận");
-  await sv.getByRole("button",{name:"Làm mới",exact:true}).click();
+  await sv.goto("/notifications");
+  await sv.getByRole("button",{name:/GVHD đã xác nhận, cần nộp đơn đã ký/}).click();
   await sv.getByLabel("Nộp bản đơn có xác nhận (PDF/DOCX, tối đa 10 MB)",{exact:true}).setInputFiles(process.env.KLTN_E2E_NV6_FILE!);
   await sv.getByRole("button",{name:"Lưu bản có xác nhận",exact:true}).click();
   await expect(sv.getByRole("status")).toContainText("Đã lưu bản đơn có xác nhận");
   await expect(sv.getByRole("button",{name:"Tải bản có xác nhận",exact:true})).toBeEnabled();
   expect((await read(outsider,"/withdrawals")).requests).toEqual([]);
   expect((await peer.request.get(api+`/withdrawals/${item.id}/signed-copy`)).status()).toBe(404);
-  await tbm.getByRole("button",{name:"Làm mới",exact:true}).click();
+  await tbm.goto("/notifications");
+  await tbm.getByRole("button",{name:/đã bổ sung bản đơn có xác nhận/}).click();
   await tbm.getByText("Ghi nhận kết quả đã xử lý bên ngoài",{exact:true}).click();
   await tbm.getByLabel("Số / căn cứ văn bản xử lý",{exact:true}).fill("KQ-TEST-2026/01 – Đã xử lý bên ngoài");
   await tbm.getByLabel("Nội dung ghi nhận",{exact:true}).fill("Đã đối chiếu bản đơn có xác nhận và kết quả xử lý của đơn vị phụ trách.");
@@ -95,6 +100,17 @@ test("Xin thôi KLTN: SV gửi và in đơn, GVHD xác nhận, bản ký quét t
   await expect(sv.getByText("Ghi nhận kết quả xin thôi",{exact:true})).toBeVisible();
   expect((await sv.request.get(api+`/theses/${id}`)).status()).toBe(404);
   proposal=await read(peer,`/theses/${id}/proposal`);expect(proposal.state).toBe("REVISION_REQUIRED");expect(proposal.department_confirmed).toBe(false);
+  const forms=await read(peer,`/topic-registrations/${reg.id}/forms`);
+  expect(forms.form_code).toBe("1A");expect(forms.can_submit).toBe(true);
+  const peerAuth=await read(peer,"/me/context");
+  const newForm=await peer.request.post(api+`/topic-registrations/${reg.id}/forms`,{data:await fs.readFile(process.env.KLTN_E2E_NV6_FILE!),headers:{"X-CSRF-Token":peerAuth.csrf_token,"If-Match":String(forms.registration_version),"X-Form-Code":"1A","X-File-Name":"mau-1a-cap-nhat.pdf","Content-Type":"application/octet-stream"}});
+  expect(newForm.status(),await newForm.text()).toBe(201);
+  const planDeadline=(await read(tbm,`/theses/${id}/document-deadlines`)).find((d:{document_type:string})=>d.document_type==="PLAN");
+  if(!planDeadline||planDeadline.state!=="OPEN")await post(tbm,`/theses/${id}/document-deadlines`,{document_type:"PLAN",due_at:new Date(Date.now()+7*86400000).toISOString(),reason:"Hạn kế hoạch cho nhóm cập nhật"},planDeadline?.row_version);
+  let planDoc=await post(peer,`/theses/${id}/documents`,{document_type:"PLAN",title:"Mẫu 2 cập nhật nhóm"});
+  const newPlan=await peer.request.post(api+`/theses/${id}/documents/${planDoc.id}/versions`,{data:await fs.readFile(process.env.KLTN_E2E_NV6_FILE!),headers:{"X-CSRF-Token":peerAuth.csrf_token,"If-Match":String(planDoc.row_version),"X-File-Name":"mau-2-cap-nhat.pdf","Content-Type":"application/octet-stream"}});
+  expect(newPlan.status(),await newPlan.text()).toBe(201);planDoc=await newPlan.json();
+  await post(gv,`/theses/${id}/documents/${planDoc.id}/versions/${planDoc.versions[0].id}/review`,{decision:"ACCEPT",comment:"Kế hoạch phù hợp một sinh viên"},planDoc.versions[0].row_version);
   await peer.goto("/notifications");
   await peer.getByRole("button",{name:/Nhóm có thành viên xin thôi KLTN/}).click();
   await expect(peer).toHaveURL(new RegExp(`/evaluation/${id}$`));
@@ -143,7 +159,7 @@ test("Xin thôi KLTN: SV gửi và in đơn, GVHD xác nhận, bản ký quét t
   await dialog.getByLabel(/Đính kèm bản đã ký/).setInputFiles(process.env.KLTN_E2E_NV6_FILE!);
   await expect(dialog.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
   await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
-  await dialog.getByRole("checkbox",{name:/Tôi xác nhận bản đính kèm đã ký/}).check();
+  await dialog.getByRole("checkbox",{name:/Tôi xác nhận (nội dung nhận xét này|bản đính kèm đã ký)/}).check();
   await dialog.getByRole("button",{name:"Xác nhận gửi nhận xét",exact:true}).click();await expect(dialog).toHaveCount(0);
   await tbm.goto(`/evaluation/${id}`);
   await tbm.getByRole("button",{name:"Xét và lưu điều kiện",exact:true}).click();dialog=tbm.getByRole("dialog");

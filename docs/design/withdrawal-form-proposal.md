@@ -1,5 +1,13 @@
 # Đề xuất nội dung đơn xin thôi thực hiện KLTN
 
+## Cập nhật triển khai ngày 04/11/2026
+
+Người dùng cho phép tạm dùng `Don_xin_thoi_thuc_hien_KLTN.docx` tại kho mẫu máy chủ. Sau khi GVHD xác nhận, SV mở **Kiểm tra và xuất đơn để in ký**, xem thông tin và tải DOCX. Bản xuất tự điền từ hồ sơ, ghi rõ mẫu tạm chưa được Khoa duyệt; nguồn không bị sửa và không được đưa lên Git. Khi đổi mẫu cần kiểm ánh xạ và bố cục trước khi áp dụng. Các câu mô tả chờ mở chức năng xuất bên dưới là trạng thái trước cập nhật này.
+
+Tiến trình trên cùng thẻ hồ sơ: đã gửi, GVHD xác nhận, đã tiếp nhận, đã có kết quả. Mỗi mốc có hướng dẫn người thực hiện tiếp. Điều phối có thể bổ sung minh chứng kết quả PDF/DOCX riêng với bản đơn đã ký; nếu đã bổ sung, tệp phải quét sạch và khớp nội dung lưu trước khi ghi kết quả. Có thể tải đối chiếu sau xử lý; quyền của các thành viên khác không bao gồm đơn riêng này.
+
+Sau khi rút một thành viên, nhóm còn lại tiếp tục đề tài và điều chỉnh phạm vi. Không mở lại đăng ký trên hồ sơ đã được tiếp nhận chính thức. Mẫu 1a/1b phải được nộp lại đúng thành viên; một người dùng Mẫu 1a. Mẫu 2 được cập nhật và GVHD tiếp nhận; Mẫu 3 nộp phiên bản mới để GVHD xác nhận, TBM chốt. Bản cũ và mã khóa luận được giữ. Nhận xét và xét điều kiện bảo vệ bị chặn khi thiếu Mẫu 1 hiện hành, Mẫu 2 đã tiếp nhận, đề cương được duyệt lại hoặc báo cáo mới. Trường hợp chưa có hạn cho loại tài liệu cần người điều phối thiết lập theo kế hoạch; cơ chế này không tự gia hạn đăng ký cho người mới.
+
 Đây là đề xuất cho Khoa đối chiếu, chưa phải mẫu hành chính đã ban hành. Căn cứ được dự án tham chiếu là Quy định ban hành kèm Quyết định 2919/QĐ-ĐHĐT ngày 15/11/2022: theo bản chuyển chữ nguồn của dự án, Điều 4 khoản 5 quy định xin thôi để học học phần thay thế trong hai tuần đầu, có đơn và xác nhận GVHD; khoản 6 quy định hệ quả sau hủy đăng ký hoặc nhận điểm F. Cần đối chiếu bản gốc và quy định có hiệu lực tại thời điểm áp dụng.
 
 ## Nội dung đề xuất

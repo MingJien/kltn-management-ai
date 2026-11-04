@@ -173,6 +173,11 @@ test("Bốn SV demo kích hoạt, đăng ký đề tài GV1 và xử lý xin th�
     await gv.getByRole("button",{name:"Gửi xác nhận của GVHD"}).click();
     await expect(gv.getByRole("status")).toContainText("GVHD đã xác nhận");
     await students[0].goto("/withdrawals");
+    await students[0].getByRole("button",{name:"Kiểm tra và xuất đơn để in ký"}).click();
+    const download=students[0].waitForEvent("download");
+    await students[0].getByRole("button",{name:"Tải DOCX mẫu tạm"}).click();
+    expect((await download).suggestedFilename()).toMatch(/\.docx$/);
+    await students[0].getByRole("dialog").getByRole("button",{name:"Đóng",exact:true}).click();
     await students[0].getByLabel("Nộp bản đơn có xác nhận (PDF/DOCX, tối đa 10 MB)").setInputFiles(process.env.KLTN_E2E_NV6_FILE!);
     await students[0].getByRole("button",{name:"Lưu bản có xác nhận"}).click();
     await expect(students[0].getByRole("button",{name:"Tải bản có xác nhận"})).toBeEnabled();
@@ -183,6 +188,9 @@ test("Bốn SV demo kích hoạt, đăng ký đề tài GV1 và xử lý xin th�
     await tbm.getByLabel(/Tôi đã đối chiếu thông tin tiếp nhận/).check();
     await tbm.getByRole("button",{name:"Lưu thông tin tiếp nhận"}).click();
     await expect(tbm.getByText(/Tiếp nhận chưa phải kết quả giải quyết/)).toBeVisible();
+    await tbm.getByLabel("Minh chứng kết quả xử lý nếu Khoa có cấp (PDF/DOCX, tối đa 10 MB)").setInputFiles(process.env.KLTN_E2E_NV6_FILE!);
+    await tbm.getByRole("button",{name:"Lưu minh chứng kết quả",exact:true}).click();
+    await expect(tbm.getByRole("button",{name:"Tải minh chứng kết quả",exact:true})).toBeEnabled();
     await tbm.getByText("Ghi nhận kết quả đã xử lý bên ngoài",{exact:true}).click();
     await tbm.getByLabel("Số / căn cứ văn bản xử lý").fill("KET-QUA-DEMO-01");
     await tbm.getByLabel("Nội dung ghi nhận").fill("Đã đối chiếu kết quả xử lý giả lập.");

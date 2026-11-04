@@ -33,6 +33,7 @@ export default function RegistrationForms({row,userId,onChanged,defaultOpen=fals
     {open && <div className="stack" style={{marginTop:"var(--space-3)"}}>
       <p className="text-body-sm">Điền đúng mẫu cá nhân hoặc nhóm, nộp tệp tại đây rồi mở hồ sơ đăng ký để gửi hoặc xem quyết định tiếp nhận.</p>
       <p className="text-body-sm text-muted">Trạng thái đăng ký và bản nộp được theo dõi riêng. Tệp đã nộp chưa phải xác nhận Khoa duyệt.</p>
+      <p className="text-body-sm text-muted">Nếu nhóm đã có thành viên được giải quyết cho thôi, nộp phiên bản Mẫu 1 theo nhóm hiện tại tại đây. Còn một người dùng Mẫu 1a; giữ hồ sơ cũ và tiếp tục cập nhật Mẫu 2, Mẫu 3.</p>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void run(()=>load(),"Đã làm mới các phiên bản đơn.")}>Làm mới đơn đăng ký</button>
       {error && <p role="alert" className="alert alert-danger">{error}</p>}
       {notice && <p role="status" className="alert alert-info">{notice}</p>}

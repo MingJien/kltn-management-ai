@@ -41,10 +41,17 @@ def rows(session, reg):
 
 
 def can_submit(session, user, reg):
-    if user.base_role != "STUDENT" or reg.state not in {"DRAFT", "RETURNED", "SUBMITTED"}:
+    from backend.services.membership_revision import changed_at
+    thesis = session.scalar(select(m.Thesis).where(m.Thesis.registration_id == reg.id))
+    revision = bool(thesis and thesis.state in {"ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"} and changed_at(session, thesis.id))
+    if user.base_role != "STUDENT" or (reg.state not in {"DRAFT", "RETURNED", "SUBMITTED"} and not revision):
+        return False
+    from backend.services.registration import confirmed_student_ids
+    student = profile(session, user, "STUDENT")
+    if student.id not in confirmed_student_ids(session, reg.round_id, [student.id]):
         return False
     round_ = session.get(m.ThesisRound, reg.round_id)
-    return round_.state == "OPEN" and round_.opens_at <= now() <= round_.closes_at
+    return revision or (round_.state == "OPEN" and round_.opens_at <= now() <= round_.closes_at)
 
 
 def output(session, user, reg):
