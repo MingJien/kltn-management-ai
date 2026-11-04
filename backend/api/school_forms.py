@@ -92,6 +92,12 @@ def access(user=Depends(current_user),session=Depends(get_session)):
     return service.access(session,user)
 
 
+@router.get("/rounds/{round_id}/mau-04/preview")
+def preview_round_list(round_id:UUID,user=Depends(current_user),session=Depends(get_session)):
+    from backend.services.school_form_list_export import preview_mau_04
+    return preview_mau_04(session,user,round_id)
+
+
 @router.post("/rounds/{round_id}/mau-04")
 def export_round_list(round_id:UUID,user=Depends(current_user),session=Depends(get_session)):
     from backend.services.school_form_list_export import export_mau_04

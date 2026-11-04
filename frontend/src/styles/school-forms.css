@@ -40,3 +40,59 @@
 @media (prefers-reduced-motion: reduce) {
   .school-forms-page .school-form-action-button { transition: none; }
 }
+
+/* Compact creation form for the faculty catalog. */
+.school-form-create__summary { display:flex; align-items:center; gap:12px; padding:18px 20px; color:var(--primary-900); cursor:pointer; }
+.school-form-create__summary span { display:flex; flex-direction:column; gap:3px; }
+.school-form-create__chevron { margin-left:auto; flex-shrink:0; transition:transform 140ms ease; }
+.school-form-create[open] .school-form-create__chevron { transform:rotate(180deg); }
+.school-form-create__summary small { color:var(--neutral-600); font-weight:400; }
+.school-form-create__body { padding-top:0; }
+.school-form-create__form { display:grid; gap:16px; }
+.school-form-create__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; }
+.school-form-create__grid > label, .school-form-create__file { display:flex; flex-direction:column; gap:6px; min-width:0; font-size:14px; font-weight:600; }
+.school-form-create__grid .input { width:100%; min-width:0; font-weight:400; }
+.school-form-create__grid textarea { resize:vertical; min-height:70px; }
+.school-form-create__file small, .school-form-create__footer p { color:var(--neutral-600); font-size:13px; font-weight:400; line-height:1.5; margin:0; }
+.school-form-create__file p[role="alert"] { margin:0; color:var(--danger-700,#a52525); font-weight:400; }
+.school-form-create__wide { grid-column:1 / -1; }
+.school-form-create__footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:14px; border-top:1px solid var(--neutral-200); }
+.school-form-create__footer .btn { flex-shrink:0; }
+@media (max-width:700px) {
+  .school-form-create__grid { grid-template-columns:minmax(0,1fr); }
+  .school-form-create__wide { grid-column:auto; }
+  .school-form-create__footer { align-items:stretch; flex-direction:column; }
+}
+
+.school-forms-toolbar { display:grid; gap:16px; }
+.school-forms-toolbar__filters { display:flex; align-items:end; flex-wrap:wrap; gap:12px; }
+.school-forms-toolbar__filters label { display:flex; flex-direction:column; gap:6px; min-width:190px; font-weight:600; font-size:14px; }
+.school-forms-toolbar__filters label:nth-of-type(2) { flex:1 1 230px; }
+.school-forms-toolbar__filters .input { width:100%; font-weight:400; }
+.school-forms-toolbar__help,.school-forms-toolbar__export { margin:0; color:#415971; line-height:1.55; }
+.school-forms-toolbar__export { padding:10px 14px; background:#f0f8f6; border-left:3px solid #48a897; border-radius:6px; }
+.school-forms-toolbar__export a { font-weight:600; }
+.school-forms-toolbar__actions { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; border-top:1px solid var(--neutral-200); padding-top:14px; }
+@media (max-width:700px) {
+  .school-forms-toolbar__filters label { flex:1 1 100%; }
+  .school-forms-toolbar__filters > button { order:3; }
+  .school-forms-toolbar__actions > a { width:100%; }
+}
+
+.school-form-version__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.school-form-version__withdraw {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 540px);
+  padding: 14px;
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+.school-form-version__withdraw label { font-weight: 600; }
+.school-form-version__withdraw .input { width: 100%; min-height: 60px; resize: vertical; }

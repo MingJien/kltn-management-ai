@@ -55,6 +55,37 @@ def outcome(client,user,item,kind="WITHDRAWN"):
             "effective_on":now().astimezone(service.VN).date().isoformat()})
 
 
+def test_receipt_is_audited_but_does_not_grant_withdrawal(workspace):
+    client, users, students, _, session, path = workspace
+    thesis = setup(client, users, session, path)
+    item = send(client, users[0], path)
+    payload = {"received_on": now().astimezone(service.VN).date().isoformat(),
+        "receiving_unit": "Văn phòng Khoa", "reference": "Sổ nhận 123", "note": "Đã nhận đơn",
+        "confirm_receipt": True}
+    url = f"/api/v1/withdrawals/{item['id']}/receipt"
+    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
+    item = confirm(client, users, item)
+    assert client.post(url, headers=version_headers(users[0], item), json=payload).status_code == 403
+    future = {**payload, "received_on": (now().astimezone(service.VN).date()+timedelta(days=1)).isoformat()}
+    assert client.post(url, headers=version_headers(users[4], item), json=future).status_code == 422
+    response = client.post(url, headers=version_headers(users[4], item), json=payload)
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["state"] == "ADVISOR_CONFIRMED"
+    assert updated["receipt"]["reference"] == "Sổ nhận 123"
+    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
+    session.expire_all()
+    assert session.get(m.Thesis, thesis.id).state == "ACTIVE"
+    assert session.scalar(select(m.ThesisMember.active).where(m.ThesisMember.thesis_id == thesis.id,
+        m.ThesisMember.student_id == students[0].id))
+    payload["reference"] = "Sổ nhận 124"
+    response = client.post(url, headers=version_headers(users[4], updated), json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["receipt"]["reference"] == "Sổ nhận 124"
+    assert sum(h["action"] == "WITHDRAWAL_RECEIPT_RECORDED" for h in response.json()["history"]) == 2
+    assert client.get("/api/v1/withdrawals", headers=hdr(users[1])).json()["requests"] == []
+
+
 def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     client,users,students,_,session,path=workspace
     thesis=setup(client,users,session,path)
@@ -67,7 +98,7 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     assert client.post(f"/api/v1/withdrawals/{item['id']}/advisor-decision",headers=version_headers(users[4],item),json={"decision":"CONFIRM","comment":"Wrong actor"}).status_code==403
     exported=client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[0]))
     assert exported.status_code==409,exported.text
-    assert "đang chờ Khoa duyệt" in exported.json()["detail"]
+    assert "GVHD xác nhận" in exported.json()["detail"]
     item=confirm(client,users,item)
     assert outcome(client,users[4],item).status_code==404 # no evidence, not an approval
     item=evidence(client,users[0],item,session)
@@ -76,6 +107,11 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     response=outcome(client,users[4],item)
     assert response.status_code==200,response.text
     assert response.json()["state"]=="RECORDED"
+    forms=client.get(f"/api/v1/topic-registrations/{thesis.registration_id}/forms",headers=hdr(users[1])).json()
+    assert forms["can_submit"] and forms["form_code"]=="1A"
+    replacement=client.post(f"/api/v1/topic-registrations/{thesis.registration_id}/forms",
+        headers={**version_headers(users[1],{"row_version":forms["registration_version"]}),"X-Form-Code":"1A","X-File-Name":"don-nhom-moi.pdf"},content=synthetic_pdf())
+    assert replacement.status_code==201,replacement.text
     session.expire_all()
     left=session.scalar(select(m.ThesisMember).where(m.ThesisMember.student_id==students[0].id))
     remaining=session.scalar(select(m.ThesisMember).where(m.ThesisMember.student_id==students[1].id))
@@ -90,6 +126,41 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     assert any("đề cương mới" in n["message"] for n in notices)
     assert client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[1])).status_code==404
     assert outcome(client,users[4],response.json()).status_code==409
+
+
+def test_provisional_export_and_separate_outcome_evidence(workspace, tmp_path, monkeypatch):
+    from io import BytesIO
+    from pathlib import Path
+    from docx import Document
+    from backend.services import form_templates
+    import hashlib
+    client,users,students,_,session,path=workspace
+    setup(client,users,session,path)
+    item=confirm(client,users,send(client,users[0],path))
+    source=Path(form_templates.OFFICIAL_DIR)/"Don_xin_thoi_thuc_hien_KLTN.docx"
+    if not source.exists():
+        doc=Document();doc.add_paragraph("Đơn thử")
+        for rows,cols in [(2,2),(3,4),(5,7),(3,1),(1,2)]:doc.add_table(rows=rows,cols=cols)
+        source=tmp_path/"Don_xin_thoi_thuc_hien_KLTN.docx";doc.save(source)
+        monkeypatch.setattr(form_templates,"OFFICIAL_DIR",tmp_path)
+    original=hashlib.sha256(source.read_bytes()).hexdigest()
+    response=client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[0]))
+    assert response.status_code==200,response.text
+    exported=Document(BytesIO(response.content))
+    assert students[0].student_code in exported.tables[1].cell(0,3).text
+    assert item["reason"] in exported.tables[3].cell(0,0).text
+    assert "MẪU TẠM" in exported.paragraphs[0].text
+    assert hashlib.sha256(source.read_bytes()).hexdigest()==original
+    url=f"/api/v1/withdrawals/{item['id']}/outcome-evidence"
+    headers={**version_headers(users[0],item),"X-File-Name":"ket-qua.pdf"}
+    assert client.post(url,headers=headers,content=synthetic_pdf()).status_code==403
+    response=client.post(url,headers={**version_headers(users[4],item),"X-File-Name":"ket-qua.pdf"},content=synthetic_pdf())
+    assert response.status_code==200,response.text
+    item=response.json()
+    assert item["outcome_evidence"]["scan_state"]=="QUARANTINED"
+    assert client.get(url,headers=hdr(users[1])).status_code==404
+    item=evidence(client,users[0],item,session)
+    assert outcome(client,users[4],item).status_code==409
 
 
 def test_cancel_return_and_deadline_are_not_course_withdrawal(workspace,monkeypatch):
@@ -233,7 +304,7 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     item = evidence(client, users[0], confirm(client, users, send(client, users[0], path)), session)
     assert outcome(client, users[4], item).status_code == 200
     data = evaluation_get(ctx)
-    assert {b["key"] for b in data["workflow_blockers"]} == {"proposal", "report"}
+    assert {b["key"] for b in data["workflow_blockers"]} == {"registration", "plan", "proposal", "report"}
     assert data["members"][0]["eligibility"]["state"] == "STALE"
     assert not next(r for r in evaluation_get(ctx, 5)["reviews"] if r["id"] == draft["id"])["can_edit"]
     assert client.get(path+"/evaluation", headers=hdr(users[0])).status_code == 404
@@ -248,7 +319,21 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     assert response.status_code == 201, response.text
     version = session.get(m.DocumentVersion, UUID(response.json()["versions"][0]["id"]))
     session.get(m.StoredFile, version.stored_file_id).scan_state = "CLEAN"; session.commit()
-    assert [b["key"] for b in evaluation_get(ctx)["workflow_blockers"]] == ["proposal"]
+    assert {b["key"] for b in evaluation_get(ctx)["workflow_blockers"]} == {"registration", "plan", "proposal"}
+    # New group must replace Mẫu 1 and Mẫu 2 as well as the proposal/report.
+    from backend.services.registration_forms import fingerprint
+    thesis = session.get(m.Thesis, UUID(path.split('/')[-1]))
+    reg = session.get(m.TopicRegistration, thesis.registration_id)
+    digest, form_code = fingerprint(session, reg)
+    assert form_code == "1A"
+    session.add(m.RegistrationFormVersion(id=uuid4(), registration_id=reg.id, stored_file_id=version.stored_file_id,
+        submitted_by=students[1].id, form_code=form_code, version_no=1, content_sha256=version.content_sha256,
+        registration_fingerprint=digest, submitted_at=now()))
+    plan = m.Document(id=uuid4(), thesis_id=thesis.id, document_type="PLAN", title="Kế hoạch mới", state="ACTIVE")
+    session.add(plan); session.flush()
+    session.add(m.DocumentVersion(id=uuid4(),document_id=plan.id,version_no=1,stored_file_id=version.stored_file_id,
+        submitted_by=students[1].id,submitted_at=now(),content_sha256=version.content_sha256,state="ACCEPTED"))
+    session.commit()
     assert check(ctx).status_code == 409
     # An approved proposal for the remaining member releases the workflow.
     response = client.post(path+"/proposal/versions", headers={**version_headers(users[1], {"row_version":0}),

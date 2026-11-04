@@ -432,8 +432,8 @@ export type SchoolFormVersion = {id:string;version_no:number;row_version:number;
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};
 
 
-export async function downloadWithdrawal(identifier:string,printCopy:boolean) {
-  const response=await fetch(`${baseUrl}/api/v1/withdrawals/${identifier}/${printCopy?"print-copy":"signed-copy"}`,{
+export async function downloadWithdrawal(identifier:string,printCopy:boolean,outcomeEvidence=false) {
+  const response=await fetch(`${baseUrl}/api/v1/withdrawals/${identifier}/${printCopy?"print-copy":outcomeEvidence?"outcome-evidence":"signed-copy"}`,{
     method:printCopy?"POST":"GET",credentials:"include",
     headers:printCopy&&sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
   });

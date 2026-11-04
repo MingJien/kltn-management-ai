@@ -352,3 +352,33 @@ def test_changed_review_cannot_receive_paper_for_old_export(evaluation):
     result=client.post(base+"/paper-receipt",headers=version_headers(users[4],r),json={
         "reference":"PAPER-OLD-CONTENT","export_code":export.headers["X-Document-Code"],"confirm_paper":True})
     assert result.status_code==422
+
+@pytest.mark.parametrize("source_code,target_code", [("BM-CNTT","BM-KHMT"), ("BM-KHMT","BM-CNTT")])
+def test_computing_departments_can_assign_cross_reviewer(evaluation, source_code, target_code):
+    ctx,_=evaluation
+    client,users,_,lecturers,session,path=ctx
+    source=session.get(m.Department,lecturers[0].department_id)
+    source.code=source_code
+    other=m.Department(id=uuid4(),faculty_id=source.faculty_id,code=target_code,name="Synthetic computing department")
+    session.add(other);session.flush()
+    lecturers[2].department_id=other.id;session.commit()
+    assert str(lecturers[2].id) in {candidate["id"] for candidate in get(ctx)["candidates"]}
+    result=assign(ctx)
+    assert result.status_code==201,result.text
+    assert "evaluation:reviewer" in get(ctx,5)["actions"]
+
+
+def test_cross_reviewer_rejects_other_faculty_and_unrelated_department(evaluation):
+    ctx,_=evaluation
+    _,_,_,lecturers,session,_=ctx
+    source=session.get(m.Department,lecturers[0].department_id)
+    source.code="BM-CNTT"
+    another=m.Faculty(id=uuid4(),code="T-"+uuid4().hex[:10],name="Synthetic other faculty")
+    session.add(another);session.flush()
+    outside=m.Department(id=uuid4(),faculty_id=another.id,code="BM-KHMT",name="Other faculty computing")
+    engineering=m.Department(id=uuid4(),faculty_id=source.faculty_id,code="BM-KT",name="Synthetic engineering")
+    session.add_all([outside,engineering]);session.flush()
+    for department in [outside,engineering]:
+        lecturers[2].department_id=department.id;session.commit()
+        assert str(lecturers[2].id) not in {candidate["id"] for candidate in get(ctx)["candidates"]}
+        assert assign(ctx).status_code==422

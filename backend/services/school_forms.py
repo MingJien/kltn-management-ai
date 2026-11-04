@@ -115,6 +115,13 @@ def version_out(session,version):
         source_reference=version.source_reference,change_reason=version.change_reason,published_at=version.published_at)
 
 
+def can_receive_publication(session, user, item):
+    if item.state != "ACTIVE" or not visible(session, user, item):
+        return False
+    round_ = session.get(m.ThesisRound, item.round_id)
+    return round_.state != "DRAFT" or belongs(session, user, item.round_id)
+
+
 def item_out(session,user,item):
     query=select(m.OfficialFormVersion).where(m.OfficialFormVersion.official_form_id==item.id)
     if not manages(session,user,item.round_id):
@@ -241,7 +248,18 @@ def publish(session,user,form_id,version_id,data,expected):
     if old:old.state="SUPERSEDED";old.row_version+=1;session.flush()
     version.state="PUBLISHED";version.published_by=user.id;version.published_at=now();version.row_version+=1;item.row_version+=1
     audit(session,user,"OFFICIAL_FORM_PUBLISHED","official_form",item.id,f"v{version.version_no}: {data.reason}",after_hash=file.sha256)
-    session.flush();result=item_out(session,user,item);session.commit();return result
+    session.flush()
+    from backend.services.workflow_notices import emit
+
+    recipients = [account.id for account in session.scalars(select(m.UserAccount).where(
+        m.UserAccount.status == "ACTIVE")) if can_receive_publication(session, account, item)]
+    round_ = session.get(m.ThesisRound, item.round_id)
+    emit(session, user.id, recipients, "OFFICIAL_FORM_PUBLISHED", "official_form", item.id,
+        f"Khoa đã phát hành {item.title} (v{version.version_no}) cho đợt {round_.code}.",
+        f"/forms?round_id={item.round_id}", include_actor=True)
+    result = item_out(session, user, item)
+    session.commit()
+    return result
 
 
 def withdraw(session,user,form_id,version_id,data,expected):

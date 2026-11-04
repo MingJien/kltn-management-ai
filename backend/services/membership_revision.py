@@ -24,6 +24,20 @@ def blockers(session, thesis, report):
         m.ProposalVersion.proposal_id == proposal.id,
         m.ProposalVersion.version_no == proposal.current_version_no)) if proposal else None
     result = []
+    from backend.services.registration_forms import fingerprint, rows
+    reg = session.get(m.TopicRegistration, thesis.registration_id)
+    forms = rows(session, reg)
+    current_hash, form_code = fingerprint(session, reg)
+    form = forms[0] if forms else None
+    stored = session.get(m.StoredFile, form.stored_file_id) if form else None
+    if not (form and form.submitted_at > cutoff and form.registration_fingerprint == current_hash
+            and form.form_code == form_code and stored.scan_state == "CLEAN"):
+        result.append({"key": "registration", "message": "Cần nộp lại Mẫu 1a/1b theo thành viên hiện tại tại Hồ sơ đăng ký."})
+    plan = session.scalar(select(m.DocumentVersion).join(m.Document, m.Document.id == m.DocumentVersion.document_id)
+        .where(m.Document.thesis_id == thesis.id, m.Document.document_type == "PLAN", m.Document.state == "ACTIVE")
+        .order_by(m.DocumentVersion.submitted_at.desc()).limit(1))
+    if not plan or plan.submitted_at <= cutoff or plan.state != "ACCEPTED":
+        result.append({"key": "plan", "message": "Cần nộp kế hoạch Mẫu 2 cập nhật và được GVHD tiếp nhận."})
     if (not version or version.submitted_at <= cutoff or
             proposal.state not in {"DEPARTMENT_FINALIZED", "DEAN_CONFIRMED", "PRINT_READY"}):
         result.append({"key": "proposal", "message": "Nhóm đã thay đổi thành viên. Cần nộp đề cương mới, được GVHD xác nhận và TBM chốt lại."})

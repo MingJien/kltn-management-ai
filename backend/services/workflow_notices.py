@@ -12,11 +12,13 @@ def active_users(session, user_ids):
         m.UserAccount.id.in_(set(user_ids)-{None}), m.UserAccount.status == "ACTIVE")))
 
 
-def emit(session, actor_id, recipients, event, resource_type, resource_id, message, url, *, include_inactive=False):
+def emit(session, actor_id, recipients, event, resource_type, resource_id, message, url, *, include_inactive=False, include_actor=False):
     if not url.startswith("/") or url.startswith("//"):
         raise ValueError("Notices link only to local application routes")
     recipients = set(recipients)-{None} if include_inactive else active_users(session, recipients)
-    for recipient in recipients-{actor_id}:
+    if not include_actor:
+        recipients.discard(actor_id)
+    for recipient in recipients:
         session.add(m.UserNotification(id=uuid4(), recipient_user_id=recipient, actor_user_id=actor_id,
             kind="WORKFLOW_NOTICE", subject_type=resource_type,
             subject_id=resource_id, message=message[:1500], url=url))
@@ -24,6 +26,15 @@ def emit(session, actor_id, recipients, event, resource_type, resource_id, messa
 
 
 
+
+
+def active_account_ids(session):
+    return session.scalars(select(m.UserAccount.id).where(m.UserAccount.status == "ACTIVE"))
+
+
+def round_announcement(session, actor_id, round_id, event, message, url):
+    emit(session, actor_id, active_account_ids(session), event, "round_announcement", round_id,
+        message, url, include_actor=True)
 
 
 def department_heads(session, department_id):
@@ -55,14 +66,26 @@ def topic_event(session, topic, actor_id, event):
     if event == "TOPIC_SUBMITTED" and topic.proposer_type == "LECTURER":
         recipients = department_heads(session, topic.department_id)
         label = "đã gửi đề tài chờ bộ môn duyệt"
-    elif event in {"TOPIC_ARCHIVED", "TOPIC_RESTORED"}:
+    elif event in {"TOPIC_UPDATED", "TOPIC_ARCHIVED", "TOPIC_RESTORED"}:
         recipients = {topic.proposer_user_id}
         if topic.receiving_lecturer_id:
             recipients.add(session.get(m.LecturerProfile, topic.receiving_lecturer_id).user_id)
         recipients |= set(session.scalars(select(m.StudentProfile.user_id).join(m.RegistrationMember,
             m.RegistrationMember.student_id == m.StudentProfile.id).join(m.TopicRegistration,
-            m.TopicRegistration.id == m.RegistrationMember.registration_id).where(m.TopicRegistration.topic_id == topic.id)))
-        label = "đã ngừng sử dụng đề tài cho đăng ký mới (hồ sơ đang làm được giữ nguyên)" if event == "TOPIC_ARCHIVED" else "đã khôi phục hiển thị đề tài"
+            m.TopicRegistration.id == m.RegistrationMember.registration_id).where(
+                m.TopicRegistration.topic_id == topic.id, m.RegistrationMember.active.is_(True))))
+        from backend.services.theses import effective
+        recipients.update(session.scalars(select(m.StudentProfile.user_id).join(m.ThesisMember,
+            m.ThesisMember.student_id == m.StudentProfile.id).join(m.Thesis,
+            m.Thesis.id == m.ThesisMember.thesis_id).where(
+                m.Thesis.topic_id == topic.id, m.ThesisMember.active.is_(True))))
+        recipients.update(session.scalars(select(m.LecturerProfile.user_id).join(m.AdvisorAssignment,
+            m.AdvisorAssignment.lecturer_id == m.LecturerProfile.id).join(m.Thesis,
+            m.Thesis.id == m.AdvisorAssignment.thesis_id).where(
+                m.Thesis.topic_id == topic.id, effective(m.AdvisorAssignment))))
+        label = {"TOPIC_UPDATED": "đã cập nhật đề tài",
+                 "TOPIC_ARCHIVED": "đã ngừng sử dụng đề tài cho đăng ký mới",
+                 "TOPIC_RESTORED": "đã khôi phục hiển thị đề tài"}[event]
     elif event in {"TOPIC_APPROVED", "TOPIC_RETURNED", "TOPIC_REJECTED"}:
         recipients = {topic.proposer_user_id}
         if topic.proposer_type == "STUDENT":
@@ -131,9 +154,11 @@ def can_view(session, user, notice):
             "proposal:view" if notice.kind.startswith("PROPOSAL_") else "work:view" if notice.kind.startswith("WORK_") else "view")
         return action in rights(session, user, thesis)
     if kind == "official_form":
-        from backend.services.school_forms import visible
-        item=session.get(m.OfficialForm,identifier)
-        return bool(item and visible(session,user,item))
+        from backend.services.school_forms import can_receive_publication, current
+        item = session.get(m.OfficialForm, identifier)
+        return bool(item and can_receive_publication(session, user, item) and current(session, item))
+    if kind == "round_announcement":
+        return session.get(m.ThesisRound, identifier) is not None
     if kind == "round":
         from backend.services.school_forms import belongs
         return belongs(session, user, identifier)

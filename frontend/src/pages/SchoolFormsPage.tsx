@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {Link,useSearchParams} from "react-router-dom";
-import {Archive,BookOpen,Download,Eye,FilePlus2,History,RefreshCw,RotateCcw,Upload} from "lucide-react";
+import {Archive,BookOpen,ChevronDown,Download,Eye,FilePlus2,History,RefreshCw,RotateCcw,Upload} from "lucide-react";
 import {fetchReviewFile,request,type Context,type SchoolForm,type SchoolFormRound,type SchoolFormVersion} from "../api";
 import PageHeader from "../components/layout/PageHeader";
 import {formatDate} from "../components/domain/CoreForms";
@@ -47,6 +47,7 @@ type CatalogAction = "versions" | "upload" | "visibility";
 function FormCard({item,userId,manage,run,busy,onPreview,action}:{action:CatalogAction;item:SchoolForm;userId:string;manage:boolean;busy:boolean;run:(action:()=>Promise<unknown>,message:string)=>Promise<boolean>;onPreview:(version:SchoolFormVersion)=>void}) {
   const [file,setFile]=useState<File|null>(null),[source,setSource]=useState(""),[reason,setReason]=useState("");
   const [title,setTitle]=useState(item.title),[audience,setAudience]=useState(item.audience),[metaReason,setMetaReason]=useState("");
+  const [withdrawVersionId,setWithdrawVersionId]=useState<string|null>(null);
   const [withdrawReason,setWithdrawReason]=useState(""),[visibilityReason,setVisibilityReason]=useState("");
   const card=useRef<HTMLElement>(null);
   useEffect(()=>{card.current?.scrollIntoView({behavior:"smooth",block:"start"});},[action]);
@@ -64,11 +65,33 @@ function FormCard({item,userId,manage,run,busy,onPreview,action}:{action:Catalog
     <div className="flex gap-2" style={{flexWrap:"wrap"}}><button type="button" className="btn btn-secondary btn-sm" disabled={busy || version.scan_state!=="CLEAN"} onClick={()=>onPreview(version)}><Eye size={15}/>Xem trực tiếp</button>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy || version.scan_state!=="CLEAN"} onClick={()=>void download(version)}><Download size={15}/>Tải tệp v{version.version_no}</button></div>
     {version.scan_state!=="CLEAN" && <p role="status">{scanLabel(version.scan_state)} — chưa được phát hành/xem.</p>}
-    {manage && <><div className="flex gap-2" style={{flexWrap:"wrap"}}>
+    {manage && <><div className="school-form-version__actions">
       {version.state==="DRAFT" && ["QUARANTINED","FAILED"].includes(version.scan_state) && <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void run(()=>request(`${endpoint}/versions/${version.id}/scan`,userId,{method:"POST",headers:{"If-Match":String(version.row_version)}}),"Đã quét lại tệp.")}>Quét lại</button>}
       {version.state==="DRAFT" && <button type="button" className="btn btn-primary btn-sm" disabled={busy || version.scan_state!=="CLEAN" || item.state!=="ACTIVE"} onClick={()=>void run(()=>request(`${endpoint}/versions/${version.id}/publish`,userId,{method:"POST",headers:{"If-Match":String(version.row_version)},body:JSON.stringify({reason:version.change_reason})}),"Đã phát hành; người dùng đúng quyền thấy phiên bản mới.")}>Phát hành v{version.version_no}</button>}
-      {version.state!=="WITHDRAWN" && <details><summary>Thu hồi v{version.version_no}</summary><label>Lý do thu hồi phiên bản<textarea className="input" value={withdrawReason} minLength={5} maxLength={2000} onChange={event=>setWithdrawReason(event.target.value)}/></label><button type="button" className="btn btn-secondary btn-sm" disabled={busy || withdrawReason.trim().length<5} onClick={()=>void run(()=>request(`${endpoint}/versions/${version.id}/withdraw`,userId,{method:"POST",headers:{"If-Match":String(version.row_version)},body:JSON.stringify({reason:withdrawReason})}),"Đã thu hồi phiên bản; lịch sử vẫn giữ.")}>Xác nhận thu hồi v{version.version_no}</button></details>}
-    </div>{version.state==="DRAFT" && <small>Phát hành sử dụng lý do cập nhật đã lưu cùng phiên bản.</small>}</>}
+      {version.state!=="WITHDRAWN" && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+        aria-expanded={withdrawVersionId===version.id} onClick={()=>{
+          setWithdrawVersionId(withdrawVersionId===version.id ? null : version.id);
+          setWithdrawReason("");
+        }}>Thu hồi v{version.version_no}</button>}
+    </div>
+    {version.state==="DRAFT" && <small>Phát hành sử dụng lý do cập nhật đã lưu cùng phiên bản.</small>}
+    {version.state!=="WITHDRAWN" && withdrawVersionId===version.id && <form className="school-form-version__withdraw" onSubmit={async event=>{
+      event.preventDefault();
+      if(busy || withdrawReason.trim().length<5)return;
+      const saved=await run(()=>request(endpoint+"/versions/"+version.id+"/withdraw",userId,{
+        method:"POST",headers:{"If-Match":String(version.row_version)},
+        body:JSON.stringify({reason:withdrawReason.trim()}),
+      }),"Đã thu hồi phiên bản; lịch sử vẫn giữ.");
+      if(saved){setWithdrawVersionId(null);setWithdrawReason("");}
+    }}>
+      <label htmlFor={"withdraw-"+version.id}>Lý do thu hồi phiên bản</label>
+      <textarea id={"withdraw-"+version.id} className="input" rows={2} required minLength={5} maxLength={2000}
+        value={withdrawReason} disabled={busy} onChange={event=>setWithdrawReason(event.target.value)}/>
+      <div className="school-form-version__actions">
+        <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>{setWithdrawVersionId(null);setWithdrawReason("");}}>Hủy</button>
+        <button className="btn btn-destructive btn-sm" disabled={busy || withdrawReason.trim().length<5}>Xác nhận thu hồi v{version.version_no}</button>
+      </div>
+    </form>}</>}
   </div>;
   const latest=item.versions.find(version=>version.state==="PUBLISHED") || item.versions[0];
   const pending=manage?item.versions.filter(version=>version.state==="DRAFT" && version.id!==latest?.id):[];
@@ -109,8 +132,9 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   const [params,setParams]=useSearchParams();const roundId=params.get("round_id") || "";
   const [rounds,setRounds]=useState<SchoolFormRound[]>([]),[items,setItems]=useState<SchoolForm[]>([]);
   const [error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
-  const [bootstrapInfo,setBootstrapInfo]=useState<{created:number;published:number;drafts:number;missing:string[]}|null>(null);
   const [code,setCode]=useState(""),[title,setTitle]=useState(""),[kind,setKind]=useState("FORM"),[audience,setAudience]=useState("STUDENT_AND_LECTURER"),[reason,setReason]=useState("");
+  const [newFile,setNewFile]=useState<File|null>(null),[newSource,setNewSource]=useState("");
+  const validNewFile=!!newFile && newFile.size>0 && newFile.size<=25*1024*1024 && /\.(pdf|docx|xlsx)$/i.test(newFile.name);
   const [selectedId,setSelectedId]=useState<string|null>(null),[selectedAction,setSelectedAction]=useState<CatalogAction>("versions");
   const [search,setSearch]=useState(""),[category,setCategory]=useState("ALL");
   const [preview,setPreview]=useState<{item:SchoolForm;version:SchoolFormVersion}|null>(null);
@@ -130,7 +154,7 @@ export default function SchoolFormsPage({context}:{context:Context}) {
     const buffer=await fetchReviewFile(`/school-forms/${item.id}/versions/${version.id}/download`);
     const url=URL.createObjectURL(new Blob([buffer]));const link=document.createElement("a");link.href=url;link.download=version.file_name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   },"Đã tải bản đang áp dụng.");
-  useEffect(()=>{setSelectedId(null);setCategory("ALL");setBootstrapInfo(null);},[roundId,context.user_id]);
+  useEffect(()=>{setSelectedId(null);setCategory("ALL");},[roundId,context.user_id]);
   useEffect(()=>{
     if(!roundId)return;
     const controller=new AbortController();
@@ -140,25 +164,54 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   },[load,manage,roundId]);
 
   return <><PageHeader title="Kho biểu mẫu & tài liệu Khoa" description={manage ? "Quản lý mẫu trắng, hướng dẫn và tài liệu công bố theo đợt. Bản mới chỉ hiển thị cho đúng đối tượng sau khi phát hành." : "Xem và tải mẫu trắng, hướng dẫn hoặc tài liệu Khoa công bố. Bản đã điền được nộp tại Hồ sơ nộp & xét duyệt."}>{context.base_role !== "ADMIN" && <Link className="btn btn-primary" to="/submissions">Mở hồ sơ nộp & xét duyệt</Link>}</PageHeader>
-    <div className="stack school-forms-page"><div className="card"><div className="card-body stack">
-      <div className="flex gap-2" style={{alignItems:"end",flexWrap:"wrap"}}><label>Đợt KLTN<select className="input" value={roundId} disabled={busy} onChange={event=>setParams({round_id:event.target.value})}>{!rounds.length && <option value="">Chưa có đợt trong phạm vi</option>}{rounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label><button type="button" className="btn btn-secondary" disabled={busy || loading} onClick={()=>void run(async()=>{},"Đã làm mới kho tài liệu Khoa.")}><RefreshCw size={16}/>Làm mới kho</button></div>
-      <div className="flex gap-2" style={{flexWrap:"wrap"}}><label>Tìm biểu mẫu / tài liệu<input className="input" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Nhập tên hoặc mã"/></label>{showCategory && <label>Nhóm tài liệu<select className="input" value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">Tất cả</option><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label>}</div>
-      {manage ? <p>Bạn có quyền thêm, cập nhật và gỡ biểu mẫu của đợt này. Tải lên chỉ tạo nháp; phát hành để SV/GV đúng quyền xem bản mới. Bản cũ giữ trong lịch sử.</p> : <p>Mẫu trắng để điền và danh sách SV đã chốt được trình bày riêng. Tài liệu công bố chỉ hiện trong phạm vi đợt của bạn.</p>}
-      {context.base_role==="ADMIN" && <Link className="btn btn-secondary" to="/administration/assignments">Phân công thêm người quản lý biểu mẫu</Link>}
+    <div className="stack school-forms-page"><div className="card"><div className="card-body school-forms-toolbar">
+      <div className="school-forms-toolbar__filters"><label>Đợt KLTN<select className="input" value={roundId} disabled={busy} onChange={event=>setParams({round_id:event.target.value})}>{!rounds.length && <option value="">Chưa có đợt trong phạm vi</option>}{rounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label><button type="button" className="btn btn-secondary" disabled={busy || loading} onClick={()=>void run(async()=>{},"Đã làm mới kho tài liệu Khoa.")}><RefreshCw size={16}/>Làm mới kho</button><label>Tìm biểu mẫu / tài liệu<input className="input" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Nhập tên hoặc mã"/></label>{showCategory && <label>Nhóm tài liệu<select className="input" value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">Tất cả</option><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label>}</div>
+      <p className="school-forms-toolbar__help">{manage ? "Tải tệp lên để lưu nháp, kiểm tra rồi phát hành cho đúng đối tượng. Các phiên bản cũ được giữ trong lịch sử." : "Xem mẫu trắng và tài liệu Khoa đã công bố theo quyền của bạn."}</p>
+      {selected?.can_export_list && <p className="school-forms-toolbar__export">Cần danh sách sinh viên, đề tài và GVHD đã tự điền? <Link to={"/topics?round_id="+encodeURIComponent(roundId)}>Xuất danh sách theo Mẫu 4</Link>. Biểu mẫu trắng và tài liệu đã được Khoa công bố được tải theo từng dòng bên dưới.</p>}
+      <div className="school-forms-toolbar__actions">{context.base_role==="ADMIN" && <Link className="btn btn-secondary" to="/administration/assignments">Phân công thêm người quản lý biểu mẫu</Link>}
 
-      {manage && <details><summary>Bổ sung các mẫu có sẵn còn thiếu</summary><p>Chỉ thêm những mã mẫu chưa có trong đợt từ bộ mẫu nguồn của Khoa. Tệp quét sạch được phát hành cho đúng đối tượng. Không đặt lại kho và không thay thế các mẫu đã được cập nhật; muốn thay tệp, chọn Cập nhật tệp trên dòng tương ứng.</p><button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void run(async()=>{const total={created:0,published:0,drafts:0,missing:[] as string[]};
-          let remaining=1;while(remaining>0){const result=await request<typeof total & {remaining:number}>(`/school-forms/bootstrap/${roundId}`,context.user_id,{method:"POST"});total.created+=result.created;total.published+=result.published;total.drafts+=result.drafts;total.missing=Array.from(new Set([...total.missing,...result.missing]));remaining=result.remaining;setBootstrapInfo({...total});}},"Đã khởi tạo bộ mẫu nguồn; kiểm tra trạng thái từng tệp.")}>Bổ sung mẫu còn thiếu</button></details>}
+      </div>
     </div></div>
-    {bootstrapInfo && <p role="status" className="alert alert-info">Khởi tạo {bootstrapInfo.created} danh mục: {bootstrapInfo.published} bản phát hành, {bootstrapInfo.drafts} bản nháp. {bootstrapInfo.missing.length>0 && `Thiếu tệp nguồn: ${bootstrapInfo.missing.join(", ")}`}</p>}
     {error && <p role="alert" className="alert alert-danger">{error}</p>}{notice && <p role="status" className="alert alert-success">{notice}</p>}
-    {manage && <details className="card"><summary style={{padding:20,fontWeight:600}}><FilePlus2 size={17}/>Thêm biểu mẫu hoặc tài liệu công bố</summary><div className="card-body"><form className="core-form" onSubmit={async event=>{
-      event.preventDefault();if(await run(()=>request("/school-forms",context.user_id,{method:"POST",body:JSON.stringify({round_id:roundId,code,title,document_kind:kind,audience,reason})}),"Đã tạo danh mục; chọn tệp để lưu phiên bản đầu.")){setCode("");setTitle("");setReason("");}
-    }}><label>Mã tài liệu<input className="input" required pattern="[a-z0-9][a-z0-9_-]{1,49}" value={code} placeholder="Ví dụ: ds-sv-thuc-hien" onChange={event=>{setCode(event.target.value);if(/^mau-(06|07|08|09|10|11)$/.test(event.target.value))setAudience("LECTURER");}}/></label>
-      <label>Tên tài liệu<input className="input" required minLength={3} maxLength={255} value={title} onChange={event=>setTitle(event.target.value)}/></label>
-      <label htmlFor="catalog-kind">Phân loại</label><select id="catalog-kind" className="input" value={kind} onChange={event=>setKind(event.target.value)}><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt (ví dụ Mẫu 4 đã điền)</option></select>
-      <label>Cho ai xem<select className="input" value={audience} onChange={event=>setAudience(event.target.value)}><option value="STUDENT_AND_LECTURER">Sinh viên và giảng viên</option><option value="LECTURER">Chỉ giảng viên</option></select></label><small>Mẫu 6–11 chỉ dành cho GV. Danh sách đã điền phải chọn Tài liệu công bố theo đợt.</small>
-      <label>Lý do tạo danh mục<textarea className="input" required minLength={5} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/></label>
-      <button className="btn btn-primary" disabled={busy || !roundId || reason.trim().length<5}><BookOpen size={16}/>Tạo danh mục</button>
+    {manage && <details className="card school-form-create"><summary className="school-form-create__summary"><FilePlus2 size={19} aria-hidden="true"/><span><strong>Thêm biểu mẫu hoặc tài liệu công bố</strong><small>Tạo danh mục và tải tệp trong một bước</small></span><ChevronDown className="school-form-create__chevron" size={18} aria-hidden="true"/></summary><div className="card-body school-form-create__body"><form className="school-form-create__form" onSubmit={async event=>{
+      event.preventDefault();
+      if(busy || !newFile || !validNewFile || newSource.trim().length<3 || reason.trim().length<5)return;
+      const form=event.currentTarget;
+      let created:SchoolForm|null=null;
+      setBusy(true);setError("");setNotice("");
+      try {
+        created=await request<SchoolForm>("/school-forms",context.user_id,{method:"POST",body:JSON.stringify({round_id:roundId,code:code.trim(),title:title.trim(),document_kind:kind,audience,reason:reason.trim()})});
+        setSearch("");setCategory("ALL");setSelectedId(created.id);setSelectedAction("versions");
+        const payload=new FormData();payload.append("file",newFile);payload.append("source_reference",newSource.trim());payload.append("reason",reason.trim());
+        await request("/school-forms/"+created.id+"/versions",context.user_id,{method:"POST",body:payload,headers:{"If-Match":String(created.row_version)}});
+        await load();
+        setNotice("Đã lưu tệp thành phiên bản nháp. Kiểm tra trạng thái quét và nội dung; chỉ phát hành khi biểu mẫu đã được Khoa chấp thuận.");
+      } catch(cause) {
+        if(created){
+          await load().catch(()=>undefined);
+          setSelectedId(created.id);setSelectedAction("versions");
+          setError("Danh mục đã được tạo nhưng chưa xác nhận được kết quả tải tệp. Hãy kiểm tra lịch sử phiên bản bên dưới; nếu chưa có tệp, chọn Cập nhật tệp để tải lại. "+errorMessage(cause));
+        } else setError(errorMessage(cause)+" Nếu kết nối bị gián đoạn, hãy tìm mã tài liệu trong danh sách trước khi thử tạo lại.");
+      } finally {
+        if(created){setCode("");setTitle("");setReason("");setNewSource("");setNewFile(null);form.reset();}
+        setBusy(false);
+      }
+    }}><div className="school-form-create__grid">
+      <label>Mã tài liệu<input className="input" required pattern="[a-z0-9][a-z0-9_-]{1,49}" value={code} placeholder="Ví dụ: don-xin-thoi" onChange={event=>{setCode(event.target.value);if(/^mau-(06|07|08|09|10|11)$/.test(event.target.value))setAudience("LECTURER");}}/></label>
+      <label>Tên tài liệu<input className="input" required minLength={3} maxLength={255} value={title} placeholder="Ví dụ: Đơn xin thôi thực hiện KLTN" onChange={event=>setTitle(event.target.value)}/></label>
+      <label htmlFor="catalog-kind">Phân loại<select id="catalog-kind" className="input" value={kind} onChange={event=>setKind(event.target.value)}><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label>
+      <label>Cho ai xem<select className="input" value={audience} onChange={event=>setAudience(event.target.value)}><option value="STUDENT_AND_LECTURER">Sinh viên và giảng viên</option><option value="LECTURER">Chỉ giảng viên</option></select></label>
+      <label>Nguồn / văn bản áp dụng<input className="input" required minLength={3} maxLength={500} value={newSource} onChange={event=>setNewSource(event.target.value)} placeholder="Ví dụ: Mẫu Khoa cung cấp"/></label>
+      <div className="school-form-create__file"><label htmlFor="new-school-form-file">Tệp biểu mẫu hoặc tài liệu (PDF, DOCX, XLSX)</label>
+        <input id="new-school-form-file" className="input" type="file" accept=".pdf,.docx,.xlsx" required disabled={busy} onChange={event=>setNewFile(event.target.files?.[0] || null)}/>
+        <small>Tối đa 25 MB · Tệp được quét trước khi phát hành.</small>
+        {newFile && !validNewFile && <p role="alert">Tệp phải là PDF, DOCX hoặc XLSX, không rỗng và không quá 25 MB.</p>}
+      </div>
+      <label className="school-form-create__wide">Lý do tạo danh mục<textarea className="input" rows={2} required minLength={5} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/></label>
+    </div>
+    <div className="school-form-create__footer"><p>Mẫu 6–11 chỉ dành cho GV. Tệp mới được lưu nháp; chỉ phát hành sau khi Khoa chấp thuận.</p>
+      <button className="btn btn-primary" disabled={busy || !roundId || !validNewFile || newSource.trim().length<3 || reason.trim().length<5}><BookOpen size={16}/>{busy?"Đang lưu và quét tệp…":"Tạo và lưu tệp nháp"}</button>
+    </div>
     </form></div></details>}
     {loading?<p role="status">Đang tải tài liệu Khoa…</p>:displayed.length===0?<p>Chưa có tài liệu trong phạm vi này.</p>:<><div className="table-container" role="region" aria-label="Danh mục biểu mẫu Khoa" tabIndex={0}><table className="table"><thead><tr><th>Mã / tên biểu mẫu</th><th>Loại</th><th>Đối tượng</th><th>Bản đang áp dụng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{displayed.map(item=>{const published=item.versions.find(v=>v.state==="PUBLISHED");return <tr key={item.id}><td><strong>{item.title}</strong><div className="text-caption">{item.code}</div></td><td>{item.document_kind==="FORM"?"Biểu mẫu":"Tài liệu công bố"}</td><td>{item.audience==="LECTURER"?"Giảng viên":"SV và GV"}</td><td>{published?`v${published.version_no} · ${formatDate(published.published_at || published.uploaded_at)}`:"Chưa phát hành"}</td><td>{item.state==="ACTIVE"?"Đang sử dụng":"Đã ẩn / ngừng sử dụng"}</td><td className="school-form-actions-cell"><div className="school-form-actions">{published && <>
 <button type="button" className="btn btn-secondary school-form-action-button" title="Xem trực tiếp bản đang áp dụng" aria-label="Xem trực tiếp" disabled={busy || published.scan_state!=="CLEAN"} onClick={()=>setPreview({item,version:published})}><Eye size={17}/></button>

@@ -21,7 +21,8 @@ from backend.services.roster import EMAIL
 from backend.services.account_mail import mail_delivery_ready
 from backend.services.account_directory import build_account_directory
 from backend.services.lecturer_roster import MAIL_ACTIONS, lock_identities, record_delivery
-from backend.services.notifications import notify_user
+from backend.services.notifications import format_due, notify_user
+from backend.services.workflow_notices import round_announcement
 
 router = APIRouter(prefix="/api/v1/admin", tags=["account administration"])
 AccountReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
@@ -282,6 +283,13 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
         resource_type="thesis_round", resource_id=round_.id,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
         correlation_id=uuid4()))
+    if payload.state == "OPEN":
+        round_announcement(session, user.id, round_.id, "ROUND_OPENED",
+            f"Khoa đã mở đợt đăng ký KLTN {round_.code}. Thời gian đăng ký từ {format_due(round_.opens_at)} đến {format_due(round_.closes_at)}.",
+            "/topics")
+    else:
+        round_announcement(session, user.id, round_.id, "ROUND_CLOSED",
+            f"Khoa đã đóng đợt đăng ký KLTN {round_.code}.", "/topics")
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
 

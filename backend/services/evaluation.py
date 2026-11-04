@@ -152,13 +152,25 @@ def assignments(session, thesis):
         m.ReviewerAssignment.review_scope == "THESIS").order_by(m.ReviewerAssignment.assigned_at.desc())).all()
 
 
+def reviewer_department_ids(session, thesis):
+    """Reviewer eligibility stays within the faculty; CNTT and KHMT can cross-review."""
+    department = session.get(m.Department, thesis.department_id)
+    eligible = {thesis.department_id}
+    if department and department.code in {"BM-CNTT", "BM-KHMT"}:
+        eligible.update(session.scalars(select(m.Department.id).where(
+            m.Department.faculty_id == department.faculty_id,
+            m.Department.code.in_(["BM-CNTT", "BM-KHMT"]),
+            m.Department.active.is_(True))))
+    return eligible
+
+
 def assign(session, user, thesis_id, data, expected):
     thesis = access(session, user, thesis_id, "evaluation:manage", write=True)
     row_version(expected, thesis.row_version)
     lecturer = session.get(m.LecturerProfile, data.lecturer_id)
     account = session.get(m.UserAccount, lecturer.user_id) if lecturer else None
-    if not lecturer or lecturer.department_id != thesis.department_id or not account or account.status != "ACTIVE":
-        raise HTTPException(422, "Chọn GV đang hoạt động thuộc bộ môn của khóa luận")
+    if not lecturer or lecturer.department_id not in reviewer_department_ids(session, thesis) or not account or account.status != "ACTIVE":
+        raise HTTPException(422, "Chọn GV đang hoạt động thuộc bộ môn phù hợp với khóa luận")
     advisor = primary_advisor(session, thesis.id)
     if advisor and advisor.lecturer_id == lecturer.id:
         raise HTTPException(422, "GVHD không được đồng thời phản biện cùng khóa luận")
@@ -501,13 +513,13 @@ def workspace(session, user, thesis_id):
     if "evaluation:manage" in actions:
         advisor = primary_advisor(session, thesis.id)
         for lecturer in session.scalars(select(m.LecturerProfile).join(m.UserAccount,
-            m.UserAccount.id == m.LecturerProfile.user_id).where(m.LecturerProfile.department_id == thesis.department_id,
+            m.UserAccount.id == m.LecturerProfile.user_id).where(m.LecturerProfile.department_id.in_(reviewer_department_ids(session, thesis)),
             m.UserAccount.status == "ACTIVE").order_by(m.LecturerProfile.display_name)):
             if not advisor or lecturer.id != advisor.lecturer_id:
                 load = session.scalar(select(func.count()).select_from(m.ReviewerAssignment).where(
                     m.ReviewerAssignment.lecturer_id == lecturer.id, m.ReviewerAssignment.review_scope == "THESIS",
                     m.ReviewerAssignment.state == "ACTIVE"))
-                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "active_load": load})
+                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load})
     history = []
     if "evaluation:eligibility" in actions or user.base_role == "STUDENT":
         member_ids = [member["id"] for member in visible_members]

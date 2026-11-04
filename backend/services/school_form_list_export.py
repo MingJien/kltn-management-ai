@@ -150,11 +150,10 @@ def render_nop_ds(path, year_code, records):
         workbook.close()
 
 
-def export_mau_04(session, user, round_id):
+def roster_records(session, user, round_id):
     round_ = school_forms.round_row(session, round_id)
     if not school_forms.can_export_list(session, user, round_id):
-        raise HTTPException(403, "Cần quyền Điều phối KLTN hoặc Admin được giao quản lý biểu mẫu của đợt để xuất danh sách.")
-    year = session.get(m.AcademicYear, round_.academic_year_id)
+        raise HTTPException(403, "Cần quyền Điều phối KLTN hoặc Admin để xuất danh sách của đợt.")
     rows = session.execute(select(m.Thesis, m.StudentProfile, m.Faculty.name)
         .join(m.ThesisMember, m.ThesisMember.thesis_id == m.Thesis.id)
         .join(m.StudentProfile, m.StudentProfile.id == m.ThesisMember.student_id)
@@ -168,6 +167,21 @@ def export_mau_04(session, user, round_id):
         lecturer = session.get(m.LecturerProfile, assignment.lecturer_id) if assignment else None
         records.append((index, student.student_code, student.display_name, student.class_name or "", faculty_name,
                         thesis.current_title, lecturer.display_name if lecturer else "", "" if lecturer else "Chưa có GVHD chính thức"))
+    return round_, rows, records
+
+
+def preview_mau_04(session, user, round_id):
+    round_, rows, records = roster_records(session, user, round_id)
+    return {"round_id": str(round_.id), "round_code": round_.code, "students": len(records),
+            "theses": len({thesis.id for thesis, _, _ in rows}),
+            "missing_advisors": sum(1 for record in records if record[7])}
+
+
+def export_mau_04(session, user, round_id):
+    round_, rows, records = roster_records(session, user, round_id)
+    if not records:
+        raise HTTPException(409, "Đợt này chưa có sinh viên đang thực hiện khóa luận; hãy chọn đợt khác hoặc hoàn tất bước GV tiếp nhận.")
+    year = session.get(m.AcademicYear, round_.academic_year_id)
     content = render_nop_ds(template_path(session, round_id), year.code, records)
     audit(session, user, "ROUND_MAU04_EXPORTED", "thesis_round", round_id,
           f"Xuất danh sách Mẫu 4: {len(records)} sinh viên; {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).isoformat()}")

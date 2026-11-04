@@ -92,11 +92,11 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
                        "DOCUMENT_DEADLINE_EXTENDED": "DOCUMENT_DEADLINE_EXTENDED",
                        "DOCUMENT_DEADLINE_REOPENED": "DOCUMENT_DEADLINE_REOPENED"}.get(action, action)
         if action == "DOCUMENT_DEADLINE_SET":
-            message = f"Khoa đã thiết lập hạn nộp {label} cho đợt {round_.code}: {format_due(data.due_at)}."
+            message = f"Khoa đã thiết lập hạn nộp {label} đến {format_due(data.due_at)}."
         elif action == "DOCUMENT_DEADLINE_REOPENED":
-            message = f"Khoa đã gia hạn và mở nhận lại {label} cho đợt {round_.code} đến {format_due(data.due_at)}."
+            message = f"Khoa đã gia hạn và mở nhận lại {label} đến {format_due(data.due_at)}."
         else:
-            message = f"Khoa đã gia hạn {label} cho đợt {round_.code} đến {format_due(data.due_at)}."
+            message = f"Khoa đã gia hạn {label} đến {format_due(data.due_at)}."
         notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
                                   kind=notice_kind, message=message, section="documents")
         result = output(item)
@@ -131,7 +131,7 @@ def close_deadline(session, user, thesis_id, document_type: str, reason: str, ex
     label = DOCUMENT_TYPE_LABELS.get(document_type, document_type)
     notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
         kind="DOCUMENT_DEADLINE_CLOSED",
-        message=f"Khoa đã đóng nhận {label} cho đợt {round_.code}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
+        message=f"Khoa đã đóng nhận {label}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
         section="documents")
     result = output(item)
     session.commit()

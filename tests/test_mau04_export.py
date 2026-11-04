@@ -43,6 +43,10 @@ def test_mau04_export_tracks_active_members_and_checks_permissions(forms, tmp_pa
     thesis = session.scalar(select(m.Thesis).where(m.Thesis.round_id == round_id))
     thesis.current_title = "=đề tài giả lập"
     session.commit()
+    preview = client.get(path + "/preview", headers=hdr(users[4]))
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["students"] >= 1 and preview.json()["theses"] >= 1
+    assert client.get(path + "/preview", headers=hdr(users[0])).status_code == 403
     response = client.post(path, headers=hdr(users[4]))
     assert response.status_code == 200, response.text
     result = load_workbook(BytesIO(response.content), data_only=False)
@@ -79,6 +83,13 @@ def test_mau04_export_tracks_active_members_and_checks_permissions(forms, tmp_pa
     assignment.state = "REVOKED"
     session.commit()
     assert client.post(path, headers=hdr(admin)).status_code == 200
+    for item in session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis.id)):
+        item.active = False
+    session.commit()
+    assert client.get(path + "/preview", headers=hdr(users[4])).json()["students"] == 0
+    empty = client.post(path, headers=hdr(users[4]))
+    assert empty.status_code == 409
+    assert "chưa có sinh viên" in empty.json()["detail"]
 
 
 def test_nop_ds_preserves_template_and_moves_footer_for_large_group(tmp_path):

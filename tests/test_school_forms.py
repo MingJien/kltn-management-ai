@@ -94,6 +94,9 @@ def test_student_cannot_download_lecturer_forms_even_direct_link(forms):
     path=f"/api/v1/school-forms/{item['id']}/versions/{item['versions'][0]['id']}/download"
     assert client.get(path,headers=hdr(users[0])).status_code==404
     assert client.get(path,headers=hdr(users[3])).status_code==200
+    for user, expected in ((users[0], False), (users[3], True)):
+        inbox = client.get("/api/v1/notifications", headers=hdr(user)).json()["items"]
+        assert any(note["message"].startswith("Khoa đã phát hành") for note in inbox) is expected
     bad=client.patch(f"/api/v1/school-forms/{item['id']}",headers=version_headers(users[4],item),
         json={"title":"Mẫu đánh giá","audience":"STUDENT_AND_LECTURER","state":"ACTIVE","reason":"Cannot expose this protected form"})
     assert bad.status_code==422

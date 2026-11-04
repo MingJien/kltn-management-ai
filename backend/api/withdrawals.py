@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request
 from backend.api.dependencies import current_user, get_session
-from backend.api.withdrawal_schemas import AdvisorDecision, ExternalOutcome, StartDate, WithdrawalCreate
+from backend.api.withdrawal_schemas import AdvisorDecision, ExternalOutcome, ReceiptRecord, StartDate, WithdrawalCreate
 from backend.services import withdrawals as service
 
 router = APIRouter(prefix="/api/v1", tags=["Xin thôi KLTN"])
@@ -61,6 +61,12 @@ def outcome(identifier: UUID, data: ExternalOutcome, if_match: int = Header(alia
     return service.record(session, user, identifier, data, if_match)
 
 
+@router.post("/withdrawals/{identifier}/receipt")
+def receipt(identifier: UUID, data: ReceiptRecord, if_match: int = Header(alias="If-Match", ge=1),
+            user=Depends(current_user), session=Depends(transaction)):
+    return service.record_receipt(session, user, identifier, data, if_match)
+
+
 @router.get("/withdrawals/{identifier}/signed-copy")
 def download(identifier: UUID, user=Depends(current_user), session=Depends(transaction)):
     return service.download(session, user, identifier)
@@ -69,3 +75,20 @@ def download(identifier: UUID, user=Depends(current_user), session=Depends(trans
 @router.post("/withdrawals/{identifier}/print-copy")
 def print_copy(identifier: UUID, user=Depends(current_user), session=Depends(transaction)):
     return service.print_copy(session, user, identifier)
+
+
+@router.post("/withdrawals/{identifier}/outcome-evidence")
+async def outcome_upload(identifier: UUID, request: Request, if_match: int = Header(alias="If-Match", ge=1),
+                         user=Depends(current_user), session=Depends(transaction)):
+    return await service.upload_outcome(session, user, identifier, request, if_match)
+
+
+@router.get("/withdrawals/{identifier}/outcome-evidence")
+def outcome_download(identifier: UUID, user=Depends(current_user), session=Depends(transaction)):
+    return service.outcome_file_action(session, user, identifier)
+
+
+@router.post("/withdrawals/{identifier}/outcome-evidence/scan")
+def outcome_scan(identifier: UUID, if_match: int = Header(alias="If-Match", ge=1),
+                 user=Depends(current_user), session=Depends(transaction)):
+    return service.outcome_file_action(session, user, identifier, if_match)

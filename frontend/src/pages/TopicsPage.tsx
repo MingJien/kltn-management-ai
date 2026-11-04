@@ -30,7 +30,10 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const [topics, setTopics] = useState<Topic[]>([]);
   const [rounds, setRounds] = useState<OpenRound[]>([]);
   const [exportRounds,setExportRounds]=useState<SchoolFormRound[]>([]);
-  const [exportRoundId,setExportRoundId]=useState("");
+  const [exportRoundId,setExportRoundId]=useState(() => new URLSearchParams(window.location.search).get("round_id") || "");
+  const [exportPreview,setExportPreview]=useState<{round_id:string;round_code:string;students:number;theses:number;missing_advisors:number}|null>(null);
+  const [previewLoading,setPreviewLoading]=useState(false);
+  const [previewError,setPreviewError]=useState("");
   const [roundsLoaded, setRoundsLoaded] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [lecturersLoading, setLecturersLoading] = useState(true);
@@ -63,6 +66,16 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     }).catch(cause=>{if(!controller.signal.aborted)setMessage(errorMessage(cause));});
     return()=>controller.abort();
   },[userId,admin,context.actions.includes("progress:coordinate")]);
+  useEffect(()=>{
+    if(!exportRoundId || !exportRounds.some(row=>row.id===exportRoundId)){setExportPreview(null);return;}
+    const controller=new AbortController();
+    setExportPreview(null);setPreviewError("");setPreviewLoading(true);
+    void request<{round_id:string;round_code:string;students:number;theses:number;missing_advisors:number}>("/school-forms/rounds/"+exportRoundId+"/mau-04/preview",userId,{signal:controller.signal})
+      .then(result=>{if(!controller.signal.aborted)setExportPreview(result);})
+      .catch(cause=>{if(!controller.signal.aborted)setPreviewError(errorMessage(cause));})
+      .finally(()=>{if(!controller.signal.aborted)setPreviewLoading(false);});
+    return()=>controller.abort();
+  },[exportRoundId,exportRounds,userId]);
   const path = "/topics?" + new URLSearchParams({limit:String(PAGE_SIZE), offset:String(page * PAGE_SIZE), search, view, sort});
   const reload = useCallback(async () => setTopics(await request<Topic[]>(path, userId)), [path, userId]);
   const loadLecturers = useCallback(async (signal?: AbortSignal) => {
@@ -157,7 +170,12 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
       <h2>Danh sách sinh viên và GVHD thực hiện KLTN</h2>
       <p>Xuất Excel theo khung “Nộp ds” của Mẫu 4, lấy thành viên đang tham gia và GVHD chính thức tại thời điểm tải. Đây là danh sách thực hiện KLTN, khác với danh mục đề tài chào đăng ký.</p>
       <div className="flex gap-2" style={{flexWrap:"wrap",alignItems:"end"}}><label>Đợt xuất danh sách<select className="input" value={exportRoundId} disabled={busy} onChange={event=>setExportRoundId(event.target.value)}>{exportRounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
-      <button type="button" className="btn btn-secondary" disabled={busy || !exportRoundId} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}>Tải danh sách SV và GVHD theo Mẫu 4</button></div>
+      <button type="button" className="btn btn-secondary" disabled={busy || previewLoading || exportPreview?.round_id !== exportRoundId || !exportPreview?.students} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}>Xuất danh sách đã điền theo Mẫu 4</button></div>
+      {previewLoading && <p role="status">Đang kiểm tra dữ liệu của đợt…</p>}
+      {previewError && <p role="alert" className="alert alert-danger">{previewError}</p>}
+      {exportPreview?.round_id === exportRoundId && (exportPreview.students > 0
+        ? <p role="status"><strong>{exportPreview.students} sinh viên · {exportPreview.theses} khóa luận</strong> sẽ được đưa vào danh sách.{exportPreview.missing_advisors > 0 && (" Có "+exportPreview.missing_advisors+" sinh viên chưa có GVHD chính thức; cột ghi chú sẽ đánh dấu.")}</p>
+        : <p role="status" className="alert alert-info">Đợt này chưa có sinh viên đang thực hiện khóa luận. Hãy chọn đợt có hồ sơ đã được GV tiếp nhận.</p>)}
     </div></section>}
     <div className="topic-toolbar">
       <div className="topic-toolbar__search">
