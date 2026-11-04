@@ -426,6 +426,11 @@ def report_download(session, user, thesis_id, version_id):
 def check_eligibility(session, user, thesis_id, data, expected):
     thesis = access(session, user, thesis_id, "evaluation:eligibility", write=True)
     row_version(expected, thesis.row_version)
+    if session.scalar(select(m.ThesisWithdrawalRequest.id).where(
+        m.ThesisWithdrawalRequest.thesis_id == thesis.id,
+        m.ThesisWithdrawalRequest.state.in_(["SUBMITTED", "ADVISOR_CONFIRMED"]),
+    ).limit(1)):
+        raise HTTPException(409, "Cần xử lý yêu cầu xin thôi đang chờ trước khi xét bảo vệ")
     member = member_for(session, thesis, data.thesis_member_id)
     current = report(session, thesis)
     membership_revision.ensure_ready(session, thesis, current)
@@ -461,6 +466,8 @@ def reopen(session, user, thesis_id, data, expected):
     row_version(expected, thesis.row_version)
     if thesis.state != "READY_FOR_DEFENSE":
         raise HTTPException(409, "Chỉ mở xét lại hồ sơ đã chốt đủ điều kiện bảo vệ")
+    if session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
+        raise HTTPException(409, "Hủy lịch bảo vệ trước khi mở xét lại điều kiện")
     current = report(session, thesis)
     for member in members(session, thesis):
         previous = last_check(session, member)

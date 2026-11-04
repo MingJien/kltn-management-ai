@@ -1,3 +1,4 @@
+import ReportSimilarity from "../components/domain/ReportSimilarity";
 import { errorMessage } from "../errors";
 import { FormEvent, useState } from "react";
 import type { SearchHit, ChatResult } from "../api";
@@ -8,10 +9,11 @@ import { Bot, Search, HelpCircle, ExternalLink, AlertTriangle, Info } from "luci
 
 interface AIPageProps {
   userId: string;
+  canCompareReports: boolean;
 }
 
-export default function AIPage({ userId }: AIPageProps) {
-  const [activeTab, setActiveTab] = useState<"chat" | "similarity">("chat");
+export default function AIPage({ userId, canCompareReports }: AIPageProps) {
+  const [activeTab, setActiveTab] = useState<"chat" | "similarity" | "reports">("chat");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [question, setQuestion] = useState("");
@@ -83,7 +85,11 @@ export default function AIPage({ userId }: AIPageProps) {
           <Search size={16} />
           Tìm đề tài tương đồng
         </button>
+        {canCompareReports && <button className={`tabs__tab ${activeTab==="reports"?"tabs__tab--active":""}`}
+          onClick={()=>{setMessage("");setActiveTab("reports");}}><Search size={16}/> Đối chiếu báo cáo</button>}
       </div>
+
+      {activeTab === "reports" && <ReportSimilarity userId={userId}/>}
 
       {/* Chat tab */}
       {activeTab === "chat" && (

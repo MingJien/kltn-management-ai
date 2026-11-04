@@ -858,8 +858,8 @@ class ThesisWithdrawalRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixi
         CheckConstraint("state IN ('SUBMITTED','ADVISOR_CONFIRMED','RETURNED','CANCELLED','RECORDED','NOT_GRANTED')", name="state"),
         CheckConstraint("length(trim(reason)) >= 10", name="reason"),
         CheckConstraint("jsonb_typeof(application_data) = 'object'", name="application_data"),
-        CheckConstraint("state NOT IN ('ADVISOR_CONFIRMED','RETURNED','RECORDED','NOT_GRANTED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)", name="advisor_stamp"),
-        CheckConstraint("state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND evidence_file_id IS NOT NULL AND effective_on IS NOT NULL)", name="outcome_stamp"),
+        CheckConstraint("state NOT IN ('ADVISOR_CONFIRMED','RETURNED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)", name="advisor_stamp"),
+        CheckConstraint("state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND effective_on IS NOT NULL)", name="outcome_stamp"),
         Index("uq_withdrawal_member_open", "thesis_id", "student_id", unique=True, postgresql_where=text("state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED')")),
         Index("ix_withdrawal_student_state", "student_id", "state"),
     )
@@ -879,3 +879,36 @@ class ThesisWithdrawalRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixi
     effective_on: Mapped[Optional[date]] = mapped_column(Date)
     recorded_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     recorded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseCouncil(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "defense_council"
+    __table_args__ = (UniqueConstraint("round_id", "department_id", "name"),)
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    department_id: Mapped[uuid.UUID] = fk("department.id")
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    reference: Mapped[str] = mapped_column(String(300), nullable=False)
+    members: Mapped[list] = mapped_column(JSONB, nullable=False)
+    created_by: Mapped[uuid.UUID] = fk("user_account.id")
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "defense_slot"
+    __table_args__ = (
+        CheckConstraint("ends_at > starts_at", name="time_order"),
+        CheckConstraint("(finalized_at IS NULL) = (finalized_by IS NULL)", name="finalized_stamp"),
+        Index("ix_defense_slot_council_start", "council_id", "starts_at"),
+    )
+    thesis_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("thesis.id", ondelete="RESTRICT"), unique=True)
+    council_id: Mapped[uuid.UUID] = fk("defense_council.id")
+    report_version_id: Mapped[uuid.UUID] = fk("document_version.id")
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    room: Mapped[str] = mapped_column(String(200), nullable=False)
+    roster: Mapped[list] = mapped_column(JSONB, nullable=False)
+    marks: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    attendance: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    minutes: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    finalized_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

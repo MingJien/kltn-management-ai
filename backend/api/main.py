@@ -19,6 +19,7 @@ from backend.api.core import router as thesis_workspace_router
 from backend.api.activity import router as activity_router
 from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
+from backend.api.defense import router as defense_router
 from backend.api.lecturer_profiles import router as lecturer_profiles_router
 from backend.api.withdrawals import router as withdrawals_router
 from backend.api.dependencies import current_user, get_session
@@ -78,6 +79,7 @@ app.include_router(thesis_workspace_router)
 app.include_router(activity_router)
 app.include_router(school_forms_router)
 app.include_router(evaluation_router)
+app.include_router(defense_router)
 app.include_router(lecturer_profiles_router)
 app.include_router(withdrawals_router)
 
@@ -474,6 +476,19 @@ def similar_topics(
         source_types={"THESIS", "CAPSTONE_PROJECT", "TERM_PROJECT", "COURSE_PROJECT"},
         representation="TOPIC", limit=payload.limit,
     )]
+
+
+@app.get("/api/v1/ai/reports")
+def similarity_reports(user=Depends(current_user), session=Depends(get_session)):
+    from backend.services.report_similarity import options
+    return options(session,user)
+
+
+@app.post("/api/v1/ai/compare-reports")
+def compare_reports(left_version_id: UUID, right_version_id: UUID,
+                    user=Depends(current_user), session=Depends(get_session)):
+    from backend.services.report_similarity import compare
+    return compare(session,user,left_version_id,right_version_id)
 
 
 @app.post("/api/v1/ai/chat", response_model=ChatOut)

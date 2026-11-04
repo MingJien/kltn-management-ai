@@ -4,7 +4,7 @@
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic head `20261102_0019`: **43 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
+PostgreSQL `kltn_management`, Alembic head `20261104_0021`: **45 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
 
 Tiến độ có khung xem PDF và ghim nhận xét theo đúng lần nộp. Ghim nháp tự lưu riêng cho GV; khi gửi kết quả mới hiện cho SV. Trang, thu phóng, vị trí cuộn và nhận xét tổng quát đang viết được khôi phục trên cùng trình duyệt/tài khoản. DOCX/TXT nhận xét theo mục và đoạn trích.
 
@@ -12,13 +12,15 @@ Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng
 
 ## Tình hình hiện tại
 
-- **Xin thôi thực hiện KLTN**: SV gửi đơn trong 02 tuần theo ngày bắt đầu do Khoa ghi nhận; xuất phiếu DOCX có mã/footer để in, ký và nộp bên ngoài. GVHD xác nhận/trả lại; điều phối đợt đối chiếu bản có xác nhận đã quét và căn cứ để ghi nhận kết quả, không thay cơ quan xử lý hành chính. Rút riêng từng SV; nhóm còn lại tiếp tục cùng đề tài và nộp đề cương mới để duyệt. Báo cáo phải cập nhật sau thay đổi nhóm; tạm chặn lập phiếu/xét bảo vệ đến khi đề cương được duyệt lại và có báo cáo mới. Giữ bản cũ, thông báo và lịch sử. Migration `0019` thêm `thesis_withdrawal_request`, hai cột ngày/căn cứ bắt đầu đợt và sửa UNIQUE xác nhận theo phiên bản; không xóa hồ sơ cũ. Phiếu xuất hiện là bản đề nghị của hệ thống, mẫu chính thức chờ Khoa cung cấp. [Thao tác theo vai trò](docs/design/nv6-review-defense-workflow.md) · [Kiểm chứng tích hợp](docs/evidence/nv6-group-review-validation.md).
+- **Xin thôi thực hiện KLTN** trong 14 ngày đầu theo ngày bắt đầu do Khoa ghi nhận. Sinh viên gửi yêu cầu, điều phối đúng đợt chấp thuận hoặc từ chối trên hệ thống. Nhóm còn lại giữ đề tài và cập nhật Mẫu 1–3, báo cáo và xét bảo vệ.
+
+- **NV6 tuần 2** có hội đồng, lịch bảo vệ, phiếu Mẫu 6, tổng hợp điểm, biên bản Mẫu 9 và bảng điểm Mẫu 10–11 từ hồ sơ đã chốt. Tab đối chiếu hai báo cáo Word/PDF đọc cả chữ trong scan và ảnh chèn khi có Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md) · [Kiểm chứng](docs/evidence/nv6-week2-validation.md).
 
 - **Hồ sơ giảng viên**: danh bạ có tìm kiếm không dấu, lọc bộ môn, phân trang và xem chi tiết; quản trị sửa định danh có căn cứ. GV tự lưu nháp thông tin chuyên môn/liên hệ và ảnh đại diện, gửi TBM duyệt trước khi công bố. Có so sánh trước–sau, trả lại/gửi lại, rút yêu cầu, lịch sử và thông báo; không cho tự duyệt. Tên GV trên đề tài, đăng ký, GVHD và phân công phản biện mở cửa sổ xem nhanh, bấm ngoài hoặc Esc để đóng. [Luồng và kiểm chứng](docs/evidence/lecturer-profile-validation.md).
 
 - **NV6 tuần 1** có UI/API phân công, thu hồi, gia hạn phản biện; nhận xét GVHD Mẫu 7/GVPB Mẫu 8 theo từng sinh viên và đúng bản báo cáo. Nháp riêng, xuất phiếu đã điền để ký, quét bản ký trước khi gửi; phiếu đã gửi giữ nguyên và bản sửa có lý do. TBM xét ba điều kiện cấp Trường theo căn cứ, lưu lịch sử và gửi thông báo đúng tài khoản. Nhóm chỉ sẵn sàng bảo vệ khi mọi thành viên đủ điều kiện. [Luồng bàn giao](docs/design/nv6-review-defense-workflow.md) · [Kiểm chứng và giới hạn](docs/evidence/nv6-week1-validation.md).
 
-- Cuốn báo cáo KLTN trước bảo vệ có hạn REPORT riêng và phiên bản, tách khỏi báo cáo tiến độ theo mốc. Kiểm tra tương đồng chưa triển khai. Mẫu 1a/1b vẫn nộp tại Hồ sơ đăng ký.
+- Cuốn báo cáo KLTN trước bảo vệ có hạn REPORT riêng và phiên bản, tách khỏi báo cáo tiến độ theo mốc. Tra cứu tên đề tài và đối chiếu hai báo cáo là hai chức năng riêng. Mẫu 1a/1b vẫn nộp tại Hồ sơ đăng ký.
 - Chuông gửi thông báo theo đúng người liên quan, phản hồi cho cả nhóm; bấm thông báo nạp dữ liệu mới kể cả khi đang ở chính trang đó. Quyền được kiểm lại trước khi xem thông báo riêng. SV/GV/TBM/Admin đều tra cứu đề tài đã công bố, không được mở hồ sơ riêng chỉ nhờ biết liên kết.
 
 - Kho “Biểu mẫu và tài liệu Khoa” quản lý theo đợt: người được giao quyền tải PDF/DOCX/XLSX (tối đa 25 MB), quét ClamAV, lưu nháp, xem trước rồi phát hành hoặc thu hồi. Từng phiên bản giữ nguyên tệp, nguồn và lý do cập nhật. SV chỉ thấy mẫu 1a/1b–5; GV thấy toàn bộ bộ mẫu. Danh sách đã điền (ví dụ Mẫu 4) là tài liệu công bố riêng, chỉ người thuộc đợt xem được; không tự nhập danh sách vào tài khoản. Admin cấp/thu hồi quyền `FORM_MANAGER`, không mặc nhiên duyệt nghiệp vụ.
