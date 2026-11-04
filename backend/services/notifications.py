@@ -129,20 +129,11 @@ def notify_thesis_students(session: Session, *, thesis: m.Thesis, actor_user_id:
 
 def notify_round_participants(session: Session, *, round_id: UUID, actor_user_id: UUID,
                               kind: str, message: str, section: str = "progress") -> None:
-    """Notify every student and advisor of the round's theses, one row per thesis target."""
-    theses = session.scalars(select(m.Thesis).where(
-        m.Thesis.round_id == round_id,
-        m.Thesis.state.notin_(["WITHDRAWN", "ARCHIVED"]))).all()
-    for thesis in theses:
-        url = f"/theses/{thesis.id}?section={section}"
-        advisor = _advisor(session, thesis)
-        recipients = {user_id for user_id in _student_user_ids(session, thesis.id)}
-        if advisor is not None:
-            recipients.add(advisor.user_id)
-        for user_id in sorted(recipients - {actor_user_id}):
-            add_notice(session, thesis=thesis, actor_user_id=actor_user_id, kind=kind,
-                       recipient_user_id=user_id, message=message, url=url,
-                       subject_type="thesis", subject_id=thesis.id)
+    from backend.services.workflow_notices import round_announcement
+
+    round_ = session.get(m.ThesisRound, round_id)
+    round_announcement(session, actor_user_id, round_id, kind,
+        f"Đợt {round_.code} · {message}", f"/{section}")
 
 
 def notify_department_heads(session: Session, *, topic: m.Topic, actor_user_id: UUID,

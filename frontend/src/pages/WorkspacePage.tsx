@@ -60,7 +60,7 @@ export default function WorkspacePage({context}: {context: Context}) {
     : head && pendingCount > 0 ? "Xem hồ sơ chờ xét"
     : head ? "Duyệt đề tài" : "Quản lý đề tài";
   const secondaryPath = isAdmin ? "/administration" : isStudent ? "/theses" : head ? "/topics" : "/registrations";
-  const secondaryLabel = isAdmin ? "Tài khoản và phân công"
+  const secondaryLabel = isAdmin ? "Tài khoản"
     : isStudent ? "Không gian khóa luận" : head ? "Danh sách đề tài" : "Hồ sơ đăng ký";
   const welcomeCopy = isAdmin
     ? "Tổ chức đợt khóa luận, phân công nhiệm vụ và quản lý tài khoản."
@@ -72,7 +72,8 @@ export default function WorkspacePage({context}: {context: Context}) {
 
   const shortcuts: WorkspaceLink[] = isAdmin ? [
     {path: "/rounds", title: "Đợt khóa luận", detail: "Lịch đăng ký và trạng thái đợt", icon: CalendarDays},
-    {path: "/administration", title: "Tài khoản & phân công", detail: "Người dùng và nhiệm vụ", icon: UsersRound},
+    {path: "/administration", title: "Tài khoản", detail: "Trạng thái và hỗ trợ truy cập", icon: UsersRound},
+    {path: "/administration/assignments", title: "Phân công theo đợt", detail: "Nhiệm vụ và quyền theo đợt KLTN", icon: ClipboardList},
     {path: "/forms", title: "Biểu mẫu Khoa", detail: "Tài liệu học vụ đang phát hành", icon: FileText},
   ] : [
     {path: "/topics", title: isStudent ? "Tìm đề tài" : head ? "Duyệt đề tài" : "Đề tài của tôi",

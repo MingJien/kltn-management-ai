@@ -7,7 +7,7 @@ import { formatDate } from "./CoreForms";
 const names = {PROPOSAL:"Đề cương (Mẫu 3)", PLAN:"Kế hoạch thực hiện (Mẫu 2)", REPORT:"Cuốn báo cáo KLTN", SUPPORTING:"Tài liệu hỗ trợ"};
 type Kind = keyof typeof names;
 
-export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,run,kinds=["PROPOSAL","PLAN","REPORT","SUPPORTING"]}: {
+export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,run,kinds=["PROPOSAL","PLAN","REPORT"]}: {
   thesis:Thesis; deadlines:DocumentDeadline[]; history:AuditEvent[]; userId:string; busy:boolean; run:CoreRun; kinds?:Kind[];
 }) {
   const [kind,setKind] = useState<Kind>(kinds[0]);

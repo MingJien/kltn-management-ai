@@ -15,6 +15,7 @@ from backend.db.models import entities as m
 
 RESOURCE_ROLE_LABELS = {
     "FORM_MANAGER": "Quản lý biểu mẫu và tài liệu Khoa",
+    "REVIEW_RECORDS_MANAGER": "Tiếp nhận hồ sơ phản biện",
     "ELIGIBILITY_IMPORTER": "Nhập danh sách đủ điều kiện",
     "ELIGIBILITY_VERIFIER": "Điều chỉnh/thu hồi danh sách",
     "ACCOUNT_MANAGER": "Quản lý tài khoản sinh viên",
@@ -167,6 +168,7 @@ def build_account_directory(
     additional_role: str,
     offset: int,
     limit: int,
+    account_status: str = "ALL",
 ) -> dict:
     """Return one row per account, with tabs/counts and current additional duties."""
     rows = session.execute(
@@ -219,6 +221,9 @@ def build_account_directory(
     filtered = []
     for row in rows:
         user_roles = roles_by_user.get(row.id, [])
+        state = "PENDING" if row.status == "DISABLED" and row.email_verified_at is None else row.status
+        if account_status != "ALL" and state != account_status:
+            continue
         if category == "STUDENT" and row.base_role != "STUDENT":
             continue
         if category == "LECTURER" and row.base_role != "LECTURER":

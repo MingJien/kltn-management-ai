@@ -1,3 +1,4 @@
+import WorkflowSteps from "./WorkflowSteps";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Lecturer, ProgressReport, Proposal, Thesis, ThesisDocument } from "../../api";
@@ -7,7 +8,7 @@ import RegistrationSubmission from "./RegistrationSubmission";
 import ThesisDocuments, { type CoreRun } from "./ThesisDocuments";
 import ThesisProposal from "./ThesisProposal";
 
-export type SubmissionKind = "REGISTRATION" | "PLAN" | "PROPOSAL" | "REPORT" | "SUPPORTING";
+export type SubmissionKind = "REGISTRATION" | "PLAN" | "PROPOSAL" | "REPORT";
 export default function ThesisSubmissions({thesis, proposal, docs, deadlines, history, lecturers, reports, userId, busy, run, kind}: {
   thesis: Thesis; proposal: Proposal | null; docs: ThesisDocument[]; deadlines: DocumentDeadline[];
   history: AuditEvent[]; lecturers: Lecturer[]; reports: ProgressReport[]; userId: string;
@@ -21,7 +22,6 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
     ...(proposal ? [{kind:"PROPOSAL", label:"Đề cương", code:"Mẫu 3", description:"GVHD xác nhận · TBM chốt", state:proposal.state, pending:(thesis.actions.includes("proposal:review") && ["SUBMITTED","UNDER_REVIEW"].includes(proposal.state)) || (thesis.actions.includes("proposal:finalize") && proposal.state === "ADVISOR_CONFIRMED") || (thesis.actions.includes("proposal:dean_confirm") && proposal.state === "DEPARTMENT_FINALIZED")}] : []),
     ...(thesis.actions.includes("document:view") ? [
       {kind:"REPORT", label:"Cuốn báo cáo KLTN", code:"Báo cáo trước bảo vệ", description:"Bản báo cáo hoàn chỉnh của đề tài", state:docs.find(doc => doc.document_type === "REPORT")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "REPORT" && doc.versions[0]?.state === "SUBMITTED")},
-      {kind:"SUPPORTING", label:"Tài liệu bổ sung", code:"Khảo sát · thiết kế · hướng dẫn", description:"Tệp hỗ trợ cho hồ sơ khóa luận", state:null, pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "SUPPORTING" && !doc.title.startsWith("Minh chứng tiến độ ") && doc.versions[0]?.state === "SUBMITTED")},
     ] : []),
   ];
   const displayed = pendingOnly ? choices.filter(item => item.pending) : choices;
@@ -39,7 +39,8 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
         {item.state && <Status value={item.state} />}
       </Link>)}
     </div>
-    <div className="submission-panel stack" key={selected}>
+    <div className="submission-panel stack" key={selected}>{["PLAN","PROPOSAL","REPORT"].includes(selected) && <WorkflowSteps steps={selected==="PROPOSAL"?["SV nộp đề cương","GVHD xác nhận","TBM chốt","Hoàn tất hồ sơ"]:["SV nộp tệp","GVHD xem / phản hồi","Tiếp nhận phiên bản"]}
+ current={selected==="PROPOSAL"?(["DEPARTMENT_FINALIZED","DEAN_CONFIRMED"].includes(proposal?.state||"")?3:proposal?.state==="ADVISOR_CONFIRMED"?2:["SUBMITTED","UNDER_REVIEW"].includes(proposal?.state||"")?1:0):docs.some(d=>d.document_type===selected && ["ACCEPTED","FINAL"].includes(d.versions[0]?.state||""))?2:docs.some(d=>d.document_type===selected && d.versions.length)?1:0}/> }
       {selected === "REGISTRATION" && (thesis.registration_id
         ? <RegistrationSubmission registrationId={thesis.registration_id} userId={userId} />
         : <p className="alert alert-info">Hồ sơ này chưa có liên kết đơn đăng ký. <Link to="/registrations">Xem hồ sơ đăng ký</Link></p>)}
@@ -47,11 +48,12 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
         <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={["PROPOSAL"]} />
         <ThesisProposal thesis={thesis} proposal={proposal} deadline={deadlines.find(item => item.document_type === "PROPOSAL")} lecturers={lecturers} userId={userId} busy={busy} run={run} />
       </>}
-      {["PLAN","REPORT","SUPPORTING"].includes(selected) && <>
-        <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT" | "SUPPORTING"]} />
-        <ThesisDocuments thesis={thesis} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT" | "SUPPORTING"} pendingOnly={pendingOnly} />
+      {["PLAN","REPORT"].includes(selected) && <>
+        <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT"]} />
+        <ThesisDocuments thesis={thesis} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT"} pendingOnly={pendingOnly} />
       </>}
     </div>
+    {docs.some(doc => doc.document_type === "SUPPORTING" && !doc.title.startsWith("Minh chứng tiến độ ")) && <details className="card"><summary>Hồ sơ tài liệu đã nộp trước đây</summary><div className="card-body"><ThesisDocuments thesis={{...thesis, actions: thesis.actions.filter(action => action !== "document:submit")}} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind="SUPPORTING" legacyOnly /></div></details>}
     <p className="submission-help text-body-sm text-muted">Cần mẫu trắng hoặc tài liệu Khoa công bố? <Link to={"/forms?round_id=" + thesis.round_id}>Mở kho biểu mẫu & tài liệu Khoa</Link>. Báo cáo định kỳ nộp tại <Link to={"/theses/" + thesis.id + "?section=progress"}>Báo cáo tiến độ</Link>.</p>
   </section>;
 }

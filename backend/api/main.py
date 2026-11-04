@@ -70,6 +70,8 @@ app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(roster_router)
 app.include_router(assignment_router)
+from backend.api.positions import router as positions_router
+app.include_router(positions_router)
 app.include_router(account_admin_router)
 app.include_router(lecturer_import_router)
 app.include_router(thesis_workspace_router)
@@ -166,10 +168,14 @@ def context(
         m.ResourceAssignment.state == "ACTIVE",
         m.ResourceAssignment.effective_from <= now,
         or_(m.ResourceAssignment.effective_to.is_(None), m.ResourceAssignment.effective_to > now),
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER", "REVIEW_RECORDS_MANAGER"]),
     )).all()
-    if "FORM_MANAGER" in assignment_types:
+    if user.base_role == "ADMIN" or "FORM_MANAGER" in assignment_types:
         actions.append("forms:manage")
+    if user.base_role == "LECTURER" and "KLTN_COORDINATOR" in assignment_types:
+        actions.append("progress:coordinate")
+    if user.base_role == "LECTURER" and "REVIEW_RECORDS_MANAGER" in assignment_types:
+        actions.append("evaluation:record")
     if "ELIGIBILITY_IMPORTER" in assignment_types:
         actions.append("eligibility:import")
     if "ELIGIBILITY_VERIFIER" in assignment_types:

@@ -200,8 +200,12 @@ def test_import_confirm_activate_revoke_and_password_lifecycle(monkeypatch):
         with pytest.raises(HTTPException) as revoked:
             activate(LinkPassword(token=token, password="strong-password-123"), post_request(), session)
         assert revoked.value.status_code == 403
-        again = import_roster(session, staff, round_.id, rows, "KHOA-2026-TEST-2")
-        assert again["new_accounts"] == 0 and again["confirmed"] == 1
+        from backend.api.roster import restore_eligibility
+        with pytest.raises(HTTPException) as blocked_import:
+            import_roster(session, staff, round_.id, rows, "KHOA-2026-TEST-2")
+        assert blocked_import.value.status_code == 409
+        restore_eligibility(round_.id, RevokeStudent(student_id=student.id,
+            reason="Official restoration after review", basis_ref="KHOA-2026-RESTORE"), staff, session)
         activate(LinkPassword(token=token, password="strong-password-123"), post_request(), session)
         assert account.status == "ACTIVE" and account.email_verified_at
         assert verify_password(account.password_hash, "strong-password-123")

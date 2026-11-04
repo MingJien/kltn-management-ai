@@ -146,11 +146,11 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
   </div></article>;
 }
 
-export default function ThesisDocuments({thesis, docs, deadlines, reports, userId, busy, run, kind = "PLAN", pendingOnly = false}: {
+export default function ThesisDocuments({thesis, docs, deadlines, reports, userId, busy, run, kind = "PLAN", pendingOnly = false, legacyOnly = false}: {
   thesis: Thesis; docs: ThesisDocument[]; deadlines: DocumentDeadline[]; reports: ProgressReport[]; userId: string;
-  busy: boolean; run: CoreRun; kind?: "PLAN" | "REPORT" | "SUPPORTING"; pendingOnly?: boolean;
+  busy: boolean; run: CoreRun; kind?: "PLAN" | "REPORT" | "SUPPORTING"; pendingOnly?: boolean; legacyOnly?: boolean;
 }) {
-  const heading = kind === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : kind === "REPORT" ? "Cuốn báo cáo KLTN" : "Tài liệu bổ sung";
+  const heading = kind === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : kind === "REPORT" ? "Cuốn báo cáo KLTN" : "Tài liệu đã nộp trước đây";
   const [title, setTitle] = useState(kind === "PLAN" ? documentPresets.PLAN : kind === "REPORT" ? "Cuốn báo cáo KLTN" : documentPresets.SUPPORTING_REFERENCES);
   const [preset, setPreset] = useState("SUPPORTING_REFERENCES");
   const [file, setFile] = useState<File | null>(null);
@@ -158,7 +158,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
   const progressEvidenceIds = new Set(reports.map(report => report.evidence_document_version_id).filter((id): id is string => !!id));
   const visibleDocs = docs.filter(doc => doc.document_type === kind && (!pendingOnly || doc.versions[0]?.state === "SUBMITTED") && !(kind === "SUPPORTING" && doc.title.startsWith("Minh chứng tiến độ ") && doc.versions.some(version => progressEvidenceIds.has(version.id))));
   const active = ["ACTIVE","PROPOSAL_APPROVED","IN_PROGRESS","EXTENDED"].includes(thesis.state);
-  const canCreate = thesis.actions.includes("document:submit") && active && (kind === "SUPPORTING" || visibleDocs.length === 0);
+  const canCreate = !legacyOnly && thesis.actions.includes("document:submit") && active && (kind === "SUPPORTING" || visibleDocs.length === 0);
   const validFile = !!file && file.size > 0 && file.size <= 10*1024*1024 && (kind === "SUPPORTING" ? /\.(pdf|docx|txt)$/i : /\.(pdf|docx)$/i).test(file.name);
   const deadline = deadlines.find(item => item.document_type === kind);
   const canFirstSubmit = deadline?.state === "OPEN";
@@ -166,7 +166,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
     <div className="submission-heading"><div><span className="section-eyebrow">{kind === "PLAN" ? "KẾ HOẠCH CỦA NHÓM" : kind === "REPORT" ? "BẢN BÁO CÁO HOÀN CHỈNH" : "TỆP HỖ TRỢ HỒ SƠ"}</span><h2>{heading}</h2><p>{kind === "PLAN"
       ? "Một kế hoạch chung cho đề tài. Nộp bản đã điền; GVHD nhận xét, yêu cầu sửa hoặc tiếp nhận."
       : kind === "REPORT" ? "Nộp cuốn báo cáo trước bảo vệ. Đây là bản báo cáo hoàn chỉnh, khác với báo cáo tiến độ định kỳ."
-      : "Nộp tài liệu tham khảo, kết quả khảo sát, thiết kế hoặc hướng dẫn sử dụng. Minh chứng báo cáo định kỳ nằm tại Báo cáo tiến độ."}</p></div>
+      : legacyOnly ? "Các tệp đã nộp trước đây vẫn được giữ để xem lại và đối chiếu." : "Tệp hỗ trợ cho hồ sơ khóa luận."}</p></div>
       {kind === "PLAN" && <button type="button" className="btn btn-secondary" disabled={busy} onClick={async () => {
         setTemplateError(""); try {await downloadPlanTemplate(thesis.round_id);} catch (cause) {setTemplateError(String(cause));}
       }}>Tải mẫu áp dụng · Mẫu 2</button>}

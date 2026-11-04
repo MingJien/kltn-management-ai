@@ -47,14 +47,14 @@ def publish(forms,item,expected=None):
         headers={**hdr(users[4]),"If-Match":str(expected or version["row_version"])},json={"reason":"Khoa phát hành phiên bản đúng"})
 
 
-def test_explicit_form_assignment_not_implied_by_admin_coordinator_or_head(forms):
+def test_admin_manages_forms_and_lecturers_need_explicit_assignment(forms):
     client,users,_,_,session,round_id=forms
     payload=dict(round_id=str(round_id),code="sample",title="Tài liệu Khoa",document_kind="FORM",audience="LECTURER",reason="Synthetic official source")
     assert client.post("/api/v1/school-forms",headers=hdr(users[3]),json=payload).status_code==403
     assert client.post("/api/v1/school-forms",headers=hdr(users[0]),json=payload).status_code==403
-    # Technical ADMIN does not implicitly publish academic forms.
+    # Admin manages the catalog; academic approval rights are unchanged.
     users[5].base_role="ADMIN";session.commit()
-    assert client.post("/api/v1/school-forms",headers=hdr(users[5]),json=payload).status_code==403
+    assert client.post("/api/v1/school-forms",headers=hdr(users[5]),json={**payload,"code":"admin-sample"}).status_code==201
     assert client.post("/api/v1/school-forms",headers=hdr(users[4]),json=payload).status_code==201
 
 
@@ -94,6 +94,9 @@ def test_student_cannot_download_lecturer_forms_even_direct_link(forms):
     path=f"/api/v1/school-forms/{item['id']}/versions/{item['versions'][0]['id']}/download"
     assert client.get(path,headers=hdr(users[0])).status_code==404
     assert client.get(path,headers=hdr(users[3])).status_code==200
+    for user, expected in ((users[0], False), (users[3], True)):
+        inbox = client.get("/api/v1/notifications", headers=hdr(user)).json()["items"]
+        assert any(note["message"].startswith("Khoa đã phát hành") for note in inbox) is expected
     bad=client.patch(f"/api/v1/school-forms/{item['id']}",headers=version_headers(users[4],item),
         json={"title":"Mẫu đánh giá","audience":"STUDENT_AND_LECTURER","state":"ACTIVE","reason":"Cannot expose this protected form"})
     assert bad.status_code==422
@@ -139,3 +142,28 @@ def test_form_management_can_be_assigned_after_registration_round_closes(forms):
     assert response.status_code==201,response.text
     payload["assignment_type"]="ELIGIBILITY_IMPORTER"
     assert client.post("/api/v1/admin/round-assignments",headers=hdr(users[5]),json=payload).status_code==422
+
+
+def test_admin_without_assignment_updates_hides_and_restores_published_form(forms):
+    client,users,_,_,session,round_id=forms
+    item=publish(forms,upload(forms,create(forms))).json()
+    admin=users[5];admin.base_role="ADMIN";session.commit()
+    assert "forms:manage" in client.get("/api/v1/me/context",headers=hdr(admin)).json()["actions"]
+    access=client.get("/api/v1/school-forms/access",headers=hdr(admin)).json()
+    assert next(row for row in access if row["id"]==str(round_id))["can_manage"]
+    base=f"/api/v1/school-forms/{item['id']}"
+    version=item["versions"][0]
+    for state in ("ARCHIVED","ACTIVE"):
+        response=client.patch(base,headers=version_headers(admin,item),json={"title":"Mẫu đã cập nhật","audience":item["audience"],"state":state,"reason":"Admin điều chỉnh danh mục mẫu"})
+        assert response.status_code==200,response.text
+        item=response.json()
+        visible=client.get("/api/v1/school-forms",params={"round_id":str(round_id)},headers=hdr(users[0])).json()
+        assert bool(visible)==(state=="ACTIVE")
+        assert client.get(base+f"/versions/{version['id']}/download",headers=hdr(users[0])).status_code==(200 if state=="ACTIVE" else 404)
+        assert len(item["versions"])==1
+    uploaded=client.post(base+"/versions",headers=version_headers(admin,item),data={"source_reference":"Khoa DEMO","reason":"Admin cập nhật tệp mẫu mới"},files={"file":("admin-updated.pdf",synthetic_pdf(),"application/pdf")})
+    assert uploaded.status_code==201,uploaded.text
+    item=uploaded.json()
+    assert len(item["versions"])==2
+    session.get(m.ThesisRound,round_id).state="ARCHIVED";session.commit()
+    assert client.patch(base,headers=version_headers(admin,item),json={"title":"Không được sửa","audience":item["audience"],"state":"ARCHIVED","reason":"Đợt đã được lưu trữ"}).status_code==409

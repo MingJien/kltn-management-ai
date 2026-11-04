@@ -28,6 +28,16 @@
   align-items: stretch;
 }
 
+.admin-grid-top--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-page__quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 960px) {
   .admin-grid-top {
     grid-template-columns: 1fr;
@@ -1196,4 +1206,41 @@
   .import-step__actions .btn-primary {
     margin-left: 0;
   }
+}
+
+
+
+
+/* ── Responsive Admin Metrics ── */
+
+@media (max-width: 860px) {
+
+  .admin-metrics {
+
+    grid-auto-flow: row;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  }
+
+}
+
+
+
+@media (max-width: 480px) {
+
+  .admin-metrics {
+
+    grid-template-columns: 1fr;
+
+  }
+
+
+
+  .account-list__actions {
+
+    grid-template-columns: repeat(2, 1fr);
+
+  }
+
 }

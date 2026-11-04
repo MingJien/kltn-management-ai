@@ -11,7 +11,7 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
-from backend.api.account import _mail_link
+from backend.api.account import _mail_link, _mail_recipient
 from backend.api.account_admin import _admin
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
@@ -123,8 +123,8 @@ def send_activation(user_id: UUID, user: m.UserAccount = Depends(current_user),
                     session: Session = Depends(get_session)):
     _admin(user)
     account = session.scalar(select(m.UserAccount).where(m.UserAccount.id == user_id).with_for_update())
-    if not account or account.base_role != "LECTURER" or not session.scalar(select(m.LecturerProfile.id).where(
-            m.LecturerProfile.user_id == user_id)):
+    profile = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == user_id))
+    if not account or account.base_role != "LECTURER" or not profile:
         raise HTTPException(404, "Không tìm thấy tài khoản giảng viên.")
     if account.status != "DISABLED" or account.email_verified_at or not account.email:
         raise HTTPException(409, "Chỉ gửi kích hoạt cho giảng viên đang chờ kích hoạt, chưa bị khóa.")
@@ -136,12 +136,12 @@ def send_activation(user_id: UUID, user: m.UserAccount = Depends(current_user),
         .order_by(m.AuditEvent.occurred_at.desc()).limit(1))
     if last and last + timedelta(seconds=60) > now:
         raise HTTPException(429, "Vừa có yêu cầu gửi thư cho giảng viên này. Vui lòng đợi 60 giây rồi làm mới.")
-    account.row_version += 1
+    # Keep a self-requested activation link valid until the account is activated.
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="LECTURER_ACTIVATION_SENDING",
         resource_type="user_account", resource_id=user_id, occurred_at=now, correlation_id=uuid4()))
     session.commit()
     try:
-        _mail_link(account, "activate")
+        _mail_link(_mail_recipient(account, profile.display_name, "staff", profile.lecturer_code), "activate")
         sent = True
     except Exception:
         sent = False

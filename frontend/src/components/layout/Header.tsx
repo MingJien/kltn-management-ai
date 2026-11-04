@@ -21,7 +21,8 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/forms": "Kho biểu mẫu & tài liệu Khoa",
   "/submissions": "Hồ sơ nộp & xét duyệt",
   "/account": "Tài khoản",
-  "/administration": "Quản trị",
+  "/administration": "Tài khoản",
+  "/administration/assignments": "Phân công",
   "/rounds": "Đợt KLTN",
   "/roster": "Danh sách sinh viên",
   "/lecturers": "Danh sách giảng viên",
@@ -29,6 +30,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/ai": "Tra cứu thử nghiệm",
   "/notifications": "Thông báo",
   "/activity": "Nhật ký hoạt động",
+  "/review-records": "Tiếp nhận hồ sơ phản biện",
   "/evaluation": "Phản biện & điều kiện bảo vệ",
 };
 

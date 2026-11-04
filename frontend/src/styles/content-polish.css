@@ -239,14 +239,17 @@
   color: var(--neutral-900);
 }
 .topic-registered-table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
   font-size: 13px;
 }
 .topic-registered-table th, .topic-registered-table td {
-  padding: 8px 12px;
+  padding: 9px 13px;
   border-bottom: 1px solid var(--neutral-200);
   text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .topic-registered-table th {
   background: var(--neutral-50);

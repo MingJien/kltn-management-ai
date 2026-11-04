@@ -8,7 +8,7 @@ from sqlalchemy import func, or_, select
 from backend.db.models import entities as m
 from backend.services import documents, file_scanner, membership_revision, workflow_notices as notices
 from backend.services.registration import _is_department_head, profile, row_version
-from backend.services.theses import audit, effective, now, primary_advisor
+from backend.services.theses import audit, effective, now, primary_advisor, resource_role
 
 FORM_FIELDS = {
     "ADVISOR": [
@@ -37,7 +37,9 @@ def permissions(session, user, thesis):
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
         if _is_department_head(session, lecturer.id, thesis.department_id):
-            result.update({"evaluation:view", "evaluation:manage", "evaluation:eligibility"})
+            result.update({"evaluation:view", "evaluation:manage", "evaluation:eligibility", "evaluation:record"})
+        if resource_role(session,user.id,"REVIEW_RECORDS_MANAGER",round_id=thesis.round_id):
+            result.update({"evaluation:view","evaluation:record"})
         advisor = primary_advisor(session, thesis.id)
         if advisor and advisor.lecturer_id == lecturer.id:
             result.update({"evaluation:view", "evaluation:advisor"})
@@ -107,7 +109,7 @@ def requirements(session, current_report, review, discipline_status):
     report_file = session.get(m.StoredFile, current_report.stored_file_id) if current_report else None
     signed = session.get(m.StoredFile, review.signed_file_id) if review and review.signed_file_id else None
     complete = bool(review and review.thesis_completed and report_file and report_file.scan_state == "CLEAN")
-    consent = bool(review and review.allow_defense and signed and signed.scan_state == "CLEAN")
+    consent = bool(review and review.allow_defense and ((signed and signed.scan_state == "CLEAN") or review.paper_confirmed_at))
     return [
         {"key": "discipline", "label": "Không bị kỷ luật từ cảnh cáo toàn Trường", "met": discipline_status == "CLEAR"},
         {"key": "completion", "label": "Hoàn thành KLTN, GVHD xác nhận trên đúng bản báo cáo", "met": complete},
@@ -140,6 +142,8 @@ def people(session, thesis):
     advisor = primary_advisor(session, thesis.id)
     if advisor:
         ids.add(session.get(m.LecturerProfile, advisor.lecturer_id).user_id)
+    ids |= set(session.scalars(select(m.ResourceAssignment.user_id).where(
+        m.ResourceAssignment.round_id==thesis.round_id,m.ResourceAssignment.assignment_type=="REVIEW_RECORDS_MANAGER",effective(m.ResourceAssignment))))
     return ids
 
 
@@ -148,13 +152,25 @@ def assignments(session, thesis):
         m.ReviewerAssignment.review_scope == "THESIS").order_by(m.ReviewerAssignment.assigned_at.desc())).all()
 
 
+def reviewer_department_ids(session, thesis):
+    """Reviewer eligibility stays within the faculty; CNTT and KHMT can cross-review."""
+    department = session.get(m.Department, thesis.department_id)
+    eligible = {thesis.department_id}
+    if department and department.code in {"BM-CNTT", "BM-KHMT"}:
+        eligible.update(session.scalars(select(m.Department.id).where(
+            m.Department.faculty_id == department.faculty_id,
+            m.Department.code.in_(["BM-CNTT", "BM-KHMT"]),
+            m.Department.active.is_(True))))
+    return eligible
+
+
 def assign(session, user, thesis_id, data, expected):
     thesis = access(session, user, thesis_id, "evaluation:manage", write=True)
     row_version(expected, thesis.row_version)
     lecturer = session.get(m.LecturerProfile, data.lecturer_id)
     account = session.get(m.UserAccount, lecturer.user_id) if lecturer else None
-    if not lecturer or lecturer.department_id != thesis.department_id or not account or account.status != "ACTIVE":
-        raise HTTPException(422, "Chọn GV đang hoạt động thuộc bộ môn của khóa luận")
+    if not lecturer or lecturer.department_id not in reviewer_department_ids(session, thesis) or not account or account.status != "ACTIVE":
+        raise HTTPException(422, "Chọn GV đang hoạt động thuộc bộ môn phù hợp với khóa luận")
     advisor = primary_advisor(session, thesis.id)
     if advisor and advisor.lecturer_id == lecturer.id:
         raise HTTPException(422, "GVHD không được đồng thời phản biện cùng khóa luận")
@@ -335,13 +351,16 @@ def scan_signed(session, user, thesis_id, review_id, expected):
     return review_out(session, item, can_edit=True)
 
 
-def submit_review(session, user, thesis_id, review_id, expected):
+def submit_review(session, user, thesis_id, review_id, data, expected):
     thesis, item = editable_review(session, user, thesis_id, review_id, expected)
     if any(not item.sections.get(field["key"], "").strip() for field in FORM_FIELDS[item.kind]):
         raise HTTPException(422, "Điền đầy đủ các mục nhận xét theo biểu mẫu trước khi gửi")
     if item.kind == "ADVISOR" and (item.thesis_completed is None or item.allow_defense is None):
         raise HTTPException(422, "GVHD cần xác nhận hoàn thành và đề nghị cho bảo vệ hoặc không")
-    documents.require_clean(session.get(m.StoredFile, item.signed_file_id) if item.signed_file_id else None, "gửi bản nhận xét đã ký")
+    if not (getattr(data,"confirm_content",None) or getattr(data,"confirm_signed_copy",None)):
+        raise HTTPException(422,"Xác nhận nội dung nhận xét trước khi gửi")
+    if item.signed_file_id:
+        documents.require_clean(session.get(m.StoredFile,item.signed_file_id),"gửi bản nhận xét có đính kèm")
     item.state, item.submitted_at = "SUBMITTED", now()
     item.row_version += 1
     thesis.row_version += 1
@@ -359,7 +378,7 @@ def review_visible(session, user, thesis, item):
     actions = permissions(session, user, thesis)
     if item.state == "DRAFT":
         return user.base_role == "LECTURER" and session.get(m.LecturerProfile, item.lecturer_id).user_id == user.id
-    if "evaluation:manage" in actions or "evaluation:advisor" in actions:
+    if "evaluation:manage" in actions or "evaluation:advisor" in actions or "evaluation:record" in actions:
         return True
     if user.base_role == "LECTURER":
         return session.get(m.LecturerProfile, item.lecturer_id).user_id == user.id
@@ -376,7 +395,12 @@ def review_out(session, item, *, can_edit=False):
         "thesis_completed": item.thesis_completed, "allow_defense": item.allow_defense,
         "source_reference": item.source_reference, "revision_reason": item.revision_reason,
         "signed_file": {"name": file.original_name, "scan_state": file.scan_state} if file else None,
-        "submitted_at": item.submitted_at, "can_edit": can_edit}
+        "submitted_at": item.submitted_at, "can_edit": can_edit,
+        "paper_receipt": {"reference":item.paper_reference,"export_code":item.paper_export_code,
+            "confirmed_at":item.paper_confirmed_at,"confirmed_by":notices.actor_name(session,item.paper_confirmed_by)} if item.paper_confirmed_at else None,
+        "export_history": [{"code":event.source_reference,"at":event.occurred_at}
+            for event in session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_type=="thesis_review",
+                m.AuditEvent.resource_id==item.id,m.AuditEvent.action=="THESIS_REVIEW_EXPORTED").order_by(m.AuditEvent.occurred_at.desc()))]}
 
 
 def signed_download(session, user, thesis_id, review_id):
@@ -489,13 +513,13 @@ def workspace(session, user, thesis_id):
     if "evaluation:manage" in actions:
         advisor = primary_advisor(session, thesis.id)
         for lecturer in session.scalars(select(m.LecturerProfile).join(m.UserAccount,
-            m.UserAccount.id == m.LecturerProfile.user_id).where(m.LecturerProfile.department_id == thesis.department_id,
+            m.UserAccount.id == m.LecturerProfile.user_id).where(m.LecturerProfile.department_id.in_(reviewer_department_ids(session, thesis)),
             m.UserAccount.status == "ACTIVE").order_by(m.LecturerProfile.display_name)):
             if not advisor or lecturer.id != advisor.lecturer_id:
                 load = session.scalar(select(func.count()).select_from(m.ReviewerAssignment).where(
                     m.ReviewerAssignment.lecturer_id == lecturer.id, m.ReviewerAssignment.review_scope == "THESIS",
                     m.ReviewerAssignment.state == "ACTIVE"))
-                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "active_load": load})
+                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load})
     history = []
     if "evaluation:eligibility" in actions or user.base_role == "STUDENT":
         member_ids = [member["id"] for member in visible_members]
@@ -520,7 +544,7 @@ def workspace(session, user, thesis_id):
                     and current and r.report_version_id == current.id for r in reviews) for member in members(session, thesis))),
             "reason": a.assignment_reason, "source_reference": a.source_reference,
             "revoked_reason": revocations[str(a.id)].reason if str(a.id) in revocations else None} for a in assignments(session, thesis)],
-        "candidates": candidates, "eligibility_history": history, "workflow_blockers": workflow_blockers}
+        "reviewer_department": session.get(m.Department,thesis.department_id).name, "candidates": candidates, "eligibility_history": history, "workflow_blockers": workflow_blockers}
 
 
 def report_submitted(session, user, thesis):
@@ -547,3 +571,31 @@ def listing(session, user, search, limit, offset):
             "reviewer_count": len(active), "report_available": report(session, thesis) is not None,
             "advisor_name": row.advisor_name})
     return {"total": len(rows), "items": items}
+
+def review_fingerprint(session,item):
+    import hashlib,json
+    thesis=session.get(m.Thesis,item.thesis_id)
+    values=[str(item.id),str(item.report_version_id),item.sections,item.thesis_completed,item.allow_defense,item.source_reference,thesis.current_title]
+    return hashlib.sha256(json.dumps(values,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+
+def record_paper(session,user,thesis_id,review_id,data,expected):
+    thesis=access(session,user,thesis_id,"evaluation:record",write=True)
+    item=session.scalar(select(m.ThesisReview).where(m.ThesisReview.id==review_id,m.ThesisReview.thesis_id==thesis.id).with_for_update())
+    if not item or item.state!="SUBMITTED":
+        raise HTTPException(409,"Chỉ ghi nhận bản giấy của phiếu đã gửi")
+    row_version(expected,item.row_version)
+    if item.paper_confirmed_at:
+        raise HTTPException(409,"Bản giấy đã được ghi nhận; lịch sử được giữ nguyên")
+    exported=session.scalar(select(m.AuditEvent).where(m.AuditEvent.resource_type=="thesis_review",m.AuditEvent.resource_id==item.id,
+        m.AuditEvent.action=="THESIS_REVIEW_EXPORTED",m.AuditEvent.source_reference==data.export_code))
+    if not exported or ("content_sha256="+review_fingerprint(session,item)) not in (exported.reason or ""):
+        raise HTTPException(422,"Mã bản xuất không thuộc đúng nội dung phiếu này; xuất lại phiếu hiện tại để đối chiếu")
+    item.paper_reference,item.paper_export_code=data.reference,data.export_code
+    item.paper_confirmed_by,item.paper_confirmed_at=user.id,now()
+    item.row_version+=1;thesis.row_version+=1
+    audit(session,user,"THESIS_REVIEW_PAPER_RECEIVED","thesis_review",item.id,data.reference,source_reference=data.export_code)
+    author=session.get(m.LecturerProfile,item.lecturer_id).user_id
+    student=session.get(m.StudentProfile,session.get(m.ThesisMember,item.thesis_member_id).student_id).user_id
+    notify(session,user,thesis,people(session,thesis)|{author,student},"THESIS_REVIEW_PAPER_RECEIVED","Đã ghi nhận bản giấy nhận xét; bộ môn có thể xét lại điều kiện")
+    session.commit()
+    return workspace(session,user,thesis.id)

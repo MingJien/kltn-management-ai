@@ -122,7 +122,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     }}><div className="card-body core-form">
       <h3>Mở mốc theo kế hoạch đợt</h3>
       <p className="text-body-sm text-muted">Áp dụng cho mọi khóa luận trong {thesis.round_label}. Mốc đã mở giữ nguyên; đóng trước khi ban hành phiên bản mới cùng mã.</p>
-      <p className="text-body-sm text-muted">Mốc này dùng cho báo cáo tiến độ định kỳ. Hạn nộp từng loại tài liệu (Đề cương, Kế hoạch, Cuốn báo cáo KLTN, Tài liệu hỗ trợ) được đặt riêng ở mục “Hạn nộp tài liệu theo đợt” phía trên, không phải ở đây.</p>
+      <p className="text-body-sm text-muted">Mốc này dùng cho báo cáo tiến độ định kỳ. Hạn nộp từng loại tài liệu (Đề cương, Kế hoạch, Cuốn báo cáo KLTN) được đặt riêng ở mục “Hạn nộp tài liệu theo đợt” phía trên, không phải ở đây.</p>
       <div className="core-fields">
         <div className="input-group"><label htmlFor="milestone-code">Mã mốc</label><input className="input" id="milestone-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} pattern="(?:[A-Z0-9_]|-){1,50}" maxLength={50} placeholder="NOI_BO_1" required disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-title">Tên mốc</label><input className="input" id="milestone-title" value={title} onChange={event => setTitle(event.target.value)} required maxLength={255} disabled={busy} /></div>

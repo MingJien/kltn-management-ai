@@ -343,7 +343,8 @@
 }
 
 .roster-page .account-table {
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: collapse;
   font-family: var(--font-sans);
   font-size: 13px;
@@ -354,7 +355,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: #f8fafc;
   color: var(--neutral-600);
   font-size: 12px;
@@ -366,10 +367,11 @@
 }
 
 .roster-page .account-table tbody td {
-  padding: 13px 16px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--neutral-150);
   color: var(--neutral-700);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .roster-page .account-table tbody tr:last-child td {
@@ -616,6 +618,54 @@
   border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: var(--radius-sm);
   background: #ffffff;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.roster-preview .account-table {
+  min-width: 100%;
+  width: max-content;
+}
+
+.roster-preview .account-table th,
+.roster-preview .account-table td {
+  white-space: nowrap;
+  padding: 9px 13px;
+}
+
+.roster-preview .account-table th:first-child,
+.roster-preview .account-table td:first-child {
+  width: 1%;
+  min-width: 50px;
+  max-width: 65px;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--neutral-500);
+}
+
+.roster-preview .account-table td:nth-child(2) {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--primary-800);
+}
+
+.roster-preview .account-table td:nth-child(3) {
+  font-weight: 600;
+  color: var(--neutral-900);
+}
+
+.table-col-index {
+  width: 1%;
+  min-width: 50px;
+  max-width: 65px;
+  text-align: center !important;
+  font-family: var(--font-mono, monospace);
+}
+
+.table-col-code {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
 }
 
 /* ── Accordion ── */

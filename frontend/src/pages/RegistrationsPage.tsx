@@ -1,3 +1,4 @@
+import WorkflowSteps from "../components/domain/WorkflowSteps";
 import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -110,7 +111,7 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
         const me = row.members.find((member) => member.student_id === context.student_id);
         const activeCount = row.members.filter((member) => member.active).length;
         const draft = ["DRAFT","RETURNED"].includes(row.state);
-        return <article className="card registration-card" key={row.id}><div className="card-body stack">
+        return <article className="card registration-card" key={row.id}><div className="card-body stack"><WorkflowSteps steps={["Lập hồ sơ / xác nhận nhóm","Gửi hồ sơ","GV tiếp nhận","Hồ sơ khóa luận"]} current={row.thesis_id?3:row.state==="LECTURER_ACCEPTED"?2:row.state==="SUBMITTED"?1:0}/>
           <div className="registration-card__heading"><div><span className="topic-code">{row.topic_code}</span>
             <h2 className="topic-card-title">{row.topic_title}</h2></div>
             {row.proposer_type === "STUDENT" && row.state === "SUBMITTED"

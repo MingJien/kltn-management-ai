@@ -42,7 +42,7 @@ def create_milestone(session, user, thesis_id, data):
 
     notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
         kind="MILESTONE_OPENED",
-        message=f"Mốc {data.code} — {data.title} đã mở cho đợt {round_.code}, hạn nộp {format_due(data.due_at)}.",
+        message=f"Mốc {data.code} — {data.title} đã mở, hạn nộp {format_due(data.due_at)}.",
         section="progress")
     result = milestone_out(item)
     session.commit()
@@ -69,7 +69,7 @@ def close_milestone(session, user, thesis_id, milestone_id, data, expected):
 
     notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
         kind="MILESTONE_CLOSED",
-        message=f"Mốc {item.code} — {item.title} đã đóng nhận báo cáo cho đợt {round_.code}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
+        message=f"Mốc {item.code} — {item.title} đã đóng nhận báo cáo. Chỉ nộp lại khi GVHD yêu cầu sửa.",
         section="progress")
     result = milestone_out(item)
     session.commit()

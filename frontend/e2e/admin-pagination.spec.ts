@@ -14,7 +14,7 @@ test("Danh sách tài khoản phân trang 20/trang và tìm kiếm về trang 1"
     await page.getByLabel("Mật khẩu",{exact:true}).fill(accounts.admin.password);
     await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
     await expect(page.getByRole("heading",{name:"Tổng quan",exact:true})).toBeVisible();
-    await page.locator("#main-content").getByRole("link",{name:"Tài khoản và phân công"}).click();
+    await page.locator("#main-content").getByRole("link",{name:"Phân công theo đợt"}).click();
     await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption({label:"SYN-DEMO · OPEN"});
     await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_IMPORTER");
     await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption({label:accounts.admin.email});

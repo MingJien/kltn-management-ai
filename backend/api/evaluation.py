@@ -2,7 +2,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Request
 from backend.api.dependencies import current_user, get_session
-from backend.api.evaluation_schemas import ReviewerCreate, ReviewerDeadline, Reason, ReviewCreate, ReviewSave, ReviewSubmit, EligibilityCreate
+from backend.api.evaluation_schemas import ReviewerCreate, ReviewerDeadline, Reason, ReviewCreate, ReviewSave, ReviewSubmit, EligibilityCreate, PaperReceipt
 from backend.services import evaluation as service
 
 router = APIRouter(prefix="/api/v1", tags=["NV6 review and eligibility"])
@@ -74,7 +74,7 @@ def scan(thesis_id: UUID, review_id: UUID, if_match: int = Header(alias="If-Matc
 @router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/submit")
 def submit(thesis_id: UUID, review_id: UUID, data: ReviewSubmit,
            if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(transaction)):
-    return service.submit_review(session, user, thesis_id, review_id, if_match)
+    return service.submit_review(session, user, thesis_id, review_id, data, if_match)
 
 
 @router.get("/theses/{thesis_id}/evaluation/reviews/{review_id}/signed-copy")
@@ -104,3 +104,8 @@ def eligibility(thesis_id: UUID, data: EligibilityCreate, if_match: int = Header
 def reopen(thesis_id: UUID, data: Reason, if_match: int = Header(alias="If-Match", ge=1),
            user=Depends(current_user), session=Depends(transaction)):
     return service.reopen(session, user, thesis_id, data, if_match)
+
+@router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/paper-receipt")
+def paper_receipt(thesis_id: UUID,review_id: UUID,data:PaperReceipt,if_match:int=Header(alias="If-Match",ge=1),
+                  user=Depends(current_user),session=Depends(transaction)):
+    return service.record_paper(session,user,thesis_id,review_id,data,if_match)

@@ -2,11 +2,11 @@
 .app-shell__main, .page-content, #main-content, .card, .card-body, .stack { min-width:0; }
 :is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) { max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-gutter:stable; }
 :is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap):focus-visible { outline:3px solid var(--primary-400); outline-offset:3px; }
-:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) > table { width:100%; min-width:850px; table-layout:auto; }
-:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) :is(th,td) { min-width:120px; padding:14px 18px; vertical-align:top; overflow-wrap:normal; word-break:normal; white-space:normal; }
+:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) > table { min-width:100%; width:max-content; table-layout:auto; border-collapse:collapse; }
+:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) :is(th,td) { padding:10px 14px; vertical-align:middle; white-space:nowrap; overflow-wrap:normal; word-break:normal; }
 :is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) th { white-space:nowrap; font-weight:700; }
-:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) td:has(input[type=checkbox]) { min-width:54px; }
-:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) td:has(.btn) { min-width:175px; }
+:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) :is(th,td):has(input[type=checkbox]) { width:44px; min-width:44px; max-width:44px; text-align:center; padding:8px 10px; }
+:is(.table-container,.table-scroll,.admin-table-wrap,.roster-table-wrap) td:has(.btn) { width:1%; white-space:nowrap; min-width:unset; }
 .review-text-sheet table,.review-pdf-sheet table { min-width:0; }
 #main-content .card-body > h2, #main-content section.stack > h2 { font-size:clamp(19px,1.5vw,23px); line-height:1.4; font-weight: 700; letter-spacing:-.025em; color:var(--primary-800); }
 #main-content h3 { font-size:17px; font-weight:700; line-height:1.45; }

@@ -1,3 +1,6 @@
+function responseFileName(response:Response,fallback:string) {
+  return decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1]||fallback);
+}
 import { ApiError, apiMessage } from "./errors";
 
 export type Context = {
@@ -124,7 +127,7 @@ export async function downloadRegistrationForm(registrationId:string,version:Reg
     method:printCopy?"POST":"GET",credentials:"include",headers:{...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})}});
   if(!response.ok) {const body=await response.json().catch(()=>null);throw new Error(body?.detail||`HTTP ${response.status}`);}
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");link.href=url;
-  link.download=printCopy?`${response.headers.get("X-Document-Code")||"don-dang-ky"}.${version.file_name.split(".").pop()}`:version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
@@ -322,7 +325,7 @@ export async function downloadProposal(thesisId: string, version: Proposal["vers
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `de-cuong-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -366,7 +369,7 @@ export async function exportThesisReview(thesisId:string, reviewId:string, versi
   });
   if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
   const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
-  anchor.href=url;anchor.download=(response.headers.get("X-Document-Code")||"phieu-nhan-xet")+".docx";anchor.click();
+  anchor.href=url;anchor.download=decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1] || (response.headers.get("X-Document-Code")||"phieu-nhan-xet")+".docx");anchor.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
@@ -399,7 +402,7 @@ export async function downloadDocument(thesisId: string, doc: ThesisDocument, ve
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = printCopy ? `${response.headers.get("X-Document-Code") || `ban-in-v${version.version_no}`}.${version.file_name.split(".").pop()}` : version.file_name;
+  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -415,7 +418,16 @@ export type ChatResult = {
   provider_status: "NOT_CONFIGURED";
 };
 
-export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean};
+export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean;can_export_list:boolean};
+
+export async function exportRoundMau04(roundId:string) {
+  const response=await fetch(`${baseUrl}/api/v1/school-forms/rounds/${encodeURIComponent(roundId)}/mau-04`,{
+    method:"POST",credentials:"include",headers:sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
+  });
+  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");
+  link.href=url;link.download="danh-sach-sv-gvhd-mau-04.xlsx";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 export type SchoolFormVersion = {id:string;version_no:number;row_version:number;state:string;file_name:string;byte_size:number;scan_state:string;uploaded_at:string;uploaded_by_name:string;source_reference:string;change_reason:string;published_at:string|null};
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};
 

@@ -64,6 +64,8 @@ def visibility(session, user):
         label = "Tài khoản và hồ sơ được phân công"
         lecturer = session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == user.id))
         if lecturer:
+            scopes["position_assignment"] |= _ids(session, m.PositionAssignment.id, m.PositionAssignment.lecturer_id == lecturer.id)
+        if lecturer:
             scopes["lecturer_profile"].add(lecturer.id)
             heads = {dep for dep in session.scalars(select(m.Department.id))
                      if _is_department_head(session, lecturer.id, dep)}
@@ -144,6 +146,11 @@ def visibility(session, user):
     from backend.services.withdrawals import can_view as withdrawal_visible
     scopes["thesis_withdrawal_request"] |= {item.id for item in session.scalars(select(m.ThesisWithdrawalRequest))
         if withdrawal_visible(session, user, item)}
+    from backend.services.evaluation import permissions as review_permissions,review_visible
+    for item in session.scalars(select(m.ThesisReview)):
+        thesis=session.get(m.Thesis,item.thesis_id)
+        if "evaluation:view" in review_permissions(session,user,thesis) and review_visible(session,user,thesis,item):
+            scopes["thesis_review"].add(item.id)
     clauses = [and_(m.AuditEvent.resource_type == kind, m.AuditEvent.resource_id.in_(ids))
                for kind, ids in scopes.items() if ids]
     # A reviewer sees only the portion assigned to them, even when the event is keyed by thesis.
@@ -266,6 +273,8 @@ def resource_labels(session, events, viewer):
     for row in session.scalars(select(m.UserAccount).where(m.UserAccount.id.in_(accounts))):
         result["user_account", row.id] = names.get(row.id, "Tài khoản") + (
             f" · {row.email}" if viewer.base_role == "ADMIN" and row.email else "")
+    for row in session.execute(select(m.PositionAssignment.id, m.LecturerProfile.display_name, m.Department.name).join(m.LecturerProfile, m.LecturerProfile.id == m.PositionAssignment.lecturer_id).join(m.Department, m.Department.id == m.PositionAssignment.department_id).where(m.PositionAssignment.id.in_(ids["position_assignment"]))):
+        result["position_assignment", row.id] = f"Trưởng bộ môn · {row.name} · {row.display_name}"
     for row in session.scalars(select(m.StudentProfile).where(m.StudentProfile.id.in_(ids["student_profile"]))):
         result["student_profile", row.id] = f"{row.student_code} · {row.display_name}"
     for row in session.execute(select(m.DocumentVersion.id, m.DocumentVersion.version_no, m.Document.title)

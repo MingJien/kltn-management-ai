@@ -13,7 +13,7 @@ from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.api.account import _audit, _mail_link, _student_can_activate
+from backend.api.account import _account_display_name, _account_identifier, _audit, _mail_link, _mail_recipient, _student_can_activate
 from backend.api.dependencies import current_user, get_session
 from backend.db.models import entities as m
 from backend.services.passwords import unusable_password
@@ -21,7 +21,8 @@ from backend.services.roster import EMAIL
 from backend.services.account_mail import mail_delivery_ready
 from backend.services.account_directory import build_account_directory
 from backend.services.lecturer_roster import MAIL_ACTIONS, lock_identities, record_delivery
-from backend.services.notifications import notify_user
+from backend.services.notifications import format_due, notify_user
+from backend.services.workflow_notices import round_announcement
 
 router = APIRouter(prefix="/api/v1/admin", tags=["account administration"])
 AccountReason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=1000)]
@@ -37,7 +38,7 @@ class LecturerInvite(BaseModel):
 class RoundAssignment(BaseModel):
     round_id: UUID
     user_id: UUID
-    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR|FORM_MANAGER)$")
+    assignment_type: str = Field(pattern="^(ELIGIBILITY_IMPORTER|ELIGIBILITY_VERIFIER|ACCOUNT_MANAGER|KLTN_COORDINATOR|FORM_MANAGER|REVIEW_RECORDS_MANAGER)$")
     basis_ref: str = Field(min_length=3, max_length=500)
 
 
@@ -282,6 +283,13 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
         resource_type="thesis_round", resource_id=round_.id,
         reason=payload.reason.strip(), occurred_at=datetime.now(timezone.utc),
         correlation_id=uuid4()))
+    if payload.state == "OPEN":
+        round_announcement(session, user.id, round_.id, "ROUND_OPENED",
+            f"Khoa đã mở đợt đăng ký KLTN {round_.code}. Thời gian đăng ký từ {format_due(round_.opens_at)} đến {format_due(round_.closes_at)}.",
+            "/topics")
+    else:
+        round_announcement(session, user.id, round_.id, "ROUND_CLOSED",
+            f"Khoa đã đóng đợt đăng ký KLTN {round_.code}.", "/topics")
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
 
@@ -289,7 +297,7 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
 @router.get("/users/directory")
 def users_directory(search: str = "", category: Literal[
         "ALL", "STUDENT", "LECTURER", "ADMIN", "LECTURER_WITH_DUTIES"] = "ALL",
-        additional_role: str = "", offset: int = 0, limit: int = 20,
+        additional_role: str = "", account_status: Literal["ALL", "PENDING", "ACTIVE", "LOCKED", "DISABLED"] = "ALL", offset: int = 0, limit: int = 20,
         user: m.UserAccount = Depends(current_user),
         session: Session = Depends(get_session)) -> dict:
     """Admin account directory with real, currently effective lecturer duties."""
@@ -300,12 +308,13 @@ def users_directory(search: str = "", category: Literal[
         raise HTTPException(422, "Invalid paging range")
     return build_account_directory(
         session, search=search, category=category, additional_role=additional_role,
-        offset=offset, limit=limit,
+        offset=offset, limit=limit, account_status=account_status,
     )
 
 
 @router.get("/users")
 def users(search: str = "", offset: int = 0, limit: int = 100,
+          account_status: Literal["ALL", "PENDING", "ACTIVE", "LOCKED", "DISABLED"] = "ALL",
           user: m.UserAccount = Depends(current_user),
           session: Session = Depends(get_session)) -> list[dict]:
     rounds = _managed_rounds(session, user) if user.base_role != "ADMIN" else []
@@ -320,6 +329,12 @@ def users(search: str = "", offset: int = 0, limit: int = 100,
         query = query.where(m.UserAccount.id.in_(select(m.StudentProfile.user_id)
             .join(m.EligibilitySnapshot, m.EligibilitySnapshot.student_id == m.StudentProfile.id)
             .where(m.EligibilitySnapshot.round_id.in_(rounds))))
+    if account_status == "PENDING":
+        query = query.where(m.UserAccount.status == "DISABLED", m.UserAccount.email_verified_at.is_(None))
+    elif account_status == "DISABLED":
+        query = query.where(m.UserAccount.status == "DISABLED", m.UserAccount.email_verified_at.is_not(None))
+    elif account_status != "ALL":
+        query = query.where(m.UserAccount.status == account_status)
     if search.strip():
         term = search.strip().lower()
         query = query.where(or_(func.lower(m.UserAccount.email).contains(term),
@@ -330,7 +345,8 @@ def users(search: str = "", offset: int = 0, limit: int = 100,
         student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == row.id)) if row.base_role == "STUDENT" else None
         result.append({"id": str(row.id), "email": row.email, "base_role": row.base_role,
             "status": row.status, "verified": row.email_verified_at is not None,
-            "student_code": student.student_code if student else None})
+            "student_code": student.student_code if student else None,
+            "display_name": student.display_name if student else row.email})
     return result
 
 
@@ -386,7 +402,7 @@ def invite_lecturer(payload: LecturerInvite, user: m.UserAccount = Depends(curre
         session.rollback()
         raise HTTPException(409, "Lecturer code or email was assigned concurrently") from exc
     try:
-        _mail_link(account, "activate")
+        _mail_link(_mail_recipient(account, profile.display_name, "staff", profile.lecturer_code), "activate")
         delivered = True
     except Exception:
         # The account remains unverified. Staff can request a fresh activation link.
@@ -405,9 +421,9 @@ def grant_round_assignment(payload: RoundAssignment,
     round_ = session.get(m.ThesisRound, payload.round_id)
     if not target or target.status != "ACTIVE" or target.base_role not in {"ADMIN", "LECTURER"}:
         raise HTTPException(422, "An active staff account is required")
-    if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR"} and target.base_role != "LECTURER":
+    if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR", "REVIEW_RECORDS_MANAGER"} and target.base_role != "LECTURER":
         raise HTTPException(422, "Round account/progress coordination must be assigned to a lecturer")
-    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type == "FORM_MANAGER" else {"DRAFT", "OPEN"}
+    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type in {"FORM_MANAGER","REVIEW_RECORDS_MANAGER"} else {"DRAFT", "OPEN"}
     if not round_ or round_.state not in allowed_states:
         raise HTTPException(422, "Round is unavailable")
     existing = session.scalar(select(m.ResourceAssignment.id).where(
@@ -443,7 +459,7 @@ def round_assignments(user: m.UserAccount = Depends(current_user),
     rows = session.execute(select(
         m.ResourceAssignment.id, m.ResourceAssignment.round_id,
         m.ResourceAssignment.user_id, m.ResourceAssignment.assignment_type).where(
-        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"]),
+        m.ResourceAssignment.assignment_type.in_(["ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER", "REVIEW_RECORDS_MANAGER"]),
         m.ResourceAssignment.round_id.is_not(None),
         m.ResourceAssignment.state == "ACTIVE").order_by(m.ResourceAssignment.effective_from.desc()).limit(200)).all()
     return [{"id": str(row.id), "round_id": str(row.round_id),
@@ -462,7 +478,7 @@ def revoke_assignment(assignment_id: UUID, payload: AssignmentRevoke,
         m.ResourceAssignment.assignment_type).where(
         m.ResourceAssignment.id == assignment_id).with_for_update()).one_or_none()
     if not assignment or assignment.state != "ACTIVE" or assignment.assignment_type not in {
-            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER"}:
+            "ELIGIBILITY_IMPORTER", "ELIGIBILITY_VERIFIER", "ACCOUNT_MANAGER", "KLTN_COORDINATOR", "FORM_MANAGER", "REVIEW_RECORDS_MANAGER"}:
         raise HTTPException(404, "Active assignment not found")
     session.execute(update(m.ResourceAssignment).where(
         m.ResourceAssignment.id == assignment_id).values(
@@ -582,7 +598,7 @@ def reissue_link(user_id: UUID, payload: AccountChangeReason,
         message="Khoa đã cấp lại liên kết đăng nhập cho tài khoản của bạn qua email đang lưu.")
     session.commit()
     try:
-        _mail_link(target, purpose)
+        _mail_link(_mail_recipient(target, _account_display_name(session, target), "staff", _account_identifier(session, target)), purpose)
         delivered = True
     except Exception:
         delivered = False
@@ -643,7 +659,7 @@ def correct_student_email(user_id: UUID, payload: StudentEmailCorrection,
     delivered = False
     if target.status == "DISABLED" and _student_can_activate(session, student) and mail_delivery_ready():
         try:
-            _mail_link(target, "activate")
+            _mail_link(_mail_recipient(target, student.display_name, "staff", student.student_code), "activate")
             delivered = True
         except Exception:
             pass
@@ -675,7 +691,7 @@ def correct_staff_email(user_id: UUID, payload: StaffEmailCorrection,
     delivered = False
     if target.status == "DISABLED" and mail_delivery_ready():
         try:
-            _mail_link(target, "activate")
+            _mail_link(_mail_recipient(target, _account_display_name(session, target), "staff", _account_identifier(session, target)), "activate")
             delivered = True
         except Exception:
             pass

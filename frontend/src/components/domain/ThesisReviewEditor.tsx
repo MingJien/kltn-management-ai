@@ -45,8 +45,8 @@ export default function ThesisReviewEditor({initial,data,context,onClose,onUpdat
         </div>}
         <label className="evaluation-field">Số hoặc căn cứ phiếu (nếu có)<input maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>
       </fieldset>
-      <fieldset className="evaluation-fieldset" disabled={busy||confirm}><legend>2. Bản nhận xét đã ký</legend>
-        <p>Xuất phiếu đã điền từ mẫu chính thức của Khoa, kiểm tra rồi ký theo quy trình. Sau đó đính kèm đúng bản đã ký để gửi nhận xét.</p>
+      <fieldset className="evaluation-fieldset" disabled={busy||confirm}><legend>2. Xuất phiếu và bản ký (bổ sung sau)</legend>
+        <p>Xuất phiếu đã điền từ mẫu chính thức của Khoa, kiểm tra rồi ký theo quy trình. Bạn có thể gửi nhận xét ngay trên hệ thống. Bản giấy được cán bộ phụ trách hoặc TBM ghi nhận sau; đính kèm bản quét là tùy chọn.</p>
         <button className="btn btn-primary" disabled={busy||dirty||!allFields||(review.kind==="ADVISOR"&&(!completed||!allow))} onClick={()=>{
           setBusy(true);setError("");void exportThesisReview(data.thesis_id,review.id,review.row_version)
             .then(()=>setNotice("Đã xuất phiếu đã điền để ký. Kiểm tra bản in trước khi ký và đính kèm lại."))
@@ -61,9 +61,9 @@ export default function ThesisReviewEditor({initial,data,context,onClose,onUpdat
         {review.signed_file&&<div className="evaluation-note"><strong>{review.signed_file.name}</strong><p>{labels[review.signed_file.scan_state]}</p>{review.signed_file.scan_state!=="CLEAN"&&<button className="btn btn-secondary" onClick={()=>void run(()=>mutate<Review>(path+"/scan",context.user_id,{},review.row_version),"Đã kiểm tra lại trạng thái quét.")}>Quét lại bản ký</button>}</div>}
       </fieldset>
       <fieldset className="evaluation-fieldset" disabled={busy}><legend>3. Gửi nhận xét</legend><p>Sau khi gửi, nội dung và bản ký được giữ nguyên. Bản sửa cần một phiên bản phiếu mới kèm lý do.</p>
-        {!confirm?<button className="btn btn-primary" disabled={dirty||!allFields||!review.signed_file||review.signed_file.scan_state!=="CLEAN"||(review.kind==="ADVISOR"&&(!completed||!allow))} onClick={()=>setConfirm(true)}><Send size={16} aria-hidden="true"/>Kiểm tra và gửi nhận xét</button>:<div className="evaluation-confirm">
-          <label className="evaluation-check"><input type="checkbox" checked={attested} onChange={e=>setAttested(e.target.checked)}/>Tôi xác nhận bản đính kèm đã ký và khớp nội dung phiếu này.</label>
-          <div className="flex gap-2"><button className="btn btn-secondary" onClick={()=>{setConfirm(false);setAttested(false);}}>Quay lại kiểm tra</button><button className="btn btn-primary" disabled={!attested} onClick={()=>void run(()=>mutate<Review>(path+"/submit",context.user_id,{confirm_signed_copy:true},review.row_version),"Đã gửi nhận xét.").then(updated=>{if(updated)onClose();})}><Check size={16} aria-hidden="true"/>Xác nhận gửi nhận xét</button></div>
+        {!confirm?<button className="btn btn-primary" disabled={dirty||!allFields||(!!review.signed_file&&review.signed_file.scan_state!=="CLEAN")||(review.kind==="ADVISOR"&&(!completed||!allow))} onClick={()=>setConfirm(true)}><Send size={16} aria-hidden="true"/>Kiểm tra và gửi nhận xét</button>:<div className="evaluation-confirm">
+          <label className="evaluation-check"><input type="checkbox" checked={attested} onChange={e=>setAttested(e.target.checked)}/>Tôi xác nhận nội dung nhận xét này là của tôi và đã kiểm tra đúng sinh viên, phiên bản báo cáo.</label>
+          <div className="flex gap-2"><button className="btn btn-secondary" onClick={()=>{setConfirm(false);setAttested(false);}}>Quay lại kiểm tra</button><button className="btn btn-primary" disabled={!attested} onClick={()=>void run(()=>mutate<Review>(path+"/submit",context.user_id,{confirm_content:true},review.row_version),"Đã gửi nhận xét.").then(updated=>{if(updated)onClose();})}><Check size={16} aria-hidden="true"/>Xác nhận gửi nhận xét</button></div>
         </div>}
       </fieldset>
     </div>

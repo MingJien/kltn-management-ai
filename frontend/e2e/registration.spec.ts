@@ -180,7 +180,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     const round = rounds.find((item:{state:string}) => item.state === "OPEN");
     expect(round).toBeTruthy();
     const lecturer = (await read(admin.page,"/admin/users?search="+encodeURIComponent(accounts.gv.email)))[0];
-    await admin.page.goto(web+"/administration");
+    await admin.page.goto(web+"/administration/assignments");
     const assignment = admin.page.locator("section.card").filter({has:admin.page.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
     await expect(assignment.locator("select").nth(0).locator(`option[value="${round.id}"]`)).toHaveCount(1);
     await expect(assignment.locator("select").nth(1).locator(`option[value="${lecturer.id}"]`)).toHaveCount(1);

@@ -60,7 +60,13 @@ class ReviewSave(Input):
 
 
 class ReviewSubmit(Input):
-    confirm_signed_copy: Literal[True]
+    confirm_signed_copy: Literal[True] | None = None
+    confirm_content: Literal[True] | None = None
+
+class PaperReceipt(Input):
+    reference: str = Field(min_length=5,max_length=500)
+    export_code: str = Field(min_length=5,max_length=100)
+    confirm_paper: Literal[True]
 
 
 class EligibilityCreate(Reason):

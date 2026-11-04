@@ -40,6 +40,9 @@ async def upload_evidence(session: Session, user: m.UserAccount, registration_id
             m.RegistrationMember.student_id == student.id, m.RegistrationMember.active.is_(True)))
         if not member:
             raise HTTPException(404, "Registration not found")
+        from backend.services.registration import confirmed_student_ids
+        if student.id not in confirmed_student_ids(session, reg.round_id, [student.id]):
+            raise HTTPException(403, "Quyền tham gia đợt đã bị thu hồi; không thể nộp minh chứng mới")
         if not may_upload_evidence(reg, member):
             raise HTTPException(409, "Evidence is locked after submission")
         # One bounded file per member. A PDF may contain multiple supporting pages.

@@ -1,9 +1,10 @@
+import WorkflowSteps from "../components/domain/WorkflowSteps";
 import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CalendarDays, ClipboardCheck, FileText, Plus, UserRound, Users } from "lucide-react";
-import type { Context, Lecturer, OpenRound, Registration, Topic } from "../api";
-import { request, uploadEvidence } from "../api";
+import type { Context, Lecturer, OpenRound, Registration, SchoolFormRound, Topic } from "../api";
+import { exportRoundMau04, request, uploadEvidence } from "../api";
 import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import TopicDescriptionPreview from "../components/domain/TopicDescriptionPreview";
@@ -28,6 +29,11 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const focusedTopicId = new URLSearchParams(location.search).get("focus");
   const [topics, setTopics] = useState<Topic[]>([]);
   const [rounds, setRounds] = useState<OpenRound[]>([]);
+  const [exportRounds,setExportRounds]=useState<SchoolFormRound[]>([]);
+  const [exportRoundId,setExportRoundId]=useState(() => new URLSearchParams(window.location.search).get("round_id") || "");
+  const [exportPreview,setExportPreview]=useState<{round_id:string;round_code:string;students:number;theses:number;missing_advisors:number}|null>(null);
+  const [previewLoading,setPreviewLoading]=useState(false);
+  const [previewError,setPreviewError]=useState("");
   const [roundsLoaded, setRoundsLoaded] = useState(false);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [lecturersLoading, setLecturersLoading] = useState(true);
@@ -50,6 +56,26 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const student = context.base_role === "STUDENT";
   const admin = context.base_role === "ADMIN";
   const head = context.actions.includes("topic:department_decide");
+  useEffect(()=>{
+    if (!admin && !context.actions.includes("progress:coordinate")) {setExportRounds([]);return;}
+    const controller=new AbortController();
+    void request<SchoolFormRound[]>("/school-forms/access",userId,{signal:controller.signal}).then(rows=>{
+      if(controller.signal.aborted)return;
+      const allowed=rows.filter(row=>row.can_export_list);setExportRounds(allowed);
+      setExportRoundId(previous=>allowed.some(row=>row.id===previous)?previous:allowed[0]?.id || "");
+    }).catch(cause=>{if(!controller.signal.aborted)setMessage(errorMessage(cause));});
+    return()=>controller.abort();
+  },[userId,admin,context.actions.includes("progress:coordinate")]);
+  useEffect(()=>{
+    if(!exportRoundId || !exportRounds.some(row=>row.id===exportRoundId)){setExportPreview(null);return;}
+    const controller=new AbortController();
+    setExportPreview(null);setPreviewError("");setPreviewLoading(true);
+    void request<{round_id:string;round_code:string;students:number;theses:number;missing_advisors:number}>("/school-forms/rounds/"+exportRoundId+"/mau-04/preview",userId,{signal:controller.signal})
+      .then(result=>{if(!controller.signal.aborted)setExportPreview(result);})
+      .catch(cause=>{if(!controller.signal.aborted)setPreviewError(errorMessage(cause));})
+      .finally(()=>{if(!controller.signal.aborted)setPreviewLoading(false);});
+    return()=>controller.abort();
+  },[exportRoundId,exportRounds,userId]);
   const path = "/topics?" + new URLSearchParams({limit:String(PAGE_SIZE), offset:String(page * PAGE_SIZE), search, view, sort});
   const reload = useCallback(async () => setTopics(await request<Topic[]>(path, userId)), [path, userId]);
   const loadLecturers = useCallback(async (signal?: AbortSignal) => {
@@ -140,6 +166,17 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
       description={admin ? "Danh sách đề tài đã công bố để tra cứu. Hồ sơ đăng ký, bài nộp và phản hồi riêng vẫn theo đúng quyền." : student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
+    {exportRounds.length>0 && <section className="card" aria-label="Xuất danh sách KLTN"><div className="card-body stack">
+      <h2>Danh sách sinh viên và GVHD thực hiện KLTN</h2>
+      <p>Xuất Excel theo khung “Nộp ds” của Mẫu 4, lấy thành viên đang tham gia và GVHD chính thức tại thời điểm tải. Đây là danh sách thực hiện KLTN, khác với danh mục đề tài chào đăng ký.</p>
+      <div className="flex gap-2" style={{flexWrap:"wrap",alignItems:"end"}}><label>Đợt xuất danh sách<select className="input" value={exportRoundId} disabled={busy} onChange={event=>setExportRoundId(event.target.value)}>{exportRounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+      <button type="button" className="btn btn-secondary" disabled={busy || previewLoading || exportPreview?.round_id !== exportRoundId || !exportPreview?.students} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}>Xuất danh sách đã điền theo Mẫu 4</button></div>
+      {previewLoading && <p role="status">Đang kiểm tra dữ liệu của đợt…</p>}
+      {previewError && <p role="alert" className="alert alert-danger">{previewError}</p>}
+      {exportPreview?.round_id === exportRoundId && (exportPreview.students > 0
+        ? <p role="status"><strong>{exportPreview.students} sinh viên · {exportPreview.theses} khóa luận</strong> sẽ được đưa vào danh sách.{exportPreview.missing_advisors > 0 && (" Có "+exportPreview.missing_advisors+" sinh viên chưa có GVHD chính thức; cột ghi chú sẽ đánh dấu.")}</p>
+        : <p role="status" className="alert alert-info">Đợt này chưa có sinh viên đang thực hiện khóa luận. Hãy chọn đợt có hồ sơ đã được GV tiếp nhận.</p>)}
+    </div></section>}
     <div className="topic-toolbar">
       <div className="topic-toolbar__search">
         <input aria-label="Tìm đề tài" className="input" maxLength={200} placeholder="Tìm theo mã, tên đề tài hoặc GV..."
@@ -247,7 +284,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
         <div className="topic-detail-content__intro"><span>{selected.round_label}</span>
           <span className={selected.proposer_type === "STUDENT" ? "topic-card__proposer topic-card__proposer--student" : "topic-card__proposer topic-card__proposer--lecturer"}>
             {selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
-          <ThesisStatusBadge state={selected.state} /></div>
+          <ThesisStatusBadge state={selected.state} /></div><WorkflowSteps steps={["Soạn đề xuất","TBM xét duyệt","Mở đăng ký"]} current={["APPROVED","LOCKED"].includes(selected.state)?2:selected.state==="SUBMITTED"?1:0}/>
         {selected.archived_at && <p className="alert alert-warning">Đề tài đã ngừng sử dụng: {selected.archive_reason}. Hồ sơ đã liên kết vẫn được giữ nguyên.</p>}
         <TopicLifecycle key={selected.id+"-"+selected.row_version} topic={selected} context={context} onChanged={async()=>{closeDetail();setSelected(null);await reload();setMessage("Đã cập nhật đề tài và ghi nhật ký.");}}/>
         <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>

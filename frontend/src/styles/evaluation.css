@@ -56,3 +56,8 @@
 @media(max-width:1150px) {.evaluation-columns {grid-template-columns:minmax(0,1fr) 310px;}.evaluation-card,.evaluation-panel {padding:20px;}}
 @media(max-width:850px) {.evaluation-columns,.evaluation-catalogue {grid-template-columns:1fr;}.evaluation-aside {grid-row:1;}.evaluation-steps {gap:8px;}.evaluation-steps>div {display:flex;flex-direction:column;padding:14px;}.evaluation-steps svg {margin-bottom:4px;}}
 @media(max-width:520px) {.evaluation-steps {grid-template-columns:1fr;}.evaluation-steps>div {display:grid;grid-template-columns:26px 1fr;}.evaluation-steps svg {grid-row:span 2;}.evaluation-panel,.evaluation-card {padding:17px;}.evaluation-two-fields {grid-template-columns:1fr;gap:0;}.evaluation-assignment {flex-direction:column;}.evaluation-facts {gap:14px;}.evaluation-save-state {width:100%;}.evaluation-page .page-header .flex {flex-wrap:wrap;}}
+
+.evaluation-student-identity {display:grid;gap:7px;padding:17px 18px;margin:10px 0 18px;background:#edf7f4;border:1px solid #c5e2d8;border-left:4px solid #137c6e;border-radius:10px;}
+.evaluation-student-identity>span {font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#406655;}
+.evaluation-student-identity>strong {font-size:21px;line-height:1.45;color:#163e3d;}
+.evaluation-student-identity>b {font-size:13px;color:#375c5c;font-weight:600;}

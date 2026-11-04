@@ -1,5 +1,5 @@
 -- KLTN PostgreSQL public schema; pg_dump --schema-only from kltn_ai.
--- Alembic 20261004_0011; 62 bảng nghiệp vụ + alembic_version. Không chứa dữ liệu.
+-- Alembic 20261014_0014; 62 bảng nghiệp vụ + alembic_version. Không chứa dữ liệu.
 -- Mỗi bảng có đủ cột hiện hành trong một CREATE TABLE; khóa FK/PK ở phần ALTER TABLE.
 -- Chỉ dùng để xem/nộp thiết kế; không chạy trên database đang có bảng.
 
@@ -444,6 +444,7 @@ CREATE TABLE progress_report (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     row_version integer DEFAULT 1 NOT NULL,
+    submitted_at timestamp with time zone,
     CONSTRAINT ck_progress_report_reported_ratio CHECK (((reported_ratio IS NULL) OR ((reported_ratio >= (0)::numeric) AND (reported_ratio <= (100)::numeric)))),
     CONSTRAINT ck_progress_report_state CHECK (((state)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'CONFIRMED'::character varying, 'REVISION_REQUIRED'::character varying])::text[]))),
     CONSTRAINT ck_progress_report_version_positive CHECK ((version_no > 0))
@@ -457,6 +458,7 @@ CREATE TABLE progress_review (
     id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    revision_due_at timestamp with time zone,
     CONSTRAINT ck_progress_review_decision CHECK (((decision)::text = ANY ((ARRAY['COMMENT_ONLY'::character varying, 'CONFIRM'::character varying, 'REVISION_REQUIRED'::character varying])::text[])))
 );
 
@@ -792,7 +794,9 @@ CREATE TABLE student_profile (
     display_name character varying(255) NOT NULL,
     id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    class_name character varying(100),
+    major_code character varying(32)
 );
 
 CREATE TABLE thesis (
@@ -893,6 +897,8 @@ CREATE TABLE topic_registration (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     row_version integer DEFAULT 1 NOT NULL,
+    expected_member_count integer DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_topic_registration_expected_member_count CHECK (((expected_member_count >= 1) AND (expected_member_count <= 3))),
     CONSTRAINT ck_topic_registration_state CHECK (((state)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'LECTURER_ACCEPTED'::character varying, 'LECTURER_REJECTED'::character varying, 'RETURNED'::character varying, 'FINALIZED'::character varying, 'CANCELLED'::character varying])::text[])))
 );
 

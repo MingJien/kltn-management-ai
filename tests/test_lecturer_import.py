@@ -39,7 +39,7 @@ def setup(scenario, monkeypatch):
     session.commit()
     monkeypatch.setenv("AUTH_SESSION_SECRET", "test-lecturer-import-secret-at-least-32-characters")
     sent = []
-    monkeypatch.setattr("backend.api.lecturer_import._mail_link", lambda account, purpose: sent.append((account.email, purpose)))
+    monkeypatch.setattr("backend.api.lecturer_import._mail_link", lambda account, purpose: sent.append((account.email, purpose, account.identifier)))
     monkeypatch.setattr("backend.api.lecturer_import.mail_delivery_ready", lambda: True)
     department = session.get(m.Department, topic.department_id)
     suffix = uuid4().hex[:8]
@@ -140,9 +140,9 @@ def test_send_per_account_cooldown_failure_persistence_and_activation_guard(setu
     account = session.get(m.UserAccount, UUID(ids[0]))
     old_token = make_token(account, "activate")
     response = client.post(BASE + f"/{ids[0]}/activation-link", headers=hdr(admin))
-    assert response.status_code == 200 and response.json()["sent"] and sent == [(rows[0][2], "activate")]
+    assert response.status_code == 200 and response.json()["sent"] and sent == [(rows[0][2], "activate", rows[0][0])]
     session.refresh(account)
-    assert token_account(old_token, "activate")[2] != account.row_version
+    assert token_account(old_token, "activate")[2] == account.row_version
     assert client.post(BASE + f"/{ids[0]}/activation-link", headers=hdr(admin)).status_code == 429
     def fail_mail(*_):
         raise RuntimeError("Synthetic SMTP failure - must not expose transport details")

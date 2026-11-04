@@ -2,7 +2,7 @@ import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import {lazy,Suspense,useCallback,useEffect,useState} from "react";
 import {Link,useParams} from "react-router-dom";
 import {ArrowLeft,CheckCircle2,ClipboardCheck,Download,Eye,FileText,Plus,RefreshCw,ShieldCheck,Users,XCircle} from "lucide-react";
-import {request,type Context} from "../api";
+import {exportThesisReview,request,type Context} from "../api";
 import {errorMessage} from "../errors";
 import {downloadEvaluationFile,labels,mutate,when,type Evaluation,type Kind,type Review} from "../evaluation";
 import PageHeader from "../components/layout/PageHeader";
@@ -19,6 +19,7 @@ export default function EvaluationPage({context}:{context:Context}) {
 function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
   const [data,setData]=useState<Evaluation|null>(null),[error,setError]=useState(""),[message,setMessage]=useState("");
   const [busy,setBusy]=useState(false),[memberId,setMemberId]=useState(""),[operation,setOperation]=useState<Operation|null>(null),[editor,setEditor]=useState<Review|null>(null);
+  const [paperReview,setPaperReview]=useState<Review|null>(null);
   const [preview,setPreview]=useState<{name:string;path:string}|null>(null);
   const path=`/theses/${thesisId}/evaluation`;
   const load=useCallback(async(signal?:AbortSignal)=>{
@@ -50,6 +51,14 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
         {review.kind==="ADVISOR"&&<p><strong>{review.thesis_completed?"Đã hoàn thành KLTN":"Chưa hoàn thành KLTN"} · {review.allow_defense?"Đồng ý cho bảo vệ":"Không đồng ý cho bảo vệ"}</strong></p>}
         <p>Lý do lập phiếu: {review.revision_reason}</p>{review.source_reference&&<p>Căn cứ: {review.source_reference}</p>}
       </details>
+      {review.state==="SUBMITTED"&&<div className="evaluation-note">
+        <strong>{review.paper_receipt?"Đã đối chiếu bản giấy":review.signed_file?.scan_state==="CLEAN"?"Đã có bản ký đính kèm":"Chờ đối chiếu bản ký"}</strong>
+        {review.paper_receipt&&<p>{review.paper_receipt.reference} · {review.paper_receipt.confirmed_by} · {when(review.paper_receipt.confirmed_at)}<br/>Mã bản xuất: {review.paper_receipt.export_code}</p>}
+        {(can("record")||review.lecturer_id===context.lecturer_id)&&<button className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void run(()=>exportThesisReview(thesisId,review.id,review.row_version),"Đã xuất đúng phiên bản phiếu; mã xuất nằm trong lịch sử.")}>Xuất phiếu đã gửi để ký</button>}
+        {can("record")&&!review.paper_receipt&&<button className="btn btn-primary btn-sm" disabled={busy||!review.export_history.length} onClick={()=>setPaperReview(review)}>Ghi nhận bản giấy</button>}
+        {!review.export_history.length&&can("record")&&<p>Xuất phiếu hiện tại trước khi đối chiếu bản giấy.</p>}
+      </div>}
+      {!!review.export_history.length&&<details><summary>Lịch sử xuất phiếu ({review.export_history.length})</summary>{review.export_history.map(e=><p key={e.code}><strong>{e.code}</strong> · {when(e.at)}</p>)}</details>}
       {review.signed_file&&<div className="evaluation-file-actions"><span>{review.signed_file.name} · {labels[review.signed_file.scan_state]}</span><button className="btn btn-secondary btn-sm" disabled={busy||review.signed_file.scan_state!=="CLEAN"} onClick={()=>setPreview({name:review.signed_file!.name,path:`${path}/reviews/${review.id}/signed-copy`})}><Eye size={15} aria-hidden="true"/>Xem bản ký</button><button className="btn btn-secondary btn-sm" disabled={busy||review.signed_file.scan_state!=="CLEAN"} onClick={()=>fileAction(review.signed_file!.name,`${path}/reviews/${review.id}/signed-copy`)}><Download size={15} aria-hidden="true"/>Tải bản ký</button></div>}
     </article>;
   }
@@ -58,7 +67,7 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
     <PageHeader title="Phản biện & điều kiện bảo vệ" description={`${data.title} · Đợt ${data.round_label}`}><button className="btn btn-secondary" disabled={busy} onClick={()=>void run(()=>load(),"Đã làm mới hồ sơ.")}><RefreshCw size={16} aria-hidden="true"/>Làm mới</button></PageHeader>
     {error&&<p role="alert" className="alert alert-danger">{error}</p>}{message&&<p role="status" className="alert alert-success">{message}</p>}
     {blocked&&<section className="evaluation-note" aria-labelledby="membership-update-heading"><h2 id="membership-update-heading">Cập nhật hồ sơ sau thay đổi thành viên</h2><p>Thành viên còn lại tiếp tục cùng đề tài. Các bản cũ giữ trong lịch sử; tạm dừng lập phiếu và xét điều kiện cho đến khi hoàn tất các việc sau.</p><ol>{data.workflow_blockers.map(item=><li key={item.key}>{item.message}</li>)}</ol>{(context.base_role==="STUDENT"||can("advisor")||can("manage"))&&<div className="flex gap-2"><Link className="btn btn-secondary" to={`/theses/${thesisId}?section=submissions&kind=PROPOSAL`}>Mở đề cương để cập nhật / duyệt lại</Link><Link className="btn btn-secondary" to={`/theses/${thesisId}?section=submissions&kind=REPORT`}>Mở báo cáo cần cập nhật</Link></div>}</section>}
-    <details className="evaluation-note"><summary>Hướng dẫn thao tác theo vai trò</summary><ol><li>SV nộp cuốn báo cáo đã cập nhật; tệp phải được quét an toàn.</li><li>TBM phân công GV phản biện; người được giao nhận thông báo ở biểu tượng chuông.</li><li>GVHD lập Mẫu 7, GVPB lập Mẫu 8 cho từng sinh viên: lưu nháp → xuất để ký → tải bản đã ký → kiểm tra và gửi.</li><li>TBM chọn từng sinh viên, đối chiếu căn cứ rồi xét và lưu điều kiện. Nhóm chỉ sẵn sàng khi tất cả thành viên đang thực hiện đều đủ điều kiện.</li><li>SV mở chuông thông báo hoặc hồ sơ này để xem nhận xét và kết quả của mình.</li></ol></details>
+    <details className="evaluation-note"><summary>Hướng dẫn thao tác theo vai trò</summary><ol><li>SV nộp cuốn báo cáo đã cập nhật; tệp phải được quét an toàn.</li><li>TBM phân công GV phản biện; người được giao nhận thông báo ở biểu tượng chuông.</li><li>GVHD lập Mẫu 7, GVPB lập Mẫu 8 cho từng sinh viên: lưu nháp → kiểm tra và gửi. Xuất phiếu để ký ngoài; cán bộ tiếp nhận/TBM ghi nhận bản giấy, không bắt tải lại bản quét.</li><li>TBM chọn từng sinh viên, đối chiếu căn cứ rồi xét và lưu điều kiện. Nhóm chỉ sẵn sàng khi tất cả thành viên đang thực hiện đều đủ điều kiện.</li><li>SV mở chuông thông báo hoặc hồ sơ này để xem nhận xét và kết quả của mình.</li></ol></details>
     <div className="evaluation-steps" aria-label="Các bước xử lý"><div><Users aria-hidden="true"/><strong>1. Phân công</strong><span>{active.length}/2 GV phản biện</span></div><div><FileText aria-hidden="true"/><strong>2. Nhận xét theo mẫu</strong><span>GVHD: Mẫu 7 · Phản biện: Mẫu 8</span></div><div><ShieldCheck aria-hidden="true"/><strong>3. Xét điều kiện</strong><span>{labels[data.state]||data.state}</span></div></div>
     {blocked&&context.base_role==="STUDENT"&&<div className="flex gap-2"><Link className="btn btn-secondary" to={`/theses/${thesisId}?section=submissions&kind=REGISTRATION`}>Cập nhật Mẫu 1a/1b</Link><Link className="btn btn-secondary" to={`/theses/${thesisId}?section=submissions&kind=PLAN`}>Cập nhật kế hoạch Mẫu 2</Link></div>}
     <div className="evaluation-columns"><div className="evaluation-main">
@@ -76,7 +85,7 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
         {!!oldReviews.length&&<details className="evaluation-old-reviews"><summary>Phiếu theo các bản báo cáo trước ({oldReviews.length})</summary><div className="stack">{oldReviews.map(reviewCard)}</div></details>}
       </section>
     </div><aside className="evaluation-aside">
-      <section className="evaluation-panel" aria-labelledby="eligibility-heading"><div className="evaluation-panel-title"><ShieldCheck size={20} aria-hidden="true"/><h2 id="eligibility-heading">Điều kiện dự bảo vệ</h2></div><p className="text-muted">{member?.name} · {member?.student_code}</p>
+      <section className="evaluation-panel" aria-labelledby="eligibility-heading"><div className="evaluation-panel-title"><ShieldCheck size={20} aria-hidden="true"/><h2 id="eligibility-heading">Điều kiện dự bảo vệ</h2></div><div className="evaluation-student-identity"><span>Hồ sơ đang xét</span><strong>{member?.name}</strong><b>MSSV: {member?.student_code}</b></div>
         {eligibility?<><span className={`evaluation-badge ${eligibility.state==="ELIGIBLE"?"is-success":"is-warning"}`}>{labels[eligibility.state]}</span><ul className="evaluation-checklist">{eligibility.conditions.map(c=><li key={c.key}>{c.met?<CheckCircle2 aria-label="Đã có căn cứ"/>:<XCircle aria-label="Thiếu hoặc chưa đạt"/>}<span>{c.label}</span></li>)}</ul><p className="text-caption">{eligibility.checked_at?`Xét gần nhất: ${when(eligibility.checked_at)}`:"Bộ môn chưa ghi nhận kết quả xét."}</p>{eligibility.source_reference&&<p className="evaluation-reference">Căn cứ: {eligibility.source_reference}</p>}{eligibility.reason&&<p>{eligibility.reason}</p>}
           {can("eligibility")&&reviewOpen&&<button className="btn btn-primary" disabled={busy||blocked} onClick={()=>setOperation({kind:"check"})}>Xét và lưu điều kiện</button>}
         </>:<p>Chỉ sinh viên liên quan, GVHD và người xét có quyền xem căn cứ điều kiện cá nhân.</p>}
@@ -86,6 +95,7 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
       {!!data.eligibility_history.filter(h=>h.thesis_member_id===memberId).length&&<section className="evaluation-panel"><h2>Lịch sử xét điều kiện</h2><ol className="evaluation-history">{data.eligibility_history.filter(h=>h.thesis_member_id===memberId).map(h=><li key={h.id}><strong>Lần {h.version_no} · {labels[h.state]}</strong><small>{when(h.checked_at)} · {h.checked_by}</small><p>{h.source_reference}</p><p>{h.reason}</p></li>)}</ol></section>}
     </aside></div>
     {operation&&<OperationDialog key={`${operation.kind}:${memberId}`} operation={operation} data={data} memberId={memberId} context={context} onClose={()=>setOperation(null)} onSaved={async result=>{await load();setMessage("Đã lưu thay đổi và thông báo đến tài khoản liên quan.");setOperation(null);if(result)setEditor(result);}}/>}
+    {paperReview&&<PaperReceiptDialog review={paperReview} userId={context.user_id} thesisId={thesisId} onClose={()=>setPaperReview(null)} onDone={async()=>{setPaperReview(null);await load();setMessage("Đã ghi nhận bản giấy. TBM xét lại điều kiện để cập nhật kết quả.");}}/>}
     {editor&&<ThesisReviewEditor key={editor.id} initial={editor} data={data} context={context} onClose={()=>setEditor(null)} onUpdated={load}/>}
     {preview&&<Dialog open size="lg" title="Xem tài liệu" onClose={()=>setPreview(null)}><Suspense fallback={<p role="status">Đang mở tài liệu…</p>}><Preview name={preview.name} endpoint={preview.path} label="Tài liệu phản biện" backLabel="Đóng xem trước" caption="Đúng phiên bản đã lưu trong hồ sơ." onBack={()=>setPreview(null)}/></Suspense></Dialog>}
   </div>;
@@ -116,7 +126,7 @@ function OperationDialog({operation:op,data,memberId,context,onClose,onSaved}:{o
   return <Dialog open title={titles[op.kind]} busy={busy} onClose={onClose} footer={<><button className="btn btn-secondary" disabled={busy} onClick={onClose}>Hủy</button><button className="btn btn-primary" type="submit" form="evaluation-operation" disabled={busy}>{busy?"Đang lưu…":op.kind==="create"?"Tạo phiếu nháp":"Xác nhận và lưu"}</button></>}>
     <form id="evaluation-operation" className="evaluation-form" onSubmit={e=>void submit(e)}>
       {error&&<p className="alert alert-danger" role="alert">{error}</p>}
-      {op.kind==="assign"&&<><label className="evaluation-field">Giảng viên phản biện<select aria-label="Giảng viên phản biện" required value={lecturer} onChange={e=>setLecturer(e.target.value)}><option value="">Chọn GV thuộc bộ môn</option>{data.candidates.filter(c=>!data.assignments.some(a=>a.lecturer_id===c.id&&a.state==="ACTIVE")).map(c=><option value={c.id} key={c.id}>{c.name} · {c.code} · {c.active_load} phân công đang mở</option>)}</select></label><label className="evaluation-field">Hạn gửi nhận xét (giờ Việt Nam)<input type="datetime-local" required value={due} onChange={e=>setDue(e.target.value)}/></label><p className="text-caption">GVHD được loại khỏi lựa chọn. Mỗi khóa luận có tối đa hai GV phản biện đang được phân công.</p></>}
+      {op.kind==="assign"&&<><label className="evaluation-field">Giảng viên phản biện<select aria-label="Giảng viên phản biện" required value={lecturer} onChange={e=>setLecturer(e.target.value)}><option value="">Chọn GV đang hoạt động phù hợp</option>{data.candidates.filter(c=>!data.assignments.some(a=>a.lecturer_id===c.id&&a.state==="ACTIVE")).map(c=><option value={c.id} key={c.id}>{c.name} · {c.code} · {c.department} · {c.active_load} phân công đang mở</option>)}</select></label><label className="evaluation-field">Hạn gửi nhận xét (giờ Việt Nam)<input type="datetime-local" required value={due} onChange={e=>setDue(e.target.value)}/></label><p className="text-caption">Bộ môn của hồ sơ: <strong>{data.reviewer_department}</strong>. CNTT và KHMT trong cùng Khoa có thể phản biện chéo; người phân công cần chọn GV có chuyên môn phù hợp. GVHD không được phản biện cùng đề tài. Tối đa hai GV phản biện đang được phân công.</p></>}
       {op.kind==="revoke"&&<p>Thu hồi phân công của <strong>{op.name}</strong>. GV này sẽ mất quyền xem hồ sơ phản biện; các phiếu đã gửi vẫn được giữ trong lịch sử.</p>}
       {op.kind==="extend"&&<><p>Gia hạn cho <strong>{op.name}</strong>. Hạn hiện tại: {when(op.due)}.</p><label className="evaluation-field">Hạn mới (giờ Việt Nam)<input type="datetime-local" required value={due} onChange={e=>setDue(e.target.value)}/></label></>}
       {op.kind==="reopen"&&<p>Hồ sơ trở lại “Đang thực hiện”. Kết quả cũ vẫn được giữ, mọi thành viên cần được xét lại trước khi chốt đủ điều kiện bảo vệ.</p>}
@@ -126,4 +136,17 @@ function OperationDialog({operation:op,data,memberId,context,onClose,onSaved}:{o
       <label className="evaluation-field">{op.kind==="create"?"Lý do lập phiếu / phiên bản sửa":"Lý do / ghi chú nghiệp vụ"}<textarea required minLength={5} maxLength={2000} rows={3} value={reason} onChange={e=>setReason(e.target.value)}/></label>
     </form>
   </Dialog>;
+}
+
+function PaperReceiptDialog({review,userId,thesisId,onClose,onDone}:{review:Review;userId:string;thesisId:string;onClose:()=>void;onDone:()=>Promise<void>}) {
+ const [code,setCode]=useState(review.export_history[0]?.code||""),[reference,setReference]=useState(""),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ return <Dialog open title="Ghi nhận bản giấy đã ký" onClose={onClose} busy={busy}>
+ <form className="evaluation-form" onSubmit={async e=>{e.preventDefault();if(busy)return;setBusy(true);setError("");try{await mutate("/theses/"+thesisId+"/evaluation/reviews/"+review.id+"/paper-receipt",userId,{reference,export_code:code,confirm_paper:confirmed},review.row_version);await onDone();}catch(cause){setError(errorMessage(cause));}finally{setBusy(false);}}}>
+ <p>Đối chiếu chữ ký của đúng GV viết phiếu, nội dung và mã in trên bản giấy. Thao tác này ghi nhận hồ sơ đã nhận; không tạo chữ ký số.</p>
+ {error&&<p className="alert alert-danger" role="alert">{error}</p>}
+ <label className="evaluation-field">Mã bản xuất trên giấy<select required value={code} onChange={e=>setCode(e.target.value)}>{review.export_history.map(x=><option key={x.code} value={x.code}>{x.code} · {when(x.at)}</option>)}</select></label>
+ <label className="evaluation-field">Số / căn cứ tiếp nhận bản giấy<input required minLength={5} maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>
+ <label className="evaluation-check"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Tôi đã đối chiếu bản giấy có chữ ký đúng người, đúng nội dung và mã bản xuất.</label>
+ <button className="btn btn-primary" disabled={busy||!confirmed||reference.trim().length<5}>Xác nhận đã nhận bản giấy</button>
+ </form></Dialog>;
 }

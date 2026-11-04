@@ -19,7 +19,7 @@ def messages(client, user):
     return [item["message"] for item in notices(client, user)]
 
 
-def test_report_book_deadline_and_submission_notify_only_the_advisor(workspace):
+def test_round_deadline_is_public_but_report_submission_is_private(workspace):
     client, users, _, _, _, path = workspace
     requested = client.post(path + "/document-deadlines", headers=hdr(users[4]), json={
         "document_type": "REPORT",
@@ -28,11 +28,11 @@ def test_report_book_deadline_and_submission_notify_only_the_advisor(workspace):
     })
     assert requested.status_code == 200, requested.text
 
-    # Every student and the advisor of the round hear about the new deadline.
-    assert any("Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[0]))
-    assert any("Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[3]))
-    # A lecturer outside this thesis does not receive round-scoped academic notices.
-    assert not any("Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[5]))
+    for user in users:
+        announcements = [item for item in notices(client, user)
+                         if "đã thiết lập hạn nộp Cuốn báo cáo KLTN" in item["message"]]
+        assert len(announcements) == 1
+        assert announcements[0]["url"] == "/documents"
 
     doc = client.post(path + "/documents", headers=hdr(users[0]),
         json={"title": "Cuốn báo cáo KLTN", "document_type": "REPORT"}).json()
@@ -58,9 +58,9 @@ def test_progress_submission_notice_is_private_to_the_thesis_advisor(workspace):
 
     assert any(item["message"].startswith("Synthetic student đã nộp báo cáo tiến độ")
                for item in notices(client, users[3]))
-    assert not any("báo cáo tiến độ" in item["message"] for item in notices(client, users[4]))
-    assert not any("báo cáo tiến độ" in item["message"] for item in notices(client, users[5]))
-    assert not any("báo cáo tiến độ" in item["message"] for item in notices(client, users[2]))
+    assert not any("đã nộp báo cáo tiến độ" in item["message"] for item in notices(client, users[4]))
+    assert not any("đã nộp báo cáo tiến độ" in item["message"] for item in notices(client, users[5]))
+    assert not any("đã nộp báo cáo tiến độ" in item["message"] for item in notices(client, users[2]))
 
 
 def test_proposal_upload_notifies_only_the_advisor(workspace, monkeypatch, tmp_path):
@@ -153,3 +153,22 @@ def test_dean_confirmation_notifies_students_advisor_and_department_head(workspa
     for recipient in (users[0], users[1], users[3], users[4]):
         assert any("Trưởng khoa đã ghi nhận bản đề cương" in text for text in messages(client, recipient))
     assert not any("Trưởng khoa đã ghi nhận bản đề cương" in text for text in messages(client, users[2]))
+
+def test_open_round_announces_to_active_accounts_without_theses(scenario):
+    client, users, _, _, topic, session = scenario
+    admin = users[5]
+    admin.base_role = "ADMIN"
+    existing = session.get(m.ThesisRound, topic.round_id)
+    year = session.get(m.AcademicYear, existing.academic_year_id)
+    round_ = m.ThesisRound(id=uuid4(), academic_year_id=year.id, code="SYN-NOTICE",
+        round_type="MAIN", opens_at=now(), closes_at=now()+timedelta(days=5), state="DRAFT")
+    session.add(round_)
+    session.commit()
+
+    response = client.patch(f"/api/v1/admin/rounds/{round_.id}",
+        headers={**hdr(admin), "If-Match": str(round_.row_version)},
+        json={"state":"OPEN", "reason":"Synthetic announcement"})
+    assert response.status_code == 200, response.text
+    for user in users:
+        assert sum("Khoa đã mở đợt đăng ký KLTN SYN-NOTICE" in text
+                   for text in messages(client, user)) == 1

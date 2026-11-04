@@ -97,6 +97,7 @@ function ThesisWorkspace({context}: {context: Context}) {
     </PageHeader>
     {active && <Link className="btn btn-secondary" to={`/withdrawals?thesis=${thesis.id}`}>Đơn xin thôi thực hiện KLTN</Link>}
     {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}
+    {context.base_role === "STUDENT" && active && !thesis.actions.includes("document:submit") && <p className="alert alert-warning" role="status">Quyền tham gia đợt của bạn đã bị thu hồi. Bạn vẫn xem được hồ sơ; các thao tác nộp/sửa được tạm dừng. Liên hệ Khoa nếu cần khôi phục.</p>}
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
     <div className="core-toolbar">
       <div className="core-toolbar__tabs" role="tablist" aria-label="Phân hệ hồ sơ khóa luận">

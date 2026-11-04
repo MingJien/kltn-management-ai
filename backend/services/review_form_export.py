@@ -62,6 +62,9 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
                 fonts.set(f"{{{W}}}ascii", "Times New Roman"); fonts.set(f"{{{W}}}hAnsi", "Times New Roman")
             if original_font.find(f"{{{W}}}sz") is None:
                 E.SubElement(original_font, f"{{{W}}}sz").set(f"{{{W}}}val", "28")
+            # Body responses use regular text, independently of a bold/italic label.
+            for tag in ("b","i"):
+                E.SubElement(original_font,f"{{{W}}}{tag}").set(f"{{{W}}}val","0")
             lines = value.split("\n")
             replace(p, lines[0])
             following = p.getnext()
@@ -74,6 +77,8 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
                 response = E.Element(f"{{{W}}}p")
                 original_props = p.find(f"{{{W}}}pPr")
                 props = deepcopy(original_props) if original_props is not None else E.Element(f"{{{W}}}pPr")
+                for indent in props.findall(f"{{{W}}}ind"):
+                    props.remove(indent)
                 for keep in props.findall(f"{{{W}}}keepNext"):
                     props.remove(keep)
                 alignment = props.find(f"{{{W}}}jc")
@@ -150,6 +155,30 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
             else:
                 break
 
+        names=sorted({values.get("lecturer",""),values.get("advisor","")}-{""},key=len,reverse=True)
+        pattern=re.compile("("+"|".join(re.escape(name) for name in names)+")") if names else None
+        if pattern:
+            for paragraph in root.xpath(".//w:p",namespaces=NS):
+                for original_run in list(paragraph.findall(f"{{{W}}}r")):
+                    original_text="".join(original_run.xpath("./w:t/text()",namespaces=NS))
+                    if not any(name in original_text for name in names): continue
+                    position=paragraph.index(original_run)
+                    for piece in pattern.split(original_text):
+                        if not piece: continue
+                        run=E.Element(f"{{{W}}}r")
+                        old_props=original_run.find(f"{{{W}}}rPr")
+                        props=deepcopy(old_props) if old_props is not None else E.Element(f"{{{W}}}rPr")
+                        run.append(props)
+                        if piece in names:
+                            for tag in ("b","i","sz","szCs","u"):
+                                for node in props.findall(f"{{{W}}}{tag}"):props.remove(node)
+                            E.SubElement(props,f"{{{W}}}b").set(f"{{{W}}}val","1")
+                            E.SubElement(props,f"{{{W}}}i").set(f"{{{W}}}val","0")
+                            for tag in ("sz","szCs"):E.SubElement(props,f"{{{W}}}{tag}").set(f"{{{W}}}val","28")
+                        node=E.SubElement(run,f"{{{W}}}t");node.set("{http://www.w3.org/XML/1998/namespace}space","preserve");node.text=piece
+                        paragraph.insert(position,run);position+=1
+                    paragraph.remove(original_run)
+
         # Add an ordinary Word footer without changing the reference's styles, section geometry or headers.
         rel_path = "word/_rels/document.xml.rels"
         rel_root = E.fromstring(parts[rel_path], parser)
@@ -175,15 +204,18 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
         reference.set(f"{{{R}}}id", rid)
         sect.insert(0, reference)
         footer = E.Element(f"{{{W}}}ftr", nsmap={"w": W})
-        p = E.SubElement(footer, f"{{{W}}}p")
-        r = E.SubElement(p, f"{{{W}}}r")
-        props = E.SubElement(r, f"{{{W}}}rPr")
-        font = E.SubElement(props, f"{{{W}}}rFonts")
-        font.set(f"{{{W}}}ascii", "Times New Roman"); font.set(f"{{{W}}}hAnsi", "Times New Roman")
-        size = E.SubElement(props, f"{{{W}}}sz"); size.set(f"{{{W}}}val", "16")
-        t = E.SubElement(r, f"{{{W}}}t")
-        local = instant.astimezone(timezone(timedelta(hours=7)))
-        t.text = f"{code} · Báo cáo v{values['report_version']} · {local:%H:%M %d/%m/%Y} (GMT+7) · Bản để ký, chưa xác nhận chữ ký"
+        from backend.services.proposal_export import _public_url
+        local=instant.astimezone(timezone(timedelta(hours=7)))
+        for line in [f"Xuất tại: {_public_url()}",f"Mã số: {code} · Báo cáo v{values['report_version']}",f"Thời gian: {local:%H:%M %d/%m/%Y} (GMT+7) · Bản để ký"]:
+            p=E.SubElement(footer,f"{{{W}}}p")
+            ppr=E.SubElement(p,f"{{{W}}}pPr")
+            E.SubElement(ppr,f"{{{W}}}spacing").set(f"{{{W}}}after","0")
+            E.SubElement(ppr,f"{{{W}}}jc").set(f"{{{W}}}val","left")
+            r=E.SubElement(p,f"{{{W}}}r");props=E.SubElement(r,f"{{{W}}}rPr")
+            font=E.SubElement(props,f"{{{W}}}rFonts")
+            font.set(f"{{{W}}}ascii","Times New Roman");font.set(f"{{{W}}}hAnsi","Times New Roman")
+            E.SubElement(props,f"{{{W}}}sz").set(f"{{{W}}}val","16")
+            E.SubElement(r,f"{{{W}}}t").text=line
         serialize = lambda node: E.tostring(node, xml_declaration=True, encoding="UTF-8", standalone=True)
         parts["word/document.xml"] = serialize(root)
         parts[rel_path] = serialize(rel_root)
@@ -207,7 +239,18 @@ def export_review(session, user, thesis_id, review_id, expected):
     from backend.services import evaluation as service, form_templates, school_forms
     from backend.services.proposal_export import _print_response
     from backend.services.theses import audit, now, primary_advisor
-    thesis, item = service.editable_review(session, user, thesis_id, review_id, expected)
+    thesis=service.access(session,user,thesis_id)
+    item=session.get(m.ThesisReview,review_id)
+    if not item or item.thesis_id!=thesis.id or not service.review_visible(session,user,thesis,item):
+        raise HTTPException(404,"Không tìm thấy phiếu được phép xuất")
+    if item.state=="DRAFT":
+        thesis,item=service.editable_review(session,user,thesis_id,review_id,expected)
+    else:
+        from backend.services.registration import row_version
+        row_version(expected,item.row_version)
+        author=session.get(m.LecturerProfile,item.lecturer_id).user_id
+        if author!=user.id and "evaluation:record" not in service.permissions(session,user,thesis):
+            raise HTTPException(403,"Chỉ người viết hoặc người tiếp nhận được xuất phiếu để ký")
     if any(not item.sections.get(f["key"]) for f in service.FORM_FIELDS[item.kind]) or (
         item.kind == "ADVISOR" and (item.allow_defense is None or item.thesis_completed is None)):
         raise HTTPException(422, "Lưu đầy đủ nội dung phiếu và đề nghị trước khi xuất để ký")
@@ -225,7 +268,7 @@ def export_review(session, user, thesis_id, review_id, expected):
     advisor = primary_advisor(session, thesis.id)
     instant = now()
     report = session.get(m.DocumentVersion, item.report_version_id)
-    code = f"M{'7' if item.kind == 'ADVISOR' else '8'}-{item.id.hex[:12].upper()}-V{item.version_no}-R{item.row_version}"
+    code = f"M{'7' if item.kind == 'ADVISOR' else '8'}-{item.id.hex[:8].upper()}-V{item.version_no}-R{item.row_version}-{instant:%Y%m%d%H%M%S%f}"
     content = fill_review_form(source, item.kind, {"student": student.display_name, "student_code": student.student_code,
         "class_name": student.class_name or "Chưa cập nhật", "title": thesis.current_title,
         "faculty": faculty.name,
@@ -233,7 +276,12 @@ def export_review(session, user, thesis_id, review_id, expected):
         "advisor": session.get(m.LecturerProfile, advisor.lecturer_id).display_name if advisor else "Chưa ghi nhận",
         "report_version": report.version_no}, item.sections, completed=item.thesis_completed,
         allow=item.allow_defense, code=code, instant=instant)
-    audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu đã điền để ký ngoài hệ thống",
+    audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu để ký; content_sha256="+service.review_fingerprint(session,item),
         before_hash=hashlib.sha256(source).hexdigest(), after_hash=hashlib.sha256(content).hexdigest(), source_reference=code)
     session.commit()
-    return _print_response(content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", code, ".docx", instant)
+    from urllib.parse import quote
+    filename=f"Mau-{'7-GVHD' if item.kind=='ADVISOR' else '8-Phan-bien'}-{student.student_code}-v{item.version_no}-{instant:%Y%m%d-%H%M%S}.docx"
+    filename=re.sub(r'[\\/:*?"<>|\x00-\x1f]',"_",filename)
+    response=_print_response(content,"application/vnd.openxmlformats-officedocument.wordprocessingml.document",code,".docx",instant)
+    response.headers["Content-Disposition"]="attachment; filename*=UTF-8''"+quote(filename)
+    return response

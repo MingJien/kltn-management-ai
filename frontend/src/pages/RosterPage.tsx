@@ -10,7 +10,7 @@ type Assignment = {round_id:string; round_code:string; assignment_type:string};
 type PreviewRow = {line:number; student_code:string; display_name:string; email:string; department_code:string; class_name:string; major_code:string};
 type Preview = {sha256:string; count:number; rows:PreviewRow[]};
 type CatalogEntry = {department_code:string; department_name:string; major_code:string; major_name:string};
-type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null; registration_submitted:boolean; registration_submitted_at:string|null};
+type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null; registration_submitted:boolean; registration_submitted_at:string|null; mail_status?:string|null; delivery_mode?:string|null; current_delivery_mode?:string|null; mail_ready?:boolean; mail_retry_at?:string|null; can_send_activation?:boolean};
 type ImportResult = {new_accounts:number; confirmed:number; unchanged:number; snapshot_ids:string[]};
 
 function normalized(value:string) {
@@ -61,6 +61,9 @@ export default function RosterPage({context}: {context:Context}) {
   const [activationFilter,setActivationFilter] = useState("all");
   const [revokeStudent, setRevokeStudent] = useState("");
   const [revokeReason, setRevokeReason] = useState("");
+  const [restoreStudent, setRestoreStudent] = useState("");
+  const [restoreReason, setRestoreReason] = useState("");
+  const [restoreBasis, setRestoreBasis] = useState("");
   const [specialStudent, setSpecialStudent] = useState("");
   const [specialRef, setSpecialRef] = useState("");
   const [specialReason, setSpecialReason] = useState("");
@@ -76,6 +79,12 @@ export default function RosterPage({context}: {context:Context}) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [activePanel, setActivePanel] = useState("list");
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [sendingLinks, setSendingLinks] = useState(false);
+  const [mailProgress, setMailProgress] = useState("");
+  const [mailErrors, setMailErrors] = useState<Record<string,string>>({});
+
+  useEffect(()=>setSelectedStudents(new Set()),[stateFilter,activationFilter,rosterQuery]);
 
   const permissions = useMemo(()=>assignments.filter(a=>a.round_id===roundId).map(a=>a.assignment_type),[assignments,roundId]);
   const canImport = permissions.includes("ELIGIBILITY_IMPORTER");
@@ -94,7 +103,7 @@ export default function RosterPage({context}: {context:Context}) {
       .catch(()=>setDepartmentError("Chưa tải được danh mục bộ môn–ngành. Hãy làm mới trang rồi thử lại."));
   },[context.user_id]);
   useEffect(()=>{
-    setPreview(null);setRevokeStudent("");setSpecialStudent("");setCorrectionStudent("");
+    setRestoreStudent("");setRestoreReason("");setRestoreBasis("");setPreview(null);setRevokeStudent("");setSpecialStudent("");setCorrectionStudent("");setSelectedStudents(new Set());setMailErrors({});
     void refreshRoster(roundId).catch(cause=>setError(errorMessage(cause)));
   },[roundId,refreshRoster]);
 
@@ -118,6 +127,36 @@ export default function RosterPage({context}: {context:Context}) {
     (stateFilter === "all" || row.state === stateFilter)
     && (activationFilter==="all" || (activationFilter==="activated")===accountActivated(row))
     && normalized(`${row.student_code} ${row.display_name} ${row.email}`).includes(normalized(rosterQuery.trim())));
+  const canSendStudentLinks = context.base_role === "ADMIN";
+  const sendableStudents = filteredRoster.filter(row=>row.can_send_activation);
+  const selectedVisibleStudents = sendableStudents.filter(row=>selectedStudents.has(row.student_id));
+  const allSendableSelected = sendableStudents.length > 0 && selectedVisibleStudents.length === sendableStudents.length;
+  async function sendStudentLinks(ids:string[]) {
+    if (!ids.length || sendingLinks) return;
+    setSendingLinks(true);setError("");setNotice("");setMailErrors({});
+    let sent=0;
+    for (const [index,id] of ids.entries()) {
+      setMailProgress(`Đang gửi ${index+1}/${ids.length}…`);
+      try {
+        const result=await request<{sent:boolean;delivery_mode:string}>(`/rounds/${roundId}/roster/${id}/activation-link`,context.user_id,{method:"POST"});
+        if(result.sent) sent++;
+        else setMailErrors(old=>({...old,[id]:"Gửi thất bại; kiểm tra dịch vụ thư và thử lại sau."}));
+      } catch(cause) {setMailErrors(old=>({...old,[id]:errorMessage(cause)}));}
+    }
+    setSelectedStudents(new Set());setMailProgress("");
+    setNotice(`Đã xử lý ${ids.length} sinh viên: ${sent} yêu cầu gửi thành công, ${ids.length-sent} chưa gửi được. Xem kết quả từng dòng.`);
+    try {await refreshRoster(roundId);} catch {setError("Đã xử lý gửi nhưng chưa tải lại được danh sách; hãy làm mới trang.");}
+    setSendingLinks(false);
+  }
+  function studentMailLabel(row:RosterEntry) {
+    if(row.mail_status==="ACTIVATED") return "Đã kích hoạt";
+    if(row.mail_status==="BLOCKED") return "Không đủ điều kiện gửi";
+    if(row.mail_status==="SENT") return row.delivery_mode==="smtp" ? "Máy chủ thư đã tiếp nhận" : row.delivery_mode==="development_outbox" ? "Đã lưu thư thử nghiệm trên máy" : "Đã xử lý gửi";
+    if(row.mail_status==="FAILED") return "Gửi thất bại";
+    if(row.mail_status==="SENDING") return "Đang xử lý gửi";
+    if(row.mail_status==="UNKNOWN") return "Chưa rõ kết quả; có thể gửi lại";
+    return "Chưa ghi nhận gửi link";
+  }
   const legacyPendingCount = roster.filter(row=>row.state==="SUBMITTED").length;
   const confirmedRows = roster.filter(row=>row.state==="CONFIRMED");
   const confirmedCount = confirmedRows.length;
@@ -157,7 +196,7 @@ export default function RosterPage({context}: {context:Context}) {
       {assignments.length?<section className="roster-context card" aria-label="Phạm vi danh sách">
         <div className="roster-context__copy"><span className="roster-eyebrow">PHẠM VI ĐANG LÀM VIỆC</span>
           <strong>Danh sách theo đợt KLTN</strong><p>Chọn một đợt để xem, nhập hoặc cập nhật kết quả sinh viên.</p></div>
-        <label className="input-group roster-context__select">Đợt KLTN<select className="input" value={roundId} onChange={e=>setRoundId(e.target.value)}>
+        <label className="input-group roster-context__select">Đợt KLTN<select className="input" value={roundId} disabled={sendingLinks} onChange={e=>setRoundId(e.target.value)}>
           {[...new Map(assignments.map(a=>[a.round_id,a])).values()].map(a=><option key={a.round_id} value={a.round_id}>{a.round_code}</option>)}
         </select></label>
         <div className={`roster-metrics${revokedCount ? " roster-metrics--with-revoked" : ""}`} role="region" aria-label="Tình trạng danh sách" tabIndex={0}>
@@ -177,7 +216,7 @@ export default function RosterPage({context}: {context:Context}) {
 
       {panels.length?<>
         <div className="roster-tabs-wrap"><div className="roster-tabs" role="tablist" aria-label="Thao tác danh sách sinh viên" onKeyDown={handlePanelKeyDown}>
-          {panels.map(panel=><button key={panel.id} id={`roster-tab-${panel.id}`} type="button" role="tab"
+          {panels.map(panel=><button key={panel.id} id={`roster-tab-${panel.id}`} type="button" role="tab" disabled={sendingLinks}
             aria-selected={selectedPanel===panel.id} aria-controls={`roster-panel-${panel.id}`} tabIndex={selectedPanel===panel.id?0:-1}
             className={`roster-tab${selectedPanel===panel.id?" roster-tab--active":""}`} onClick={()=>setActivePanel(panel.id)}>
             <span>{panel.label}</span><small>{panel.detail}</small>
@@ -197,16 +236,16 @@ export default function RosterPage({context}: {context:Context}) {
             </div>
             <div className="card-body stack">
               <div className="roster-filter-grid">
-                <label className="input-group">Trạng thái đủ điều kiện<select className="input" aria-label="Trạng thái đủ điều kiện" value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
+                <label className="input-group">Trạng thái đủ điều kiện<select className="input" aria-label="Trạng thái đủ điều kiện" disabled={sendingLinks} value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
                   <option value="all">Tất cả hồ sơ ({roster.length})</option>
                   <option value="CONFIRMED">Đủ điều kiện ({confirmedCount})</option>
                   {legacyPendingCount > 0 ? <option value="SUBMITTED">Cần nhập lại danh sách ({legacyPendingCount})</option> : null}
                   {revokedCount > 0 ? <option value="REJECTED">Đã thu hồi ({revokedCount})</option> : null}
                 </select></label>
-                <label className="input-group">Kích hoạt tài khoản<select className="input" aria-label="Kích hoạt tài khoản" value={activationFilter} onChange={e=>setActivationFilter(e.target.value)}>
+                <label className="input-group">Kích hoạt tài khoản<select className="input" aria-label="Kích hoạt tài khoản" disabled={sendingLinks} value={activationFilter} onChange={e=>setActivationFilter(e.target.value)}>
                   <option value="all">Tất cả tài khoản</option><option value="activated">Đã kích hoạt</option><option value="not-activated">Chưa kích hoạt</option>
                 </select></label>
-                <label className="input-group">Tìm sinh viên<input className="input" type="search" aria-label="Tìm sinh viên" value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)} placeholder="MSSV, họ tên hoặc email" /></label>
+                <label className="input-group">Tìm sinh viên<input className="input" type="search" aria-label="Tìm sinh viên" disabled={sendingLinks} value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)} placeholder="MSSV, họ tên hoặc email" /></label>
               </div>
               <p className="text-caption">Đang hiện {filteredRoster.length}/{roster.length} sinh viên thuộc đợt đã chọn{stateFilter !== "all" || activationFilter !== "all" || rosterQuery.trim() ? ` (đang lọc: ${[
                 stateFilter !== "all" ? (stateFilter === "SUBMITTED" ? "Cần nhập lại danh sách" : stateFilter === "CONFIRMED" ? "Đủ điều kiện" : "Đã thu hồi") : "",
@@ -219,8 +258,43 @@ export default function RosterPage({context}: {context:Context}) {
                   <p>Nhập lại danh sách chính thức của đợt để các hồ sơ này được ghi nhận đủ điều kiện ngay; không cần thao tác xác nhận riêng.</p>
                 </div>
               ) : null}
-              <div className="table-scroll" role="region" aria-label="Danh sách sinh viên đủ điều kiện" tabIndex={0}><table className="account-table"><thead><tr><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Đủ điều kiện</th><th>Kích hoạt</th><th>Đăng ký đề tài</th></tr></thead>
-                <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}><td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
+              {canSendStudentLinks ? <div className="stack">
+                <p className="text-caption">Danh sách nhập không tự gửi thư. Chọn sinh viên đang chờ kích hoạt rồi gửi; sinh viên vẫn có thể tự yêu cầu link. Chỉ chọn trong kết quả lọc hiện tại.</p>
+                {roster.some(row=>row.current_delivery_mode==="development_outbox") ? <p className="alert alert-warning">Thư đang lưu thử nghiệm trên máy, chưa gửi đến email thật.</p> : null}
+                {roster.length && !roster.some(row=>row.mail_ready) ? <p className="alert alert-warning">Dịch vụ gửi thư chưa sẵn sàng.</p> : null}
+                <div className="account-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-bulk-toggle"
+                    disabled={sendingLinks || !sendableStudents.length}
+                    onClick={() => {
+                      if (allSendableSelected) {
+                        setSelectedStudents(new Set());
+                      } else {
+                        setSelectedStudents(new Set(sendableStudents.map(row => row.student_id)));
+                      }
+                    }}
+                  >
+                    {allSendableSelected ? `Bỏ chọn tất cả (${sendableStudents.length})` : `Chọn tất cả có thể gửi (${sendableStudents.length})`}
+                  </button>
+                  <button type="button" className="btn btn-secondary" disabled={sendingLinks || busy} onClick={() => void refreshRoster(roundId).catch(cause => setError(errorMessage(cause)))}>Làm mới trạng thái</button>
+                  <button type="button" className="btn btn-primary btn-bulk-submit" disabled={sendingLinks || busy || !selectedVisibleStudents.length || !roster.some(row => row.mail_ready)} onClick={() => void sendStudentLinks(selectedVisibleStudents.map(row => row.student_id))}>Gửi link đã chọn ({selectedVisibleStudents.length})</button>
+                </div>
+                <p role="status" aria-live="polite" className="text-caption">{mailProgress || `Đã chọn ${selectedVisibleStudents.length} sinh viên trong kết quả lọc.`}</p>
+              </div> : null}
+              <div className="table-scroll" role="region" aria-label="Danh sách sinh viên đủ điều kiện" tabIndex={0}><table className="account-table"><thead><tr>{canSendStudentLinks ? (
+                    <th style={{ width: 44, textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Chọn hoặc bỏ chọn tất cả sinh viên có thể gửi"
+                        title={allSendableSelected ? "Bỏ chọn tất cả" : "Chọn tất cả có thể gửi"}
+                        checked={allSendableSelected}
+                        disabled={sendingLinks || !sendableStudents.length}
+                        onChange={e => setSelectedStudents(e.target.checked ? new Set(sendableStudents.map(row => row.student_id)) : new Set())}
+                      />
+                    </th>
+                  ) : null}<th>MSSV</th><th>Họ tên</th><th>Email</th><th>Bộ môn</th><th>Ngành</th><th>Đủ điều kiện</th><th>Kích hoạt</th>{canSendStudentLinks?<th>Trạng thái gửi link</th>:null}<th>Đăng ký đề tài</th>{canSendStudentLinks?<th>Thao tác</th>:null}</tr></thead>
+                <tbody>{filteredRoster.map(row=><tr key={row.snapshot_id}>{canSendStudentLinks?<td><input type="checkbox" aria-label={`Chọn SV ${row.student_code}`} checked={selectedStudents.has(row.student_id)} disabled={!row.can_send_activation||sendingLinks||busy} onChange={e=>setSelectedStudents(old=>{const next=new Set(old);if(e.target.checked)next.add(row.student_id);else next.delete(row.student_id);return next;})}/></td>:null}<td>{row.student_code}</td><td>{row.display_name}</td><td>{row.email}</td>
                   <td>{row.department_code}</td><td>{row.major_code||"—"}{catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name
                     ? ` · ${catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name}`:""}</td>
                   <td>{row.state === "SUBMITTED" ? <span className="badge badge-warning">Cần nhập lại danh sách</span> :
@@ -228,10 +302,11 @@ export default function RosterPage({context}: {context:Context}) {
                        row.state === "REJECTED" ? <span className="badge badge-danger">Đã thu hồi</span> :
                        <span className="badge badge-neutral">{row.state}</span>}</td>
                   <td>{accountActivated(row)?"Đã kích hoạt":"Chưa kích hoạt"}{row.account_status==="LOCKED"?" · Đã khóa":""}</td>
-                  <td>{row.registration_submitted ? <>Đã gửi{row.registration_submitted_at ? <small className="text-caption"> · {new Date(row.registration_submitted_at).toLocaleString("vi-VN")}</small> : null}</> : "Chưa gửi"}</td></tr>)}</tbody></table></div>
+                  {canSendStudentLinks?<td>{studentMailLabel(row)}{row.mail_retry_at&&!row.can_send_activation&&row.mail_status!=="ACTIVATED"&&row.mail_status!=="BLOCKED"?<div className="text-caption">Gửi lại sau {new Date(row.mail_retry_at).toLocaleTimeString("vi-VN")} · làm mới trang</div>:null}{mailErrors[row.student_id]?<p role="alert" className="text-danger">{mailErrors[row.student_id]}</p>:null}</td>:null}
+                  <td>{row.registration_submitted ? <>Đã gửi{row.registration_submitted_at ? <small className="text-caption"> · {new Date(row.registration_submitted_at).toLocaleString("vi-VN")}</small> : null}</> : "Chưa gửi"}</td>{canSendStudentLinks?<td><button type="button" className="btn btn-secondary btn-sm" disabled={!row.can_send_activation||!row.mail_ready||busy||sendingLinks} onClick={()=>void sendStudentLinks([row.student_id])}>Gửi link</button></td>:null}</tr>)}</tbody></table></div>
               {!filteredRoster.length?<p className="text-muted">Không có sinh viên khớp bộ lọc.</p>:null}
-              <details className="roster-accordion roster-accordion--danger">
-                <summary><span><strong>Thu hồi kết quả đã xác nhận</strong><small>Chỉ dùng khi có căn cứ cần thu hồi; hồ sơ cũ vẫn được giữ.</small></span><span className="badge badge-danger">Thao tác cần thận trọng</span></summary>
+              {canManage ? <><details className="roster-accordion roster-accordion--danger">
+                <summary><span><strong>Thu hồi kết quả đã xác nhận</strong><small>SV vẫn đăng nhập và xem hồ sơ; ngừng đăng ký và nộp nội dung trong đợt này. Các thành viên khác không bị khóa.</small></span><span className="badge badge-danger">Thao tác cần thận trọng</span></summary>
                 <div className="roster-accordion__body stack">
                   <StudentPicker label="Sinh viên cần thu hồi" rows={roster.filter(r=>r.state==="CONFIRMED")}
                     value={revokeStudent} onChange={setRevokeStudent} placeholder="Chọn sinh viên đã xác nhận" disabled={busy} />
@@ -245,6 +320,19 @@ export default function RosterPage({context}: {context:Context}) {
                       "Đã thu hồi quyền tham gia; hồ sơ cũ được giữ để rà soát.")}>Thu hồi quyền tham gia</button></div>
                 </div>
               </details>
+              <details>
+                <summary><strong>Khôi phục quyền tham gia đã thu hồi</strong></summary>
+                <div className="stack">
+                  <p>Chỉ dùng khi Khoa xác nhận lại điều kiện. Giữ nguyên lịch sử thu hồi; không tự mở khóa tài khoản hoặc tạo lại hồ sơ.</p>
+                  <StudentPicker label="Sinh viên cần khôi phục" rows={roster.filter(r=>r.state==="REJECTED")} value={restoreStudent} onChange={setRestoreStudent} placeholder="Chọn sinh viên đã bị thu hồi" disabled={busy} />
+                  <label className="input-group">Văn bản/căn cứ khôi phục<input className="input" value={restoreBasis} onChange={e=>setRestoreBasis(e.target.value)} maxLength={500} /></label>
+                  <label className="input-group">Lý do khôi phục<input className="input" value={restoreReason} onChange={e=>setRestoreReason(e.target.value)} maxLength={2000} /></label>
+                  <button className="btn btn-secondary" disabled={busy||!restoreStudent||restoreBasis.trim().length<3||restoreReason.trim().length<5} onClick={()=>void run(async()=>{
+                    await request(`/rounds/${roundId}/roster/restore`,context.user_id,{method:"POST",body:JSON.stringify({student_id:restoreStudent,basis_ref:restoreBasis,reason:restoreReason})});
+                    setRestoreStudent("");setRestoreBasis("");setRestoreReason("");
+                  },"Đã khôi phục quyền tham gia; lịch sử cũ được giữ.")}>Khôi phục quyền tham gia</button>
+                </div>
+              </details></> : null}
             </div>
           </section>:null}
 
@@ -301,8 +389,8 @@ export default function RosterPage({context}: {context:Context}) {
                 `Đã xem trước ${preview.count} sinh viên. Kiểm tra các dòng rồi nhấn “Nhập sau khi kiểm”.`}</p>
               {error?<p role="alert" className="alert alert-danger">{error}</p>:null}
               {preview?<div className="roster-preview stack"><div><span className="roster-eyebrow">ĐÃ KIỂM TRA · CHƯA NHẬP</span><h3>Xem trước: {preview.count} sinh viên</h3></div>
-                <div className="table-scroll" role="region" aria-label="Xem trước danh sách nhập" tabIndex={0}><table className="account-table"><thead><tr><th>Dòng</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Mã bộ môn</th><th>Lớp</th><th>Mã ngành</th></tr></thead>
-                  <tbody>{preview.rows.map(row=><tr key={row.line}><td>{row.line}</td><td>{row.student_code}</td><td>{row.display_name}</td>
+                <div className="table-scroll" role="region" aria-label="Xem trước danh sách nhập" tabIndex={0}><table className="account-table"><thead><tr><th className="table-col-index">Dòng</th><th>MSSV</th><th>Họ tên</th><th>Email</th><th>Mã bộ môn</th><th>Lớp</th><th>Mã ngành</th></tr></thead>
+                  <tbody>{preview.rows.map(row=><tr key={row.line}><td className="table-col-index">{row.line}</td><td className="table-col-code">{row.student_code}</td><td>{row.display_name}</td>
                     <td>{row.email}</td><td>{row.department_code} · {catalog.find(item=>item.department_code===row.department_code)?.department_name||"?"}</td><td>{row.class_name}</td>
                     <td>{row.major_code} · {catalog.find(item=>item.department_code===row.department_code&&item.major_code===row.major_code)?.major_name||"?"}</td></tr>)}</tbody></table></div>
               </div>:null}

@@ -12,7 +12,7 @@ test("Hồ sơ GV: nháp riêng, ảnh, TBM trả lại và duyệt; danh bạ v
  try{
   await gv.goto("/account",{waitUntil:"domcontentloaded"});await gv.getByRole("button",{name:"Cập nhật hồ sơ",exact:true}).click();
   await gv.getByLabel("Họ và tên",{exact:true}).fill("Giảng viên hồ sơ kiểm thử");
-  await gv.getByLabel("Trình độ học vấn",{exact:true}).selectOption("DOCTOR");
+  await gv.getByLabel("Trình độ đào tạo cao nhất",{exact:true}).selectOption("DOCTOR");
   await gv.getByLabel("Chuyên môn",{exact:true}).fill("Công nghệ phần mềm\nTrí tuệ nhân tạo");
   await gv.getByLabel("Email liên hệ công khai",{exact:true}).fill("lecturer@example.test");
   await gv.getByLabel("Số điện thoại",{exact:true}).fill("0901234567");
@@ -47,5 +47,25 @@ test("Hồ sơ GV: nháp riêng, ảnh, TBM trả lại và duyệt; danh bạ v
   await sv.setViewportSize({width:390,height:844});await sv.goto(`/lecturers/${lecturerId}`,{waitUntil:"domcontentloaded"});await expect(sv.getByText("Phòng mẫu 201",{exact:true})).toBeVisible();expect(await sv.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const axe=await new AxeBuilder({page:sv}).include(".lecturer-page").withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze();expect(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
   await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"lecturer-profile-mobile.png"),fullPage:true});
+  // TBM explicitly self-confirms their own submitted change; the action remains auditable.
+  await tbm.goto("/account?section=lecturer-profile",{waitUntil:"domcontentloaded"});
+  await tbm.getByRole("button",{name:"Cập nhật hồ sơ",exact:true}).click();
+  await tbm.getByLabel("Giới thiệu",{exact:true}).fill("Thông tin giả: Trưởng bộ môn tự xác nhận hồ sơ.");
+  await tbm.getByRole("button",{name:"Lưu bản nháp",exact:true}).click();
+  await tbm.getByRole("button",{name:"Gửi Khoa duyệt",exact:true}).click();
+  dialog=tbm.getByRole("dialog");await dialog.getByLabel("Nội dung cập nhật / căn cứ đề nghị").fill("Đề nghị tự xác nhận thông tin giả đã đối chiếu");
+  await dialog.getByRole("button",{name:"Xác nhận gửi duyệt",exact:true}).click();await expect(dialog).toHaveCount(0);
+  const ownProfile=await read(tbm,"/account/lecturer-profile");
+  await tbm.goto("/lecturer-profile-reviews",{waitUntil:"domcontentloaded"});
+  await tbm.getByRole("row").filter({hasText:ownProfile.profile.lecturer_code}).getByRole("button",{name:"Xem và duyệt",exact:true}).click();
+  await expect(tbm.getByText("Đây là hồ sơ của bạn.",{exact:false})).toBeVisible();
+  await tbm.getByRole("button",{name:"Tự xác nhận và công bố",exact:true}).click();dialog=tbm.getByRole("dialog");
+  await dialog.getByLabel("Lý do xử lý hồ sơ").fill("Tự đối chiếu và xác nhận hồ sơ giả");
+  await dialog.getByRole("checkbox",{name:/Tôi đã đối chiếu thông tin/}).check();
+  await dialog.getByRole("button",{name:"Xác nhận duyệt hồ sơ",exact:true}).click();
+  await expect(tbm.getByText("Đã tự xác nhận và công bố hồ sơ",{exact:false})).toBeVisible();
+  await tbm.goto(`/lecturers/${ownProfile.profile.id}`);
+  await expect(tbm.getByText("TBM tự xác nhận thông tin",{exact:true})).toBeVisible();
+
  }finally{for(const {c} of contexts)await c.close();}
 });

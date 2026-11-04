@@ -66,7 +66,7 @@ export default function NotificationsBell({userId}: {userId: string}) {
       {summary.items.length ? <ul className="notifications__list">{summary.items.map((item) =>
         <li key={item.id}><button type="button" className="notifications__item notifications__item--unread"
           disabled={!!busyId} onClick={() => void view(item)}>
-          <span>{item.message}</span>
+          <span className="notifications__message">{item.message}</span>
           <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString("vi-VN")}</time>
         </button></li>)}</ul> : <p className="notifications__empty">Không có thông báo chưa xem.</p>}
       <Link className="notifications__all" to="/notifications" onClick={() => setOpen(false)}>Xem tất cả</Link>

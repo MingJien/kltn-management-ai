@@ -124,15 +124,20 @@ def test_scope_self_approval_and_expired_head_are_rejected(profiles):
     assert not any("gửi cập nhật hồ sơ" in row["message"] for row in client.get("/api/v1/notifications",headers=hdr(users[4])).json()["items"])
 
 
-def test_head_profile_requires_an_independent_faculty_dean(profiles):
+def test_head_can_self_confirm_own_profile(profiles):
     ctx=profiles;client,users,lecturers,session,admin=ctx
     sent=submit(ctx,save(ctx,draft(ctx,4),index=4),index=4)
-    assert decide(ctx,sent,index=4).status_code==403
+    queue=client.get("/api/v1/lecturer-profile-reviews",headers=hdr(users[4])).json()
+    assert any(row["id"]==sent["id"] and row["can_review"] for row in queue["items"])
+    result=decide(ctx,sent,index=4);assert result.status_code==200,result.text
+    assert result.json()["state"]=="APPROVED"
+    assert own(ctx,index=4)["profile"]["verification_kind"]=="SELF_CONFIRMED"
+    assert session.scalar(select(m.AuditEvent.id).where(m.AuditEvent.resource_id==sent["id"],m.AuditEvent.action=="LECTURER_PROFILE_SELF_CONFIRMED",m.AuditEvent.actor_id==users[4].id))
     faculty=session.get(m.Department,lecturers[1].department_id).faculty_id
     position=m.OrganizationalPosition(id=uuid4(),code="FACULTY_DEAN",name="Trưởng khoa mẫu")
     session.add(position);session.flush()
     session.add(m.PositionAssignment(id=uuid4(),lecturer_id=lecturers[2].id,position_id=position.id,faculty_id=faculty,effective_from=now()-timedelta(days=1),state="ACTIVE"));session.commit()
-    approved=decide(ctx,sent,index=5);assert approved.status_code==200,approved.text
+    assert decide(ctx,sent,index=5).status_code==409
 
 
 def test_stale_draft_and_stale_base_cannot_overwrite_identity_correction(profiles):

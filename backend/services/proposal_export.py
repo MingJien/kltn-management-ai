@@ -205,9 +205,11 @@ def _print_bytes(source_bytes: bytes, suffix: str, lines: list[str] | str) -> tu
 
 
 def _print_response(result: bytes, media_type: str, code: str, suffix: str,
-                    instant: datetime) -> Response:
+                    instant: datetime, filename: str | None = None) -> Response:
+    from urllib.parse import quote
+    safe_name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", filename or (code+suffix))
     return Response(content=result, media_type=media_type, headers={
-        "Content-Disposition": f'attachment; filename="{code}{suffix}"',
+        "Content-Disposition": "attachment; filename*=UTF-8\x27\x27"+quote(safe_name),
         "X-Document-Code": code,
         "X-Exported-At": instant.isoformat(),
         "X-Print-SHA256": hashlib.sha256(result).hexdigest(),
@@ -295,7 +297,7 @@ def export_proposal(session, user, thesis_id, version_id) -> Response:
         f"exporter={user.id}; code={code}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, media_type, code, suffix, instant)
+    return _print_response(result, media_type, code, suffix, instant, filename="De-cuong-v"+str(version.version_no)+"-"+original.original_name)
 
 
 def export_document(session, user, thesis_id, document_id, version_id) -> Response:
@@ -330,4 +332,4 @@ def export_document(session, user, thesis_id, document_id, version_id) -> Respon
         f"exporter={user.id}; code={code}; document={item.id}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, media_type, code, suffix, instant)
+    return _print_response(result, media_type, code, suffix, instant, filename=("Ke-hoach" if item.document_type=="PLAN" else "Bao-cao")+"-v"+str(version.version_no)+"-"+original.original_name)

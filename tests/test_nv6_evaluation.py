@@ -308,3 +308,77 @@ def test_export_fills_official_form_preserves_reference_and_requires_saved_compl
     assert source.read_bytes()==original
     assert client.post(base+"/print-copy",headers=version_headers(users[0],saved)).status_code in (403,404)
     assert client.post(base+"/print-copy",headers=version_headers(users[user],review)).status_code==409
+
+def test_submit_without_scan_then_scoped_paper_receipt(evaluation):
+    ctx,_=evaluation;client,users,_,_,session,path=ctx
+    review=create(ctx).json();base=path+f"/evaluation/reviews/{review['id']}"
+    payload={"sections":{f["key"]:"Complete authenticated review "+f["key"] for f in FORM_FIELDS["ADVISOR"]},"thesis_completed":True,"allow_defense":True}
+    saved=client.put(base,headers=version_headers(users[3],review),json=payload).json()
+    assert client.post(base+"/submit",headers=version_headers(users[3],saved),json={}).status_code==422
+    sent=client.post(base+"/submit",headers=version_headers(users[3],saved),json={"confirm_content":True})
+    assert sent.status_code==200,sent.text
+    sent=sent.json();assert sent["signed_file"] is None
+    eligibility=get(ctx)["members"][0]["eligibility"]
+    assert next(c for c in eligibility["conditions"] if c["key"]=="completion")["met"]
+    assert not next(c for c in eligibility["conditions"] if c["key"]=="consent")["met"]
+    export=client.post(base+"/print-copy",headers=version_headers(users[3],sent))
+    assert export.status_code==200,export.text
+    code=export.headers["X-Document-Code"]
+    receipt={"reference":"PAPER-REGISTER-2026-01","export_code":code,"confirm_paper":True}
+    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json=receipt).status_code in (403,404)
+    session.add(m.ResourceAssignment(id=uuid4(),user_id=users[5].id,round_id=session.get(m.Thesis,UUID(path.split("/")[-1])).round_id,
+        assignment_type="REVIEW_RECORDS_MANAGER",state="ACTIVE",effective_from=now()))
+    session.commit()
+    assert "evaluation:record" in get(ctx,5)["actions"]
+    bad=client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json={**receipt,"export_code":"OTHER-EXPORT-CODE"})
+    assert bad.status_code==422
+    received=client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json=receipt)
+    assert received.status_code==200,received.text
+    item=next(r for r in received.json()["reviews"] if r["id"]==sent["id"])
+    assert item["paper_receipt"]["reference"]==receipt["reference"]
+    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],item),json=receipt).status_code==409
+    assert next(c for c in get(ctx)["members"][0]["eligibility"]["conditions"] if c["key"]=="consent")["met"]
+
+def test_changed_review_cannot_receive_paper_for_old_export(evaluation):
+    ctx,_=evaluation;client,users,_,_,_,path=ctx
+    r=create(ctx).json();base=path+f"/evaluation/reviews/{r['id']}"
+    payload={"sections":{f["key"]:"Original text "+f["key"] for f in FORM_FIELDS["ADVISOR"]},"thesis_completed":True,"allow_defense":True}
+    r=client.put(base,headers=version_headers(users[3],r),json=payload).json()
+    export=client.post(base+"/print-copy",headers=version_headers(users[3],r))
+    assert export.status_code==200,export.text
+    payload["sections"]["attitude"]="Corrected content after first print"
+    r=client.put(base,headers=version_headers(users[3],r),json=payload).json()
+    r=client.post(base+"/submit",headers=version_headers(users[3],r),json={"confirm_content":True}).json()
+    result=client.post(base+"/paper-receipt",headers=version_headers(users[4],r),json={
+        "reference":"PAPER-OLD-CONTENT","export_code":export.headers["X-Document-Code"],"confirm_paper":True})
+    assert result.status_code==422
+
+@pytest.mark.parametrize("source_code,target_code", [("BM-CNTT","BM-KHMT"), ("BM-KHMT","BM-CNTT")])
+def test_computing_departments_can_assign_cross_reviewer(evaluation, source_code, target_code):
+    ctx,_=evaluation
+    client,users,_,lecturers,session,path=ctx
+    source=session.get(m.Department,lecturers[0].department_id)
+    source.code=source_code
+    other=m.Department(id=uuid4(),faculty_id=source.faculty_id,code=target_code,name="Synthetic computing department")
+    session.add(other);session.flush()
+    lecturers[2].department_id=other.id;session.commit()
+    assert str(lecturers[2].id) in {candidate["id"] for candidate in get(ctx)["candidates"]}
+    result=assign(ctx)
+    assert result.status_code==201,result.text
+    assert "evaluation:reviewer" in get(ctx,5)["actions"]
+
+
+def test_cross_reviewer_rejects_other_faculty_and_unrelated_department(evaluation):
+    ctx,_=evaluation
+    _,_,_,lecturers,session,_=ctx
+    source=session.get(m.Department,lecturers[0].department_id)
+    source.code="BM-CNTT"
+    another=m.Faculty(id=uuid4(),code="T-"+uuid4().hex[:10],name="Synthetic other faculty")
+    session.add(another);session.flush()
+    outside=m.Department(id=uuid4(),faculty_id=another.id,code="BM-KHMT",name="Other faculty computing")
+    engineering=m.Department(id=uuid4(),faculty_id=source.faculty_id,code="BM-KT",name="Synthetic engineering")
+    session.add_all([outside,engineering]);session.flush()
+    for department in [outside,engineering]:
+        lecturers[2].department_id=department.id;session.commit()
+        assert str(lecturers[2].id) not in {candidate["id"] for candidate in get(ctx)["candidates"]}
+        assert assign(ctx).status_code==422

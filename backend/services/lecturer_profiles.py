@@ -39,8 +39,8 @@ def scopes(session, user):
 
 
 def can_review(session,user,lecturer):
-    if user.id==lecturer.user_id:return False
     departments,faculties=scopes(session,user)
+    if user.id==lecturer.user_id:return lecturer.department_id in departments
     department=session.get(m.Department,lecturer.department_id)
     return lecturer.department_id in departments or bool(department and department.faculty_id in faculties)
 
@@ -89,7 +89,7 @@ def detail(session,user,identifier):
         "display_name":item.display_name,"department_id":item.department_id,"department_code":department.code,
         "department_name":department.name,"faculty_name":faculty.name,"data":data,
         "avatar_url":avatar_url(item),"row_version":item.row_version,
-        "verified_at":item.profile_verified_at,"positions":positions,
+        "verified_at":item.profile_verified_at,"verification_kind":("SELF_CONFIRMED" if item.profile_verified_by==item.user_id else "REVIEWED") if item.profile_verified_at else None,"positions":positions,
         "account_email":account.email if private else None,"account_status":account.status if private else None,
         "can_manage_identity":user.base_role=="ADMIN","is_owner":user.id==item.user_id}
 
@@ -124,7 +124,8 @@ def reviewers(session,lecturer):
     candidates=session.execute(select(m.LecturerProfile.user_id,m.OrganizationalPosition.code).join(m.PositionAssignment,
         m.PositionAssignment.lecturer_id==m.LecturerProfile.id).join(m.OrganizationalPosition,
         m.OrganizationalPosition.id==m.PositionAssignment.position_id).join(m.UserAccount,m.UserAccount.id==m.LecturerProfile.user_id)
-        .where(effective(m.PositionAssignment),m.UserAccount.status=="ACTIVE",m.UserAccount.id!=lecturer.user_id,
+        .where(effective(m.PositionAssignment),m.UserAccount.status=="ACTIVE",
+            or_(m.UserAccount.id!=lecturer.user_id, and_(m.OrganizationalPosition.code=="DEPARTMENT_HEAD",m.PositionAssignment.department_id==lecturer.department_id)),
             or_(and_(m.OrganizationalPosition.code=="DEPARTMENT_HEAD",m.PositionAssignment.department_id==lecturer.department_id),
                 and_(m.OrganizationalPosition.code=="FACULTY_DEAN",m.PositionAssignment.faculty_id==department.faculty_id)))).all()
     heads={row.user_id for row in candidates if row.code=="DEPARTMENT_HEAD"}
@@ -204,8 +205,9 @@ def withdraw(session,user,identifier,data,expected):
 
 def decide(session,user,identifier,data,expected):
     lecturer,item=request_access(session,user,identifier,write=True)
-    if not can_review(session,user,lecturer):raise HTTPException(403,"Không được tự duyệt hồ sơ; cần TBM cùng bộ môn hoặc Trưởng khoa đúng phạm vi")
+    if not can_review(session,user,lecturer):raise HTTPException(403,"Cần TBM hoặc Trưởng khoa có quyền trong phạm vi hồ sơ")
     row_version(expected,item.row_version)
+    if user.id==lecturer.user_id and data.decision!="APPROVE":raise HTTPException(422,"Hãy rút yêu cầu để chỉnh sửa hồ sơ của mình")
     if item.state!="SUBMITTED":raise HTTPException(409,"Yêu cầu đã được xử lý hoặc đã rút")
     if data.decision=="APPROVE":
         if not data.confirm_verified:raise HTTPException(422,"Cần xác nhận đã đối chiếu thông tin trước khi duyệt")
@@ -219,7 +221,7 @@ def decide(session,user,identifier,data,expected):
         item.state="APPROVED"
     else:item.state="RETURNED"
     item.reviewed_by=user.id;item.reviewed_at=now();item.decision_reason=data.reason;item.row_version+=1
-    audit(session,user,"LECTURER_PROFILE_APPROVED" if data.decision=="APPROVE" else "LECTURER_PROFILE_RETURNED",
+    audit(session,user,("LECTURER_PROFILE_SELF_CONFIRMED" if user.id==lecturer.user_id else "LECTURER_PROFILE_APPROVED") if data.decision=="APPROVE" else "LECTURER_PROFILE_RETURNED",
         "lecturer_profile_change",item.id,data.reason)
     notices.emit(session,user.id,{lecturer.user_id},"LECTURER_PROFILE_DECIDED","lecturer_profile_change",item.id,
         f"Hồ sơ giảng viên lần {item.version_no} {'đã được duyệt và cập nhật công khai' if item.state=='APPROVED' else 'cần bổ sung, chỉnh sửa'}. Lý do: {data.reason}","/account?section=lecturer-profile")
@@ -231,8 +233,8 @@ def review_query(session,user):
     if not departments and not faculties:raise HTTPException(403,"Chỉ TBM hoặc Trưởng khoa đang được phân công xem danh sách duyệt")
     return (select(m.LecturerProfileChange).join(m.LecturerProfile,m.LecturerProfile.id==m.LecturerProfileChange.lecturer_id)
         .join(m.Department,m.Department.id==m.LecturerProfile.department_id).where(
-            m.LecturerProfile.user_id!=user.id,
-            or_(m.LecturerProfile.department_id.in_(departments),m.Department.faculty_id.in_(faculties))))
+            or_(m.LecturerProfile.department_id.in_(departments),
+                and_(m.LecturerProfile.user_id!=user.id,m.Department.faculty_id.in_(faculties)))))
 
 
 def queue(session,user,state,q,limit,offset):
@@ -258,7 +260,7 @@ def directory(session,user,q,department_id,status,limit,offset):
     items=[]
     for row in rows:
         data=detail(session,user,row.id)
-        items.append({key:data[key] for key in ("id","user_id","display_name","lecturer_code","department_id","department_name","faculty_name","avatar_url","data","verified_at","account_email","account_status","row_version")})
+        items.append({key:data[key] for key in ("id","user_id","display_name","lecturer_code","department_id","department_name","faculty_name","avatar_url","data","verified_at","verification_kind","account_email","account_status","row_version")})
     departments=session.scalars(select(m.Department).where(m.Department.active.is_(True)).order_by(m.Department.name)).all()
     return {"items":items,"total":total,"departments":[{"id":d.id,"code":d.code,"name":d.name} for d in departments]}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -19,6 +19,7 @@ from backend.services.roster import (
     CODE, MAX_BYTES, assigned, import_roster, parse_roster, require_assignment, validate_rows,
 )
 
+STUDENT_MAIL_ACTIONS = ("STUDENT_ACTIVATION_SENDING", "STUDENT_ACTIVATION_SENT", "STUDENT_ACTIVATION_FAILED")
 router = APIRouter(prefix="/api/v1/rounds/{round_id}/roster", tags=["eligibility roster"])
 assignment_router = APIRouter(prefix="/api/v1/me", tags=["eligibility roster"])
 
@@ -111,6 +112,14 @@ async def preview(round_id: UUID, request: Request,
     require_assignment(session, user, round_id, "ELIGIBILITY_IMPORTER")
     rows, digest = await _read_file(request, file_name)
     validate_rows(session, rows)
+    for row in rows:
+        student = session.scalar(select(m.StudentProfile).where(m.StudentProfile.student_code == row.student_code))
+        if student:
+            latest = session.scalar(select(m.EligibilitySnapshot).where(
+                m.EligibilitySnapshot.student_id == student.id, m.EligibilitySnapshot.round_id == round_id
+            ).order_by(m.EligibilitySnapshot.version.desc()).limit(1))
+            if latest and latest.state == "REJECTED":
+                raise HTTPException(409, f"Sinh viên {row.student_code} đã bị thu hồi. Hãy khôi phục quyền tham gia với căn cứ mới trước khi nhập lại.")
     # Only authorized staff see names. Never return passwords, GPA or transcript data.
     return {"sha256": digest, "count": len(rows), "rows": [row.__dict__ for row in rows]}
 
@@ -158,15 +167,42 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
     latest: dict[UUID, m.EligibilitySnapshot] = {}
     for snapshot in snapshots:
         latest.setdefault(snapshot.student_id, snapshot)
+    from backend.services.account_mail import delivery_mode, mail_delivery_ready
+    student_ids = [snapshot.student_id for snapshot in latest.values()]
+    profiles = session.scalars(select(m.StudentProfile).where(m.StudentProfile.id.in_(student_ids))).all() if student_ids else []
+    user_ids = [profile.user_id for profile in profiles]
+    mail_events = {}
+    if user.base_role == "ADMIN" and user_ids:
+        for event in session.scalars(select(m.AuditEvent).where(
+                m.AuditEvent.resource_type == "user_account", m.AuditEvent.resource_id.in_(user_ids),
+                m.AuditEvent.action.in_((*STUDENT_MAIL_ACTIONS, "ACCOUNT_EMAIL_CORRECTED")))
+                .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id.desc())):
+            mail_events.setdefault(event.resource_id, event)
+    now = datetime.now(timezone.utc)
     rows = []
     for snapshot in latest.values():
         student = session.get(m.StudentProfile, snapshot.student_id)
         account = session.get(m.UserAccount, student.user_id)
+        event = mail_events.get(account.id)
+        retry_at = event.occurred_at + timedelta(seconds=60) if event and event.action in STUDENT_MAIL_ACTIONS else None
+        status = event.action.removeprefix("STUDENT_ACTIVATION_") if event and event.action in STUDENT_MAIL_ACTIONS else "NOT_RECORDED"
+        if account.email_verified_at:
+            status = "ACTIVATED"
+        elif account.status != "DISABLED" or snapshot.state != "CONFIRMED":
+            status = "BLOCKED"
+        elif status == "SENDING" and retry_at and retry_at <= now:
+            status = "UNKNOWN"
         rows.append({"snapshot_id": str(snapshot.id), "student_id": str(student.id),
             "student_code": student.student_code, "display_name": student.display_name,
             "class_name": student.class_name, "major_code": student.major_code,
             "department_code": session.get(m.Department, student.department_id).code,
             "email": account.email, "account_status": account.status,
+            "mail_status": status if user.base_role == "ADMIN" else None,
+            "delivery_mode": ({"Kênh gửi: SMTP": "smtp", "Kênh gửi: hộp thư thử nghiệm trên máy": "development_outbox"}.get(event.source_reference, "unknown") if event else "unknown") if user.base_role == "ADMIN" else None,
+            "mail_ready": mail_delivery_ready() if user.base_role == "ADMIN" else False,
+            "current_delivery_mode": delivery_mode() if user.base_role == "ADMIN" else None,
+            "mail_retry_at": retry_at.isoformat() if retry_at else None,
+            "can_send_activation": bool(user.base_role == "ADMIN" and snapshot.state == "CONFIRMED" and account.status == "DISABLED" and not account.email_verified_at and account.email and (not retry_at or retry_at <= now)),
             "account_activated": account.email_verified_at is not None,
             "state": snapshot.state, "version": snapshot.version,
             "evidence_ref": snapshot.evidence_ref,
@@ -177,6 +213,55 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
                 if student.id in registration_by_student else None
             )})
     return sorted(rows, key=lambda row: row["student_code"])
+
+
+@router.post("/{student_id}/activation-link")
+def send_student_activation(round_id: UUID, student_id: UUID,
+                            user: m.UserAccount = Depends(current_user),
+                            session: Session = Depends(get_session)) -> dict:
+    """Send only on explicit admin request; self-activation remains available."""
+    from backend.api.account import _mail_link, _mail_recipient
+    from backend.services.account_mail import delivery_mode, mail_delivery_ready
+    if user.base_role != "ADMIN":
+        raise HTTPException(403, "Chỉ Admin được gửi liên kết kích hoạt.")
+    if not (assigned(session, user, round_id, "ELIGIBILITY_IMPORTER") or
+            assigned(session, user, round_id, "ELIGIBILITY_VERIFIER")):
+        raise HTTPException(403, "Không có quyền xem danh sách của đợt này.")
+    student = session.get(m.StudentProfile, student_id)
+    if student is None:
+        raise HTTPException(404, "Không tìm thấy sinh viên.")
+    account = session.scalar(select(m.UserAccount).where(m.UserAccount.id == student.user_id).with_for_update())
+    snapshot = session.scalar(select(m.EligibilitySnapshot).where(
+        m.EligibilitySnapshot.student_id == student_id, m.EligibilitySnapshot.round_id == round_id
+    ).order_by(m.EligibilitySnapshot.version.desc()).limit(1).with_for_update())
+    if not account or account.base_role != "STUDENT" or not snapshot or snapshot.state != "CONFIRMED":
+        raise HTTPException(409, "Sinh viên chưa được xác nhận đủ điều kiện trong đợt này.")
+    if account.status != "DISABLED" or account.email_verified_at or not account.email:
+        raise HTTPException(409, "Chỉ gửi cho tài khoản sinh viên đang chờ kích hoạt.")
+    if not mail_delivery_ready():
+        raise HTTPException(503, "Dịch vụ gửi thư chưa sẵn sàng.")
+    now = datetime.now(timezone.utc)
+    last = session.scalar(select(m.AuditEvent.occurred_at).where(
+        m.AuditEvent.resource_type == "user_account", m.AuditEvent.resource_id == account.id,
+        m.AuditEvent.action.in_(STUDENT_MAIL_ACTIONS)).order_by(m.AuditEvent.occurred_at.desc()).limit(1))
+    if last and last + timedelta(seconds=60) > now:
+        raise HTTPException(429, "Vừa gửi cho sinh viên này; vui lòng đợi 60 giây.")
+    mode = delivery_mode()
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="STUDENT_ACTIVATION_SENDING",
+        resource_type="user_account", resource_id=account.id, occurred_at=now, correlation_id=uuid4()))
+    session.commit()
+    try:
+        _mail_link(_mail_recipient(account, student.display_name, "staff", student.student_code), "activate")
+        sent = True
+    except Exception:
+        sent = False
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id,
+        action="STUDENT_ACTIVATION_SENT" if sent else "STUDENT_ACTIVATION_FAILED",
+        resource_type="user_account", resource_id=account.id, occurred_at=datetime.now(timezone.utc),
+        source_reference="Kênh gửi: SMTP" if mode == "smtp" else "Kênh gửi: hộp thư thử nghiệm trên máy",
+        correlation_id=uuid4()))
+    session.commit()
+    return {"sent": sent, "delivery_mode": mode}
 
 
 @router.post("/confirm")
@@ -244,9 +329,43 @@ def revoke_eligibility(round_id: UUID, payload: RevokeStudent,
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_REVOKED",
         resource_type="eligibility_snapshot", resource_id=replacement.id,
         reason=payload.reason.strip(), source_reference=payload.basis_ref.strip(), occurred_at=now, correlation_id=uuid4()))
+    from backend.services.notifications import notify_user
+    student = session.get(m.StudentProfile, payload.student_id)
+    notify_user(session, recipient_user_id=student.user_id, actor_user_id=user.id,
+        kind="WORKFLOW_NOTICE", message="Quyền tham gia đợt KLTN của bạn đã bị thu hồi. Bạn vẫn được đăng nhập và xem hồ sơ nhưng không thể đăng ký hoặc nộp nội dung trong đợt này.", url="/registrations")
     session.commit()
     return {"state": "REJECTED", "snapshot_id": str(replacement.id),
             "note": "Existing academic records were preserved for manual review"}
+
+
+@router.post("/restore")
+def restore_eligibility(round_id: UUID, payload: RevokeStudent,
+                        user: m.UserAccount = Depends(current_user),
+                        session: Session = Depends(get_session)) -> dict:
+    require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
+    if len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5:
+        raise HTTPException(422, "Cần căn cứ và lý do khôi phục")
+    latest = session.scalar(select(m.EligibilitySnapshot).where(
+        m.EligibilitySnapshot.student_id == payload.student_id,
+        m.EligibilitySnapshot.round_id == round_id,
+    ).order_by(m.EligibilitySnapshot.version.desc()).limit(1).with_for_update())
+    if latest is None or latest.state != "REJECTED":
+        raise HTTPException(409, "Chỉ khôi phục sinh viên đang bị thu hồi trong đợt này")
+    now = datetime.now(timezone.utc)
+    replacement = m.EligibilitySnapshot(id=uuid4(), student_id=payload.student_id,
+        round_id=round_id, version=latest.version + 1, evidence_ref=payload.basis_ref.strip(),
+        captured_at=now, confirmed_by=user.id, confirmed_at=now,
+        decision_reason=payload.reason.strip(), state="CONFIRMED")
+    session.add(replacement)
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ELIGIBILITY_RESTORED",
+        resource_type="eligibility_snapshot", resource_id=replacement.id,
+        reason=payload.reason.strip(), source_reference=payload.basis_ref.strip(), occurred_at=now, correlation_id=uuid4()))
+    from backend.services.notifications import notify_user
+    student = session.get(m.StudentProfile, payload.student_id)
+    notify_user(session, recipient_user_id=student.user_id, actor_user_id=user.id,
+        kind="WORKFLOW_NOTICE", message="Quyền tham gia đợt KLTN của bạn đã được khôi phục theo căn cứ mới. Trạng thái khóa tài khoản và thời hạn nộp vẫn áp dụng.", url="/registrations")
+    session.commit()
+    return {"state": "CONFIRMED", "snapshot_id": str(replacement.id)}
 
 
 @router.patch("/{student_id}")

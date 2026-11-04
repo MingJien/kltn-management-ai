@@ -732,7 +732,8 @@ class ThesisReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
         CheckConstraint("state IN ('DRAFT','SUBMITTED')", name="state"),
         CheckConstraint("version_no > 0", name="version_positive"),
         CheckConstraint("(kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)", name="assignment_matches_kind"),
-        CheckConstraint("state = 'DRAFT' OR (signed_file_id IS NOT NULL AND submitted_at IS NOT NULL)", name="submitted_has_signed_copy"),
+        CheckConstraint("state = 'DRAFT' OR submitted_at IS NOT NULL", name="submitted_metadata"),
+        CheckConstraint("(paper_confirmed_by IS NULL AND paper_confirmed_at IS NULL AND paper_reference IS NULL AND paper_export_code IS NULL) OR (state = 'SUBMITTED' AND paper_confirmed_by IS NOT NULL AND paper_confirmed_at IS NOT NULL AND length(trim(paper_reference)) >= 5 AND paper_export_code IS NOT NULL)", name="paper_receipt_metadata"),
         Index("ix_thesis_review_thesis_member", "thesis_id", "thesis_member_id"),
     )
     thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
@@ -747,6 +748,10 @@ class ThesisReview(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     thesis_completed: Mapped[Optional[bool]] = mapped_column(Boolean)
     allow_defense: Mapped[Optional[bool]] = mapped_column(Boolean)
     signed_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+    paper_reference: Mapped[Optional[str]] = mapped_column(String(500))
+    paper_export_code: Mapped[Optional[str]] = mapped_column(String(100))
+    paper_confirmed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    paper_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     source_reference: Mapped[Optional[str]] = mapped_column(String(500))
     revision_reason: Mapped[str] = mapped_column(Text, nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT", server_default="DRAFT")

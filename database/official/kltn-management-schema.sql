@@ -1,4 +1,4 @@
--- Schema-only review snapshot at Alembic revision 20261102_0019.
+-- Schema-only review snapshot at Alembic revision 20261103_0020.
 -- 43 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
@@ -786,6 +786,8 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
+CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
+
 CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
 
 CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
@@ -795,8 +797,6 @@ CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_
 CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
 
 CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
-
-CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
 CREATE TABLE official_form (
 	round_id UUID NOT NULL,
@@ -861,6 +861,10 @@ CREATE TABLE thesis_review (
 	thesis_completed BOOLEAN,
 	allow_defense BOOLEAN,
 	signed_file_id UUID,
+	paper_reference VARCHAR(500),
+	paper_export_code VARCHAR(100),
+	paper_confirmed_by UUID,
+	paper_confirmed_at TIMESTAMP WITH TIME ZONE,
 	source_reference VARCHAR(500),
 	revision_reason TEXT NOT NULL,
 	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
@@ -875,14 +879,16 @@ CREATE TABLE thesis_review (
 	CONSTRAINT ck_thesis_review_state CHECK (state IN ('DRAFT','SUBMITTED')),
 	CONSTRAINT ck_thesis_review_version_positive CHECK (version_no > 0),
 	CONSTRAINT ck_thesis_review_assignment_matches_kind CHECK ((kind = 'ADVISOR' AND advisor_assignment_id IS NOT NULL AND reviewer_assignment_id IS NULL) OR (kind = 'REVIEWER' AND reviewer_assignment_id IS NOT NULL AND advisor_assignment_id IS NULL)),
-	CONSTRAINT ck_thesis_review_submitted_has_signed_copy CHECK (state = 'DRAFT' OR (signed_file_id IS NOT NULL AND submitted_at IS NOT NULL)),
+	CONSTRAINT ck_thesis_review_submitted_metadata CHECK (state = 'DRAFT' OR submitted_at IS NOT NULL),
+	CONSTRAINT ck_thesis_review_paper_receipt_metadata CHECK ((paper_confirmed_by IS NULL AND paper_confirmed_at IS NULL AND paper_reference IS NULL AND paper_export_code IS NULL) OR (state = 'SUBMITTED' AND paper_confirmed_by IS NOT NULL AND paper_confirmed_at IS NOT NULL AND length(trim(paper_reference)) >= 5 AND paper_export_code IS NOT NULL)),
 	CONSTRAINT fk_thesis_review_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_review_thesis_member_id_thesis_member FOREIGN KEY(thesis_member_id) REFERENCES thesis_member (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_review_lecturer_id_lecturer_profile FOREIGN KEY(lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_review_advisor_assignment_id_advisor_assignment FOREIGN KEY(advisor_assignment_id) REFERENCES advisor_assignment (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_review_reviewer_assignment_id_reviewer_assignment FOREIGN KEY(reviewer_assignment_id) REFERENCES reviewer_assignment (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_review_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_review_signed_file_id_stored_file FOREIGN KEY(signed_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
+	CONSTRAINT fk_thesis_review_signed_file_id_stored_file FOREIGN KEY(signed_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_review_paper_confirmed_by_user_account FOREIGN KEY(paper_confirmed_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE INDEX ix_thesis_review_thesis_member ON thesis_review (thesis_id, thesis_member_id);
@@ -983,9 +989,9 @@ CREATE TABLE thesis_withdrawal_request (
 	CONSTRAINT fk_thesis_withdrawal_request_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
-CREATE INDEX ix_withdrawal_student_state ON thesis_withdrawal_request (student_id, state);
-
 CREATE UNIQUE INDEX uq_withdrawal_member_open ON thesis_withdrawal_request (thesis_id, student_id) WHERE state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED');
+
+CREATE INDEX ix_withdrawal_student_state ON thesis_withdrawal_request (student_id, state);
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,

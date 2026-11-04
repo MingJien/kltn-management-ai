@@ -23,7 +23,12 @@ STAFF_ONLY = {f"mau-{number:02d}" for number in range(6,12)}
 
 
 def manages(session, user, round_id):
-    return user.base_role in {"ADMIN", "LECTURER"} and assigned(session,user,round_id,"FORM_MANAGER")
+    return user.base_role == "ADMIN" or (user.base_role == "LECTURER" and assigned(session,user,round_id,"FORM_MANAGER"))
+
+
+def can_export_list(session, user, round_id):
+    return ((user.base_role == "LECTURER" and assigned(session, user, round_id, "KLTN_COORDINATOR"))
+            or (user.base_role == "ADMIN" and manages(session, user, round_id)))
 
 
 def round_row(session, round_id):
@@ -86,11 +91,12 @@ def access(session,user):
     result=[]
     for row in rows:
         manage=manages(session,user,row.id)
-        if not manage and (user.base_role not in {"STUDENT","LECTURER"} or (row.state=="DRAFT" and not belongs(session,user,row.id))):
+        can_export=can_export_list(session,user,row.id)
+        if not manage and not can_export and (user.base_role not in {"STUDENT","LECTURER"} or (row.state=="DRAFT" and not belongs(session,user,row.id))):
             continue
         year=session.get(m.AcademicYear,row.academic_year_id)
         result.append(dict(id=row.id,label=f"{year.code} · {row.code}",state=row.state,
-            can_manage=manage and row.state!="ARCHIVED",can_view_publications=belongs(session,user,row.id)))
+            can_manage=manage and row.state!="ARCHIVED",can_view_publications=belongs(session,user,row.id),can_export_list=can_export))
     return result
 
 
@@ -107,6 +113,13 @@ def version_out(session,version):
         file_name=file.original_name,byte_size=file.byte_size,scan_state=file.scan_state,uploaded_at=version.created_at,
         uploaded_by_name=lecturer.display_name if lecturer else actor.email,
         source_reference=version.source_reference,change_reason=version.change_reason,published_at=version.published_at)
+
+
+def can_receive_publication(session, user, item):
+    if item.state != "ACTIVE" or not visible(session, user, item):
+        return False
+    round_ = session.get(m.ThesisRound, item.round_id)
+    return round_.state != "DRAFT" or belongs(session, user, item.round_id)
 
 
 def item_out(session,user,item):
@@ -235,7 +248,18 @@ def publish(session,user,form_id,version_id,data,expected):
     if old:old.state="SUPERSEDED";old.row_version+=1;session.flush()
     version.state="PUBLISHED";version.published_by=user.id;version.published_at=now();version.row_version+=1;item.row_version+=1
     audit(session,user,"OFFICIAL_FORM_PUBLISHED","official_form",item.id,f"v{version.version_no}: {data.reason}",after_hash=file.sha256)
-    session.flush();result=item_out(session,user,item);session.commit();return result
+    session.flush()
+    from backend.services.workflow_notices import emit
+
+    recipients = [account.id for account in session.scalars(select(m.UserAccount).where(
+        m.UserAccount.status == "ACTIVE")) if can_receive_publication(session, account, item)]
+    round_ = session.get(m.ThesisRound, item.round_id)
+    emit(session, user.id, recipients, "OFFICIAL_FORM_PUBLISHED", "official_form", item.id,
+        f"Khoa đã phát hành {item.title} (v{version.version_no}) cho đợt {round_.code}.",
+        f"/forms?round_id={item.round_id}", include_actor=True)
+    result = item_out(session, user, item)
+    session.commit()
+    return result
 
 
 def withdraw(session,user,form_id,version_id,data,expected):

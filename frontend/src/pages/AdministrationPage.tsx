@@ -41,18 +41,23 @@ type AccountDirectory = {
 };
 type Assignment = { id: string; round_id: string; round_code: string; user_id: string; email: string; assignment_type: string };
 
+type AdministrationSection = "accounts" | "assignments";
+
 export default function AdministrationPage({
   context,
   onPermissionsChanged,
+  section = "accounts",
 }: {
   context: Context;
   onPermissionsChanged: () => Promise<void>;
+  section?: AdministrationSection;
 }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountCategory, setAccountCategory] = useState("ALL");
   const [additionalRole, setAdditionalRole] = useState("");
+  const [accountStatus, setAccountStatus] = useState("ALL");
   const [directoryCounts, setDirectoryCounts] = useState<Record<string, number>>({});
   const [roleCatalog, setRoleCatalog] = useState<AccountDirectory["role_catalog"]>([]);
   const [staffAccounts, setStaffAccounts] = useState<Account[]>([]);
@@ -84,6 +89,7 @@ export default function AdministrationPage({
   const isAdmin = context.base_role === "ADMIN";
 
   const assignmentDescriptions: Record<string, string> = {
+    REVIEW_RECORDS_MANAGER: "Được tiếp nhận và ghi nhận bản giấy Mẫu 7–8 trong đợt được giao. Không được sửa nhận xét, phân công phản biện hoặc xét điều kiện thay TBM.",
     FORM_MANAGER: "Được thêm, cập nhật, phát hành và thu hồi biểu mẫu/tài liệu Khoa của đợt được giao; không có quyền duyệt đề tài hoặc gia hạn mốc.",
     ELIGIBILITY_IMPORTER:
       "Được nhập danh sách chính thức của Khoa; sinh viên được ghi nhận đủ điều kiện ngay. Sinh viên vẫn phải kích hoạt tài khoản trước khi gửi đăng ký.",
@@ -97,11 +103,11 @@ export default function AdministrationPage({
 
   const eligibleStaff = (a: Account, task: string) =>
     a.status === "ACTIVE" &&
-    (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
+    (task === "KLTN_COORDINATOR" || task === "ACCOUNT_MANAGER" || task === "REVIEW_RECORDS_MANAGER" ? a.base_role === "LECTURER" : a.base_role !== "STUDENT");
 
   function changeKind(next: string) {
     setKind(next);
-    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && next !== "FORM_MANAGER") {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
+    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && !["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(next)) {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
     if (userId && !staffAccounts.some((a) => a.id === userId && eligibleStaff(a, next))) {
       setUserId("");
       setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
@@ -133,8 +139,10 @@ export default function AdministrationPage({
           ? "/admin/users/directory?search=" + encodeURIComponent(q)
             + "&category=" + encodeURIComponent(accountCategory)
             + "&additional_role=" + encodeURIComponent(additionalRole)
+            + "&account_status=" + encodeURIComponent(accountStatus)
             + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE
           : "/admin/users?search=" + encodeURIComponent(q)
+            + "&account_status=" + encodeURIComponent(accountStatus)
             + "&offset=" + atPage * PAGE_SIZE + "&limit=" + PAGE_SIZE;
         const [d, r, usersResult, staff, a] = await Promise.all([
           isAdmin ? request<Department[]>("/admin/departments", context.user_id) : Promise.resolve([]),
@@ -165,7 +173,7 @@ export default function AdministrationPage({
         setBusy(false);
       }
     },
-    [accountCategory, additionalRole, context.user_id, isAdmin, PAGE_SIZE],
+    [accountCategory, additionalRole, accountStatus, context.user_id, isAdmin, PAGE_SIZE],
   );
 
   useEffect(() => {
@@ -210,17 +218,28 @@ export default function AdministrationPage({
   const studentCount = accounts.filter((a) => a.base_role === "STUDENT").length;
   const lecturerCount = accounts.filter((a) => a.base_role === "LECTURER").length;
   const unverifiedCount = accounts.filter((a) => !a.verified).length;
-  const lockedOrDisabledCount = accounts.filter((a) => a.status !== "ACTIVE").length;
+  const lockedOrDisabledCount = accounts.filter((a) => a.status === "LOCKED" || (a.status === "DISABLED" && a.verified)).length;
 
   return (
     <div className="admin-page">
       <PageHeader
-        title="Quản trị tài khoản & Phân công"
-        description="Cấp quyền truy cập, kiểm soát trạng thái tài khoản và phân công nhiệm vụ theo đợt khóa luận"
+        title={section === "accounts" ? (isAdmin ? "Quản lý tài khoản" : "Tài khoản sinh viên theo đợt") : "Phân công theo đợt"}
+        description={section === "accounts"
+          ? "Tìm kiếm tài khoản, theo dõi trạng thái và xử lý hỗ trợ truy cập."
+          : "Giao hoặc thu hồi nhiệm vụ KLTN theo từng đợt, kèm căn cứ và lịch sử."}
       />
 
       <div className="stack">
-        <Link className="btn btn-secondary" to="/forms">Mở quản lý biểu mẫu và tài liệu Khoa</Link>
+        {isAdmin && <nav className="admin-page__quick-links" aria-label="Lối tắt quản trị">
+          {section === "accounts" && <>
+            <Link className="btn btn-secondary" to="/lecturers">Danh sách giảng viên · Nhập Excel</Link>
+            <Link className="btn btn-secondary" to="/rounds">Quản lý đợt KLTN</Link>
+          </>}
+          {section === "assignments" && <>
+            <Link className="btn btn-secondary" to="/positions">Chức vụ TBM và phạm vi duyệt</Link>
+            <Link className="btn btn-secondary" to="/forms">Kho biểu mẫu và tài liệu Khoa</Link>
+          </>}
+        </nav>}
         {error ? (
           <p role="alert" className="alert alert-danger" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <AlertTriangle size={18} aria-hidden="true" /> {error}
@@ -232,11 +251,10 @@ export default function AdministrationPage({
           </p>
         ) : null}
 
-        {isAdmin ? <Link className="btn btn-secondary" to="/lecturers">Mở danh sách GV · Nhập Excel · Gửi link kích hoạt</Link> : null}
         {isAdmin && (
-          <div className="admin-grid-top">
+          <div className="admin-grid-top admin-grid-top--single">
             {/* CARD 1: MỜI GIẢNG VIÊN */}
-            <section className="card admin-card">
+            {section === "accounts" && (<section className="card admin-card">
               <div className="admin-card__header">
                 <div className="admin-card__title-group">
                   <div className="admin-card__icon">
@@ -325,10 +343,10 @@ export default function AdministrationPage({
                   </button>
                 </form>
               </div>
-            </section>
+            </section>)}
 
             {/* CARD 2: PHÂN CÔNG THEO ĐỢT */}
-            <section className="card admin-card">
+            {section === "assignments" && (<section className="card admin-card">
               <div className="admin-card__header">
                 <div className="admin-card__title-group">
                   <div className="admin-card__icon admin-card__icon--info">
@@ -375,7 +393,7 @@ export default function AdministrationPage({
                     <select className="input" required value={roundId} onChange={(e) => setRoundId(e.target.value)}>
                       <option value="">Chọn đợt khóa luận áp dụng</option>
                       {rounds
-                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (kind === "FORM_MANAGER" && r.state === "CLOSED"))
+                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(kind) && r.state === "CLOSED"))
                         .map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.code} · {r.state}
@@ -430,6 +448,7 @@ export default function AdministrationPage({
                       <option value="ELIGIBILITY_VERIFIER">Điều chỉnh/thu hồi điều kiện</option>
                       <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
                       <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
+                      <option value="REVIEW_RECORDS_MANAGER">Tiếp nhận hồ sơ phản biện (cán bộ/thư ký)</option>
                       <option value="FORM_MANAGER">Quản lý biểu mẫu và tài liệu Khoa</option>
                     </select>
                   </label>
@@ -460,12 +479,12 @@ export default function AdministrationPage({
                   </button>
                 </form>
               </div>
-            </section>
+            </section>)}
           </div>
         )}
 
         {/* CARD 3: PHÂN CÔNG ĐANG HIỆU LỰC */}
-        {isAdmin && (
+        {section === "assignments" && isAdmin && (
           <section className="card admin-card">
             <div className="admin-card__header">
               <div className="admin-card__title-group">
@@ -535,7 +554,7 @@ export default function AdministrationPage({
                         </span>
                         <span className={`badge ${dutyClass} assignment-item__duty`}>
                           <Briefcase size={12} aria-hidden="true" />
-                          {a.assignment_type === "FORM_MANAGER" ? "Quản lý biểu mẫu và tài liệu Khoa" : a.assignment_type === "ELIGIBILITY_VERIFIER"
+                          {a.assignment_type === "REVIEW_RECORDS_MANAGER" ? "Tiếp nhận hồ sơ phản biện" : a.assignment_type === "FORM_MANAGER" ? "Quản lý biểu mẫu và tài liệu Khoa" : a.assignment_type === "ELIGIBILITY_VERIFIER"
                             ? "Điều chỉnh/thu hồi điều kiện"
                             : a.assignment_type === "ACCOUNT_MANAGER"
                             ? "Quản lý tài khoản SV"
@@ -577,7 +596,7 @@ export default function AdministrationPage({
         )}
 
         {/* CARD 4: DANH SÁCH TÀI KHOẢN */}
-        <section className="card admin-card">
+        {section === "accounts" && (<section className="card admin-card">
           <div className="admin-card__header">
             <div className="admin-card__title-group">
               <div className="admin-card__icon">
@@ -608,7 +627,7 @@ export default function AdministrationPage({
                   <GraduationCap size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">Sinh viên</span>
+                  <span className="admin-metric-card__label">SV trên trang</span>
                   <span className="admin-metric-card__value">{studentCount}</span>
                 </div>
               </div>
@@ -617,7 +636,7 @@ export default function AdministrationPage({
                   <BookOpen size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">Giảng viên</span>
+                  <span className="admin-metric-card__label">GV trên trang</span>
                   <span className="admin-metric-card__value">{lecturerCount}</span>
                 </div>
               </div>
@@ -626,7 +645,7 @@ export default function AdministrationPage({
                   <Clock size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">Chưa kích hoạt</span>
+                  <span className="admin-metric-card__label">Chưa kích hoạt trên trang</span>
                   <span className="admin-metric-card__value">{unverifiedCount}</span>
                 </div>
               </div>
@@ -636,7 +655,7 @@ export default function AdministrationPage({
                     <Lock size={18} aria-hidden="true" />
                   </div>
                   <div className="admin-metric-card__content">
-                    <span className="admin-metric-card__label">Bị khóa / Vô hiệu</span>
+                    <span className="admin-metric-card__label">Khóa / Vô hiệu trên trang</span>
                     <span className="admin-metric-card__value" style={{ color: "var(--danger-text)" }}>
                       {lockedOrDisabledCount}
                     </span>
@@ -691,6 +710,11 @@ export default function AdministrationPage({
               </label>
             ) : null}
 
+            <label className="input-group">Trạng thái tài khoản
+              <select className="input" aria-label="Trạng thái tài khoản" value={accountStatus} disabled={busy} onChange={e=>{setAccountStatus(e.target.value);setPage(0);}}>
+                <option value="ALL">Tất cả trạng thái</option><option value="PENDING">Chờ kích hoạt</option><option value="ACTIVE">Hoạt động</option><option value="LOCKED">Bị khóa</option><option value="DISABLED">Vô hiệu hóa trước đây</option>
+              </select>
+            </label>
             {/* Toolbar: Search & Action Reason */}
             <div className="admin-toolbar">
               <div className="admin-toolbar__row">
@@ -735,7 +759,7 @@ export default function AdministrationPage({
                   <span className="admin-reason-label">
                     <Shield size={14} aria-hidden="true" style={{ color: "var(--primary-600)" }} />
                     <span>Lý do thao tác tài khoản</span>
-                    <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để Khóa, Vô hiệu hóa hoặc Cấp lại)</small>
+                    <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để Khóa, Mở khóa hoặc Cấp lại)</small>
                   </span>
                   <input
                     className="input"
@@ -768,7 +792,7 @@ export default function AdministrationPage({
               <div className="admin-callout admin-callout--neutral">
                 <Info size={16} aria-hidden="true" />
                 <span>
-                  Khóa hoặc vô hiệu hóa giữ nguyên đề tài, tài liệu và lịch sử. Cấp lại liên kết kích hoạt qua email đang lưu trong hệ thống.
+                  Khóa tài khoản chặn đăng nhập và giữ hồ sơ; có thể mở khóa. Thu hồi điều kiện tham gia từng đợt thực hiện ở Danh sách sinh viên.
                 </span>
               </div>
             </div>
@@ -824,7 +848,7 @@ export default function AdministrationPage({
                                 <strong>{a.lecturer_code}</strong>
                               </span>
                             ) : null}
-                            {isLecturer && a.display_name ? (
+                            {a.display_name ? (
                               <span className="account-item__display-name">{a.display_name}</span>
                             ) : null}
                           </div>
@@ -868,7 +892,7 @@ export default function AdministrationPage({
                                 </>
                               ) : (
                                 <>
-                                  <Ban size={12} aria-hidden="true" /> Vô hiệu hóa
+                                  <Ban size={12} aria-hidden="true" /> {a.verified ? "Vô hiệu hóa" : "Chờ kích hoạt"}
                                 </>
                               )}
                             </span>
@@ -915,7 +939,7 @@ export default function AdministrationPage({
                       ) : (
                         <>
                           <div className="account-list__action-slot">
-                            {a.status !== "DISABLED" ? (
+                            {a.status !== "DISABLED" || !a.verified ? (
                               <button
                                 className="btn btn-secondary btn-sm"
                                 disabled={busy || reason.trim().length < 5}
@@ -945,25 +969,7 @@ export default function AdministrationPage({
                           </div>
 
                           <div className="account-list__action-slot">
-                            {a.status !== "DISABLED" ? (
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                disabled={busy || reason.trim().length < 5}
-                                title={reason.trim().length < 5 ? "Cần nhập lý do thao tác ít nhất 5 ký tự" : ""}
-                                onClick={() =>
-                                  void run(
-                                    () =>
-                                      request(`/admin/users/${a.id}/disable`, context.user_id, {
-                                        method: "POST",
-                                        body: JSON.stringify({ reason }),
-                                      }),
-                                    "Đã vô hiệu hóa tài khoản; hồ sơ vẫn được giữ.",
-                                  )
-                                }
-                              >
-                                <Ban size={13} aria-hidden="true" /> Vô hiệu hóa
-                              </button>
-                            ) : a.status === "DISABLED" && a.verified ? (
+                            {a.status === "DISABLED" && a.verified ? (
                               <button
                                 className="btn btn-secondary btn-sm"
                                 disabled={busy || reason.trim().length < 5}
@@ -985,7 +991,7 @@ export default function AdministrationPage({
                           </div>
 
                           <div className="account-list__action-slot">
-                            {a.status !== "LOCKED" ? (
+                            {a.status !== "LOCKED" && !(a.status === "DISABLED" && a.verified) ? (
                               <button
                                 className="btn btn-secondary btn-sm"
                                 disabled={busy || reason.trim().length < 5}
@@ -1235,7 +1241,7 @@ export default function AdministrationPage({
                 );
               })()}
           </div>
-        </section>
+        </section>)}
       </div>
     </div>
   );
