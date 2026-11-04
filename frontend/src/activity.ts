@@ -5,6 +5,11 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  THESIS_CHANGE_SUBMITTED: "Gửi đề nghị đổi đề tài", THESIS_CHANGE_CONSENT: "Xác nhận nguyện vọng đổi đề tài",
+  THESIS_CHANGE_REVIEWED: "GVHD xem xét đổi đề tài", THESIS_CHANGE_APPROVED: "Duyệt đổi đề tài",
+  THESIS_CHANGE_REJECTED: "Từ chối đổi đề tài", THESIS_CHANGE_CANCELLED: "Hủy đề nghị đổi đề tài",
+  THESIS_EXTENSION_RECORDED: "Ghi nhận gia hạn thực hiện KLTN", THESIS_TOPIC_REPLACED: "Chuyển sang đề tài khác",
+  THESIS_CHANGE_ASSIGNMENT_ENDED: "Kết thúc phân công theo đề tài cũ", ROUND_REGISTRATION_REOPENED: "Gia hạn và mở lại đăng ký",
   WITHDRAWAL_SUBMITTED: "SV gửi đơn xin thôi", WITHDRAWAL_ADVISOR_CONFIRMED: "GVHD xác nhận đơn xin thôi",
   WITHDRAWAL_RETURNED: "GVHD trả lại đơn xin thôi", WITHDRAWAL_CANCELLED: "Hủy yêu cầu xin thôi",
   WITHDRAWAL_SIGNED_COPY_ADDED: "Bổ sung đơn có xác nhận", WITHDRAWAL_FILE_SCANNED: "Kiểm tra an toàn đơn xin thôi",
@@ -35,7 +40,7 @@ const actions: Record<string, string> = {
   LECTURER_INVITED: "Cấp tài khoản giảng viên", ROUND_CREATED: "Tạo đợt KLTN", ROUND_SCHEDULE_UPDATED: "Sửa lịch đợt",
   LECTURER_PROFILE_SELF_CONFIRMED: "TBM tự xác nhận hồ sơ chuyên môn",
   POSITION_ASSIGNED: "Ghi nhận bổ nhiệm chức vụ", POSITION_REPLACED: "Thay người giữ chức vụ", POSITION_REVOKED: "Thu hồi bổ nhiệm",
-  ROUND_OPENED: "Mở đợt đăng ký", ROUND_CLOSED: "Đóng đợt đăng ký", ROUND_PERMISSION_GRANTED: "Phân công nhiệm vụ theo đợt",
+  ROUND_REGISTRATION_EXTENDED: "Gia hạn đăng ký của đợt", ROUND_OPENED: "Mở đợt đăng ký", ROUND_CLOSED: "Đóng đợt đăng ký", ROUND_PERMISSION_GRANTED: "Phân công nhiệm vụ theo đợt",
   ROUND_PERMISSION_REVOKED: "Thu hồi nhiệm vụ theo đợt", ELIGIBILITY_ROSTER_IMPORTED: "Nhập danh sách sinh viên đủ điều kiện",
   ELIGIBILITY_SPECIAL_DECISION_RECORDED: "Ghi nhận quyết định đủ điều kiện", ELIGIBILITY_REVOKED: "Thu hồi kết quả đủ điều kiện",
   ELIGIBILITY_RESTORED: "Khôi phục quyền tham gia đợt",

@@ -25,6 +25,10 @@ export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,
       const item = deadlines.find(row=>row.document_type===type);
       return <p key={type}><strong>{names[type]}:</strong> {item ? `${formatDate(item.due_at)} · ${item.state === "OPEN" ? "Đang nhận" : "Đã đóng"}` : "Chưa thiết lập — chưa nhận tệp"}</p>;
     })}
+    {thesis.extension_until_at && kinds.includes("REPORT") && <p className="alert alert-info">
+      Khóa luận này được gia hạn nộp báo cáo đến <strong>{formatDate(thesis.extension_until_at)}</strong>.
+      <a href={`/changes?thesis=${thesis.id}`}> Xem quyết định gia hạn</a>
+    </p>}
     <p className="text-caption">Chỉ người được giao điều phối đợt được đặt/gia hạn lịch. GVHD có thể yêu cầu sửa từng bản nộp; các báo cáo định kỳ được quản lý ở mục Báo cáo tiến độ.</p>
     {canManage && <form className="core-form" onSubmit={async event=>{
       event.preventDefault();

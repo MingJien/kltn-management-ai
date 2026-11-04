@@ -103,6 +103,8 @@ def workspace(session, user):
     for round_ in session.scalars(select(m.ThesisRound).where(m.ThesisRound.id.in_(managed)).order_by(m.ThesisRound.opens_at.desc())):
         has_requests = bool(session.scalar(select(m.ThesisWithdrawalRequest.id).join(m.Thesis,
             m.Thesis.id == m.ThesisWithdrawalRequest.thesis_id).where(m.Thesis.round_id == round_.id).limit(1)))
+        has_requests = has_requests or bool(session.scalar(select(m.ThesisChangeRequest.id).join(m.Thesis,
+            m.Thesis.id == m.ThesisChangeRequest.thesis_id).where(m.Thesis.round_id == round_.id).limit(1)))
         rounds.append({"id": round_.id, "code": round_.code, "starts_on": round_.execution_starts_on,
             "reference": round_.execution_start_reference, "row_version": round_.row_version,
             "can_edit": not has_requests and round_.state != "ARCHIVED"})
@@ -114,9 +116,11 @@ def set_start(session, user, round_id, data, expected):
     if not round_ or user.base_role != "LECTURER" or not resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_id):
         raise HTTPException(403, "Chỉ điều phối được giao cho đợt mới ghi nhận ngày bắt đầu")
     row_version(expected, round_.row_version)
-    if round_.state == "ARCHIVED" or session.scalar(select(m.ThesisWithdrawalRequest.id).join(m.Thesis,
+    changes = session.scalar(select(m.ThesisChangeRequest.id).join(m.Thesis,
+        m.Thesis.id == m.ThesisChangeRequest.thesis_id).where(m.Thesis.round_id == round_id).limit(1))
+    if changes or round_.state == "ARCHIVED" or session.scalar(select(m.ThesisWithdrawalRequest.id).join(m.Thesis,
             m.Thesis.id == m.ThesisWithdrawalRequest.thesis_id).where(m.Thesis.round_id == round_id).limit(1)):
-        raise HTTPException(409, "Đã có đơn hoặc đợt đã lưu trữ; không đổi ngày dùng tính hạn của hồ sơ")
+        raise HTTPException(409, "Đã có yêu cầu đổi/xin thôi hoặc đợt đã lưu trữ; không đổi ngày dùng tính hạn")
     previous = round_.execution_starts_on
     round_.execution_starts_on, round_.execution_start_reference = data.starts_on, data.reference
     round_.row_version += 1
@@ -145,6 +149,9 @@ def create(session, user, thesis_id, data):
         raise HTTPException(404, "Bạn không phải thành viên đang thực hiện khóa luận này")
     if thesis.state not in EDITABLE:
         raise HTTPException(409, "Khóa luận đã khóa hoặc đã chuyển sang giai đoạn bảo vệ")
+    from backend.services.thesis_changes import open_request
+    if open_request(session,thesis):
+        raise HTTPException(409, "Hủy hoặc xử lý yêu cầu đổi đề tài trước khi gửi xin thôi")
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if not round_.execution_starts_on:
         raise HTTPException(409, "Khoa chưa ghi nhận ngày bắt đầu thực hiện theo kế hoạch")

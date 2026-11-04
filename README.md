@@ -4,13 +4,15 @@
 
 ## CSDL hiện hành
 
-PostgreSQL `kltn_management`, Alembic head `20261104_0021`: **45 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
+PostgreSQL `kltn_management`, Alembic head `20261104_0022`: **47 bảng nghiệp vụ** và bảng kỹ thuật `alembic_version`. Cập nhật cấu trúc qua Alembic; [SQL schema-only](database/official/kltn-management-schema.sql) có mỗi bảng một lệnh tạo đầy đủ, không dùng thay migration trên database đang chạy.
 
 Tiến độ có khung xem PDF và ghim nhận xét theo đúng lần nộp. Ghim nháp tự lưu riêng cho GV; khi gửi kết quả mới hiện cho SV. Trang, thu phóng, vị trí cuộn và nhận xét tổng quát đang viết được khôi phục trên cùng trình duyệt/tài khoản. DOCX/TXT nhận xét theo mục và đoạn trích.
 
 Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng ký và Mẫu 3 về Đề cương. Nộp bản sửa trong cùng hồ sơ giữ nguyên các phiên bản cũ. Tải bản gốc và xuất bản đã duyệt có footer để ký là hai thao tác riêng; lịch sử xuất hiển thị người xuất, mã và thời điểm theo từng phiên bản. Mẫu 1 có footer bản nộp, chưa xác nhận Khoa duyệt.
 
 ## Tình hình hiện tại
+
+- **Đổi đề tài và gia hạn** có luồng SV → nhóm đồng ý → GVHD liên quan → TBM. Điều chỉnh tên/phạm vi hoặc chuyển sang đề tài trống, cập nhật hồ sơ sau khi duyệt. TBM/điều phối ghi nhận gia hạn thực hiện một lần theo quyết định; Admin gia hạn/mở lại đăng ký có xác nhận và lịch sử. [Hướng dẫn](docs/design/thesis-changes-workflow.md) · [Kiểm chứng](docs/evidence/thesis-changes-validation.md).
 
 - **Xin thôi thực hiện KLTN** trong 14 ngày đầu theo ngày bắt đầu do Khoa ghi nhận. Sinh viên gửi yêu cầu, điều phối đúng đợt chấp thuận hoặc từ chối trên hệ thống. Nhóm còn lại giữ đề tài và cập nhật Mẫu 1–3, báo cáo và xét bảo vệ.
 

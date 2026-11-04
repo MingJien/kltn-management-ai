@@ -52,7 +52,7 @@ def initial_ddl() -> list[str]:
         for statement in statements
         if (match := re.match(r"^CREATE\s+TABLE\s+(\w+)\b", statement, re.IGNORECASE))
     ]
-    initial_tables = SELECTED_TABLES - {"user_notification", "department_major", "document_deadline", "registration_form_version", "progress_review_annotation", "official_form", "official_form_version", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot"}
+    initial_tables = SELECTED_TABLES - {"user_notification", "department_major", "document_deadline", "registration_form_version", "progress_review_annotation", "official_form", "official_form_version", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "thesis_change_request", "thesis_extension"}
     if len(tables) != len(initial_tables) or set(tables) != initial_tables:
         raise RuntimeError(
             "Initial migration does not match the official selection: "
@@ -134,7 +134,7 @@ def initial_ddl() -> list[str]:
     file_index = next(i for i, statement in enumerate(statements) if statement.startswith("CREATE TABLE stored_file ("))
     if file_index > lecturer_index:
         statements.insert(lecturer_index, statements.pop(file_index))
-    for name in ("official_form", "official_form_version", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot"):
+    for name in ("official_form", "official_form_version", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "thesis_change_request", "thesis_extension"):
         table = target_metadata.tables[name]
         statements.append(str(CreateTable(table).compile(dialect=postgresql.dialect())).strip() + ";")
         statements.extend(str(CreateIndex(index).compile(dialect=postgresql.dialect())).strip() + ";" for index in table.indexes)

@@ -92,7 +92,7 @@ test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 
   await peer.goto("/notifications");
   await peer.getByRole("button",{name:/Nhóm có thành viên xin thôi KLTN/}).click();
   await expect(peer).toHaveURL(new RegExp(`/evaluation/${id}$`));
-  await expect(peer.getByRole("heading",{name:"Cập nhật hồ sơ sau thay đổi thành viên",exact:true})).toBeVisible();
+  await expect(peer.getByRole("heading",{name:"Cập nhật hồ sơ sau điều chỉnh",exact:true})).toBeVisible();
   await gv.goto(`/evaluation/${id}`);
   await expect(gv.getByRole("button",{name:"Lập phiếu Mẫu 7",exact:true})).toBeDisabled();
   await tbm.goto(`/evaluation/${id}`);

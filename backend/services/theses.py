@@ -128,6 +128,7 @@ def workspace_out(session, user, thesis):
         .order_by(m.LecturerProfile.display_name)).all()
     round_ = session.get(m.ThesisRound, thesis.round_id)
     year = session.get(m.AcademicYear, round_.academic_year_id)
+    extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == thesis.id))
     def member_out(member):
         student = session.get(m.StudentProfile, member.student_id)
         return ThesisMemberOut(student_id=student.id, display_name=student.display_name,
@@ -138,6 +139,7 @@ def workspace_out(session, user, thesis):
             "work:review", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
     return ThesisWorkspaceOut(id=thesis.id, registration_id=thesis.registration_id, title=thesis.current_title, state=thesis.state,
         row_version=thesis.row_version, round_id=thesis.round_id, round_label=f"{year.code} / {round_.code}",
+        extension_until_at=extension.until_at if extension else None,
         member_student_ids=[member.student_id for member in members], members=[member_out(member) for member in members],
         advisor_lecturer_id=current.lecturer_id if current else None,
         advisor_name=session.get(m.LecturerProfile, current.lecturer_id).display_name if current else None,

@@ -112,6 +112,7 @@ class ThesisWorkspaceOut(BaseModel):
     row_version: int
     round_id: UUID
     round_label: str
+    extension_until_at: datetime | None = None
     member_student_ids: list[UUID]
     members: list[ThesisMemberOut]
     advisor_lecturer_id: UUID | None

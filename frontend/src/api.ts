@@ -228,6 +228,7 @@ export type Thesis = {
   id: string;
   registration_id?: string;
   title: string;
+  extension_until_at?: string | null;
   state: string;
   member_student_ids: string[];
   advisor_lecturer_id: string | null;

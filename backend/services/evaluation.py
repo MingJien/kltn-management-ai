@@ -426,6 +426,9 @@ def report_download(session, user, thesis_id, version_id):
 def check_eligibility(session, user, thesis_id, data, expected):
     thesis = access(session, user, thesis_id, "evaluation:eligibility", write=True)
     row_version(expected, thesis.row_version)
+    from backend.services.thesis_changes import open_request
+    if open_request(session,thesis):
+        raise HTTPException(409, "Cần xử lý yêu cầu đổi đề tài trước khi xét điều kiện bảo vệ")
     if session.scalar(select(m.ThesisWithdrawalRequest.id).where(
         m.ThesisWithdrawalRequest.thesis_id == thesis.id,
         m.ThesisWithdrawalRequest.state.in_(["SUBMITTED", "ADVISOR_CONFIRMED"]),

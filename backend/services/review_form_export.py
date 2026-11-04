@@ -268,12 +268,14 @@ def export_review(session, user, thesis_id, review_id, expected):
     advisor = primary_advisor(session, thesis.id)
     instant = now()
     report = session.get(m.DocumentVersion, item.report_version_id)
+    from backend.services.thesis_changes import historical_identity
+    identity = historical_identity(session,thesis,report.submitted_at)
     code = f"M{'7' if item.kind == 'ADVISOR' else '8'}-{item.id.hex[:8].upper()}-V{item.version_no}-R{item.row_version}-{instant:%Y%m%d%H%M%S%f}"
     content = fill_review_form(source, item.kind, {"student": student.display_name, "student_code": student.student_code,
-        "class_name": student.class_name or "Chưa cập nhật", "title": thesis.current_title,
+        "class_name": student.class_name or "Chưa cập nhật", "title": identity["title"],
         "faculty": faculty.name,
         "lecturer": lecturer.display_name, "unit": department.name+" · "+faculty.name,
-        "advisor": session.get(m.LecturerProfile, advisor.lecturer_id).display_name if advisor else "Chưa ghi nhận",
+        "advisor": identity["advisor"],
         "report_version": report.version_no}, item.sections, completed=item.thesis_completed,
         allow=item.allow_defense, code=code, instant=instant)
     audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu để ký; content_sha256="+service.review_fingerprint(session,item),

@@ -14,6 +14,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/topics": "Đề tài",
   "/registrations": "Đăng ký",
   "/withdrawals": "Xin thôi KLTN",
+  "/changes": "Đổi đề tài & gia hạn",
   "/theses": "Khóa luận & GVHD",
   "/proposals": "Đề cương",
   "/progress": "Tiến độ",

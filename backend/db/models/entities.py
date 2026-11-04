@@ -893,6 +893,51 @@ class DefenseCouncil(UuidPrimaryKeyMixin, TimestampMixin, Base):
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
+class ThesisChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "thesis_change_request"
+    __table_args__ = (
+        CheckConstraint("kind IN ('ADJUSTMENT','REPLACEMENT')", name="kind"),
+        CheckConstraint("state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')", name="state"),
+        CheckConstraint("length(trim(reason)) >= 10", name="reason"),
+        CheckConstraint("state != 'APPROVED' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL)", name="decision"),
+        Index("uq_thesis_change_open", "thesis_id", unique=True,
+            postgresql_where=text("state IN ('SUBMITTED','ADVISOR_REVIEWED')")),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    kind: Mapped[str] = mapped_column(String(20))
+    state: Mapped[str] = mapped_column(String(25), default="SUBMITTED")
+    requested_by: Mapped[uuid.UUID] = fk("user_account.id")
+    reason: Mapped[str] = mapped_column(Text)
+    proposed_title: Mapped[str] = mapped_column(String(500))
+    proposed_description: Mapped[str] = mapped_column(Text)
+    target_topic_id: Mapped[Optional[uuid.UUID]] = fk("topic.id", nullable=True)
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    consents: Mapped[dict] = mapped_column(JSONB)
+    reviews: Mapped[dict] = mapped_column(JSONB)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class ThesisExtension(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "thesis_extension"
+    __table_args__ = (
+        UniqueConstraint("thesis_id"),
+        CheckConstraint("until_at > original_due_at", name="later_due"),
+        CheckConstraint("length(trim(reference)) >= 5", name="reference"),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    original_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    until_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    decision_on: Mapped[date] = mapped_column(Date)
+    reference: Mapped[str] = mapped_column(String(500))
+    reason: Mapped[str] = mapped_column(Text)
+    recorded_by: Mapped[uuid.UUID] = fk("user_account.id")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    evidence_file_id: Mapped[Optional[uuid.UUID]] = fk("stored_file.id", nullable=True)
+
+
 class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "defense_slot"
     __table_args__ = (

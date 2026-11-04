@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261104_0021.
--- 45 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261104_0022.
+-- 47 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -786,6 +786,10 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
+CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
+
 CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
 
 CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
@@ -793,10 +797,6 @@ CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (pr
 CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
 
 CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
-
-CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
-
-CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
 CREATE TABLE official_form (
 	round_id UUID NOT NULL,
@@ -1039,6 +1039,61 @@ CREATE TABLE defense_slot (
 );
 
 CREATE INDEX ix_defense_slot_council_start ON defense_slot (council_id, starts_at);
+
+CREATE TABLE thesis_change_request (
+	thesis_id UUID NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	state VARCHAR(25) NOT NULL,
+	requested_by UUID NOT NULL,
+	reason TEXT NOT NULL,
+	proposed_title VARCHAR(500) NOT NULL,
+	proposed_description TEXT NOT NULL,
+	target_topic_id UUID,
+	snapshot JSONB NOT NULL,
+	consents JSONB NOT NULL,
+	reviews JSONB NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	decided_by UUID,
+	decided_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_change_request PRIMARY KEY (id),
+	CONSTRAINT ck_thesis_change_request_kind CHECK (kind IN ('ADJUSTMENT','REPLACEMENT')),
+	CONSTRAINT ck_thesis_change_request_state CHECK (state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')),
+	CONSTRAINT ck_thesis_change_request_reason CHECK (length(trim(reason)) >= 10),
+	CONSTRAINT ck_thesis_change_request_decision CHECK (state != 'APPROVED' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL)),
+	CONSTRAINT fk_thesis_change_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_requested_by_user_account FOREIGN KEY(requested_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_target_topic_id_topic FOREIGN KEY(target_topic_id) REFERENCES topic (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_thesis_change_open ON thesis_change_request (thesis_id) WHERE state IN ('SUBMITTED','ADVISOR_REVIEWED');
+
+CREATE TABLE thesis_extension (
+	thesis_id UUID NOT NULL,
+	original_due_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	until_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	decision_on DATE NOT NULL,
+	reference VARCHAR(500) NOT NULL,
+	reason TEXT NOT NULL,
+	recorded_by UUID NOT NULL,
+	recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	evidence_file_id UUID,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_thesis_extension PRIMARY KEY (id),
+	CONSTRAINT uq_thesis_extension_thesis_id UNIQUE (thesis_id),
+	CONSTRAINT ck_thesis_extension_later_due CHECK (until_at > original_due_at),
+	CONSTRAINT ck_thesis_extension_reference CHECK (length(trim(reference)) >= 5),
+	CONSTRAINT fk_thesis_extension_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
+);
 
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL,
