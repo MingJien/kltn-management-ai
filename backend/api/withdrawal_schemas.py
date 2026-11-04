@@ -39,6 +39,22 @@ class AdvisorDecision(BaseModel):
         return value.strip()
 
 
+class ReceiptRecord(BaseModel):
+    received_on: date
+    receiving_unit: str = Field(min_length=3, max_length=200)
+    reference: str = Field(min_length=3, max_length=500)
+    note: str = Field(default="", max_length=1000)
+    confirm_receipt: Literal[True]
+
+    @field_validator("receiving_unit", "reference", "note")
+    @classmethod
+    def trimmed_receipt(cls, value, info):
+        value = value.strip()
+        if info.field_name in {"receiving_unit", "reference"} and len(value) < 3:
+            raise ValueError("Cần nhập ít nhất 3 ký tự")
+        return value
+
+
 class ExternalOutcome(BaseModel):
     outcome: Literal["WITHDRAWN", "NOT_GRANTED"]
     reference: str = Field(min_length=5, max_length=500)

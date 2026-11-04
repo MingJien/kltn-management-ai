@@ -1,11 +1,9 @@
 """Real PostgreSQL lifecycle, permissions, calendar boundary and immutable evidence."""
 from datetime import timedelta
-from io import BytesIO
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-from docx import Document
 from sqlalchemy import select
 from test_core_workspace import workspace, synthetic_pdf, version_headers
 from test_registration import hdr, scenario
@@ -57,6 +55,37 @@ def outcome(client,user,item,kind="WITHDRAWN"):
             "effective_on":now().astimezone(service.VN).date().isoformat()})
 
 
+def test_receipt_is_audited_but_does_not_grant_withdrawal(workspace):
+    client, users, students, _, session, path = workspace
+    thesis = setup(client, users, session, path)
+    item = send(client, users[0], path)
+    payload = {"received_on": now().astimezone(service.VN).date().isoformat(),
+        "receiving_unit": "Văn phòng Khoa", "reference": "Sổ nhận 123", "note": "Đã nhận đơn",
+        "confirm_receipt": True}
+    url = f"/api/v1/withdrawals/{item['id']}/receipt"
+    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
+    item = confirm(client, users, item)
+    assert client.post(url, headers=version_headers(users[0], item), json=payload).status_code == 403
+    future = {**payload, "received_on": (now().astimezone(service.VN).date()+timedelta(days=1)).isoformat()}
+    assert client.post(url, headers=version_headers(users[4], item), json=future).status_code == 422
+    response = client.post(url, headers=version_headers(users[4], item), json=payload)
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["state"] == "ADVISOR_CONFIRMED"
+    assert updated["receipt"]["reference"] == "Sổ nhận 123"
+    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
+    session.expire_all()
+    assert session.get(m.Thesis, thesis.id).state == "ACTIVE"
+    assert session.scalar(select(m.ThesisMember.active).where(m.ThesisMember.thesis_id == thesis.id,
+        m.ThesisMember.student_id == students[0].id))
+    payload["reference"] = "Sổ nhận 124"
+    response = client.post(url, headers=version_headers(users[4], updated), json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["receipt"]["reference"] == "Sổ nhận 124"
+    assert sum(h["action"] == "WITHDRAWAL_RECEIPT_RECORDED" for h in response.json()["history"]) == 2
+    assert client.get("/api/v1/withdrawals", headers=hdr(users[1])).json()["requests"] == []
+
+
 def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     client,users,students,_,session,path=workspace
     thesis=setup(client,users,session,path)
@@ -68,10 +97,8 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     assert client.get("/api/v1/withdrawals",headers=hdr(users[5])).json()["requests"]==[]
     assert client.post(f"/api/v1/withdrawals/{item['id']}/advisor-decision",headers=version_headers(users[4],item),json={"decision":"CONFIRM","comment":"Wrong actor"}).status_code==403
     exported=client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[0]))
-    assert exported.status_code==200,exported.text
-    doc=Document(BytesIO(exported.content))
-    assert students[0].student_code in " ".join(p.text for p in doc.paragraphs)
-    assert item["code"] in " ".join(p.text for p in doc.sections[0].footer.paragraphs)
+    assert exported.status_code==409,exported.text
+    assert "đang chờ Khoa duyệt" in exported.json()["detail"]
     item=confirm(client,users,item)
     assert outcome(client,users[4],item).status_code==404 # no evidence, not an approval
     item=evidence(client,users[0],item,session)

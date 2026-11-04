@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request
 from backend.api.dependencies import current_user, get_session
-from backend.api.withdrawal_schemas import AdvisorDecision, ExternalOutcome, StartDate, WithdrawalCreate
+from backend.api.withdrawal_schemas import AdvisorDecision, ExternalOutcome, ReceiptRecord, StartDate, WithdrawalCreate
 from backend.services import withdrawals as service
 
 router = APIRouter(prefix="/api/v1", tags=["Xin thôi KLTN"])
@@ -59,6 +59,12 @@ def scan(identifier: UUID, if_match: int = Header(alias="If-Match", ge=1),
 def outcome(identifier: UUID, data: ExternalOutcome, if_match: int = Header(alias="If-Match", ge=1),
             user=Depends(current_user), session=Depends(transaction)):
     return service.record(session, user, identifier, data, if_match)
+
+
+@router.post("/withdrawals/{identifier}/receipt")
+def receipt(identifier: UUID, data: ReceiptRecord, if_match: int = Header(alias="If-Match", ge=1),
+            user=Depends(current_user), session=Depends(transaction)):
+    return service.record_receipt(session, user, identifier, data, if_match)
 
 
 @router.get("/withdrawals/{identifier}/signed-copy")

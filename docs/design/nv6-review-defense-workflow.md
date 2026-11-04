@@ -41,7 +41,8 @@ Thu hồi phân công mất quyền mở hồ sơ và tải tệp ngay ở API, 
 | ADMIN, khi cần thiết lập ban đầu | Quản trị hệ thống → Phân công theo đợt → giao Điều phối KLTN, có căn cứ | Tài khoản được giao mới ghi nhận kế hoạch và kết quả xin rút; TBM không tự có quyền điều phối nếu chưa được giao |
 | Điều phối đúng đợt | Đề tài và đăng ký → Xin thôi KLTN → Ngày bắt đầu theo kế hoạch Khoa | Ghi ngày bắt đầu và căn cứ; hệ thống tính 14 ngày theo giờ Việt Nam, gồm ngày bắt đầu. Có đơn rồi không sửa ngày để thay đổi hạn của hồ sơ |
 | SV xin rút | Xin thôi KLTN → Lập yêu cầu → nhập lý do và xác nhận hệ quả → Gửi đơn đến GVHD | Chỉ gửi đơn cá nhân; nhóm và quyền tham gia chưa thay đổi. Có thể hủy trước khi GVHD xác nhận |
-| GVHD chính | Mở thông báo hoặc Xin thôi KLTN → xem đơn → xác nhận hoặc trả lại, kèm ý kiến | Xác nhận GVHD chưa phải quyết định cho thôi; SV xuất phiếu để in/ký, nộp bản có xác nhận và xử lý bên ngoài theo hướng dẫn Khoa |
+| GVHD chính | Mở thông báo hoặc Xin thôi KLTN → xem đơn → xác nhận hoặc trả lại, kèm ý kiến | Xác nhận trên hệ thống chưa phải quyết định cho thôi; SV thực hiện đơn và ký theo hướng dẫn Khoa. Chức năng xuất mẫu đang chờ Khoa duyệt |
+| Điều phối đúng đợt | Mở đơn → Ghi nhận hồ sơ đã được tiếp nhận → nhập ngày, đơn vị, số hoặc căn cứ tiếp nhận | Ghi nhận tiếp nhận thực tế; có thể cập nhật và giữ lịch sử. Không tự cho thôi và không thay quyết định của đơn vị có thẩm quyền |
 | Điều phối đúng đợt | Mở đơn → đối chiếu bản có xác nhận đã quét sạch → Ghi nhận kết quả đã xử lý bên ngoài → nhập căn cứ, ngày và nội dung, tích xác nhận | Chỉ kết quả cho thôi đã ghi nhận mới ngừng quyền thành viên; không chấp thuận thì SV tiếp tục. Có kiểm phiên bản và ghi lịch sử |
 | Thành viên còn lại | Mở thông báo thay đổi nhóm → Mở đề cương để cập nhật / duyệt lại → nộp PDF/DOCX mới | Giữ mã khóa luận, đề tài, GVHD; chuyển người đại diện nếu cần. Cập nhật danh sách SV, phạm vi và phân công trong nội dung mới |
 | GVHD và TBM | Hồ sơ nộp & xét duyệt → Đề cương → GVHD xem tệp và xác nhận bản mới → TBM chốt | Mỗi xác nhận gắn đúng phiên bản. Không có thao tác xác nhận lại bản cũ thay cho nộp mới |
@@ -50,7 +51,7 @@ Thu hồi phân công mất quyền mở hồ sơ và tải tệp ngay ở API, 
 
 Khi nhóm không còn thành viên, khóa luận chuyển Đã rút, đăng ký chuyển Đã hủy, phân công nhận xét kết thúc. Người đã rút vẫn xem đơn của mình nhưng mất quyền hồ sơ nhóm; thành viên còn lại và GVPB không đọc được đơn/lý do riêng của người xin rút.
 
-Thông báo ở biểu tượng chuông và trang **Thông báo**, có liên kết đến đúng đơn/hồ sơ; chỉ tài khoản còn quyền mới mở được nội dung. Đây là thông báo trong tài khoản, không phải email hay lời nhắc được lập lịch. Phiếu xin thôi xuất từ hệ thống hiện là bản đề nghị có mã để đối chiếu; không tự nhận là mẫu chính thức của Khoa.
+Thông báo ở biểu tượng chuông và trang **Thông báo**, có liên kết đến đúng đơn/hồ sơ; chỉ tài khoản còn quyền mới mở được nội dung. Đây là thông báo trong tài khoản, không phải email hay lời nhắc được lập lịch. Mẫu xin thôi đang chờ Khoa duyệt nên hệ thống chưa cho xuất phiếu; nội dung đề xuất tại [mẫu xin thôi](withdrawal-form-proposal.md).
 
 Nếu không có nút thao tác: kiểm tra phân công còn hiệu lực, ngày bắt đầu, thời hạn, quyền của tài khoản và trạng thái hồ sơ. Hồ sơ đã chốt đủ điều kiện phải được TBM **Mở xét lại hồ sơ** trước khi xử lý thay đổi nhóm. Quá 02 tuần đầu thì UI hướng dẫn liên hệ đơn vị phụ trách, không tự hủy đăng ký, đổi điểm hoặc tự tạo ngoại lệ hành chính. Việc ghi nhận kết quả dựa trên hồ sơ đã được đơn vị có thẩm quyền xử lý bên ngoài.
 

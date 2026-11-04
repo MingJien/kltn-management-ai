@@ -4,16 +4,13 @@ Advisor confirmation is not an administrative approval or an electronic signatur
 The original registration, submitted versions and signed records remain historical.
 """
 from datetime import datetime, time, timedelta
-from io import BytesIO
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from docx import Document
-from docx.shared import Cm, Pt
 from fastapi import HTTPException
-from fastapi.responses import Response
 from sqlalchemy import exists, select
 
 from backend.db.models import entities as m
@@ -65,6 +62,16 @@ def code(item):
     return "RUT-" + item.submitted_at.astimezone(VN).strftime("%Y") + "-" + item.id.hex.upper()
 
 
+def history_reason(event):
+    if event.action == "WITHDRAWAL_RECEIPT_RECORDED":
+        receipt = json.loads(event.reason)
+        return (f"Ngày {receipt['received_on']}; đơn vị: {receipt['receiving_unit']}; "
+            f"căn cứ: {receipt['reference']}; ghi chú: {receipt['note']}")
+    if event.reason and event.action == "WITHDRAWAL_SIGNED_COPY_ADDED":
+        return event.reason.split("; previous_file=")[0]
+    return event.reason
+
+
 def output(session, user, item):
     thesis = session.get(m.Thesis, item.thesis_id)
     student = session.get(m.StudentProfile, item.student_id)
@@ -72,6 +79,12 @@ def output(session, user, item):
     history = session.scalars(select(m.AuditEvent).where(
         m.AuditEvent.resource_type == "thesis_withdrawal_request", m.AuditEvent.resource_id == item.id)
         .order_by(m.AuditEvent.occurred_at, m.AuditEvent.id)).all()
+    receipt_events = [h for h in history if h.action == "WITHDRAWAL_RECEIPT_RECORDED"]
+    receipt = None
+    if receipt_events:
+        event = receipt_events[-1]
+        receipt = {**json.loads(event.reason), "recorded_at": event.occurred_at,
+            "recorded_by": notices.actor_name(session, event.actor_id)}
     return {"id": item.id, "code": code(item), "thesis_id": thesis.id, "title": item.application_data["title"],
         "student_name": student.display_name, "student_code": student.student_code,
         "state": item.state, "reason": item.reason, "submitted_at": item.submitted_at,
@@ -81,11 +94,12 @@ def output(session, user, item):
         "effective_on": item.effective_on, "recorded_at": item.recorded_at,
         "evidence_name": stored.original_name if stored else None,
         "scan_state": stored.scan_state if stored else None,
+        "receipt": receipt,
         "can_cancel": user.id == student.user_id and item.state == "SUBMITTED",
         "can_confirm": is_advisor(session, user, thesis) and item.state == "SUBMITTED",
         "can_record": can_record(session, user, thesis) and item.state == "ADVISOR_CONFIRMED",
         "can_upload": (user.id == student.user_id or can_record(session, user, thesis)) and item.state == "ADVISOR_CONFIRMED",
-        "history": [{"action": h.action, "reason": h.reason.split("; previous_file=")[0] if h.reason and h.action == "WITHDRAWAL_SIGNED_COPY_ADDED" else h.reason, "at": h.occurred_at,
+        "history": [{"action": h.action, "reason": history_reason(h), "at": h.occurred_at,
             "actor": notices.actor_name(session, h.actor_id)} for h in history]}
 
 
@@ -278,6 +292,27 @@ def rescan(session, user, identifier, expected):
     return output(session, user, item)
 
 
+def record_receipt(session, user, identifier, data, expected):
+    item = get(session, user, identifier, lock=True)
+    thesis = session.get(m.Thesis, item.thesis_id)
+    row_version(expected, item.row_version)
+    if not can_record(session, user, thesis):
+        raise HTTPException(403, "Chỉ điều phối đợt được ghi nhận thông tin tiếp nhận")
+    if item.state != "ADVISOR_CONFIRMED":
+        raise HTTPException(409, "Chỉ ghi nhận tiếp nhận khi đơn đã được GVHD xác nhận và đang chờ kết quả")
+    if not item.submitted_at.astimezone(VN).date() <= data.received_on <= now().astimezone(VN).date():
+        raise HTTPException(422, "Ngày tiếp nhận phải từ ngày gửi yêu cầu đến hôm nay")
+    payload = {"received_on": data.received_on.isoformat(), "receiving_unit": data.receiving_unit,
+        "reference": data.reference, "note": data.note}
+    item.row_version += 1
+    audit(session, user, "WITHDRAWAL_RECEIPT_RECORDED", "thesis_withdrawal_request", item.id,
+        json.dumps(payload, ensure_ascii=False))
+    notify(session, user, item, "WITHDRAWAL_RECEIPT_RECORDED",
+        "đã ghi nhận hồ sơ được tiếp nhận; đang chờ kết quả xử lý bên ngoài")
+    session.commit()
+    return output(session, user, item)
+
+
 def record(session, user, identifier, data, expected):
     item = get(session, user, identifier, lock=True)
     # Same lock order as registration: student -> thesis; the request row is unique per student.
@@ -385,45 +420,6 @@ def download(session, user, identifier):
 
 
 def print_copy(session, user, identifier):
-    item = get(session, user, identifier)
-    from backend.services.proposal_export import _public_url, _stamp_docx
-    doc = Document()
-    section = doc.sections[0]
-    section.top_margin = section.bottom_margin = Cm(2)
-    style = doc.styles["Normal"]
-    style.font.name, style.font.size = "Times New Roman", Pt(13)
-    doc.add_heading("PHIẾU ĐỀ NGHỊ XIN THÔI THỰC HIỆN KLTN", 0)
-    doc.add_paragraph("Bản đề nghị từ hệ thống – dùng để in, ký và nộp theo hướng dẫn của Khoa. Chưa phải biểu mẫu chính thức do Trường ban hành.")
-    snapshot = item.application_data
-    for label, value in [("Mã hồ sơ", code(item)), ("Họ tên", snapshot["student_name"]),
-        ("MSSV", snapshot["student_code"]), ("Lớp", snapshot["class_name"]),
-        ("Bộ môn", snapshot["department"]), ("Đề tài", snapshot["title"]),
-        ("GVHD", snapshot["advisor_name"]), ("Đợt", snapshot["round_code"]),
-        ("Ngày bắt đầu thực hiện", item.execution_starts_on.strftime("%d/%m/%Y")),
-        ("Ngày gửi yêu cầu", item.submitted_at.astimezone(VN).strftime("%d/%m/%Y %H:%M"))]:
-        doc.add_paragraph(f"{label}: {value}")
-    doc.add_paragraph("Lý do xin thôi: " + item.reason)
-    doc.add_paragraph("Tôi đề nghị xin thôi thực hiện KLTN để chuyển sang học các học phần thay thế theo Điều 4 Quy định ban hành kèm QĐ 2919/QĐ-ĐHĐT. Tôi đã được thông tin về hệ quả không được đăng ký lại KLTN khi hủy đăng ký theo khoản 6 Điều 4.")
-    doc.add_paragraph("Ý kiến GVHD trên hệ thống: " + (item.advisor_comment or "Chưa xác nhận"))
-    doc.add_paragraph("Sinh viên (ký, ghi rõ họ tên)                         GVHD (xác nhận, ký và ghi rõ họ tên)")
-    doc.add_paragraph("\n\n")
-    doc.add_paragraph("Phần ghi nhận của đơn vị phụ trách: ........................................................\nCăn cứ / kết quả xử lý: ...................................................................................")
-    state_label = {"SUBMITTED":"Chờ GVHD xác nhận", "ADVISOR_CONFIRMED":"Chờ kết quả xử lý bên ngoài",
-        "RETURNED":"GVHD trả lại", "CANCELLED":"Đã hủy yêu cầu", "RECORDED":"Đã ghi nhận thôi KLTN",
-        "NOT_GRANTED":"Không chấp thuận xin thôi"}[item.state]
-    doc.add_paragraph("Trạng thái trên hệ thống: " + state_label)
-    if item.official_reference:
-        doc.add_paragraph("Kết quả xử lý được ghi nhận: " + item.official_reference + "; " + (item.outcome_note or ""))
-    instant = now()
-    output_bytes = BytesIO()
-    doc.save(output_bytes)
-    content = _stamp_docx(output_bytes.getvalue(), [f"Xuất tại: {_public_url()}",
-        f"Mã số: {code(item)} | {state_label}",
-        f"Thời gian: {instant.astimezone(VN).strftime('%H:%M %d/%m/%Y')}"])
-    import hashlib
-    audit(session, user, "WITHDRAWAL_PRINT_EXPORTED", "thesis_withdrawal_request", item.id,
-        f"{code(item)}; trạng thái {item.state}", after_hash=hashlib.sha256(content).hexdigest())
-    session.commit()
-    return Response(content, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f'attachment; filename="{code(item)}.docx"',
-            "X-Document-Code": code(item), "X-Exported-At": instant.isoformat()})
+    # Preserve authorization even while the unapproved template is unavailable.
+    get(session, user, identifier)
+    raise HTTPException(409, "Mẫu đơn xin thôi KLTN đang chờ Khoa duyệt; tạm thời chưa hỗ trợ tải mẫu hoặc xuất bản in có footer.")
