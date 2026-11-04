@@ -172,3 +172,38 @@ def test_open_round_announces_to_active_accounts_without_theses(scenario):
     for user in users:
         assert sum("Khoa đã mở đợt đăng ký KLTN SYN-NOTICE" in text
                    for text in messages(client, user)) == 1
+
+def test_registration_round_extension_checks_authority_audit_and_announces(scenario):
+    from sqlalchemy import select
+    client, users, _, _, topic, session = scenario
+    admin = users[5]
+    admin.base_role = "ADMIN"
+    existing = session.get(m.ThesisRound, topic.round_id)
+    year = session.get(m.AcademicYear, existing.academic_year_id)
+    year.state = "ACTIVE"
+    round_ = m.ThesisRound(id=uuid4(), academic_year_id=year.id, code="SYN-EXTEND",
+        round_type="MAIN", opens_at=now()-timedelta(days=7),
+        closes_at=now()-timedelta(days=2), state="OPEN")
+    session.add(round_)
+    session.commit()
+    old_end, version = round_.closes_at, round_.row_version
+    path = f"/api/v1/admin/rounds/{round_.id}/extend"
+    data = {"closes_at":(now()+timedelta(days=2)).isoformat(),
+            "basis_ref":"QĐ DEMO 01", "reason":"Gia hạn theo kế hoạch Khoa"}
+    assert client.post(path, headers={**hdr(users[4]),"If-Match":str(version)}, json=data).status_code == 403
+    bad = {**data,"closes_at":old_end.isoformat()}
+    assert client.post(path, headers={**hdr(admin),"If-Match":str(version)}, json=bad).status_code == 422
+    response = client.post(path, headers={**hdr(admin),"If-Match":str(version)}, json=data)
+    assert response.status_code == 200, response.text
+    assert response.json()["state"] == "OPEN"
+    assert client.post(path, headers={**hdr(admin),"If-Match":str(version)}, json=data).status_code == 409
+    event = session.scalar(select(m.AuditEvent).where(
+        m.AuditEvent.action=="ROUND_REGISTRATION_EXTENDED", m.AuditEvent.resource_id==round_.id))
+    assert event and event.source_reference=="QĐ DEMO 01" and old_end.isoformat() in event.reason
+    for user in users:
+        assert sum("gia hạn đăng ký KLTN đợt SYN-EXTEND" in text for text in messages(client, user)) == 1
+    round_.state = "CLOSED"
+    session.commit()
+    response = client.post(path, headers={**hdr(admin),"If-Match":str(round_.row_version)},
+        json={**data,"closes_at":(now()+timedelta(days=3)).isoformat()})
+    assert response.status_code == 409

@@ -64,6 +64,20 @@ def listing(session, user, department_id, offset, limit):
     return dict(items=[output(session, r) for r in rows], total=total)
 
 
+
+def available_appointments(session, user):
+    """All current and scheduled department-head decisions available for action."""
+    admin(user)
+    instant = now()
+    rows = session.scalars(select(m.PositionAssignment).join(m.OrganizationalPosition,
+        m.OrganizationalPosition.id == m.PositionAssignment.position_id).where(
+        m.OrganizationalPosition.code == "DEPARTMENT_HEAD",
+        m.PositionAssignment.department_id.is_not(None),
+        m.PositionAssignment.state == "ACTIVE",
+        (m.PositionAssignment.effective_to.is_(None) | (m.PositionAssignment.effective_to > instant)))
+        .order_by(m.PositionAssignment.effective_from.desc(), m.PositionAssignment.id)).all()
+    return [output(session, row) for row in rows]
+
 def scope_lock(session, department_id):
     # All writes for a department share this lock, including new empty scopes.
     row = session.scalar(select(m.Department).where(m.Department.id == department_id).with_for_update())

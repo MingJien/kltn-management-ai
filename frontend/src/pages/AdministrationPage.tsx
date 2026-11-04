@@ -1,3 +1,5 @@
+import AssignmentTabs from "../components/layout/AssignmentTabs";
+import LecturerActivationPicker from "../components/domain/LecturerActivationPicker";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Context } from "../api";
@@ -62,6 +64,7 @@ export default function AdministrationPage({
   const [roleCatalog, setRoleCatalog] = useState<AccountDirectory["role_catalog"]>([]);
   const [staffAccounts, setStaffAccounts] = useState<Account[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [lecturerInviteMode, setLecturerInviteMode] = useState<"new" | "existing">("new");
   const [lecturerCode, setLecturerCode] = useState("");
   const [lecturerName, setLecturerName] = useState("");
   const [lecturerEmail, setLecturerEmail] = useState("");
@@ -229,6 +232,7 @@ export default function AdministrationPage({
           : "Giao hoặc thu hồi nhiệm vụ KLTN theo từng đợt, kèm căn cứ và lịch sử."}
       />
 
+      {section === "assignments" && isAdmin && <AssignmentTabs />}
       <div className="stack">
         {isAdmin && <nav className="admin-page__quick-links" aria-label="Lối tắt quản trị">
           {section === "accounts" && <>
@@ -236,7 +240,6 @@ export default function AdministrationPage({
             <Link className="btn btn-secondary" to="/rounds">Quản lý đợt KLTN</Link>
           </>}
           {section === "assignments" && <>
-            <Link className="btn btn-secondary" to="/positions">Chức vụ TBM và phạm vi duyệt</Link>
             <Link className="btn btn-secondary" to="/forms">Kho biểu mẫu và tài liệu Khoa</Link>
           </>}
         </nav>}
@@ -268,7 +271,11 @@ export default function AdministrationPage({
                 <span className="admin-card__counter">Giảng viên mới</span>
               </div>
               <div className="card-body stack">
-                <form
+                <div className="lecturer-invite-tabs" role="group" aria-label="Cách mời giảng viên">
+                  <button type="button" className={`btn ${lecturerInviteMode === "new" ? "btn-primary" : "btn-secondary"}`} aria-pressed={lecturerInviteMode === "new"} onClick={() => setLecturerInviteMode("new")}>Tạo giảng viên mới</button>
+                  <button type="button" className={`btn ${lecturerInviteMode === "existing" ? "btn-primary" : "btn-secondary"}`} aria-pressed={lecturerInviteMode === "existing"} onClick={() => setLecturerInviteMode("existing")}>Gửi liên kết cho GV đã có</button>
+                </div>
+                {lecturerInviteMode === "existing" ? <LecturerActivationPicker userId={context.user_id} /> : <form
                   className="stack"
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -341,7 +348,7 @@ export default function AdministrationPage({
                   <button className="btn btn-primary" disabled={busy}>
                     <UserPlus size={16} aria-hidden="true" /> Tạo và gửi lời mời
                   </button>
-                </form>
+                </form>}
               </div>
             </section>)}
 
@@ -440,6 +447,7 @@ export default function AdministrationPage({
                     <span className="text-caption">{matchingStaff.length} tài khoản phù hợp. Tìm bằng mã/tên, rồi chọn email bên phải.</span>
                     {selectedStaff ? <p role="status" className="text-caption" style={{ color: "var(--primary-800)", fontWeight: 500 }}>Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
                   </div>
+                  <div className="assignment-details-grid">
                   <label className="input-group">
                     Nhiệm vụ
                     <select className="input" required value={kind} onChange={(e) => changeKind(e.target.value)}>
@@ -452,17 +460,6 @@ export default function AdministrationPage({
                       <option value="FORM_MANAGER">Quản lý biểu mẫu và tài liệu Khoa</option>
                     </select>
                   </label>
-                  {assignmentDescriptions[kind] ? (
-                    <div className="admin-callout" role="status" aria-live="polite">
-                      <Info size={16} aria-hidden="true" />
-                      <span>{assignmentDescriptions[kind]}</span>
-                    </div>
-                  ) : null}
-                  {assignmentHint ? (
-                    <p id="assignment-hint" role="status" className="text-caption" style={{ color: "var(--neutral-600)" }}>
-                      {assignmentHint}
-                    </p>
-                  ) : null}
                   <label className="input-group">
                     Căn cứ phân công
                     <input
@@ -474,6 +471,18 @@ export default function AdministrationPage({
                       placeholder="Số văn bản hoặc quyết định của Khoa"
                     />
                   </label>
+                  </div>
+                  {assignmentDescriptions[kind] ? (
+                    <div className="admin-callout" role="status" aria-live="polite">
+                      <Info size={16} aria-hidden="true" />
+                      <span>{assignmentDescriptions[kind]}</span>
+                    </div>
+                  ) : null}
+                  {assignmentHint ? (
+                    <p id="assignment-hint" role="status" className="text-caption" style={{ color: "var(--neutral-600)" }}>
+                      {assignmentHint}
+                    </p>
+                  ) : null}
                   <button className="btn btn-primary" disabled={busy || !kind || !selectedStaff}>
                     <Shield size={16} aria-hidden="true" /> Lưu phân công
                   </button>

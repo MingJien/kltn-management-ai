@@ -46,6 +46,20 @@ const messages: Record<string, string> = {
 export function apiMessage(status: number, detail: unknown, path = ""): string {
   if (path.startsWith("/admin/lecturers") && typeof detail === "string"
       && [409, 413, 422, 429, 503].includes(status)) return messages[detail] || detail;
+  if (path.startsWith("/admin/rounds/") && path.endsWith("/extend") && typeof detail === "string" &&
+      [409, 422].includes(status)) return detail;
+  if (status === 409 && path.includes("/roster") && typeof detail === "string") {
+    if (detail.startsWith("Sinh viên ") && detail.includes("đã bị thu hồi")) return detail;
+    const row = /^Row (\d+): (.*)$/.exec(detail);
+    if (row?.[2] === "existing student information differs; correct it separately")
+      return "Dòng " + row[1] + ": thông tin sinh viên khác hồ sơ đã có. Hãy đối chiếu và đính chính hồ sơ trước khi nhập.";
+    if (row?.[2] === "email already belongs to another account")
+      return "Dòng " + row[1] + ": email đã thuộc tài khoản khác. Hãy đối chiếu email trước khi nhập.";
+    if (detail === "File changed since preview") return "Tệp đã thay đổi sau khi kiểm tra. Hãy chọn tệp và kiểm tra lại.";
+    if (detail === "The round is not open for roster import") return "Đợt này không còn nhận danh sách. Hãy chọn đợt còn cho phép nhập.";
+    if (detail === "A concurrent import changed the roster; preview and retry")
+      return "Danh sách vừa được cập nhật ở nơi khác. Hãy kiểm tra lại tệp trước khi nhập.";
+  }
   if (status === 422 && path.includes("/roster")) {
     if (Array.isArray(detail)) {
       const locations = detail.flatMap(item => Array.isArray(item?.loc) ? item.loc : []);
@@ -53,7 +67,7 @@ export function apiMessage(status: number, detail: unknown, path = ""): string {
       if (locations.includes("round_id")) return "Đợt KLTN chưa hợp lệ. Hãy chọn lại đợt rồi thử lại.";
     }
     if (typeof detail === "string") {
-      if (detail.startsWith("Dòng ") && detail.includes("mã bộ môn")) return detail;
+      if (detail.startsWith("Dòng ") && (detail.includes("mã bộ môn") || detail.includes("mã ngành") || detail.includes("MSSV"))) return detail;
       const row = /^Row (\d+)(.*)$/.exec(detail);
       if (row) {
         const line = `Dòng ${row[1]}`;

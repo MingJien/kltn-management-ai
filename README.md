@@ -11,6 +11,7 @@
 - Có luồng xin thôi KLTN trong 14 ngày đầu, giữ lịch sử và xử lý riêng từng thành viên.
 - Mẫu nhận xét Mẫu 7/8 gắn với đúng sinh viên và bản báo cáo; GV gửi nhận xét trên hệ thống, xuất phiếu có footer để ký ngoài. Người được phân công tiếp nhận hồ sơ hoặc TBM ghi nhận bản giấy theo mã bản xuất và căn cứ; không yêu cầu tải bản ký lên lại.
 - Có hồ sơ chuyên môn GV, phân công theo đợt và kiểm tra điều kiện bảo vệ ở mức hiện tại.
+- Quản trị ghi nhận Trưởng bộ môn theo bộ môn và thời hạn, phân công nhiệm vụ theo đợt; GV được chọn từ danh sách để gửi lại liên kết kích hoạt.
 
 Hội đồng, lịch bảo vệ, chấm điểm chính thức, biên bản Mẫu 9, kiểm tra tương đồng và chatbot AI hoàn chỉnh chưa triển khai.
 

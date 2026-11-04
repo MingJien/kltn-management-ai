@@ -35,7 +35,7 @@ const actions: Record<string, string> = {
   LECTURER_INVITED: "Cấp tài khoản giảng viên", ROUND_CREATED: "Tạo đợt KLTN", ROUND_SCHEDULE_UPDATED: "Sửa lịch đợt",
   LECTURER_PROFILE_SELF_CONFIRMED: "TBM tự xác nhận hồ sơ chuyên môn",
   POSITION_ASSIGNED: "Ghi nhận bổ nhiệm chức vụ", POSITION_REPLACED: "Thay người giữ chức vụ", POSITION_REVOKED: "Thu hồi bổ nhiệm",
-  ROUND_OPENED: "Mở đợt đăng ký", ROUND_CLOSED: "Đóng đợt đăng ký", ROUND_PERMISSION_GRANTED: "Phân công nhiệm vụ theo đợt",
+  ROUND_REGISTRATION_EXTENDED: "Gia hạn đăng ký của đợt", ROUND_OPENED: "Mở đợt đăng ký", ROUND_CLOSED: "Đóng đợt đăng ký", ROUND_PERMISSION_GRANTED: "Phân công nhiệm vụ theo đợt",
   ROUND_PERMISSION_REVOKED: "Thu hồi nhiệm vụ theo đợt", ELIGIBILITY_ROSTER_IMPORTED: "Nhập danh sách sinh viên đủ điều kiện",
   ELIGIBILITY_SPECIAL_DECISION_RECORDED: "Ghi nhận quyết định đủ điều kiện", ELIGIBILITY_REVOKED: "Thu hồi kết quả đủ điều kiện",
   ELIGIBILITY_RESTORED: "Khôi phục quyền tham gia đợt",

@@ -6,9 +6,10 @@ import hashlib
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field, StringConstraints, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -96,6 +97,12 @@ class RoundCreate(BaseModel):
 class RoundStateChange(BaseModel):
     state: Literal["OPEN", "CLOSED"]
     reason: str = Field(min_length=3, max_length=500)
+
+
+class RoundExtension(BaseModel):
+    closes_at: AwareDatetime
+    basis_ref: str = Field(min_length=3, max_length=500)
+    reason: str = Field(min_length=5, max_length=1000)
 
 
 class RoundScheduleUpdate(BaseModel):
@@ -249,6 +256,45 @@ def update_round_schedule(round_id: UUID, payload: RoundScheduleUpdate,
         session.rollback()
         raise HTTPException(409, "Round code was changed concurrently") from exc
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
+
+
+@router.post("/rounds/{round_id}/extend")
+def extend_round_registration(round_id: UUID, payload: RoundExtension,
+                              if_match: int = Header(alias="If-Match", ge=1),
+                              user: m.UserAccount = Depends(current_user),
+                              session: Session = Depends(get_session)) -> dict:
+    _admin(user)
+    round_ = session.scalar(select(m.ThesisRound).where(
+        m.ThesisRound.id == round_id).with_for_update())
+    if not round_:
+        raise HTTPException(404, "Không tìm thấy đợt KLTN")
+    if round_.row_version != if_match:
+        raise HTTPException(409, "Đợt đã thay đổi. Hãy tải lại trước khi gia hạn")
+    if round_.state != "OPEN":
+        raise HTTPException(409, "Chỉ được gia hạn đợt đang ở trạng thái mở")
+    instant = datetime.now(timezone.utc)
+    new_end = payload.closes_at.astimezone(timezone.utc)
+    if new_end <= round_.closes_at or new_end <= instant:
+        raise HTTPException(422, "Hạn mới phải sau hạn cũ và sau thời điểm hiện tại")
+    year = session.get(m.AcademicYear, round_.academic_year_id)
+    if year.state == "CLOSED" or new_end.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date() > year.ends_on:
+        raise HTTPException(422, "Hạn mới phải thuộc năm học đang hoạt động")
+    basis = payload.basis_ref.strip()
+    reason = payload.reason.strip()
+    if len(basis) < 3 or len(reason) < 5:
+        raise HTTPException(422, "Nhập căn cứ và lý do gia hạn")
+    previous_end = round_.closes_at
+    round_.closes_at = new_end
+    round_.row_version += 1
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_REGISTRATION_EXTENDED",
+        resource_type="thesis_round", resource_id=round_.id, source_reference=basis,
+        reason=f"Hạn cũ: {previous_end.isoformat()} · Hạn mới: {new_end.isoformat()} · {reason}",
+        occurred_at=instant, correlation_id=uuid4()))
+    round_announcement(session, user.id, round_.id, "ROUND_REGISTRATION_EXTENDED",
+        f"Khoa đã gia hạn đăng ký KLTN đợt {round_.code} đến {format_due(new_end)}.", "/topics")
+    session.commit()
+    return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version,
+            "closes_at": round_.closes_at}
 
 
 @router.patch("/rounds/{round_id}")

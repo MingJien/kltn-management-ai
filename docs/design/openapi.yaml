@@ -641,6 +641,86 @@
         }
       }
     },
+    "/api/v1/rounds/{round_id}/roster/{student_id}/activation-link": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Send Student Activation",
+        "description": "Send only on explicit admin request; self-activation remains available.",
+        "operationId": "send_student_activation_api_v1_rounds__round_id__roster__student_id__activation_link_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Send Student Activation Api V1 Rounds  Round Id  Roster  Student Id  Activation Link Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/rounds/{round_id}/roster/confirm": {
       "post": {
         "tags": [
@@ -862,6 +942,85 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Revoke Eligibility Api V1 Rounds  Round Id  Roster Revoke Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rounds/{round_id}/roster/restore": {
+      "post": {
+        "tags": [
+          "eligibility roster"
+        ],
+        "summary": "Restore Eligibility",
+        "operationId": "restore_eligibility_api_v1_rounds__round_id__roster_restore_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeStudent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Restore Eligibility Api V1 Rounds  Round Id  Roster Restore Post"
                 }
               }
             }
@@ -1515,6 +1674,23 @@
             }
           },
           {
+            "name": "account_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ALL",
+                "PENDING",
+                "ACTIVE",
+                "LOCKED",
+                "DISABLED"
+              ],
+              "type": "string",
+              "default": "ALL",
+              "title": "Account Status"
+            }
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -1621,6 +1797,23 @@
               "type": "integer",
               "default": 100,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "account_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ALL",
+                "PENDING",
+                "ACTIVE",
+                "LOCKED",
+                "DISABLED"
+              ],
+              "type": "string",
+              "default": "ALL",
+              "title": "Account Status"
             }
           },
           {
@@ -9096,6 +9289,71 @@
         }
       }
     },
+    "/api/v1/school-forms/rounds/{round_id}/mau-04": {
+      "post": {
+        "tags": [
+          "Faculty forms"
+        ],
+        "summary": "Export Round List",
+        "operationId": "export_round_list_api_v1_school_forms_rounds__round_id__mau_04_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/school-forms": {
       "get": {
         "tags": [
@@ -15479,6 +15737,10 @@
           "can_view_publications": {
             "type": "boolean",
             "title": "Can View Publications"
+          },
+          "can_export_list": {
+            "type": "boolean",
+            "title": "Can Export List"
           }
         },
         "type": "object",
@@ -15487,7 +15749,8 @@
           "label",
           "state",
           "can_manage",
-          "can_view_publications"
+          "can_view_publications",
+          "can_export_list"
         ],
         "title": "AccessOut"
       },

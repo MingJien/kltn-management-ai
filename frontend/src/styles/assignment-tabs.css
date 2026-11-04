@@ -1,0 +1,28 @@
+.assignment-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #dce6e3;
+  overflow-x: auto;
+}
+
+.assignment-tabs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 18px;
+  border-bottom: 3px solid transparent;
+  color: #4d625d;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.assignment-tabs__link:hover,
+.assignment-tabs__link.is-active {
+  color: #106351;
+  background: #f0f8f5;
+}
+
+.assignment-tabs__link.is-active { border-bottom-color: #147b6b; }
+.assignment-tabs__link:focus-visible { outline: 2px solid #147b6b; outline-offset: -3px; }
