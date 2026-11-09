@@ -8,6 +8,7 @@ from backend.api.defense_schemas import AttendanceInput, BonusInput, CouncilInpu
 from backend.api.evaluation import transaction
 from backend.api.evaluation_schemas import Reason
 from backend.services import defense, defense_export
+from backend.api.defense_schemas import CouncilAttendance, ReopenInput
 
 router = APIRouter(prefix="/api/v1/defense", tags=["Hội đồng và bảo vệ"])
 
@@ -78,6 +79,18 @@ def finalize(identifier:UUID,version:int=Header(alias="If-Match",ge=1),
 def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:UUID|None=None,lecturer_id:UUID|None=None,
               user=Depends(current_user),session=Depends(transaction)):
     return defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id)
+
+
+@router.put("/slots/{identifier}/council-attendance",status_code=204)
+def council_attendance(identifier:UUID,data:CouncilAttendance,version:int=Header(alias="If-Match",ge=1),
+                       user=Depends(current_user),session=Depends(transaction)):
+    defense.save_council_attendance(session,user,identifier,version,data)
+
+
+@router.post("/slots/{identifier}/reopen-unsigned",status_code=204)
+def reopen_unsigned(identifier:UUID,data:ReopenInput,version:int=Header(alias="If-Match",ge=1),
+                    user=Depends(current_user),session=Depends(transaction)):
+    defense.reopen_unsigned(session,user,identifier,version,data)
 
 
 @router.get("/councils/{identifier}/forms/{form}")

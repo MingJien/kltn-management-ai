@@ -1,0 +1,19 @@
+.defense-page{min-width:0;gap:20px}
+.defense-page .card-body{display:grid;gap:16px;min-width:0}
+.defense-page h3,.defense-page p,.defense-page li{overflow-wrap:anywhere;line-height:1.7}
+.defense-page form{display:grid;gap:14px;min-width:0}
+.defense-page label{display:grid;gap:7px;font-size:.88rem}
+.defense-page .input{width:100%;min-width:0}
+.defense-page form>div.flex,.defense-page .flex{flex-wrap:wrap}
+.defense-operation{padding:16px;border:1px solid #dbe3eb;border-radius:12px;background:#f8fafc}
+.defense-operation>summary{font-weight:600;cursor:pointer;color:#234657}
+.defense-operation[open]>form,.defense-operation[open]>.card{margin-top:16px}
+.defense-page .defense-check{display:flex;align-items:start;gap:10px;line-height:1.6}
+.defense-check input{margin-top:5px;flex-shrink:0}
+.defense-attendance{padding:16px;background:#f1f7fa;border-radius:12px}
+.defense-score-preview{position:sticky;bottom:0;padding:14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;color:#065f46;font-weight:600}
+.defense-blockers{padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;color:#7c2d12}
+.defense-blockers ul{margin:8px 0;padding-left:22px}
+.defense-page button[aria-disabled=true]{opacity:.6;cursor:not-allowed}
+@media(min-width:850px){.defense-page form:not(.defense-attendance){grid-template-columns:repeat(2,minmax(0,1fr))}.defense-page form>h4,.defense-page form>p,.defense-page form>.flex,.defense-page form>button,.defense-page form>details{grid-column:1/-1}}
+@media(max-width:520px){.defense-page .card-body{padding:16px}.defense-page .btn{white-space:normal;min-height:42px}.defense-page .flex>.btn{width:100%}}

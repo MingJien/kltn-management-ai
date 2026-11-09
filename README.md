@@ -16,7 +16,7 @@ Mục Tài liệu có lựa chọn sẵn, dẫn Mẫu 1a/1b về hồ sơ đăng
 
 - **Xin thôi thực hiện KLTN** trong 14 ngày đầu theo ngày bắt đầu do Khoa ghi nhận. Sinh viên gửi yêu cầu, điều phối đúng đợt chấp thuận hoặc từ chối trên hệ thống. Nhóm còn lại giữ đề tài và cập nhật Mẫu 1–3, báo cáo và xét bảo vệ.
 
-- **NV6 tuần 2** có hội đồng, lịch bảo vệ, phiếu Mẫu 6, tổng hợp điểm, biên bản Mẫu 9 và bảng điểm Mẫu 10–11 từ hồ sơ đã chốt. Tab đối chiếu hai báo cáo Word/PDF đọc cả chữ trong scan và ảnh chèn khi có Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md) · [Kiểm chứng](docs/evidence/nv6-week2-validation.md).
+- **NV6 tuần 2** có hội đồng, lịch bảo vệ, phiếu Mẫu 6, tổng hợp điểm, biên bản Mẫu 9 và bảng điểm Mẫu 10–11 từ hồ sơ đã chốt. Tab đối chiếu hai báo cáo Word/PDF đọc cả chữ trong scan và ảnh chèn khi có Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md) · [Kiểm chứng](docs/evidence/nv6-week2-validation.md). Điểm danh hội đồng theo điều kiện hiện diện, làm tròn điểm 1 chữ số, giữ kết quả bản chốt và hỗ trợ sửa bản chưa ký trước khi khóa bảng điểm. [Rà soát 09/11](docs/evidence/defense-hardening-validation.md).
 
 - **Hồ sơ giảng viên**: danh bạ có tìm kiếm không dấu, lọc bộ môn, phân trang và xem chi tiết; quản trị sửa định danh có căn cứ. GV tự lưu nháp thông tin chuyên môn/liên hệ và ảnh đại diện, gửi TBM duyệt trước khi công bố. Có so sánh trước–sau, trả lại/gửi lại, rút yêu cầu, lịch sử và thông báo; không cho tự duyệt. Tên GV trên đề tài, đăng ký, GVHD và phân công phản biện mở cửa sổ xem nhanh, bấm ngoài hoặc Esc để đóng. [Luồng và kiểm chứng](docs/evidence/lecturer-profile-validation.md).
 

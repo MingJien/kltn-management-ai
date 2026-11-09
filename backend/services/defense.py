@@ -55,8 +55,8 @@ def manage_council(session, user, data):
         raise HTTPException(409, "Đợt hoặc bộ môn không còn khả dụng")
     roles = [member.role for member in data.members]
     ids = {member.lecturer_id for member in data.members}
-    if len(ids) != len(roles) or roles.count("CHAIR") != 1 or roles.count("SECRETARY") != 1 or "REVIEWER" not in roles:
-        raise HTTPException(422, "Cần một chủ tịch, một thư ký, ít nhất một phản biện và mỗi giảng viên chỉ giữ một vai trò")
+    if len(ids) != 5 or sorted(roles) != sorted(["CHAIR","SECRETARY","REVIEWER","REVIEWER","MEMBER"]):
+        raise HTTPException(422, "Hội đồng gồm 5 người khác nhau: chủ tịch, thư ký, hai phản biện và một ủy viên")
     found = dict(session.execute(select(m.LecturerProfile.id, m.LecturerProfile.display_name)
         .join(m.UserAccount, m.UserAccount.id == m.LecturerProfile.user_id)
         .where(m.LecturerProfile.id.in_(ids), m.UserAccount.status == "ACTIVE")).all())
@@ -200,10 +200,13 @@ def student_id(slot, identifier):
 
 def save_marks(session,user,identifier,expected,data):
     slot,council,member = edit(session,user,identifier,expected)
+    ensure_quorum(slot,council)
     student = student_id(slot,data.thesis_member_id)
     lecturer = str(data.lecturer_id)
     if lecturer not in {row["id"] for row in council.members}:
         raise HTTPException(422,"Giảng viên không thuộc hội đồng")
+    if lecturer not in slot.attendance["_council"]["present_ids"]:
+        raise HTTPException(409,"Giảng viên vắng không được lập phiếu chấm")
     if lecturer != member["id"] and (member["role"] != "SECRETARY" or len(data.paper_entry_reason) < 5):
         raise HTTPException(403,"Chỉ thư ký được nhập hộ từ phiếu giấy và phải ghi căn cứ")
     if slot.attendance.get(student,{}).get("status") != "PRESENT":
@@ -226,6 +229,72 @@ def save_attendance(session,user,identifier,expected,member_id,data):
     old = slot.attendance.get(student,{})
     slot.attendance = {**slot.attendance,student:{**old,"status":data.status,"reason":data.reason}}
     finish_edit(session,user,slot,"DEFENSE_ATTENDANCE_RECORDED",f"{student} · {data.status} · {data.reason}")
+
+
+def ensure_quorum(slot,council):
+    attendance=slot.attendance.get("_council",{})
+    present=set(attendance.get("present_ids",[]))
+    required={p["id"] for p in council.members if p["role"] in {"CHAIR","SECRETARY"}}
+    if len(council.members)!=5 or len(present)<3 or not required<=present:
+        raise HTTPException(409,"Cần điểm danh hội đồng: ít nhất 3/5 người, gồm chủ tịch và thư ký")
+
+
+def save_council_attendance(session,user,identifier,expected,data):
+    slot,council,_=edit(session,user,identifier,expected,secretary=True)
+    present={str(value) for value in data.present_ids}
+    ids={p["id"] for p in council.members}
+    required={p["id"] for p in council.members if p["role"] in {"CHAIR","SECRETARY"}}
+    if len(present)!=len(data.present_ids) or not present<=ids or not required<=present:
+        raise HTTPException(422,"Danh sách có mặt phải gồm chủ tịch, thư ký và không trùng người")
+    if now()<slot.starts_at:
+        raise HTTPException(409,"Chưa đến giờ bảo vệ để xác nhận mở phiên")
+    if any(set(marks)-present for marks in slot.marks.values()):
+        raise HTTPException(409,"Người đã chấm không thể chuyển thành vắng")
+    slot.attendance={**slot.attendance,"_council":{"present_ids":sorted(present),"reason":data.reason,
+        "by":str(user.id),"at":now().isoformat()}}
+    finish_edit(session,user,slot,"DEFENSE_COUNCIL_ATTENDANCE",data.reason)
+
+
+def reopen_unsigned(session,user,identifier,expected,data):
+    import json
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
+    slot,council,member,_,_=load_slot(session,user,identifier,write=True)
+    row_version(expected,slot.row_version)
+    if not member or member["role"] not in {"CHAIR","SECRETARY"}:
+        raise HTTPException(403,"Chỉ chủ tịch hoặc thư ký được sửa bản chưa ký")
+    if not slot.finalized_at or council.closed_at:
+        raise HTTPException(409,"Chỉ mở bản đã chốt trước khi khóa bảng điểm hội đồng")
+    thesis=session.scalar(select(m.Thesis).where(m.Thesis.id==slot.thesis_id).with_for_update())
+    audit(session,user,"DEFENSE_UNSIGNED_REVISION","defense_slot",slot.id,json.dumps({
+        "reason":data.reason,"previous_version":slot.row_version,"marks":slot.marks,
+        "attendance":slot.attendance,"minutes":slot.minutes,"finalized_at":slot.finalized_at.isoformat(),
+        "finalized_by":str(slot.finalized_by)},ensure_ascii=False))
+    slot.finalized_at,slot.finalized_by=None,None
+    slot.minutes={key:value for key,value in slot.minutes.items() if key!="results_snapshot"}
+    thesis.state,thesis.row_version="READY_FOR_DEFENSE",thesis.row_version+1
+    finish_edit(session,user,slot,"DEFENSE_REOPENED",data.reason)
+
+
+def blockers(slot,council):
+    pending=[]
+    try:
+        ensure_quorum(slot,council)
+    except HTTPException as error:
+        pending.append(error.detail)
+    if not slot.minutes:
+        pending.append("Thư ký cần lưu nội dung họp và kết luận")
+    present=slot.attendance.get("_council",{}).get("present_ids",[])
+    for row in slot.roster:
+        status=slot.attendance.get(row["id"],{}).get("status")
+        if not status:
+            pending.append(f"Cần điểm danh {row['name']}")
+        if status=="PRESENT":
+            missing=[p["name"] for p in council.members if p["id"] in present and p["id"] not in slot.marks.get(row["id"],{})]
+            if missing:
+                pending.append(f"{row['name']} còn thiếu phiếu của "+", ".join(missing))
+    if now()<slot.starts_at:
+        pending.append("Chưa đến giờ bảo vệ")
+    return pending
 
 
 def save_bonus(session,user,identifier,expected,member_id,data):
@@ -252,21 +321,25 @@ def finish_edit(session,user,slot,event,reason=None):
     session.commit()
 
 
-def total(mark, attendance):
+def total(mark, attendance, precision=".1"):
     return min(Decimal(10),sum((Decimal(value) for value in mark["scores"]),Decimal(0)) +
-        Decimal(attendance.get("bonus","0")))
+        Decimal(attendance.get("bonus","0"))).quantize(Decimal(precision),rounding=ROUND_HALF_UP)
 
 
 def results(slot, council):
+    if slot.finalized_at and slot.minutes.get("results_snapshot"):
+        return slot.minutes["results_snapshot"]
     out = {}
     for row in slot.roster:
         key = row["id"]
         attendance = slot.attendance.get(key,{})
         marks = slot.marks.get(key,{})
-        values = [total(marks[person["id"]],attendance) if person["id"] in marks else None for person in council.members]
+        voters = slot.attendance.get("_council",{}).get("present_ids",[p["id"] for p in council.members])
+        precision=".01" if slot.finalized_at else ".1"
+        values = [total(marks[person["id"]],attendance,precision) if person["id"] in marks else None for person in council.members if person["id"] in voters]
         average = None
-        if attendance.get("status") == "PRESENT" and all(value is not None for value in values):
-            average = str((sum(values)/len(values)).quantize(Decimal(".01"),rounding=ROUND_HALF_UP))
+        if attendance.get("status") == "PRESENT" and values and all(value is not None for value in values):
+            average = str((sum(values)/len(values)).quantize(Decimal(".01" if slot.finalized_at else ".1"),rounding=ROUND_HALF_UP))
         out[key] = {"attendance":attendance,"scores":[str(value) if value is not None else None for value in values],"average":average}
     return out
 
@@ -275,8 +348,11 @@ def finalize(session,user,identifier,expected):
     slot,council,member = edit(session,user,identifier,expected)
     if member["role"] not in {"CHAIR","SECRETARY"}:
         raise HTTPException(403,"Chỉ chủ tịch hoặc thư ký được chốt")
+    ensure_quorum(slot,council)
     thesis = session.scalar(select(m.Thesis).where(m.Thesis.id == slot.thesis_id).with_for_update())
-    _,report = validate_ready(session,thesis,council)
+    active,report = validate_ready(session,thesis,council)
+    if {str(row.id) for row in active} != {row["id"] for row in slot.roster}:
+        raise HTTPException(409,"Thành viên đã thay đổi. Cần đối chiếu lại lịch bảo vệ")
     if report.id != slot.report_version_id:
         raise HTTPException(409,"Phiên bản báo cáo đã thay đổi")
     if now() < slot.starts_at:
@@ -284,9 +360,10 @@ def finalize(session,user,identifier,expected):
     if not slot.minutes or any(row["attendance"].get("status") != "ABSENT" and row["average"] is None
         for row in results(slot,council).values()):
         raise HTTPException(409,"Cần có biên bản, điểm đầy đủ của sinh viên có mặt và lý do của sinh viên vắng")
+    frozen_results=results(slot,council)
     slot.finalized_at,slot.finalized_by = now(),user.id
     advisor = primary_advisor(session,thesis.id)
-    slot.minutes = {**slot.minutes,"title":thesis.current_title,
+    slot.minutes = {**slot.minutes,"title":thesis.current_title,"results_snapshot":frozen_results,
         "advisor":session.get(m.LecturerProfile,advisor.lecturer_id).display_name if advisor else ""}
     if any(row["average"] is not None for row in results(slot,council).values()):
         thesis.state = "DEFENDED"
@@ -323,6 +400,8 @@ def workspace(session,user):
             "starts_at":slot.starts_at,"ends_at":slot.ends_at,"room":slot.room,"version":slot.row_version,
             "roster":[own] if own else slot.roster,"results":totals,"marks":marks,
             "minutes":slot.minutes if privileged else {}, "finalized_at":slot.finalized_at,
+            "council_attendance":slot.attendance.get("_council",{}) if not own else {},
+            "blockers":blockers(slot,council) if privileged and not slot.finalized_at else [],
             "role":member["role"] if member else None,"lecturer_id":member["id"] if member else None,
             "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or slot.attendance or slot.minutes)})
     scopes = []

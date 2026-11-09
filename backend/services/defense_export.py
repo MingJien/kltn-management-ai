@@ -133,7 +133,8 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
             sheet.cell(row,2).alignment = Alignment(wrap_text=True,vertical="center")
             sheet.row_dimensions[row].height = max(29, 14 * ((len(label) + 62) // 63))
         write_row(sheet,["4","Điểm thưởng",1,float(attendance.get("bonus","0"))])
-        write_row(sheet,["","Tổng điểm",10,float(defense.total(mark,attendance))])
+        precision=".1" if slot.minutes.get("results_snapshot") else ".01"
+        write_row(sheet,["","Tổng điểm",10,float(defense.total(mark,attendance,precision))])
         write_row(sheet,["","Nhận xét",mark["note"]])
         write_row(sheet,["","Người đánh giá (Ký, ghi rõ họ tên)"])
         format_sheet(sheet,header,[12,70,19,19])
@@ -149,6 +150,12 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     doc.add_heading("II. DANH SÁCH THÀNH VIÊN HỘI ĐỒNG",2)
     doc.add_paragraph(f"{council.name} · {council.reference}")
     table(doc,["STT","Họ và tên","Chức trách"],[(i,m["name"],defense.ROLES[m["role"]]) for i,m in enumerate(council.members,1)])
+    present=slot.attendance.get("_council",{}).get("present_ids")
+    if present is not None:
+        doc.add_paragraph("Có mặt: "+", ".join(m["name"] for m in council.members if m["id"] in present))
+        absent=[m["name"] for m in council.members if m["id"] not in present]
+        if absent:
+            doc.add_paragraph("Vắng: "+", ".join(absent))
     doc.add_heading("III. THỜI GIAN VÀ ĐỊA ĐIỂM HỌP",2)
     doc.add_paragraph(f"{slot.starts_at.astimezone(defense.VN):%d/%m/%Y %H:%M} – {slot.ends_at.astimezone(defense.VN):%d/%m/%Y %H:%M} · {slot.room}")
     doc.add_heading("IV. NỘI DUNG HỌP",2)

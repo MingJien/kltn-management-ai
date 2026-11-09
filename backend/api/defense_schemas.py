@@ -19,7 +19,7 @@ class CouncilInput(Input):
     department_id: UUID
     name: str = Field(min_length=3, max_length=200)
     reference: str = Field(min_length=3, max_length=300)
-    members: list[CouncilMember] = Field(min_length=3, max_length=7)
+    members: list[CouncilMember] = Field(min_length=5, max_length=5)
 
 
 class SlotInput(Input):
@@ -51,3 +51,13 @@ class BonusInput(Input):
 class MinutesInput(Input):
     discussion: str = Field(min_length=5, max_length=10000)
     conclusion: str = Field(min_length=5, max_length=5000)
+
+
+class CouncilAttendance(Input):
+    present_ids: list[UUID] = Field(min_length=3, max_length=5)
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+class ReopenInput(Input):
+    reason: str = Field(min_length=5, max_length=1000)
+    confirm_unsigned: Literal[True]
