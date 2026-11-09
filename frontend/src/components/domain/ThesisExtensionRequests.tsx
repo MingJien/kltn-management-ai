@@ -62,7 +62,7 @@ function ExtensionDialog({op,userId,close,saved}:{op:Operation;userId:string;clo
       {op.kind==="consent"&&<p>Bạn xác nhận nguyện vọng của chính mình. Không đồng ý sẽ kết thúc yêu cầu gia hạn nhóm, không hủy quyền tham gia KLTN của ai.</p>}
       {op.kind==="decision"&&!ready&&<p className="alert alert-info">Chưa đủ đồng thuận của các thành viên hoặc ý kiến đồng ý của GVHD. Bạn có thể từ chối kèm lý do; chưa thể chấp thuận.</p>}
       {op.kind==="decision"&&answer==="APPROVE"&&<>
-        <p className="change-note">Theo hướng dẫn của GV, nếu kỳ bảo vệ dự kiến tháng 4 mà chưa bảo vệ thì gia hạn từ tháng 5 đến hết tháng 9; kỳ bảo vệ tiếp theo phải diễn ra trong tháng 9. Nhập đúng ngày theo quyết định của Khoa; thời hạn không quá 5 tháng.</p>
+        <p className="change-note">Thời hạn gia hạn theo quyết định của Khoa, tối đa 5 tháng. Kỳ bảo vệ tiếp theo phải được xếp trong tháng cuối của thời hạn được duyệt và kết thúc không muộn hơn hạn này.</p>
         <div className="change-field-grid"><label>Ngày quyết định<input className="input" name="day" type="date" required/></label>
           <label>Bắt đầu gia hạn theo quyết định (giờ Việt Nam)<input className="input" name="starts" type="datetime-local" required/></label></div>
         <label>Hạn mới được duyệt (giờ Việt Nam)<input className="input" name="until" type="datetime-local" required defaultValue={item?local(item.requested_until_at):""}/></label>
