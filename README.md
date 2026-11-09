@@ -16,7 +16,7 @@
 - Mẫu nhận xét Mẫu 7/8 gắn với đúng sinh viên và bản báo cáo; GV gửi nhận xét trên hệ thống, xuất phiếu có footer để ký ngoài. Người được phân công tiếp nhận hồ sơ hoặc TBM ghi nhận bản giấy theo mã bản xuất và căn cứ; không yêu cầu tải bản ký lên lại.
 - Có hồ sơ chuyên môn GV, phân công theo đợt và kiểm tra điều kiện bảo vệ ở mức hiện tại.
 
-Chấp thuận gia hạn KLTN chính thức đang tạm khóa, chờ Khoa/GVHD chốt mốc tính tối đa 5 tháng và cách xếp hội đồng; gửi yêu cầu, đồng thuận nhóm và ý kiến GVHD vẫn hoạt động.
+Gia hạn KLTN tối đa 5 tháng theo quyết định Khoa. Ví dụ kỳ bảo vệ dự kiến tháng 4: gia hạn từ tháng 5 đến hết tháng 9, xếp kỳ bảo vệ tiếp theo trong tháng 9. Không lập lịch vượt hạn; hết hạn mà chưa hoàn tất bảo vệ trong kỳ được phép thì hồ sơ được ghi nhận không đạt.
 
 Chất lượng OCR trên tập báo cáo thực tế, chatbot AI hoàn chỉnh và đối chiếu bản in với mẫu phát hành chính thức vẫn cần được kiểm chứng tiếp.
 

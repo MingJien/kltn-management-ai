@@ -91,12 +91,17 @@ def load_slot(session, user, identifier, *, write=False):
     return slot, council, member, own, manager
 
 
+def thesis_state_allows_schedule(thesis, extension):
+    return thesis.state == "READY_FOR_DEFENSE" or (thesis.state == "EXTENDED" and extension is not None)
+
+
 def validate_ready(session, thesis, council):
     if (thesis.round_id, thesis.department_id) != (council.round_id, council.department_id):
         raise HTTPException(422, "Đề tài và hội đồng phải cùng đợt và bộ môn")
     active = evaluation.members(session, thesis)
     report = evaluation.report(session, thesis)
-    if not active or not report or thesis.state != "READY_FOR_DEFENSE" or any(
+    extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == thesis.id))
+    if not active or not report or not thesis_state_allows_schedule(thesis, extension) or any(
         evaluation.eligibility_out(session, thesis, row, report)["state"] != "ELIGIBLE" for row in active):
         raise HTTPException(409, "Đề tài cần được chốt đủ điều kiện trên phiên bản báo cáo hiện tại")
     advisor_ids = set(session.scalars(select(m.AdvisorAssignment.lecturer_id).where(
@@ -104,6 +109,20 @@ def validate_ready(session, thesis, council):
     if any(UUID(row["id"]) in advisor_ids for row in council.members):
         raise HTTPException(409, "GVHD không được chấm đề tài mình hướng dẫn trong hội đồng này")
     return active, report
+
+
+def validate_extension_window(extension, request, starts_at, ends_at):
+    if not extension:
+        return
+    until = extension.until_at.astimezone(VN)
+    starts = starts_at.astimezone(VN)
+    ends = ends_at.astimezone(VN)
+    if request and request.extension_starts_at and starts < request.extension_starts_at.astimezone(VN):
+        raise HTTPException(409, "Lịch bảo vệ chưa nằm trong thời gian gia hạn theo quyết định")
+    if (starts.year, starts.month) != (until.year, until.month):
+        raise HTTPException(409, f"Kỳ bảo vệ kế tiếp phải xếp trong tháng {until:%m/%Y}, là tháng cuối của thời hạn gia hạn")
+    if ends > until:
+        raise HTTPException(409, "Lịch bảo vệ vượt hạn gia hạn. Không được lập hội đồng sau hạn; nếu không bảo vệ trong kỳ, KLTN được ghi nhận không đạt")
 
 
 def schedule(session, user, data, identifier=None, expected=None):
@@ -127,6 +146,10 @@ def schedule(session, user, data, identifier=None, expected=None):
     if not slot and session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
         raise HTTPException(409, "Đề tài đã có lịch bảo vệ")
     active, report = validate_ready(session, thesis, council)
+    extension=session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id==thesis.id))
+    extension_request=session.scalar(select(m.ThesisExtensionRequest).where(
+        m.ThesisExtensionRequest.extension_id==extension.id)) if extension else None
+    validate_extension_window(extension,extension_request,data.starts_at,data.ends_at)
     lecturer_ids = {item["id"] for item in council.members}
     overlaps = session.execute(select(m.DefenseSlot, m.DefenseCouncil)
         .join(m.DefenseCouncil, m.DefenseCouncil.id == m.DefenseSlot.council_id)

@@ -1,13 +1,18 @@
 """Integration coverage for the frozen defense exports and student access."""
-from datetime import timedelta
+from datetime import datetime, timedelta
+from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from uuid import uuid4
 
 from docx import Document
 from openpyxl import load_workbook
+import pytest
+from fastapi import HTTPException
 
 from backend.db.models import entities as m
 from backend.services.theses import now
+from backend.services.defense import thesis_state_allows_schedule, validate_extension_window
 from test_core_workspace import workspace
 from test_nv6_evaluation import check, complete_review, evaluation, get
 from test_registration import hdr, scenario
@@ -107,6 +112,26 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     rows = list(load_workbook(BytesIO(official.content),read_only=True).active.values)
     assert any(r[1]==students[0].student_code and r[5]==10 for r in rows)
     assert any(r[1]==students[1].student_code and r[5] is None and r[6]=="Vắng" for r in rows)
+
+
+def test_only_ready_or_officially_extended_thesis_can_be_scheduled():
+    assert thesis_state_allows_schedule(SimpleNamespace(state="READY_FOR_DEFENSE"), None)
+    assert thesis_state_allows_schedule(SimpleNamespace(state="EXTENDED"), object())
+    assert not thesis_state_allows_schedule(SimpleNamespace(state="EXTENDED"), None)
+    assert not thesis_state_allows_schedule(SimpleNamespace(state="IN_PROGRESS"), object())
+
+
+def test_extended_thesis_must_defend_in_last_extension_month():
+    vn=ZoneInfo("Asia/Ho_Chi_Minh")
+    extension=SimpleNamespace(until_at=datetime(2027,9,30,23,59,59,tzinfo=vn))
+    request=SimpleNamespace(extension_starts_at=datetime(2027,5,1,0,0,tzinfo=vn))
+    validate_extension_window(extension,request,datetime(2027,9,12,9,0,tzinfo=vn),datetime(2027,9,12,11,0,tzinfo=vn))
+    with pytest.raises(HTTPException) as err:
+        validate_extension_window(extension,request,datetime(2027,8,30,9,0,tzinfo=vn),datetime(2027,8,30,11,0,tzinfo=vn))
+    assert "tháng 09/2027" in err.value.detail
+    with pytest.raises(HTTPException) as err:
+        validate_extension_window(extension,request,datetime(2027,9,30,22,0,tzinfo=vn),datetime(2027,10,1,0,30,tzinfo=vn))
+    assert "vượt hạn gia hạn" in err.value.detail
 
 
 def test_each_ballot_rounds_before_final_average():

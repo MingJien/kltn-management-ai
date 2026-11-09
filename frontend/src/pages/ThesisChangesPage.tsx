@@ -23,7 +23,7 @@ type Thesis={can_request_extension:boolean;extension_request_blocker:string;id:s
   extension_blocker:string;can_set_start:boolean;baseline_due:string|null;extension_max:string|null;extension:Extension|null;
   member_count:number;candidates:{group_available:boolean;individual_available:boolean;id:string;code:string;title:string;description:string;advisor:string;capacity:number}[];
   evidence:{id:string;name:string;scan_state:string}[]};
-type Workspace={extension_policy_confirmed:boolean;theses:Thesis[];requests:Change[];extension_requests:ExtensionRequest[]};
+type Workspace={theses:Thesis[];requests:Change[];extension_requests:ExtensionRequest[]};
 type Operation={kind:"create"|"start";thesis:Thesis}|{kind:"consent"|"review"|"decision"|"cancel";item:Change;role?:string};
 const labels:Record<string,string>={SUBMITTED:"Đang lấy ý kiến",ADVISOR_REVIEWED:"Chờ bộ môn duyệt",APPROVED:"Đã chấp thuận",
   REJECTED:"Không chấp thuận",CANCELLED:"Đã hủy",CURRENT_ADVISOR:"GVHD hiện tại",NEW_ADVISOR:"GVHD tiếp nhận đề tài mới"};
@@ -226,7 +226,7 @@ export default function ThesisChangesPage({context}:{context:Context}) {
         </aside>
         <section className="changes-main">
           <nav className="assignment-tabs" aria-label="Nghiệp vụ thay đổi"><button type="button" className={"assignment-tabs__link "+(view==="CHANGE"?"is-active":"")} onClick={()=>setView("CHANGE")}>Đổi / tách đề tài</button><button type="button" className={"assignment-tabs__link "+(view==="EXTENSION"?"is-active":"")} onClick={()=>setView("EXTENSION")}>Xin gia hạn KLTN</button></nav>
-          {view==="EXTENSION"?<ThesisExtensionRequests policyConfirmed={data.extension_policy_confirmed} userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
+          {view==="EXTENSION"?<ThesisExtensionRequests userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
           <div className="changes-toolbar"><h2><History size={19} aria-hidden="true"/>Yêu cầu đổi đề tài</h2><div className="changes-tools">
             <label className="changes-search"><span className="sr-only">Tìm yêu cầu</span><Search size={16} aria-hidden="true"/><input className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm đề tài hoặc mã…"/></label>
             <label><span className="sr-only">Trạng thái yêu cầu</span><select className="input" value={filter} onChange={e=>setFilter(e.target.value)}><option value="OPEN">Đang xử lý</option><option value="ALL">Tất cả và lịch sử</option></select></label>

@@ -1,5 +1,4 @@
 """Student requests, per-member consent and an explicit external extension decision."""
-import os
 from types import SimpleNamespace
 from uuid import UUID
 from fastapi import HTTPException
@@ -8,10 +7,6 @@ from backend.db.models import entities as m
 from backend.services import thesis_changes as c
 
 OPEN={"SUBMITTED","ADVISOR_REVIEWED"}
-POLICY_PENDING="Chờ Khoa/GVHD xác nhận mốc tính 5 tháng và cách bố trí hội đồng khi gia hạn. Chưa thể chấp thuận gia hạn chính thức."
-
-def policy_confirmed():
-    return os.getenv("KLTN_EXTENSION_POLICY_CONFIRMED", "false").strip().lower()=="true"
 
 
 def pending(session,thesis_id):
@@ -53,6 +48,22 @@ def expire(session,item):
         announce(session,system,item,"THESIS_EXTENSION_EXPIRED","Yêu cầu gia hạn hết hạn xác nhận. Hồ sơ KLTN của các thành viên vẫn giữ nguyên.")
         return True
     return False
+
+def expire_without_council(session,item):
+    if item.state!="APPROVED" or not item.extension_id:return False
+    extension=session.get(m.ThesisExtension,item.extension_id)
+    if not extension or extension.until_at>c.now():return False
+    thesis=session.scalar(select(m.Thesis).where(m.Thesis.id==item.thesis_id).with_for_update())
+    if not thesis or thesis.state in {"DEFENDED", "COMPLETED"}:return False
+    message="KLTN không đạt: hết thời hạn gia hạn mà chưa hoàn tất bảo vệ trong kỳ được phép."
+    item.state,item.decided_at,item.decision_reason="EXPIRED",extension.until_at,message
+    item.row_version+=1
+    thesis.state,thesis.row_version="ARCHIVED",thesis.row_version+1
+    system=SimpleNamespace(id=None)
+    c.audit(session,system,"THESIS_EXTENSION_EXPIRED","thesis",thesis.id,message,
+        source_reference=extension.reference)
+    announce(session,system,item,"THESIS_EXTENSION_NOT_PASSED",message)
+    return True
 
 def locked(session,user,identifier,expected):
     visible=session.get(m.ThesisExtensionRequest,identifier)
@@ -135,14 +146,13 @@ def decision(session,user,identifier,data,expected):
     item,thesis=locked(session,user,identifier,expected)
     if not c.head(session,user,thesis):raise HTTPException(403,"Chỉ Trưởng bộ môn đúng phạm vi quyết định yêu cầu gia hạn")
     if data.decision=="APPROVE":
-        if not policy_confirmed():raise HTTPException(409,POLICY_PENDING)
         fresh(session,item,thesis)
         if not unanimous(session,item) or item.state!="ADVISOR_REVIEWED":raise HTTPException(409,"Chưa đủ đồng thuận nhóm và ý kiến đồng ý của GVHD")
         if not (data.confirm_decision and data.extension_starts_at and data.until_at and data.decision_on and data.reference):
             raise HTTPException(422,"Cần ngày bắt đầu gia hạn, hạn mới, ngày quyết định, căn cứ và xác nhận đã đối chiếu quyết định")
         start,until=data.extension_starts_at.astimezone(c.VN),data.until_at.astimezone(c.VN)
-        if start<thesis.created_at or until<=start or until<=item.original_due_at or until<=c.now() or until>c.add_months(start,5):
-            raise HTTPException(422,"Hạn mới phải sau hạn cũ và hiện tại, tối đa 5 tháng từ ngày bắt đầu gia hạn ghi trong quyết định")
+        if start<thesis.created_at or until<=start or until<=item.original_due_at or until<=c.now() or until>=c.add_months(start,5):
+            raise HTTPException(422,"Hạn mới phải sau hạn cũ và hiện tại, nằm trong thời hạn tối đa 5 tháng theo quyết định")
         if not thesis.created_at.astimezone(c.VN).date()<=data.decision_on<=c.now().astimezone(c.VN).date():raise HTTPException(422,"Ngày quyết định phải từ ngày lập khóa luận đến hôm nay")
         record=m.ThesisExtension(thesis_id=thesis.id,original_due_at=item.original_due_at,until_at=until,
             decision_on=data.decision_on,reference=data.reference,reason=data.reason,recorded_by=user.id,recorded_at=c.now())
@@ -185,7 +195,8 @@ def output(session,user,item):
         "reason":item.reason,"submitted_at":item.submitted_at,"original_due_at":item.original_due_at,
         "requested_until_at":item.requested_until_at,"consent_due_at":item.consent_due_at,
         "advisor_reason":item.advisor_reason,"decision_reason":item.decision_reason,"decided_at":item.decided_at,
-        "extension_starts_at":item.extension_starts_at,"all_agreed":everyone,"approval_allowed":policy_confirmed(),
+        "extension_starts_at":item.extension_starts_at,"extension_until_at":session.get(m.ThesisExtension,item.extension_id).until_at if item.extension_id else None,
+        "all_agreed":everyone,
         "members":[{"student_id":row["student_id"],"name":row["name"],"user_id":row["user_id"],
             "decision":rows[row["student_id"]].decision,"responded_at":rows[row["student_id"]].responded_at} for row in item.snapshot["members"]],
         "can_consent":opened and any(row["user_id"]==str(user.id) and rows[row["student_id"]].decision=="PENDING" for row in item.snapshot["members"]),
@@ -202,6 +213,7 @@ def listing(session,user,thesis_ids):
     for item in session.scalars(query.order_by(m.ThesisExtensionRequest.submitted_at.desc()).with_for_update().execution_options(populate_existing=True)):
         if not can_see(session,user,item):continue
         changed=expire(session,item) or changed
+        changed=expire_without_council(session,item) or changed
         items.append(output(session,user,item))
     if changed:session.commit()
     return items
@@ -215,4 +227,10 @@ def sweep_expired():
             m.ThesisExtensionRequest.consent_due_at.is_not(None),m.ThesisExtensionRequest.consent_due_at<=c.now())
             .order_by(m.ThesisExtensionRequest.consent_due_at).limit(100).with_for_update(skip_locked=True)).all()
         for item in rows:expire(session,item)
+        due_extensions = select(m.ThesisExtension.id).where(m.ThesisExtension.until_at <= c.now())
+        approved=session.scalars(select(m.ThesisExtensionRequest).where(
+            m.ThesisExtensionRequest.state=="APPROVED",
+            m.ThesisExtensionRequest.extension_id.in_(due_extensions))
+            .order_by(m.ThesisExtensionRequest.updated_at).limit(100).with_for_update(skip_locked=True)).all()
+        for item in approved:expire_without_council(session,item)
         session.commit()

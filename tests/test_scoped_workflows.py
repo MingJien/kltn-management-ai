@@ -9,11 +9,6 @@ from test_registration import scenario,hdr
 from test_core_workspace import workspace,version_headers,synthetic_pdf
 from test_thesis_changes import submit,agree_group,agree_advisor,approve
 
-@pytest.fixture(autouse=True)
-def confirmed_policy_for_mechanical_tests(monkeypatch):
-    # Synthetic policy only: production remains blocked until academic confirmation.
-    monkeypatch.setenv('KLTN_EXTENSION_POLICY_CONFIRMED','true')
-
 def extension_request(ctx):
     client,users,_,_,session,path=ctx
     thesis=session.get(m.Thesis,UUID(path.split('/')[-1]))
@@ -193,17 +188,27 @@ def test_extension_opens_only_own_report_submission_not_official_round(workspace
     assert baseline.state=='CLOSED' and baseline.due_at<until
 
 
-def test_unconfirmed_policy_blocks_approval_without_changing_thesis(workspace,monkeypatch):
+def test_confirmed_extension_window_allows_decision_and_records_outcome(workspace,monkeypatch):
+    from backend.services import thesis_extensions
     client,users,_,_,session,path=workspace
     item,baseline=extension_request(workspace)
     item=extension_action(workspace,item,'consent',1,{'decision':'AGREE'})
     item=extension_action(workspace,item,'advisor-review',3,{'decision':'AGREE','reason':'Feasible academic work after an extension'})
-    monkeypatch.delenv('KLTN_EXTENSION_POLICY_CONFIRMED')
     listing=client.get('/api/v1/thesis-changes',headers=hdr(users[4])).json()
-    assert not listing['extension_policy_confirmed']
-    assert not listing['extension_requests'][0]['approval_allowed']
-    extension_action(workspace,item,'decision',4,{'decision':'APPROVE','reason':'Attempt before academic rules are confirmed',
-        'decision_on':now().date().isoformat(),'extension_starts_at':baseline.due_at.isoformat(),
-        'until_at':(now()+timedelta(days=30)).isoformat(),'reference':'SYN-PENDING-POLICY','confirm_decision':True},409)
-    session.refresh(session.get(m.Thesis,UUID(path.split('/')[-1])))
-    assert not session.scalar(select(m.ThesisExtension.id).where(m.ThesisExtension.thesis_id==UUID(path.split('/')[-1])))
+    assert listing['extension_requests'][0]['all_agreed']
+    start=baseline.due_at
+    cap=thesis_extensions.c.add_months(start,5)
+    extension_action(workspace,item,'decision',4,{'decision':'APPROVE','reason':'Khoa đã đối chiếu thời hạn gia hạn',
+        'decision_on':now().date().isoformat(),'extension_starts_at':start.isoformat(),
+        'until_at':(cap-timedelta(seconds=1)).isoformat(),'reference':'SYN-EXTENSION-DECISION','confirm_decision':True})
+    request=session.get(m.ThesisExtensionRequest,UUID(item['id']))
+    thesis=session.get(m.Thesis,UUID(path.split('/')[-1]))
+    extension=session.get(m.ThesisExtension,request.extension_id)
+    assert request.state=='APPROVED' and thesis.state=='EXTENDED'
+    assert extension.until_at<cap
+    monkeypatch.setattr(thesis_extensions.c,'now',lambda: extension.until_at+timedelta(seconds=1))
+    assert thesis_extensions.expire_without_council(session,request)
+    session.commit()
+    session.refresh(request);session.refresh(thesis)
+    assert request.state=='EXPIRED' and request.decision_reason.startswith('KLTN không đạt')
+    assert thesis.state=='ARCHIVED'

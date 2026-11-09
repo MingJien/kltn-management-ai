@@ -89,8 +89,7 @@ def main() -> int:
         options['options'] = f'-csearch_path={schema}'
         private_url = url.set(query=options).render_as_string(hide_password=False)
         env = os.environ.copy()
-        # Simulated policy exercises mechanics only in this isolated schema.
-        env.update(DATABASE_URL=private_url, KLTN_ENV='test', KLTN_DEV_AUTH='false', KLTN_EXTENSION_POLICY_CONFIRMED='true',
+        env.update(DATABASE_URL=private_url, KLTN_ENV='test', KLTN_DEV_AUTH='false',
             AUTH_SESSION_SECRET=secrets.token_urlsafe(48), PYTHONIOENCODING='utf-8',
             KLTN_ALLOW_SYNTHETIC_SEED='true', KLTN_PROPOSAL_DIR=str(directory / 'uploads' / 'proposals'),
             KLTN_DOCUMENT_DIR=str(directory / 'uploads' / 'documents'),

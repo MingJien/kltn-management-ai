@@ -538,5 +538,4 @@ def workspace(session,user):
         m.ThesisChangeRequest.snapshot["members"].contains([{"user_id":user_key}])))
     items=[request_out(session,user,item) for item in session.scalars(query.order_by(m.ThesisChangeRequest.submitted_at.desc()))
         if accessible(session,user,item)]
-    from backend.services.thesis_extensions import policy_confirmed
-    return {"theses":theses,"requests":items,"extension_requests":extension_items,"extension_policy_confirmed":policy_confirmed()}
+    return {"theses":theses,"requests":items,"extension_requests":extension_items}
