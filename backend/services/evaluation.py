@@ -153,15 +153,9 @@ def assignments(session, thesis):
 
 
 def reviewer_department_ids(session, thesis):
-    """Reviewer eligibility stays within the faculty; CNTT and KHMT can cross-review."""
-    department = session.get(m.Department, thesis.department_id)
-    eligible = {thesis.department_id}
-    if department and department.code in {"BM-CNTT", "BM-KHMT"}:
-        eligible.update(session.scalars(select(m.Department.id).where(
-            m.Department.faculty_id == department.faculty_id,
-            m.Department.code.in_(["BM-CNTT", "BM-KHMT"]),
-            m.Department.active.is_(True))))
-    return eligible
+    """Reviewers may be chosen from active departments of the same faculty."""
+    from backend.services.faculty_pool import department_ids
+    return department_ids(session, thesis.department_id)
 
 
 def assign(session, user, thesis_id, data, expected):
@@ -426,6 +420,14 @@ def report_download(session, user, thesis_id, version_id):
 def check_eligibility(session, user, thesis_id, data, expected):
     thesis = access(session, user, thesis_id, "evaluation:eligibility", write=True)
     row_version(expected, thesis.row_version)
+    from backend.services.thesis_changes import open_request
+    if open_request(session,thesis):
+        raise HTTPException(409, "Cần xử lý yêu cầu đổi đề tài trước khi xét điều kiện bảo vệ")
+    if session.scalar(select(m.ThesisWithdrawalRequest.id).where(
+        m.ThesisWithdrawalRequest.thesis_id == thesis.id,
+        m.ThesisWithdrawalRequest.state.in_(["SUBMITTED", "ADVISOR_CONFIRMED"]),
+    ).limit(1)):
+        raise HTTPException(409, "Cần xử lý yêu cầu xin thôi đang chờ trước khi xét bảo vệ")
     member = member_for(session, thesis, data.thesis_member_id)
     current = report(session, thesis)
     membership_revision.ensure_ready(session, thesis, current)
@@ -461,6 +463,8 @@ def reopen(session, user, thesis_id, data, expected):
     row_version(expected, thesis.row_version)
     if thesis.state != "READY_FOR_DEFENSE":
         raise HTTPException(409, "Chỉ mở xét lại hồ sơ đã chốt đủ điều kiện bảo vệ")
+    if session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
+        raise HTTPException(409, "Hủy lịch bảo vệ trước khi mở xét lại điều kiện")
     current = report(session, thesis)
     for member in members(session, thesis):
         previous = last_check(session, member)
@@ -519,7 +523,11 @@ def workspace(session, user, thesis_id):
                 load = session.scalar(select(func.count()).select_from(m.ReviewerAssignment).where(
                     m.ReviewerAssignment.lecturer_id == lecturer.id, m.ReviewerAssignment.review_scope == "THESIS",
                     m.ReviewerAssignment.state == "ACTIVE"))
-                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load})
+                from backend.services.faculty_pool import suggestion
+                topic=session.get(m.Topic,thesis.topic_id)
+                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load,
+                    **suggestion(lecturer,thesis.current_title+" "+(topic.description or ""))})
+        candidates.sort(key=lambda row:(-len(row["recommendation_reasons"]),row["active_load"],row["name"]))
     history = []
     if "evaluation:eligibility" in actions or user.base_role == "STUDENT":
         member_ids = [member["id"] for member in visible_members]

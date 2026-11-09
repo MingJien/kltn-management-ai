@@ -61,7 +61,7 @@ export type TopicRegisteredStudent = {
   registration_state: string | null;
 };
 export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
-export type Lecturer = {id: string; display_name: string; lecturer_code: string; department_name?: string | null; faculty_name?: string | null};
+export type Lecturer = {available?: boolean; recommended?: boolean; profile_verified?: boolean; recommendation_reasons?: string[]; id: string; display_name: string; lecturer_code: string; department_name?: string | null; faculty_name?: string | null};
 export type OpenRound = { id: string; code: string; closes_at: string; academic_year: string; label: string };
 export type EligibleStudent = { id: string; display_name: string; student_code: string };
 export type RegistrationMember = {
@@ -228,6 +228,7 @@ export type Thesis = {
   id: string;
   registration_id?: string;
   title: string;
+  extension_until_at?: string | null;
   state: string;
   member_student_ids: string[];
   advisor_lecturer_id: string | null;
@@ -241,7 +242,7 @@ export type Thesis = {
   cross_reviewers: {lecturer_id: string; display_name: string}[];
   actions: string[];
 };
-export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
+export type Milestone = {scope?: "ROUND" | "THESIS"; thesis_id?: string | null; id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
 export type DocumentDeadline = {id: string; document_type: "PROPOSAL" | "PLAN" | "REPORT" | "SUPPORTING"; due_at: string; state: "OPEN" | "CLOSED"; row_version: number; reason: string};
 export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
 export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_by_student_id: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; evidence_document_version_id: string | null; evidence_scan_state: string | null; evidence_file_name: string | null; reviews: Review[]};
@@ -430,16 +431,3 @@ export async function exportRoundMau04(roundId:string) {
 }
 export type SchoolFormVersion = {id:string;version_no:number;row_version:number;state:string;file_name:string;byte_size:number;scan_state:string;uploaded_at:string;uploaded_by_name:string;source_reference:string;change_reason:string;published_at:string|null};
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};
-
-
-export async function downloadWithdrawal(identifier:string,printCopy:boolean,outcomeEvidence=false) {
-  const response=await fetch(`${baseUrl}/api/v1/withdrawals/${identifier}/${printCopy?"print-copy":outcomeEvidence?"outcome-evidence":"signed-copy"}`,{
-    method:printCopy?"POST":"GET",credentials:"include",
-    headers:printCopy&&sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
-  });
-  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
-  const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
-  anchor.href=url;anchor.download=printCopy?(response.headers.get("X-Document-Code")||"phieu-xin-thoi")+".docx":
-    decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=utf-8''([^;]+)/i)?.[1]||"don-co-xac-nhan");
-  anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}

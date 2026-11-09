@@ -82,12 +82,12 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     if (admin) {setLecturers([]);setLecturersLoading(false);return;}
     setLecturersLoading(true); setLecturersError("");
     try {
-      const rows = await request<Lecturer[]>("/lecturers", userId, {signal});
+      const rows = await request<Lecturer[]>("/lecturers"+(selected?"?topic_id="+selected.id:""), userId, {signal});
       if (!signal?.aborted) setLecturers(rows);
     } catch (cause) {
       if (!signal?.aborted) setLecturersError(errorMessage(cause));
     } finally {if (!signal?.aborted) setLecturersLoading(false);}
-  }, [userId,admin]);
+  }, [userId,admin,selected?.id]);
   useEffect(() => {
     const controller = new AbortController();
     void loadLecturers(controller.signal);
@@ -162,7 +162,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
     finally {setBusy(false);}
   }
   const editable = selected?.proposer_user_id === userId && ["DRAFT","RETURNED"].includes(selected.state);
-  const receiverReady = !lecturersLoading && !lecturersError && lecturers.some(item => item.id === receiver);
+  const receiverReady = !lecturersLoading && !lecturersError && lecturers.some(item => item.id === receiver && item.available !== false);
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
       description={admin ? "Danh sách đề tài đã công bố để tra cứu. Hồ sơ đăng ký, bài nộp và phản hồi riêng vẫn theo đúng quyền." : student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
@@ -374,9 +374,10 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
               {selected.proposer_type === "STUDENT" ? <div className="review-field">
                 <label htmlFor="topic-receiver" className="review-field__label">GV tiếp nhận (xác nhận hoặc chọn lại)</label>
                 <select id="topic-receiver" className="input" required disabled={busy || lecturersLoading || !!lecturersError} value={receiverReady ? receiver : ""} aria-describedby="receiver-hint" onChange={(event) => setReceiver(event.target.value)}>
-                  <option value="">Chọn GV</option>{lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.display_name}</option>)}
+                  <option value="">Chọn GV</option>{lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id} disabled={lecturer.available === false}>{lecturer.recommended ? "★ Phù hợp · " : ""}{lecturer.display_name} — {lecturer.department_name}{lecturer.available === false ? " · Đã đủ 3 khóa luận" : ""}</option>)}
                 </select>
                 <span id="receiver-hint" className="review-field__hint" role="status">{lecturersLoading ? "Đang tải danh sách giảng viên…" : lecturersError ? `Chưa tải được danh sách: ${lecturersError}` : !lecturers.length ? "Chưa có giảng viên phù hợp trong phạm vi của bạn." : !receiverReady ? "Vui lòng chọn GV tiếp nhận hợp lệ trước khi duyệt. GV được đề xuất có thể không còn trong danh sách hiện hành." : "Đã chọn GV tiếp nhận. Bạn có thể giữ hoặc chọn lại."}</span>
+                {lecturers.find(row=>row.id===receiver)?.recommended&&<span className="review-field__hint">Chuyên môn đã xác nhận: {lecturers.find(row=>row.id===receiver)?.recommendation_reasons?.join("; ")}. Đây là gợi ý để TBM xem xét.</span>}
                 {lecturersError && <button type="button" className="btn btn-secondary" disabled={busy || lecturersLoading} onClick={()=>void loadLecturers()}>Tải lại danh sách giảng viên</button>}
                 </div> : null}
               <label className="review-field">

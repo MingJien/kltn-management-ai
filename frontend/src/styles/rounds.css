@@ -9,3 +9,12 @@
   .rounds-form-grid { grid-template-columns:minmax(0,1fr); }
   .rounds-form-grid__full { grid-column:auto; }
 }
+
+.rounds-row-actions {display:flex;flex-wrap:wrap;gap:8px;align-items:start;min-width:0}
+.round-history {flex-basis:100%;font-size:.82rem;max-width:100%;overflow-wrap:anywhere}
+.round-history summary {cursor:pointer;padding:8px 0;color:#475569}
+.round-history__item {display:grid;gap:5px;padding:12px 0;border-top:1px solid #e2e8f0}
+.round-history__item small {color:#64748b}
+.round-history__item p {margin:0;line-height:1.7;white-space:pre-wrap}
+.round-reopen-confirm {display:flex;gap:8px;align-items:start;font-size:.85rem;line-height:1.6}
+@media(max-width:700px){.rounds-row-actions{width:100%}}

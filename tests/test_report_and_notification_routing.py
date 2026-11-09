@@ -207,3 +207,22 @@ def test_registration_round_extension_checks_authority_audit_and_announces(scena
     response = client.post(path, headers={**hdr(admin),"If-Match":str(round_.row_version)},
         json={**data,"closes_at":(now()+timedelta(days=3)).isoformat()})
     assert response.status_code == 409
+
+
+def test_admin_reopens_closed_registration_round_only_with_explicit_confirmation(scenario):
+    client,users,_,_,topic,session=scenario
+    admin=users[5]
+    admin.base_role="ADMIN"
+    round_=session.get(m.ThesisRound,topic.round_id)
+    round_.state="CLOSED"
+    session.commit()
+    payload={"closes_at":(now()+timedelta(days=12)).isoformat(),"basis_ref":"QD-SYN-REOPEN",
+        "reason":"Supplementary registration intake","reopen_closed":True}
+    response=client.post(f"/api/v1/admin/rounds/{round_.id}/extend",
+        headers=version_headers(admin,{"row_version":round_.row_version}),json=payload)
+    assert response.status_code==200,response.text
+    assert response.json()["state"]=="OPEN"
+    history=client.get(f"/api/v1/admin/rounds/{round_.id}/history",headers=hdr(admin)).json()
+    assert history[0]["action"]=="ROUND_REGISTRATION_REOPENED"
+    assert history[0]["reference"]=="QD-SYN-REOPEN"
+    assert client.get(f"/api/v1/admin/rounds/{round_.id}/history",headers=hdr(users[0])).status_code==403

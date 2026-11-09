@@ -1,9 +1,7 @@
-"""Real PostgreSQL lifecycle, permissions, calendar boundary and immutable evidence."""
+"""Real PostgreSQL lifecycle, permissions, calendar boundary and recorded decisions."""
 from datetime import timedelta
-from types import SimpleNamespace
 from uuid import UUID, uuid4
 
-import pytest
 from sqlalchemy import select
 from test_core_workspace import workspace, synthetic_pdf, version_headers
 from test_registration import hdr, scenario
@@ -29,61 +27,9 @@ def send(client,user,path):
     return response.json()
 
 
-def confirm(client,users,item):
-    response=client.post(f"/api/v1/withdrawals/{item['id']}/advisor-decision",headers=version_headers(users[3],item),
-        json={"decision":"CONFIRM","comment":"Xác nhận nội dung đơn xin thôi của sinh viên"})
-    assert response.status_code==200,response.text
-    return response.json()
-
-
-def evidence(client,user,item,session):
-    response=client.post(f"/api/v1/withdrawals/{item['id']}/signed-copy",headers={**version_headers(user,item),"X-File-Name":"don-co-xac-nhan.pdf"},content=synthetic_pdf())
-    assert response.status_code==200,response.text
-    item=response.json()
-    # The fixture explicitly disables scanner; its quarantine must be enforced before a real verdict.
-    assert item["scan_state"]=="QUARANTINED"
-    request=session.get(m.ThesisWithdrawalRequest,UUID(item["id"]))
-    file=session.get(m.StoredFile,request.evidence_file_id)
-    file.scan_state="CLEAN"
-    session.commit()
-    return item
-
-
 def outcome(client,user,item,kind="WITHDRAWN"):
     return client.post(f"/api/v1/withdrawals/{item['id']}/outcome",headers=version_headers(user,item),
-        json={"outcome":kind,"confirm_evidence":True,"reference":"KHOA-TEST-2026/01","note":"Đã đối chiếu hồ sơ và kết quả giải quyết bên ngoài",
-            "effective_on":now().astimezone(service.VN).date().isoformat()})
-
-
-def test_receipt_is_audited_but_does_not_grant_withdrawal(workspace):
-    client, users, students, _, session, path = workspace
-    thesis = setup(client, users, session, path)
-    item = send(client, users[0], path)
-    payload = {"received_on": now().astimezone(service.VN).date().isoformat(),
-        "receiving_unit": "Văn phòng Khoa", "reference": "Sổ nhận 123", "note": "Đã nhận đơn",
-        "confirm_receipt": True}
-    url = f"/api/v1/withdrawals/{item['id']}/receipt"
-    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
-    item = confirm(client, users, item)
-    assert client.post(url, headers=version_headers(users[0], item), json=payload).status_code == 403
-    future = {**payload, "received_on": (now().astimezone(service.VN).date()+timedelta(days=1)).isoformat()}
-    assert client.post(url, headers=version_headers(users[4], item), json=future).status_code == 422
-    response = client.post(url, headers=version_headers(users[4], item), json=payload)
-    assert response.status_code == 200, response.text
-    updated = response.json()
-    assert updated["state"] == "ADVISOR_CONFIRMED"
-    assert updated["receipt"]["reference"] == "Sổ nhận 123"
-    assert client.post(url, headers=version_headers(users[4], item), json=payload).status_code == 409
-    session.expire_all()
-    assert session.get(m.Thesis, thesis.id).state == "ACTIVE"
-    assert session.scalar(select(m.ThesisMember.active).where(m.ThesisMember.thesis_id == thesis.id,
-        m.ThesisMember.student_id == students[0].id))
-    payload["reference"] = "Sổ nhận 124"
-    response = client.post(url, headers=version_headers(users[4], updated), json=payload)
-    assert response.status_code == 200, response.text
-    assert response.json()["receipt"]["reference"] == "Sổ nhận 124"
-    assert sum(h["action"] == "WITHDRAWAL_RECEIPT_RECORDED" for h in response.json()["history"]) == 2
-    assert client.get("/api/v1/withdrawals", headers=hdr(users[1])).json()["requests"] == []
+        json={"outcome":kind,"note":"Đã đối chiếu yêu cầu của sinh viên"})
 
 
 def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
@@ -95,15 +41,8 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     assert session.get(m.ThesisMember,session.scalar(select(m.ThesisMember.id).where(m.ThesisMember.student_id==students[0].id))).active
     assert client.get("/api/v1/withdrawals",headers=hdr(users[1])).json()["requests"]==[]
     assert client.get("/api/v1/withdrawals",headers=hdr(users[5])).json()["requests"]==[]
-    assert client.post(f"/api/v1/withdrawals/{item['id']}/advisor-decision",headers=version_headers(users[4],item),json={"decision":"CONFIRM","comment":"Wrong actor"}).status_code==403
-    exported=client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[0]))
-    assert exported.status_code==409,exported.text
-    assert "GVHD xác nhận" in exported.json()["detail"]
-    item=confirm(client,users,item)
-    assert outcome(client,users[4],item).status_code==404 # no evidence, not an approval
-    item=evidence(client,users[0],item,session)
     response=outcome(client,users[3],item)
-    assert response.status_code==403
+    assert response.status_code==404
     response=outcome(client,users[4],item)
     assert response.status_code==200,response.text
     assert response.json()["state"]=="RECORDED"
@@ -128,51 +67,13 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     assert outcome(client,users[4],response.json()).status_code==409
 
 
-def test_provisional_export_and_separate_outcome_evidence(workspace, tmp_path, monkeypatch):
-    from io import BytesIO
-    from pathlib import Path
-    from docx import Document
-    from backend.services import form_templates
-    import hashlib
-    client,users,students,_,session,path=workspace
-    setup(client,users,session,path)
-    item=confirm(client,users,send(client,users[0],path))
-    source=Path(form_templates.OFFICIAL_DIR)/"Don_xin_thoi_thuc_hien_KLTN.docx"
-    if not source.exists():
-        doc=Document();doc.add_paragraph("Đơn thử")
-        for rows,cols in [(2,2),(3,4),(5,7),(3,1),(1,2)]:doc.add_table(rows=rows,cols=cols)
-        source=tmp_path/"Don_xin_thoi_thuc_hien_KLTN.docx";doc.save(source)
-        monkeypatch.setattr(form_templates,"OFFICIAL_DIR",tmp_path)
-    original=hashlib.sha256(source.read_bytes()).hexdigest()
-    response=client.post(f"/api/v1/withdrawals/{item['id']}/print-copy",headers=hdr(users[0]))
-    assert response.status_code==200,response.text
-    exported=Document(BytesIO(response.content))
-    assert students[0].student_code in exported.tables[1].cell(0,3).text
-    assert item["reason"] in exported.tables[3].cell(0,0).text
-    assert "MẪU TẠM" in exported.paragraphs[0].text
-    assert hashlib.sha256(source.read_bytes()).hexdigest()==original
-    url=f"/api/v1/withdrawals/{item['id']}/outcome-evidence"
-    headers={**version_headers(users[0],item),"X-File-Name":"ket-qua.pdf"}
-    assert client.post(url,headers=headers,content=synthetic_pdf()).status_code==403
-    response=client.post(url,headers={**version_headers(users[4],item),"X-File-Name":"ket-qua.pdf"},content=synthetic_pdf())
-    assert response.status_code==200,response.text
-    item=response.json()
-    assert item["outcome_evidence"]["scan_state"]=="QUARANTINED"
-    assert client.get(url,headers=hdr(users[1])).status_code==404
-    item=evidence(client,users[0],item,session)
-    assert outcome(client,users[4],item).status_code==409
-
-
-def test_cancel_return_and_deadline_are_not_course_withdrawal(workspace,monkeypatch):
+def test_cancel_and_deadline_are_not_course_withdrawal(workspace,monkeypatch):
     client,users,students,_,session,path=workspace
     thesis=setup(client,users,session,path)
     item=send(client,users[0],path)
     cancelled=client.post(f"/api/v1/withdrawals/{item['id']}/cancel",headers=version_headers(users[0],item))
     assert cancelled.status_code==200,cancelled.text
     assert students[0].id in confirmed_student_ids(session,thesis.round_id,[students[0].id])
-    item=send(client,users[0],path)
-    response=client.post(f"/api/v1/withdrawals/{item['id']}/advisor-decision",headers=version_headers(users[3],item),json={"decision":"RETURN","comment":"Đề nghị đối chiếu lại lý do"})
-    assert response.status_code==200
     round_=session.get(m.ThesisRound,thesis.round_id)
     changed=client.put(f"/api/v1/withdrawal-rounds/{round_.id}/start",headers=version_headers(users[4],{"row_version":round_.row_version}),json={"starts_on":now().date().isoformat(),"reference":"Changed plan"})
     assert changed.status_code==409
@@ -181,37 +82,30 @@ def test_cancel_return_and_deadline_are_not_course_withdrawal(workspace,monkeypa
     timely=send(client,users[0],path)
     # Confirmation may happen later; the student's original timely filing is preserved.
     monkeypatch.setattr(service,"now",lambda:boundary+timedelta(days=2))
-    assert confirm(client,users,timely)["state"]=="ADVISOR_CONFIRMED"
+    assert outcome(client,users[4],timely,"NOT_GRANTED").json()["state"]=="NOT_GRANTED"
     late=client.post(path+"/withdrawals",headers=hdr(users[1]),json={"reason":"Xin thôi sau hạn theo tình huống kiểm thử","confirm_replacement":True})
     assert late.status_code==409
     assert students[1].id in confirmed_student_ids(session,thesis.round_id,[students[1].id])
 
 
-def test_external_refusal_keeps_student_and_quarantine_blocks_recording(workspace):
+def test_refusal_keeps_student(workspace):
     client,users,students,_,session,path=workspace
     setup(client,users,session,path)
-    item=confirm(client,users,send(client,users[0],path))
-    uploaded=client.post(f"/api/v1/withdrawals/{item['id']}/signed-copy",headers={**version_headers(users[0],item),"X-File-Name":"don.pdf"},content=synthetic_pdf())
-    assert uploaded.status_code==200,uploaded.text
-    item=uploaded.json()
-    assert outcome(client,users[4],item).status_code==409
-    assert client.get(f"/api/v1/withdrawals/{item['id']}/signed-copy",headers=hdr(users[0])).status_code==409
-    row=session.get(m.ThesisWithdrawalRequest,UUID(item["id"]))
-    session.get(m.StoredFile,row.evidence_file_id).scan_state="CLEAN";session.commit()
+    item=send(client,users[0],path)
     response=outcome(client,users[4],item,"NOT_GRANTED")
     assert response.status_code==200,response.text
-    assert students[0].id in confirmed_student_ids(session,session.get(m.Thesis,row.thesis_id).round_id,[students[0].id])
+    assert students[0].id in confirmed_student_ids(session,session.get(m.Thesis,UUID(path.split("/")[-1])).round_id,[students[0].id])
     assert client.get(path,headers=hdr(users[0])).status_code==200
 
 
-def test_last_member_withdrawal_closes_thesis_and_advisor_history_remains_readable(workspace):
+def test_last_member_withdrawal_closes_thesis_without_exposing_private_reason(workspace):
     client,users,students,_,session,path=workspace
     thesis=setup(client,users,session,path)
     assert assign(workspace).status_code == 201
     # Simulate a one-student thesis without creating or touching any production records.
     member=session.scalar(select(m.ThesisMember).where(m.ThesisMember.student_id==students[1].id))
     member.active=False;session.commit()
-    item=evidence(client,users[0],confirm(client,users,send(client,users[0],path)),session)
+    item=send(client,users[0],path)
     response=outcome(client,users[4],item)
     assert response.status_code==200,response.text
     session.expire_all()
@@ -220,7 +114,7 @@ def test_last_member_withdrawal_closes_thesis_and_advisor_history_remains_readab
     assert not session.scalar(select(m.ReviewerAssignment.id).where(m.ReviewerAssignment.thesis_id == thesis.id,
         m.ReviewerAssignment.state == "ACTIVE"))
     assert client.get(path+"/evaluation", headers=hdr(users[5])).status_code == 404
-    assert client.get("/api/v1/withdrawals",headers=hdr(users[3])).json()["requests"][0]["state"]=="RECORDED"
+    assert client.get("/api/v1/withdrawals",headers=hdr(users[3])).json()["requests"]==[]
 
 
 def test_remaining_student_resubmits_proposal_without_reusing_old_approval(workspace):
@@ -241,7 +135,7 @@ def test_remaining_student_resubmits_proposal_without_reusing_old_approval(works
         return response.json()
     first=approve(submit(users[0],{"row_version":0}))
     assert first["department_confirmed"]
-    item=evidence(client,users[0],confirm(client,users,send(client,users[0],path)),session)
+    item=send(client,users[0],path)
     assert outcome(client,users[4],item).status_code==200
     proposal=client.get(path+"/proposal",headers=hdr(users[1])).json()
     assert proposal["state"]=="REVISION_REQUIRED" and not proposal["department_confirmed"]
@@ -269,7 +163,7 @@ def test_record_rollback_restores_group_and_request_on_failure(workspace,monkeyp
     from fastapi import HTTPException
     client,users,students,_,session,path=workspace
     thesis=setup(client,users,session,path)
-    item=evidence(client,users[0],confirm(client,users,send(client,users[0],path)),session)
+    item=send(client,users[0],path)
     original=service.audit
     def fail_after_membership_update(session,user,action,*args,**kwargs):
         if action=="WITHDRAWAL_RECORDED":
@@ -278,7 +172,7 @@ def test_record_rollback_restores_group_and_request_on_failure(workspace,monkeyp
     monkeypatch.setattr(service,"audit",fail_after_membership_update)
     assert outcome(client,users[4],item).status_code==409
     session.expire_all()
-    assert session.get(m.ThesisWithdrawalRequest,UUID(item["id"])).state=="ADVISOR_CONFIRMED"
+    assert session.get(m.ThesisWithdrawalRequest,UUID(item["id"])).state=="SUBMITTED"
     members=session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id==thesis.id,m.ThesisMember.active.is_(True))).all()
     assert len(members)==2 and any(x.student_id==students[0].id and x.is_coordinator for x in members)
     assert students[0].id in confirmed_student_ids(session,thesis.round_id,[students[0].id])
@@ -301,7 +195,7 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     assert response.status_code == 200, response.text
     deadline = session.scalar(select(m.DocumentDeadline).where(m.DocumentDeadline.document_type == "REPORT"))
     deadline.state = "CLOSED"; session.commit()
-    item = evidence(client, users[0], confirm(client, users, send(client, users[0], path)), session)
+    item = send(client, users[0], path)
     assert outcome(client, users[4], item).status_code == 200
     data = evaluation_get(ctx)
     assert {b["key"] for b in data["workflow_blockers"]} == {"registration", "plan", "proposal", "report"}
@@ -358,15 +252,16 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     assert any(r["id"] == old_review["id"] for r in final.json()["reviews"])
 
 
-@pytest.mark.parametrize("confirmation", [None, False])
-def test_external_outcome_requires_explicit_evidence_confirmation(workspace, confirmation):
+def test_decision_requires_a_reason_and_is_attributed_to_the_coordinator(workspace):
     client, users, _, _, session, path = workspace
     setup(client, users, session, path)
-    item = evidence(client, users[0], confirm(client, users, send(client, users[0], path)), session)
-    payload = {"outcome":"WITHDRAWN", "reference":"KHOA-TEST", "note":"Đã đối chiếu hồ sơ thử nghiệm",
-        "effective_on":now().astimezone(service.VN).date().isoformat()}
-    if confirmation is not None:
-        payload["confirm_evidence"] = confirmation
-    response = client.post(f"/api/v1/withdrawals/{item['id']}/outcome", headers=version_headers(users[4], item), json=payload)
-    assert response.status_code == 422
-    assert session.get(m.ThesisWithdrawalRequest, UUID(item["id"])).state == "ADVISOR_CONFIRMED"
+    item = send(client, users[0], path)
+    url = f"/api/v1/withdrawals/{item['id']}/outcome"
+    assert client.post(url, headers=version_headers(users[4],item),json={"outcome":"WITHDRAWN"}).status_code == 422
+    assert client.post(url, headers=version_headers(users[4],item),
+        json={"outcome":"WITHDRAWN","note":"   abc   "}).status_code == 422
+    response = outcome(client,users[4],item)
+    assert response.status_code == 200,response.text
+    row = session.get(m.ThesisWithdrawalRequest,UUID(item["id"]))
+    assert row.recorded_by == users[4].id and row.official_reference == item["code"]
+    assert row.evidence_file_id is None and row.advisor_reviewed_by is None

@@ -6,6 +6,7 @@ export class ApiError extends Error {
 }
 
 const messages: Record<string, string> = {
+  "Giảng viên đã hướng dẫn đủ 3 khóa luận đang thực hiện. Vui lòng chọn giảng viên khác hoặc liên hệ bộ môn.": "Giảng viên đã hướng dẫn đủ 3 khóa luận đang thực hiện. Vui lòng chọn giảng viên khác hoặc liên hệ bộ môn.",
   "The selected round is not open": "Đợt đăng ký đã đóng hoặc chưa mở. Hãy làm mới danh sách.",
   "Students describe their proposal; lecturer requirements are not student-editable": "SV nhập phạm vi trong mô tả đề xuất; không được sửa yêu cầu của GV.",
   "Topic registration capacity is full": "Đề tài đã đủ số SV. Hãy làm mới danh sách và chọn đề tài còn chỗ.",
@@ -44,6 +45,12 @@ const messages: Record<string, string> = {
 };
 
 export function apiMessage(status: number, detail: unknown, path = ""): string {
+  // These workflows return actionable Vietnamese explanations for their business rules.
+  if (typeof detail === "string" && [403, 409, 422].includes(status) &&
+      (path.startsWith("/thesis-changes/") || path.startsWith("/thesis-extension-requests/") || /^\/theses\/[^/]+\/(change-requests|extension-requests|extension)(?:\/|$)/.test(path))) {
+    if (messages[detail]) return messages[detail];
+    if (/[^\x00-\x7F]/.test(detail)) return detail;
+  }
   if (path.startsWith("/admin/lecturers") && typeof detail === "string"
       && [409, 413, 422, 429, 503].includes(status)) return messages[detail] || detail;
   if (path.startsWith("/admin/rounds/") && path.endsWith("/extend") && typeof detail === "string" &&

@@ -13,106 +13,110 @@ from backend.services.registration import profile, row_version
 from backend.services.theses import audit, eligible_lecturer, now, rights, thesis_access
 
 
-def milestones(session, thesis):
-    return session.scalars(select(m.ProgressMilestone).where(m.ProgressMilestone.round_id == thesis.round_id)
-        .order_by(m.ProgressMilestone.due_at, m.ProgressMilestone.code, m.ProgressMilestone.version_no)).all()
+def milestone_scope(thesis):
+    return (m.ProgressMilestone.thesis_id.is_(None) | (m.ProgressMilestone.thesis_id == thesis.id))
+
+
+def milestones(session, thesis, user=None):
+    query=select(m.ProgressMilestone).where(m.ProgressMilestone.round_id==thesis.round_id,milestone_scope(thesis))
+    if user is None or "progress:view" not in rights(session,user,thesis):
+        query=query.where(m.ProgressMilestone.thesis_id.is_(None))
+    return session.scalars(query.order_by(m.ProgressMilestone.due_at,m.ProgressMilestone.code,m.ProgressMilestone.version_no)).all()
 
 
 def milestone_out(item):
-    return MilestoneOut(id=item.id, code=item.code, title=item.title, version_no=item.version_no,
-        row_version=item.row_version, state=item.state, due_at=item.due_at, expected_ratio=item.expected_ratio)
+    return MilestoneOut(id=item.id,code=item.code,title=item.title,version_no=item.version_no,
+        row_version=item.row_version,state=item.state,due_at=item.due_at,expected_ratio=item.expected_ratio,
+        scope="THESIS" if item.thesis_id else "ROUND",thesis_id=item.thesis_id)
+
+
+def _milestone_right(session,user,thesis,private):
+    action="milestone:manage_own" if private else "milestone:manage"
+    if action not in rights(session,user,thesis):
+        raise HTTPException(403,"Chỉ GVHD chính thức quản lý mốc nội bộ; người điều phối chỉ quản lý mốc chung của đợt")
+
+
+def _notify_milestone(session,user,thesis,item,event,message):
+    if item.thesis_id:
+        from backend.services import workflow_notices as notices
+        from backend.services.theses import primary_advisor
+        advisor=primary_advisor(session,thesis.id)
+        recipients=set(session.scalars(select(m.StudentProfile.user_id).join(m.ThesisMember,
+            m.ThesisMember.student_id==m.StudentProfile.id).where(m.ThesisMember.thesis_id==thesis.id,m.ThesisMember.active.is_(True))))
+        if advisor:
+            recipients.add(session.get(m.LecturerProfile,advisor.lecturer_id).user_id)
+        for recipient in recipients:
+            notices.emit(session,user.id,{recipient},event,"account",recipient,message,f"/theses/{thesis.id}?section=progress")
+    else:
+        from backend.services.notifications import notify_round_participants
+        notify_round_participants(session,round_id=thesis.round_id,actor_user_id=user.id,kind=event,message=message,section="progress")
+
+
+def _audit_milestone(session,user,thesis,item,event,reason):
+    audit(session,user,event,"progress_milestone" if item.thesis_id else "round",
+        item.id if item.thesis_id else thesis.round_id,reason)
 
 
 def create_milestone(session, user, thesis_id, data):
-    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", write=True)
-    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
-    if round_.state == "ARCHIVED":
-        raise HTTPException(409, "Đợt đã lưu trữ")
-    previous = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.round_id == thesis.round_id,
-        m.ProgressMilestone.code == data.code).order_by(m.ProgressMilestone.version_no.desc()).limit(1))
-    if previous and previous.state == "OPEN":
-        raise HTTPException(409, "Đóng phiên bản mốc đang mở trước khi ban hành phiên bản mới")
-    item = m.ProgressMilestone(id=uuid4(), round_id=thesis.round_id, code=data.code, title=data.title,
-        due_at=data.due_at, expected_ratio=data.expected_ratio, source_type="ROUND_POLICY",
-        version_no=previous.version_no + 1 if previous else 1, state="OPEN")
-    session.add(item)
-    audit(session, user, "MILESTONE_OPENED", "round", thesis.round_id, f"{data.code}: {data.title}")
-    session.flush()
-    from backend.services.notifications import format_due, notify_round_participants
-
-    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
-        kind="MILESTONE_OPENED",
-        message=f"Mốc {data.code} — {data.title} đã mở, hạn nộp {format_due(data.due_at)}.",
-        section="progress")
-    result = milestone_out(item)
+    private=data.scope=="THESIS"
+    thesis=thesis_access(session,user,thesis_id,lock=True,write=True)
+    _milestone_right(session,user,thesis,private)
+    round_=session.scalar(select(m.ThesisRound).where(m.ThesisRound.id==thesis.round_id).with_for_update())
+    if round_.state=="ARCHIVED":
+        raise HTTPException(409,"Đợt đã lưu trữ")
+    scope=m.ProgressMilestone.thesis_id==thesis.id if private else m.ProgressMilestone.thesis_id.is_(None)
+    previous=session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.round_id==thesis.round_id,
+        scope,m.ProgressMilestone.code==data.code).order_by(m.ProgressMilestone.version_no.desc()).limit(1))
+    if previous and previous.state=="OPEN":
+        raise HTTPException(409,"Đóng phiên bản mốc đang mở trước khi ban hành phiên bản mới cùng mã")
+    item=m.ProgressMilestone(id=uuid4(),round_id=thesis.round_id,thesis_id=thesis.id if private else None,
+        code=data.code,title=data.title,due_at=data.due_at,expected_ratio=data.expected_ratio,
+        source_type="ADVISOR" if private else "ROUND_POLICY",version_no=previous.version_no+1 if previous else 1,state="OPEN")
+    session.add(item);session.flush()
+    _audit_milestone(session,user,thesis,item,"MILESTONE_OPENED",f"{item.code}: {item.title}")
+    _notify_milestone(session,user,thesis,item,"MILESTONE_OPENED",f"Đã mở mốc {item.title} cho {'khóa luận của bạn' if private else 'toàn đợt'}.")
     session.commit()
-    return result
+    return milestone_out(item)
 
 
-def close_milestone(session, user, thesis_id, milestone_id, data, expected):
-    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", write=True)
-    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
-    if round_.state == "ARCHIVED":
-        raise HTTPException(409, "Đợt đã lưu trữ; không thể đóng mốc tiến độ")
-    item = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == milestone_id,
-        m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
+def _locked_milestone(session,user,thesis_id,milestone_id,expected):
+    thesis=thesis_access(session,user,thesis_id,lock=True,write=True)
+    item=session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id==milestone_id,
+        m.ProgressMilestone.round_id==thesis.round_id,milestone_scope(thesis)).with_for_update())
     if not item:
-        raise HTTPException(404, "Không tìm thấy mốc trong đợt này")
-    row_version(expected, item.row_version)
-    if item.state != "OPEN":
-        raise HTTPException(409, "Mốc đã đóng")
-    item.state = "CLOSED"
-    item.row_version += 1
-    audit(session, user, "MILESTONE_CLOSED", "round", thesis.round_id, f"{item.code}: {data.reason}")
-    session.flush()
-    from backend.services.notifications import notify_round_participants
+        raise HTTPException(404,"Không tìm thấy mốc trong phạm vi khóa luận")
+    _milestone_right(session,user,thesis,item.thesis_id is not None)
+    round_=session.get(m.ThesisRound,thesis.round_id)
+    if round_.state=="ARCHIVED":raise HTTPException(409,"Đợt đã lưu trữ")
+    row_version(expected,item.row_version)
+    return thesis,item
 
-    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
-        kind="MILESTONE_CLOSED",
-        message=f"Mốc {item.code} — {item.title} đã đóng nhận báo cáo. Chỉ nộp lại khi GVHD yêu cầu sửa.",
-        section="progress")
-    result = milestone_out(item)
+
+def close_milestone(session,user,thesis_id,milestone_id,data,expected):
+    thesis,item=_locked_milestone(session,user,thesis_id,milestone_id,expected)
+    if item.state!="OPEN":raise HTTPException(409,"Mốc đã đóng")
+    item.state,item.row_version="CLOSED",item.row_version+1
+    _audit_milestone(session,user,thesis,item,"MILESTONE_CLOSED",f"{item.code}: {data.reason}")
+    _notify_milestone(session,user,thesis,item,"MILESTONE_CLOSED",f"Mốc {item.title} đã đóng nhận báo cáo. Chỉ nộp lại khi GVHD yêu cầu sửa.")
     session.commit()
-    return result
+    return milestone_out(item)
 
 
-def extend_milestone(session, user, thesis_id, milestone_id, data, expected):
-    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", write=True)
-    round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
-    if round_.state == "ARCHIVED":
-        raise HTTPException(409, "Đợt đã lưu trữ")
-    item = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == milestone_id,
-        m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
-    if not item:
-        raise HTTPException(404, "Không tìm thấy mốc trong đợt này")
-    row_version(expected, item.row_version)
-    latest = session.scalar(select(func.max(m.ProgressMilestone.version_no)).where(
-        m.ProgressMilestone.round_id == thesis.round_id, m.ProgressMilestone.code == item.code))
-    if item.version_no != latest:
-        raise HTTPException(409, "Mốc đã có phiên bản mới; không thể mở lại phiên bản cũ")
-    if item.due_at is None:
-        raise HTTPException(409, "Mốc chưa có hạn nộp")
-    if data.due_at <= item.due_at or data.due_at <= now():
-        raise HTTPException(422, "Hạn mới phải sau hạn cũ và sau thời điểm hiện tại")
-    old_due = item.due_at
-    reopening = item.state == "CLOSED"
-    item.due_at = data.due_at
-    item.state = "OPEN"
-    item.row_version += 1
-    audit(session, user, "MILESTONE_REOPENED" if reopening else "MILESTONE_EXTENDED", "round", thesis.round_id,
-        f"{item.code}: {old_due.isoformat()} -> {data.due_at.isoformat()}; {data.reason}")
-    session.flush()
-    from backend.services.notifications import format_due, notify_round_participants
-
-    notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
-        kind="MILESTONE_REOPENED" if reopening else "MILESTONE_EXTENDED",
-        message=(f"Mốc {item.code} — {item.title} đã được gia hạn và mở nhận lại đến {format_due(data.due_at)}."
-                 if reopening else
-                 f"Mốc {item.code} — {item.title} đã được gia hạn đến {format_due(data.due_at)}."),
-        section="progress")
-    result = milestone_out(item)
+def extend_milestone(session,user,thesis_id,milestone_id,data,expected):
+    thesis,item=_locked_milestone(session,user,thesis_id,milestone_id,expected)
+    scope=m.ProgressMilestone.thesis_id==item.thesis_id if item.thesis_id else m.ProgressMilestone.thesis_id.is_(None)
+    latest=session.scalar(select(func.max(m.ProgressMilestone.version_no)).where(m.ProgressMilestone.round_id==thesis.round_id,
+        scope,m.ProgressMilestone.code==item.code))
+    if item.version_no!=latest:raise HTTPException(409,"Mốc đã có phiên bản mới; không thể mở lại phiên bản cũ")
+    if not item.due_at:raise HTTPException(409,"Mốc chưa có hạn nộp")
+    if data.due_at<=item.due_at or data.due_at<=now():raise HTTPException(422,"Hạn mới phải sau hạn cũ và sau thời điểm hiện tại")
+    old_due=item.due_at;reopening=item.state=="CLOSED"
+    item.due_at,item.state,item.row_version=data.due_at,"OPEN",item.row_version+1
+    event="MILESTONE_REOPENED" if reopening else "MILESTONE_EXTENDED"
+    _audit_milestone(session,user,thesis,item,event,f"{item.code}: {old_due.isoformat()} -> {data.due_at.isoformat()}; {data.reason}")
+    _notify_milestone(session,user,thesis,item,event,f"Mốc {item.title} đã được gia hạn{' và mở nhận lại' if reopening else ''}. Báo cáo cũ giữ nguyên dấu trễ.")
     session.commit()
-    return result
+    return milestone_out(item)
 
 
 def progress_out(session, item):
@@ -138,7 +142,7 @@ def progress_out(session, item):
 def create_progress(session, user, thesis_id, data, *, commit=True):
     thesis = thesis_access(session, user, thesis_id, action="progress:submit", lock=True, write=True)
     milestone = session.scalar(select(m.ProgressMilestone).where(m.ProgressMilestone.id == data.milestone_id,
-        m.ProgressMilestone.round_id == thesis.round_id).with_for_update())
+        m.ProgressMilestone.round_id == thesis.round_id, milestone_scope(thesis)).with_for_update())
     if not milestone:
         raise HTTPException(409, "Mốc không thuộc đợt khóa luận này")
     latest = session.scalar(select(m.ProgressReport).where(m.ProgressReport.thesis_id == thesis.id,

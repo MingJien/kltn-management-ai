@@ -5,6 +5,11 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  THESIS_CHANGE_SUBMITTED: "Gửi đề nghị đổi đề tài", THESIS_CHANGE_CONSENT: "Xác nhận nguyện vọng đổi đề tài",
+  THESIS_CHANGE_REVIEWED: "GVHD xem xét đổi đề tài", THESIS_CHANGE_APPROVED: "Duyệt đổi đề tài",
+  THESIS_CHANGE_REJECTED: "Từ chối đổi đề tài", THESIS_CHANGE_CANCELLED: "Hủy đề nghị đổi đề tài",
+  THESIS_EXTENSION_RECORDED: "Ghi nhận gia hạn thực hiện KLTN", THESIS_EXTENSION_SUBMITTED: "Gửi yêu cầu gia hạn", THESIS_EXTENSION_CONSENT: "Xác nhận xin gia hạn", THESIS_EXTENSION_REVIEWED: "GVHD cho ý kiến gia hạn", THESIS_EXTENSION_APPROVED: "TBM duyệt gia hạn", THESIS_EXTENSION_REJECTED: "Không chấp thuận gia hạn", THESIS_EXTENSION_EXPIRED: "Hết hạn lấy ý kiến gia hạn", THESIS_EXTENSION_CANCELLED: "Hủy yêu cầu gia hạn", THESIS_EXTENSION_CONSENT_DEADLINE: "Đặt hạn / nhắc đồng thuận", THESIS_TOPIC_REPLACED: "Chuyển sang đề tài khác",
+  THESIS_CHANGE_ASSIGNMENT_ENDED: "Kết thúc phân công theo đề tài cũ", ROUND_REGISTRATION_REOPENED: "Gia hạn và mở lại đăng ký",
   WITHDRAWAL_SUBMITTED: "SV gửi đơn xin thôi", WITHDRAWAL_ADVISOR_CONFIRMED: "GVHD xác nhận đơn xin thôi",
   WITHDRAWAL_RETURNED: "GVHD trả lại đơn xin thôi", WITHDRAWAL_CANCELLED: "Hủy yêu cầu xin thôi",
   WITHDRAWAL_SIGNED_COPY_ADDED: "Bổ sung đơn có xác nhận", WITHDRAWAL_FILE_SCANNED: "Kiểm tra an toàn đơn xin thôi",

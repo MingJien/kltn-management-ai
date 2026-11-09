@@ -24,6 +24,10 @@ class RequirementInput(BaseModel):
 
 
 class LecturerOut(BaseModel):
+    available: bool = True
+    recommended: bool = False
+    profile_verified: bool = False
+    recommendation_reasons: list[str] = Field(default_factory=list)
     id: UUID
     display_name: str
     lecturer_code: str

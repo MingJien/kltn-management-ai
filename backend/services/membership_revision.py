@@ -1,6 +1,6 @@
 """Keep academic evidence tied to the group that actually continues the thesis."""
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from backend.db.models import entities as m
 
@@ -8,9 +8,14 @@ from backend.db.models import entities as m
 def changed_at(session, thesis_id):
     # Use recording time, not a backdated administrative effective date. Files
     # submitted before the system knew the new group cannot confirm that group.
-    return session.scalar(select(func.max(m.ThesisWithdrawalRequest.recorded_at)).where(
+    withdrawn = session.scalar(select(func.max(m.ThesisWithdrawalRequest.recorded_at)).where(
         m.ThesisWithdrawalRequest.thesis_id == thesis_id,
         m.ThesisWithdrawalRequest.state == "RECORDED"))
+    changed = session.scalar(select(func.max(m.ThesisChangeRequest.decided_at)).where(
+        or_(m.ThesisChangeRequest.thesis_id == thesis_id,
+            m.ThesisChangeRequest.snapshot["result_thesis_id"].astext == str(thesis_id)),
+        m.ThesisChangeRequest.state == "APPROVED"))
+    return max((instant for instant in (withdrawn,changed) if instant), default=None)
 
 
 def blockers(session, thesis, report):
@@ -40,9 +45,9 @@ def blockers(session, thesis, report):
         result.append({"key": "plan", "message": "Cần nộp kế hoạch Mẫu 2 cập nhật và được GVHD tiếp nhận."})
     if (not version or version.submitted_at <= cutoff or
             proposal.state not in {"DEPARTMENT_FINALIZED", "DEAN_CONFIRMED", "PRINT_READY"}):
-        result.append({"key": "proposal", "message": "Nhóm đã thay đổi thành viên. Cần nộp đề cương mới, được GVHD xác nhận và TBM chốt lại."})
+        result.append({"key": "proposal", "message": "Hồ sơ đã đổi đề tài hoặc thành viên. Cần nộp đề cương mới, được GVHD xác nhận và TBM chốt lại."})
     if not report or report.submitted_at <= cutoff:
-        result.append({"key": "report", "message": "Cần nộp bản báo cáo cập nhật theo thành viên còn lại trước khi lập nhận xét và xét bảo vệ."})
+        result.append({"key": "report", "message": "Cần nộp bản báo cáo theo đề tài và thành viên hiện tại trước khi lập nhận xét và xét bảo vệ."})
     return result
 
 

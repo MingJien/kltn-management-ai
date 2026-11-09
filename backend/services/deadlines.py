@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from uuid import uuid4
+from types import SimpleNamespace
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -25,12 +26,17 @@ def list_for_thesis(session, user, thesis_id):
     return [output(item) for item in rows]
 
 
-def for_submission(session, thesis, document_type: str) -> m.DocumentDeadline:
+def for_submission(session, thesis, document_type: str, *, apply_extension=True) -> m.DocumentDeadline:
     item = session.scalar(select(m.DocumentDeadline).where(
         m.DocumentDeadline.round_id == thesis.round_id,
         m.DocumentDeadline.document_type == document_type).with_for_update())
     if not item:
         raise HTTPException(409, f"Khoa chưa thiết lập hạn nộp {document_type} cho đợt này")
+    if apply_extension and document_type == "REPORT":
+        extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == thesis.id))
+        if extension and extension.until_at > item.due_at:
+            return SimpleNamespace(id=item.id,document_type=item.document_type,due_at=extension.until_at,
+                state="OPEN" if now() <= extension.until_at else "CLOSED")
     return item
 
 
@@ -112,7 +118,7 @@ def close_deadline(session, user, thesis_id, document_type: str, reason: str, ex
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if round_.state == "ARCHIVED":
         raise HTTPException(409, "Đợt đã lưu trữ; không thể đóng hạn tài liệu")
-    item = for_submission(session, thesis, document_type)
+    item = for_submission(session, thesis, document_type, apply_extension=False)
     row_version(expected, item.row_version)
     if item.state != "OPEN":
         raise HTTPException(409, "Hạn đã đóng")

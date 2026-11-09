@@ -19,6 +19,8 @@ from backend.api.core import router as thesis_workspace_router
 from backend.api.activity import router as activity_router
 from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
+from backend.api.defense import router as defense_router
+from backend.api.thesis_changes import router as thesis_changes_router
 from backend.api.lecturer_profiles import router as lecturer_profiles_router
 from backend.api.withdrawals import router as withdrawals_router
 from backend.api.dependencies import current_user, get_session
@@ -78,6 +80,8 @@ app.include_router(thesis_workspace_router)
 app.include_router(activity_router)
 app.include_router(school_forms_router)
 app.include_router(evaluation_router)
+app.include_router(defense_router)
+app.include_router(thesis_changes_router)
 app.include_router(lecturer_profiles_router)
 app.include_router(withdrawals_router)
 
@@ -254,18 +258,26 @@ def topic_create(payload: TopicCreate, user: m.UserAccount = Depends(current_use
 
 
 @app.get("/api/v1/lecturers", response_model=list[LecturerOut])
-def lecturers(user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
+def lecturers(topic_id: UUID | None = None, query_text: str = Query(default="",max_length=1000), user: m.UserAccount = Depends(current_user), session: Session = Depends(get_session)):
     if user.base_role not in {"STUDENT", "LECTURER"}:
         raise HTTPException(403, "Student or lecturer required")
     viewer = profile(session, user, user.base_role)
-    rows = session.scalars(select(m.LecturerProfile).join(m.UserAccount, m.UserAccount.id == m.LecturerProfile.user_id)
-        .where(m.LecturerProfile.department_id == viewer.department_id, m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER")
-        .order_by(m.LecturerProfile.display_name)).all()
-    department = session.get(m.Department, viewer.department_id)
-    faculty = session.get(m.Faculty, department.faculty_id) if department else None
-    return [LecturerOut(id=row.id, display_name=row.display_name, lecturer_code=row.lecturer_code,
-        department_name=department.name if department else None, faculty_name=faculty.name if faculty else None)
-        for row in rows]
+    topic=get_visible_topic(session,user,topic_id) if topic_id else None
+    from backend.services.faculty_pool import lecturer_choices, suggestion
+    from backend.services.advisor_capacity import require_capacity
+    text=(topic.title+" "+(topic.description or "")) if topic else query_text
+    result=[]
+    for row in lecturer_choices(session,viewer.department_id,text):
+        department=session.get(m.Department,row.department_id)
+        faculty=session.get(m.Faculty,department.faculty_id)
+        try:
+            require_capacity(session,row.id)
+            available=True
+        except HTTPException:
+            available=False
+        result.append(LecturerOut(id=row.id,display_name=row.display_name,lecturer_code=row.lecturer_code,
+            department_name=department.name,faculty_name=faculty.name,available=available,**suggestion(row,text)))
+    return result
 
 
 @app.post("/api/v1/student-proposals", response_model=RegistrationOut, status_code=201)
@@ -476,6 +488,19 @@ def similar_topics(
     )]
 
 
+@app.get("/api/v1/ai/reports")
+def similarity_reports(user=Depends(current_user), session=Depends(get_session)):
+    from backend.services.report_similarity import options
+    return options(session,user)
+
+
+@app.post("/api/v1/ai/compare-reports")
+def compare_reports(left_version_id: UUID, right_version_id: UUID,
+                    user=Depends(current_user), session=Depends(get_session)):
+    from backend.services.report_similarity import compare
+    return compare(session,user,left_version_id,right_version_id)
+
+
 @app.post("/api/v1/ai/chat", response_model=ChatOut)
 def ai_chat(
     payload: ChatRequest,
@@ -546,3 +571,30 @@ def topic_lifecycle(topic_id: UUID, operation: str, payload: dict,
         raise HTTPException(422, "Lý do cần từ 5 đến 2000 ký tự")
     from backend.services.topics import lifecycle
     lifecycle(session, user, topic_id, "delete" if operation == "delete-draft" else operation, reason, if_match)
+
+
+@app.on_event("startup")
+async def start_extension_deadline_monitor():
+    import asyncio
+    async def monitor():
+        from backend.services.thesis_extensions import sweep_expired
+        import logging
+        while True:
+            try:
+                await asyncio.to_thread(sweep_expired)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                logging.getLogger(__name__).warning("Extension deadline monitor retry: %s",type(error).__name__)
+            await asyncio.sleep(60)
+    app.state.extension_deadline_monitor=asyncio.create_task(monitor())
+
+
+@app.on_event("shutdown")
+async def stop_extension_deadline_monitor():
+    import asyncio
+    from contextlib import suppress
+    task=getattr(app.state,"extension_deadline_monitor",None)
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):await task

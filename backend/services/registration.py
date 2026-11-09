@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from backend.api.schemas import MemberResponse, RegistrationCreate, RegistrationMemberOut, RegistrationOut, LecturerDecision, RejectedProposalResolution
 from backend.db.models import entities as m
+from backend.services.advisor_capacity import require_capacity
+from backend.services.faculty_pool import compatible
 
 
 def fail(code: int, message: str) -> None:
@@ -182,6 +184,11 @@ def create_registration(session: Session, user: m.UserAccount, data: Registratio
         allowed_state = topic.archived_at is None and (topic.state == "APPROVED" or (student_proposal and topic.state == "DRAFT"))
         if not allowed_state or round_ is None or round_.state != "OPEN" or not (round_.opens_at <= now <= round_.closes_at):
             fail(409, "Topic or registration round is not open")
+        receiver_id = topic.receiving_lecturer_id
+        if receiver_id is None and topic.proposer_type == "LECTURER":
+            receiver_id = session.scalar(select(m.LecturerProfile.id).where(m.LecturerProfile.user_id == topic.proposer_user_id))
+        if receiver_id is not None:
+            require_capacity(session, receiver_id)
         if topic.proposer_type == "STUDENT" and topic.state != "APPROVED" and not student_proposal:
             fail(403, "Student proposals belong to their proposing group")
         expected = topic.max_students
@@ -560,8 +567,9 @@ def lecturer_decision(
             if other is not None:
                 fail(409, "Another group has already been accepted for this topic")
             lecturer_account = session.get(m.UserAccount, lecturer.user_id)
-            if lecturer.department_id != topic.department_id or lecturer_account is None or lecturer_account.status != "ACTIVE":
-                fail(409, "Receiving lecturer is no longer active in this department")
+            if not compatible(session, topic.department_id, lecturer.department_id) or lecturer_account is None or lecturer_account.status != "ACTIVE":
+                fail(409, "Giảng viên tiếp nhận không còn hoạt động trong Khoa")
+            require_capacity(session, lecturer.id, lock=True)
         if data.decision == "REJECT" and not (data.reason and data.reason.strip()):
             fail(422, "A rejection requires a reason")
         notification_members = session.scalars(select(m.RegistrationMember).where(

@@ -13,12 +13,12 @@ function ExtendForm({thesis, milestone, userId, busy, run}: {
 }) {
   const [dueAt, setDueAt] = useState("");
   const [reason, setReason] = useState("");
-  return <details><summary>{milestone.state === "CLOSED" ? "Gia hạn và mở lại toàn đợt" : "Gia hạn cho toàn đợt"}</summary><form className="core-form" onSubmit={async event => {
+  return <details><summary>{milestone.scope==="THESIS"?"Gia hạn mốc nội bộ":milestone.state === "CLOSED" ? "Gia hạn và mở lại toàn đợt" : "Gia hạn cho toàn đợt"}</summary><form className="core-form" onSubmit={async event => {
     event.preventDefault();
     if (await run(() => request(`/theses/${thesis.id}/milestones/${milestone.id}/extend`, userId, {
       method: "POST", headers: {"If-Match": String(milestone.row_version)},
       body: JSON.stringify({due_at: new Date(dueAt + "+07:00").toISOString(), reason}),
-    }), "Đã gia hạn mốc cho toàn đợt; báo cáo cũ giữ nguyên nhãn đúng/trễ.")) {setDueAt(""); setReason("");}
+    }), "Đã gia hạn mốc đúng phạm vi; báo cáo cũ giữ nguyên nhãn đúng/trễ.")) {setDueAt(""); setReason("");}
   }}>
     <label htmlFor={`extend-due-${milestone.id}`}>Hạn mới (giờ Việt Nam)</label>
     <input className="input" id={`extend-due-${milestone.id}`} type="datetime-local" value={dueAt}
@@ -62,6 +62,8 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
   milestoneHistory: AuditEvent[]; userId: string; studentId: string | null; busy: boolean; run: CoreRun;
 }) {
   const [code, setCode] = useState("");
+  const [scope,setScope] = useState<"THESIS"|"ROUND">(thesis.actions.includes("milestone:manage_own")?"THESIS":"ROUND");
+  const canManageMilestone=(item:Milestone)=>thesis.actions.includes(item.scope==="THESIS"?"milestone:manage_own":"milestone:manage");
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [expectedRatio, setExpectedRatio] = useState("");
@@ -114,14 +116,15 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         }), "Đã lưu nhận xét tiến độ.")} />}
   </>;
   return <div className="stack">
-    {thesis.actions.includes("milestone:manage") && active && <form className="card" onSubmit={async event => {
+    {(thesis.actions.includes("milestone:manage") || thesis.actions.includes("milestone:manage_own")) && active && <form className="card" onSubmit={async event => {
       event.preventDefault();
       if (await run(() => request(`/theses/${thesis.id}/milestones`, userId, {method: "POST", body: JSON.stringify({
-        code, title, due_at: new Date(dueAt+"+07:00").toISOString(), expected_ratio: expectedRatio === "" ? null : Number(expectedRatio),
-      })}), "Đã mở mốc cho toàn đợt.")) {setCode(""); setTitle("");}
+        scope, code, title, due_at: new Date(dueAt+"+07:00").toISOString(), expected_ratio: expectedRatio === "" ? null : Number(expectedRatio),
+      })}), scope==="THESIS"?"Đã mở mốc riêng cho khóa luận này.":"Đã mở mốc cho toàn đợt.")) {setCode(""); setTitle("");}
     }}><div className="card-body core-form">
-      <h3>Mở mốc theo kế hoạch đợt</h3>
-      <p className="text-body-sm text-muted">Áp dụng cho mọi khóa luận trong {thesis.round_label}. Mốc đã mở giữ nguyên; đóng trước khi ban hành phiên bản mới cùng mã.</p>
+      <h3>{scope==="THESIS"?"Tạo mốc nội bộ của khóa luận":"Mở mốc theo kế hoạch đợt"}</h3>
+      {thesis.actions.includes("milestone:manage")&&thesis.actions.includes("milestone:manage_own")&&<label>Phạm vi mốc<select className="input" value={scope} onChange={e=>setScope(e.target.value as "THESIS"|"ROUND")}><option value="THESIS">Riêng khóa luận này</option><option value="ROUND">Toàn đợt</option></select></label>}
+      <p className="text-body-sm text-muted">{scope==="THESIS"?"GVHD quản lý mốc riêng. Chỉ nhóm SV và GVHD xem và nhận thông báo.":`Áp dụng cho mọi khóa luận trong ${thesis.round_label}.`} Đóng mốc trước khi ban hành phiên bản mới cùng mã.</p>
       <p className="text-body-sm text-muted">Mốc này dùng cho báo cáo tiến độ định kỳ. Hạn nộp từng loại tài liệu (Đề cương, Kế hoạch, Cuốn báo cáo KLTN) được đặt riêng ở mục “Hạn nộp tài liệu theo đợt” phía trên, không phải ở đây.</p>
       <div className="core-fields">
         <div className="input-group"><label htmlFor="milestone-code">Mã mốc</label><input className="input" id="milestone-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} pattern="(?:[A-Z0-9_]|-){1,50}" maxLength={50} placeholder="NOI_BO_1" required disabled={busy} /></div>
@@ -129,31 +132,27 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         <div className="input-group"><label htmlFor="milestone-due">Hạn nộp (giờ Việt Nam)</label><input className="input" id="milestone-due" type="datetime-local" value={dueAt} onChange={event => setDueAt(event.target.value)} required disabled={busy} /></div>
         <div className="input-group"><label htmlFor="milestone-ratio">Tiến độ dự kiến (%)</label><input className="input" id="milestone-ratio" type="number" min={0} max={100} step="0.01" value={expectedRatio} onChange={event => setExpectedRatio(event.target.value)} disabled={busy} /></div>
       </div>
-      <button className="btn btn-primary" disabled={busy || !title.trim() || !code || !dueAt}>Mở mốc cho đợt</button>
+      <button className="btn btn-primary" disabled={busy || !title.trim() || !code || !dueAt}>{scope==="THESIS"?"Tạo mốc nội bộ":"Mở mốc cho đợt"}</button>
     </div></form>}
     {milestones.map(milestone => <article className="card" key={milestone.id}><div className="card-body stack">
       <div className="flex justify-between gap-3"><h3>{milestone.title} · v{milestone.version_no}</h3><Status value={milestone.state} /></div>
-      <p className="text-muted">{milestone.code} · Hạn: {formatDate(milestone.due_at)}{milestone.expected_ratio !== null ? ` · Dự kiến ${milestone.expected_ratio}%` : ""}</p>
-      {thesis.actions.includes("milestone:manage") && milestone.due_at && active &&
+      <p className="text-muted">{milestone.scope==="THESIS"?"Nội bộ khóa luận":"Mốc chung của đợt"} · {milestone.code} · Hạn: {formatDate(milestone.due_at)}{milestone.expected_ratio !== null ? ` · Dự kiến ${milestone.expected_ratio}%` : ""}</p>
+      {canManageMilestone(milestone) && milestone.due_at && active &&
         <ExtendForm thesis={thesis} milestone={milestone} userId={userId} busy={busy} run={run} />}
-      {thesis.actions.includes("milestone:manage") && milestone.state === "OPEN" && active && <details><summary>Đóng mốc cho toàn đợt</summary>
+      {canManageMilestone(milestone) && milestone.state === "OPEN" && active && <details><summary>{milestone.scope==="THESIS"?"Đóng mốc nội bộ":"Đóng mốc cho toàn đợt"}</summary>
         <ReviewForm disabled={busy} choices={[{value: "CLOSE", label: "Đóng mốc, ngừng nhận báo cáo mới"}]} onSubmit={(_, reason) => run(() => request(`/theses/${thesis.id}/milestones/${milestone.id}/close`, userId, {
           method: "POST", headers: {"If-Match": String(milestone.row_version)}, body: JSON.stringify({reason}),
-        }), "Đã đóng mốc cho đợt.")} />
+        }), "Đã đóng mốc trong đúng phạm vi.")} />
       </details>}
     </div></article>)}
     {milestones.length === 0 && <div className="card"><div className="card-body">
-      <h3>Chưa có mốc tiến độ cho đợt {thesis.round_label}</h3>
+      <h3>Chưa có mốc tiến độ trong hồ sơ này</h3>
       <p className="text-muted">
-        {thesis.actions.includes("milestone:manage")
-          ? "Bạn được giao quyền điều phối đợt (KLTN_COORDINATOR): hãy sử dụng biểu mẫu phía trên để mở mốc đầu tiên theo kế hoạch đợt (kèm hạn nộp và tỷ lệ hoàn thành dự kiến)."
-          : thesis.actions.includes("progress:submit")
-          ? "Đợt này chưa có mốc tiến độ nào được mở. Người được giao điều phối đợt (KLTN_COORDINATOR) cần tạo và mở mốc theo kế hoạch. Sau khi mốc được mở, sinh viên trong nhóm mới có thể nộp báo cáo."
-          : `Đợt này chưa có mốc tiến độ nào được mở. Người điều phối đợt cần thiết lập mốc tiến độ để sinh viên nộp báo cáo và GVHD chính (${thesis.advisor_name || "GVHD"}) theo dõi, đánh giá.`}
+        {thesis.actions.includes("milestone:manage_own")?"GVHD sử dụng biểu mẫu phía trên để đặt mốc báo cáo cho khóa luận này.":"GVHD chưa mở mốc nội bộ cho khóa luận này. Mốc chung của đợt (nếu có) hiển thị riêng."}
       </p>
     </div></div>}
-    <div className="card"><div className="card-body stack"><h2>Lịch sử mốc của đợt</h2>
-      <p className="text-body-sm text-muted">Người thực hiện, thời điểm và lý do mở, gia hạn hoặc đóng mốc. Gia hạn luôn áp dụng cho toàn đợt, không riêng từng đề tài hay sinh viên.</p>
+    <div className="card"><div className="card-body stack"><h2>Lịch sử mốc trong phạm vi của bạn</h2>
+      <p className="text-body-sm text-muted">Người thực hiện, thời điểm và lý do mở, gia hạn hoặc đóng mốc. Mốc nội bộ chỉ áp dụng cho khóa luận này; mốc chung áp dụng cho toàn đợt. Báo cáo cũ giữ nguyên hạn tại thời điểm nộp.</p>
       {milestoneAudit.length
         ? milestoneAudit.map((event, index) => <p key={`${event.occurred_at}-${index}`} className="text-body-sm">
             <strong>{event.actor_name}</strong> · {milestoneAction[event.action] || event.action} · {formatDate(event.occurred_at)}
@@ -165,7 +164,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       <div className="card"><div className="card-body">
         <h3>Không có mốc nào đang mở nhận báo cáo</h3>
         <p className="text-muted">
-          Các mốc đã đóng, báo cáo đã được phản hồi hoặc đã hết hạn tự sửa. Nếu GVHD yêu cầu sửa, bạn sẽ nộp được phiên bản mới kể cả sau khi mốc đóng. Gia hạn chung do người điều phối đợt ({thesis.round_label}) thực hiện.
+          Các mốc đã đóng, báo cáo đã được phản hồi hoặc đã hết hạn tự sửa. Nếu GVHD yêu cầu sửa, bạn sẽ nộp được phiên bản mới kể cả sau khi mốc đóng. GVHD quản lý hạn mốc nội bộ; người điều phối quản lý hạn mốc chung của đợt.
         </p>
       </div></div>
     )}

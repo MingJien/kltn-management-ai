@@ -103,6 +103,7 @@ class RoundExtension(BaseModel):
     closes_at: AwareDatetime
     basis_ref: str = Field(min_length=3, max_length=500)
     reason: str = Field(min_length=5, max_length=1000)
+    reopen_closed: bool = False
 
 
 class RoundScheduleUpdate(BaseModel):
@@ -270,8 +271,9 @@ def extend_round_registration(round_id: UUID, payload: RoundExtension,
         raise HTTPException(404, "Không tìm thấy đợt KLTN")
     if round_.row_version != if_match:
         raise HTTPException(409, "Đợt đã thay đổi. Hãy tải lại trước khi gia hạn")
-    if round_.state != "OPEN":
-        raise HTTPException(409, "Chỉ được gia hạn đợt đang ở trạng thái mở")
+    reopening = round_.state == "CLOSED" and payload.reopen_closed
+    if round_.state != "OPEN" and not reopening:
+        raise HTTPException(409, "Chọn xác nhận mở lại khi gia hạn đợt đã đóng")
     instant = datetime.now(timezone.utc)
     new_end = payload.closes_at.astimezone(timezone.utc)
     if new_end <= round_.closes_at or new_end <= instant:
@@ -285,16 +287,30 @@ def extend_round_registration(round_id: UUID, payload: RoundExtension,
         raise HTTPException(422, "Nhập căn cứ và lý do gia hạn")
     previous_end = round_.closes_at
     round_.closes_at = new_end
+    round_.state = "OPEN"
     round_.row_version += 1
-    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROUND_REGISTRATION_EXTENDED",
+    event = "ROUND_REGISTRATION_REOPENED" if reopening else "ROUND_REGISTRATION_EXTENDED"
+    session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action=event,
         resource_type="thesis_round", resource_id=round_.id, source_reference=basis,
         reason=f"Hạn cũ: {previous_end.isoformat()} · Hạn mới: {new_end.isoformat()} · {reason}",
         occurred_at=instant, correlation_id=uuid4()))
-    round_announcement(session, user.id, round_.id, "ROUND_REGISTRATION_EXTENDED",
-        f"Khoa đã gia hạn đăng ký KLTN đợt {round_.code} đến {format_due(new_end)}.", "/topics")
+    round_announcement(session, user.id, round_.id, event,
+        f"Khoa đã {'gia hạn và mở lại' if reopening else 'gia hạn'} đăng ký KLTN đợt {round_.code} đến {format_due(new_end)}.", "/topics")
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version,
             "closes_at": round_.closes_at}
+
+
+@router.get("/rounds/{round_id}/history")
+def round_history(round_id: UUID, user=Depends(current_user), session=Depends(get_session)):
+    _admin(user)
+    if not session.get(m.ThesisRound,round_id):
+        raise HTTPException(404,"Không tìm thấy đợt")
+    from backend.services.workflow_notices import actor_name
+    rows = session.scalars(select(m.AuditEvent).where(m.AuditEvent.resource_type=="thesis_round",
+        m.AuditEvent.resource_id==round_id).order_by(m.AuditEvent.occurred_at.desc(),m.AuditEvent.id.desc())).all()
+    return [{"id":row.id,"action":row.action,"reason":row.reason,"reference":row.source_reference,
+        "at":row.occurred_at,"actor":actor_name(session,row.actor_id)} for row in rows]
 
 
 @router.patch("/rounds/{round_id}")

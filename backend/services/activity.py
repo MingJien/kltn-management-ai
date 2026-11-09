@@ -11,7 +11,7 @@ from backend.services.theses import effective, is_faculty_dean
 
 
 ROUND_ACTIONS = (
-    "ROUND_CREATED", "ROUND_OPENED", "ROUND_CLOSED", "ROUND_SCHEDULE_UPDATED", "ROUND_REGISTRATION_EXTENDED",
+    "ROUND_CREATED", "ROUND_OPENED", "ROUND_CLOSED", "ROUND_SCHEDULE_UPDATED", "ROUND_REGISTRATION_EXTENDED", "ROUND_REGISTRATION_REOPENED",
     "MILESTONE_OPENED", "MILESTONE_EXTENDED", "MILESTONE_REOPENED", "MILESTONE_CLOSED",
 )
 
@@ -146,6 +146,18 @@ def visibility(session, user):
     from backend.services.withdrawals import can_view as withdrawal_visible
     scopes["thesis_withdrawal_request"] |= {item.id for item in session.scalars(select(m.ThesisWithdrawalRequest))
         if withdrawal_visible(session, user, item)}
+    from backend.services.thesis_changes import accessible as change_visible
+    change_query=select(m.ThesisChangeRequest).where(or_(m.ThesisChangeRequest.thesis_id.in_(full_theses),
+        m.ThesisChangeRequest.requested_by==user.id,
+        m.ThesisChangeRequest.snapshot["advisor_user_id"].astext==str(user.id),
+        m.ThesisChangeRequest.snapshot["target_advisor_user_id"].astext==str(user.id)))
+    scopes["thesis_change_request"] |= {item.id for item in session.scalars(change_query) if change_visible(session,user,item)}
+    from backend.services.thesis_extensions import can_see as extension_visible
+    extension_query=select(m.ThesisExtensionRequest).where(or_(m.ThesisExtensionRequest.thesis_id.in_(full_theses),m.ThesisExtensionRequest.requested_by==user.id,
+        m.ThesisExtensionRequest.snapshot["advisor_user_id"].astext==str(user.id)))
+    scopes["thesis_extension_request"] |= {item.id for item in session.scalars(extension_query) if extension_visible(session,user,item)}
+    scopes["progress_milestone"] |= _ids(session,m.ProgressMilestone.id,m.ProgressMilestone.thesis_id.in_(
+        full_theses if user.base_role=="STUDENT" else advisor_theses))
     from backend.services.evaluation import permissions as review_permissions,review_visible
     for item in session.scalars(select(m.ThesisReview)):
         thesis=session.get(m.Thesis,item.thesis_id)
