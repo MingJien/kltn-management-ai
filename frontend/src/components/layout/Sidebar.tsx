@@ -140,9 +140,8 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
           {context.actions.includes("account:manage") ? <SidebarGroup label="QUẢN TRỊ" active={["/administration", "/administration/assignments", "/rounds", "/lecturers", "/positions"].includes(pathname)} collapsed={collapsed}>
             <NavLink to="/administration" end title={collapsed ? "Tài khoản" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><UsersRound aria-hidden="true" /><span>Tài khoản</span></NavLink>
-            {context.base_role === "ADMIN" && <NavLink to="/administration/assignments" title={collapsed ? "Phân công" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
-              onClick={onClose}><ClipboardList aria-hidden="true" /><span>Phân công theo đợt</span></NavLink>}
-            {context.base_role === "ADMIN" && <NavLink to="/positions" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><ShieldCheck aria-hidden="true"/><span>Chức vụ và phạm vi</span></NavLink>}
+            {context.base_role === "ADMIN" && <NavLink to="/administration/assignments" title={collapsed ? "Phân công và chức vụ" : undefined} className={({isActive}) => "sidebar__item " + (isActive || pathname === "/positions" ? "sidebar__item--active" : "")}
+              onClick={onClose}><ClipboardList aria-hidden="true" /><span>Phân công và chức vụ</span></NavLink>}
             {context.base_role === "ADMIN" ? <NavLink to="/rounds" title={collapsed ? "Đợt KLTN" : undefined} className={({isActive}) => "sidebar__item " + (isActive ? "sidebar__item--active" : "")}
               onClick={onClose}><CalendarDays aria-hidden="true" /><span>Đợt KLTN</span></NavLink> : null}
             {context.base_role === "ADMIN" && <NavLink to="/lecturers" className={({isActive})=>"sidebar__item "+(isActive?"sidebar__item--active":"")} onClick={onClose}><GraduationCap aria-hidden="true"/><span>Danh sách giảng viên</span></NavLink>}

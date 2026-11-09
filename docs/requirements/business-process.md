@@ -55,7 +55,7 @@ flowchart TB
   A9 -- Đồng ý --> A10 --> A11 --> AE
 ~~~
 
-Ghi chú: người xác nhận điều kiện là cán bộ Khoa được giao `ELIGIBILITY_VERIFIER` theo đợt sau đối chiếu nguồn Phòng Đào tạo, không mặc định TBM/Admin. Expertise do TBM đúng Bộ môn kiểm hoặc Trưởng khoa/người được giao khi TBM tự khai; không ghép thêm SV sau khi gửi theo quyết định dự án. GPA mong muốn của topic không tự loại SV nếu SV đạt điều kiện chung.
+Ghi chú: người xác nhận điều kiện là cán bộ Khoa được giao `ELIGIBILITY_VERIFIER` theo đợt sau đối chiếu nguồn Phòng Đào tạo, không mặc định TBM/Admin. Expertise do TBM đúng Bộ môn kiểm hoặc Trưởng khoa/người được giao khi TBM tự khai. SV tự bổ sung vào nhóm khi còn hạn/chỉ tiêu; GV xét lại nếu đã nhận nhóm. GPA mong muốn của topic không tự loại SV nếu SV đạt điều kiện chung.
 
 ## B. Đề cương + phản biện/góp ý + xác nhận/ký
 
@@ -239,7 +239,7 @@ Gemini là quyết định dự án; không ghi thành quy định Trường. Do
 
 ## Quy trình làm rõ ngày 25/09/2026
 
-- Đăng ký: SV đủ điều kiện lập nhóm 1–3 người cùng bộ môn; **mỗi thành viên tự xác nhận** lời mời bằng tài khoản của mình trước khi gửi. Từ SUBMITTED danh sách bất biến, không ghép/thêm/đổi người. Với đề tài do GV đề xuất đã duyệt, GV đề xuất chấp nhận/từ chối nhóm; với đề tài do SV đề xuất, nhóm đăng ký trước rồi TBM xét đề tài, GVHD được phân công đồng ý sau đó. TBM đúng bộ môn chốt; một transaction tạo Thesis, ThesisMember và AdvisorAssignment. Prototype hiện chỉ chạy nhánh đề tài do GV đề xuất và chưa có xác nhận từng thành viên.
+- Đăng ký: mỗi SV đủ điều kiện tự tham gia đề tài/nhóm khi còn hạn và chỉ tiêu 1–3. Đại diện được gửi nhóm một người; bổ sung sau khi gửi hoặc GV nhận thì GV phải xét lại. Đề tài SV tự đề xuất đăng ký cá nhân trước, TBM xét sau. GV tiếp nhận đồng ý/từ chối, rồi TBM đúng bộ môn chốt trong một transaction tạo Thesis, ThesisMember và AdvisorAssignment. Hai nhánh đề tài GV/SV đã có API/UI và kiểm thử trên dữ liệu giả.
 - Điều phối KLTN theo round nhận lịch chính thức và sắp hai buổi góp ý nội bộ; GVHD xác nhận progress của Thesis được phân công, GVHD khác có assignment chỉ góp ý chéo. Không suy ra quyền Secretary Hội đồng.
 - Nộp tài liệu: lưu DocumentVersion trước; kiểm tương đồng chạy sau và trả bằng chứng advisory; sinh viên có thể nộp version sửa. Chỉ policy được duyệt sau này mới xem xét gate ở finalization.
 - Mẫu 9: Thư ký đối chiếu bản giấy. Bản in sai trước chữ ký đầu được VOID và in lại với version/mã/thời gian mới; người chấm tự sửa điểm. Từ chữ ký đầu khóa sửa dù state còn PRINTED; khi đủ Chair và Secretary mới SIGNED. Không có bypass TBM.

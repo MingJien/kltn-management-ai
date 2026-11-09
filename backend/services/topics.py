@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 
 from backend.api.schemas import OpenRoundOut, RequirementInput, TitleVersionOut, TopicCreate, TopicDecision, TopicOut, TopicRegisteredStudentOut, TopicUpdate
 from backend.db.models import entities as m
+from backend.services.advisor_capacity import require_capacity
+from backend.services.faculty_pool import compatible
 from backend.services.registration import _is_department_head, profile, row_version
 
 
@@ -199,7 +201,9 @@ def visible_topics(session: Session, user: m.UserAccount,
     if view == "all":
         query = select(m.Topic).where(m.Topic.state.in_(["APPROVED", "LOCKED"]))
     else:
-        query = select(m.Topic).where(m.Topic.department_id == viewer.department_id, allowed)
+        query = select(m.Topic).where(allowed)
+        if view != "suggested":
+            query = query.where(m.Topic.department_id == viewer.department_id)
     if view == "archived":
         if user.base_role != "LECTURER" or not head:
             _fail(403, "Chỉ Trưởng bộ môn được quản lý đề tài ngừng sử dụng")
@@ -257,7 +261,8 @@ def get_visible_topic(session: Session, user: m.UserAccount, topic_id: UUID) -> 
         )
     else:
         _fail(404, "Topic not found")
-    if viewer.department_id != row.department_id or not allowed:
+    addressed = user.base_role == "LECTURER" and row.receiving_lecturer_id == viewer.id
+    if (viewer.department_id != row.department_id and not addressed) or not allowed:
         _fail(404, "Topic not found")
     return topic_out(session, row)
 
@@ -278,8 +283,9 @@ def _own_editable_topic(session: Session, user: m.UserAccount,
 def receiving_lecturer(session: Session, lecturer_id: UUID | None, department_id: UUID) -> m.LecturerProfile:
     lecturer = session.get(m.LecturerProfile, lecturer_id) if lecturer_id else None
     account = session.get(m.UserAccount, lecturer.user_id) if lecturer else None
-    if not lecturer or lecturer.department_id != department_id or not account or account.status != "ACTIVE" or account.base_role != "LECTURER":
-        _fail(422, "Choose an active lecturer in the same department")
+    if not lecturer or not compatible(session, department_id, lecturer.department_id) or not account or account.status != "ACTIVE" or account.base_role != "LECTURER":
+        _fail(422, "Chọn giảng viên đang hoạt động trong Khoa")
+    require_capacity(session, lecturer.id)
     return lecturer
 
 
@@ -397,6 +403,7 @@ def submit_topic(session: Session, user: m.UserAccount, topic_id: UUID,
         if not round_ or round_.state != "OPEN" or not round_.opens_at <= now <= round_.closes_at:
             _fail(409, "The selected round is not open")
         row_version(expected_version, topic.row_version)
+        require_capacity(session, topic.receiving_lecturer_id or profile(session, user, "LECTURER").id)
         before = _fingerprint(topic, session)
         topic.state = "SUBMITTED"
         topic.row_version += 1

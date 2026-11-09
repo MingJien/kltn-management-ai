@@ -6,27 +6,28 @@ import {errorMessage} from "../errors";
 import {downloadEvaluationFile,when} from "../evaluation";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import ThesisExtensionRequests,{type ExtensionRequest} from "../components/domain/ThesisExtensionRequests";
 import "../styles/thesis-changes.css";
+import "../styles/assignment-tabs.css";
 
 type Consent={decision:string;at:string};
-type Change={id:string;code:string;thesis_id:string;kind:string;state:string;reason:string;proposed_title:string;
+type Change={scope:"GROUP"|"INDIVIDUAL";requested_by:string;result_thesis_id:string|null;id:string;code:string;thesis_id:string;kind:string;state:string;reason:string;proposed_title:string;
   proposed_description:string;row_version:number;submitted_at:string;decided_at:string|null;decided_by:string|null;
   decision_reason:string|null;consents:Record<string,Consent>;reviews:Record<string,Consent&{reason:string}>;
   snapshot:{title:string;description:string;target_advisor_name?:string;members:{user_id:string;name:string}[]};
   can_consent:boolean;can_cancel:boolean;review_roles:string[];can_decide:boolean;ready:boolean};
-type Extension={until_at:string;original_due_at:string;decision_on:string;reference:string;reason:string;recorded_by:string;recorded_at:string;
+type Extension={extension_starts_at:string|null;until_at:string;original_due_at:string;decision_on:string;reference:string;reason:string;recorded_by:string;recorded_at:string;
   file:{id:string;name:string;scan_state:string}|null};
-type Thesis={id:string;title:string;description:string;state:string;row_version:number;round_label:string;round_id:string;
+type Thesis={can_request_extension:boolean;extension_request_blocker:string;id:string;title:string;description:string;state:string;row_version:number;round_label:string;round_id:string;
   round_version:number;starts_on:string|null;cutoff:string|null;can_request:boolean;message:string;can_extend:boolean;
   extension_blocker:string;can_set_start:boolean;baseline_due:string|null;extension_max:string|null;extension:Extension|null;
-  candidates:{id:string;code:string;title:string;description:string;advisor:string;capacity:number}[];
+  member_count:number;candidates:{group_available:boolean;individual_available:boolean;id:string;code:string;title:string;description:string;advisor:string;capacity:number}[];
   evidence:{id:string;name:string;scan_state:string}[]};
-type Workspace={theses:Thesis[];requests:Change[]};
-type Operation={kind:"create"|"extension"|"start";thesis:Thesis}|{kind:"consent"|"review"|"decision"|"cancel";item:Change;role?:string};
+type Workspace={extension_policy_confirmed:boolean;theses:Thesis[];requests:Change[];extension_requests:ExtensionRequest[]};
+type Operation={kind:"create"|"start";thesis:Thesis}|{kind:"consent"|"review"|"decision"|"cancel";item:Change;role?:string};
 const labels:Record<string,string>={SUBMITTED:"Đang lấy ý kiến",ADVISOR_REVIEWED:"Chờ bộ môn duyệt",APPROVED:"Đã chấp thuận",
   REJECTED:"Không chấp thuận",CANCELLED:"Đã hủy",CURRENT_ADVISOR:"GVHD hiện tại",NEW_ADVISOR:"GVHD tiếp nhận đề tài mới"};
 const pending=(item:Change)=>["SUBMITTED","ADVISOR_REVIEWED"].includes(item.state);
-const local=(value:string)=>new Date(Date.parse(value)+7*3600000).toISOString().slice(0,16);
 const shortDate=(value:string)=>new Date(value).toLocaleDateString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"});
 const formText=(form:FormData,key:string)=>String(form.get(key)??"");
 
@@ -35,7 +36,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
   const current=pending(item)?item.ready?2:groupReady?1:0:3;
   const completed=[groupReady,item.ready,item.state==="APPROVED",!pending(item)];
   return <article className="change-card card" id={"change-"+item.id}><div className="card-body stack">
-    <div className="change-card__heading"><div><p className="change-eyebrow">{item.code} · {item.kind==="REPLACEMENT"?"Chuyển sang đề tài khác":"Điều chỉnh tên và phạm vi"}</p>
+    <div className="change-card__heading"><div><p className="change-eyebrow">{item.code} · {item.scope==="INDIVIDUAL"?"Tách cá nhân · ":""}{item.kind==="REPLACEMENT"?"Chuyển sang đề tài khác":"Điều chỉnh tên và phạm vi"}</p>
       <h3>{item.proposed_title}</h3></div><span className={"change-status change-status--"+item.state.toLowerCase()}>{labels[item.state]}</span></div>
     <ol className="change-steps" aria-label="Tiến trình xét duyệt">
       {["Thành viên đồng ý","GVHD xem xét","Bộ môn quyết định","Kết quả"].map((text,index)=><li key={text} aria-current={pending(item)&&index===current?"step":undefined}
@@ -62,7 +63,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
       {item.review_roles.map(role=><button key={role} className="btn btn-primary" disabled={!groupReady} onClick={()=>open({kind:"review",item,role})}>{labels[role]} xem xét</button>)}
       {item.can_decide&&<button className="btn btn-primary" onClick={()=>open({kind:"decision",item})}>Bộ môn xét duyệt</button>}
       {item.can_cancel&&<button className="btn btn-secondary" onClick={()=>open({kind:"cancel",item})}>Hủy yêu cầu</button>}
-      {item.state==="APPROVED"&&<Link to={`/theses/${item.thesis_id}?section=submissions`} className="btn btn-primary">Cập nhật hồ sơ <ChevronRight size={16}/></Link>}
+      {item.state==="APPROVED"&&<Link to={`/theses/${item.scope==="INDIVIDUAL"&&item.requested_by===userId?item.result_thesis_id:item.thesis_id}?section=submissions`} className="btn btn-primary">Cập nhật hồ sơ <ChevronRight size={16}/></Link>}
     </div><p className="change-meta">Gửi lúc {when(item.submitted_at)} · Phiên bản {item.row_version}</p>
   </div></article>;
 }
@@ -71,22 +72,20 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
   submit:(path:string,data:unknown,version:number,method?:string)=>Promise<void>}) {
   const op=operation;
   const [kind,setKind]=useState("ADJUSTMENT");
+  const [scope,setScope]=useState("GROUP");
   const [target,setTarget]=useState("");
   const [answer,setAnswer]=useState(op.kind==="decision"?"APPROVE":"AGREE");
   const [confirmed,setConfirmed]=useState(false);
   const t="thesis" in op?op.thesis:null;
   const item="item" in op?op.item:null;
   const candidate=t?.candidates.find(c=>c.id===target);
-  const titles={create:"Đề nghị đổi đề tài",extension:"Ghi nhận gia hạn KLTN",start:"Thiết lập ngày bắt đầu",
+  const titles={create:"Đề nghị đổi đề tài",start:"Thiết lập ngày bắt đầu",
     consent:"Xác nhận của thành viên",review:"Ý kiến của giảng viên",decision:"Quyết định của bộ môn",cancel:"Hủy yêu cầu đổi đề tài"};
   async function save(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();const f=new FormData(e.currentTarget);const reason=formText(f,"reason");
-    if(op.kind==="create"&&t)await submit(`/theses/${t.id}/change-requests`,{kind,reason,confirm_consequences:confirmed,
+    if(op.kind==="create"&&t)await submit(`/theses/${t.id}/change-requests`,{kind,scope,reason,confirm_consequences:confirmed,
       proposed_title:kind==="ADJUSTMENT"?formText(f,"title"):"",proposed_description:kind==="ADJUSTMENT"?formText(f,"description"):"",
       target_topic_id:kind==="REPLACEMENT"?target:null},t.row_version);
-    if(op.kind==="extension"&&t)await submit(`/theses/${t.id}/extension`,{decision_on:formText(f,"day"),
-      until_at:formText(f,"until")+":00+07:00",reference:formText(f,"reference"),reason,
-      evidence_file_id:formText(f,"file")||null,confirm_decision:confirmed},t.row_version);
     if(op.kind==="start"&&t)await submit(`/withdrawal-rounds/${t.round_id}/start`,{starts_on:formText(f,"day"),reference:formText(f,"reference")},t.round_version,"PUT");
     if(op.kind==="consent"&&item)await submit(`/thesis-changes/${item.id}/consent`,{decision:answer},item.row_version);
     if(op.kind==="review"&&item)await submit(`/thesis-changes/${item.id}/advisor-review`,{role:op.role,decision:answer,reason},item.row_version);
@@ -96,15 +95,17 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
   return <Dialog open title={titles[op.kind]} onClose={close} size="lg" busy={busy} footer={<>
     <button type="button" className="btn btn-secondary" disabled={busy} onClick={close}>Quay lại</button>
     <button className="btn btn-primary" form="thesis-change-operation" type="submit" disabled={busy||(
-      ["create","extension"].includes(op.kind)&&!confirmed)||(op.kind==="decision"&&answer==="APPROVE"&&!item?.ready)}>
-      {busy?"Đang xử lý…":op.kind==="create"?"Gửi yêu cầu":op.kind==="extension"?"Ghi nhận quyết định":"Xác nhận"}</button></>}>
+      op.kind==="create"&&!confirmed)||(op.kind==="decision"&&answer==="APPROVE"&&!item?.ready)}>
+      {busy?"Đang xử lý…":op.kind==="create"?"Gửi yêu cầu":"Xác nhận"}</button></>}>
     <form id="thesis-change-operation" className="change-form" onSubmit={e=>void save(e)}>
       {error&&<p role="alert" className="alert alert-danger">{error}</p>}
       <fieldset disabled={busy} className="change-fieldset">
       {t&&<p className="change-context"><strong>{t.title}</strong><span>{t.round_label}</span></p>}
       {op.kind==="create"&&t&&<>
+        {t.member_count>1&&<label>Phạm vi thay đổi<select aria-label="Phạm vi thay đổi" className="input" value={scope} onChange={e=>{setScope(e.target.value);setTarget("");if(e.target.value==="INDIVIDUAL")setKind("REPLACEMENT");}}><option value="GROUP">Cả nhóm cùng thay đổi đề tài</option><option value="INDIVIDUAL">Tôi chuyển sang đề tài khác, nhóm còn lại tiếp tục</option></select></label>}
+        {scope==="INDIVIDUAL"&&<p className="alert alert-info">Bạn vẫn thuộc nhóm hiện tại khi chờ xét. Chỉ khi TBM duyệt, hệ thống mới tạo hồ sơ riêng; nhóm còn lại giữ đề tài và GVHD cũ. Hai bên cần cập nhật Mẫu 1–3.</p>}
         <div className="change-type-options">
-          <label className={kind==="ADJUSTMENT"?"is-selected":""}><input type="radio" name="kind" checked={kind==="ADJUSTMENT"} onChange={()=>setKind("ADJUSTMENT")}/>
+          <label className={kind==="ADJUSTMENT"?"is-selected":""}><input type="radio" name="kind" disabled={scope==="INDIVIDUAL"} checked={kind==="ADJUSTMENT"} onChange={()=>setKind("ADJUSTMENT")}/>
             <span><strong>Điều chỉnh đề tài đang làm</strong><small>Đổi tên, mục tiêu hoặc phạm vi với GVHD hiện tại.</small></span></label>
           <label className={kind==="REPLACEMENT"?"is-selected":""}><input type="radio" name="kind" checked={kind==="REPLACEMENT"} onChange={()=>setKind("REPLACEMENT")}/>
             <span><strong>Chuyển sang đề tài khác</strong><small>Chọn đề tài còn trống trong cùng đợt, cùng bộ môn.</small></span></label>
@@ -114,26 +115,14 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
           <label htmlFor="change-description">Mục tiêu và phạm vi mới</label>
           <textarea id="change-description" name="description" className="input" required minLength={20} maxLength={10000} rows={5} defaultValue={t.description}/>
         </>:<>
-          <label>Đề tài mới<select className="input" required value={target} onChange={e=>setTarget(e.target.value)}><option value="">Chọn đề tài</option>
-            {t.candidates.map(c=><option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</select></label>
+          <label>Đề tài mới<select aria-label="Đề tài mới" className="input" required value={target} onChange={e=>setTarget(e.target.value)}><option value="">Chọn đề tài</option>
+            {t.candidates.filter(c=>scope==="INDIVIDUAL"?c.individual_available:c.group_available).map(c=><option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</select></label>
           {!t.candidates.length&&<p className="alert alert-warning">Chưa có đề tài trống phù hợp. Liên hệ bộ môn để được hướng dẫn.</p>}
           {candidate&&<div className="change-target"><strong>{candidate.title}</strong><p>GVHD · {candidate.advisor} · Tối đa {candidate.capacity} sinh viên</p><p className="change-prose">{candidate.description}</p></div>}
         </>}
         <label>Lý do thay đổi<textarea name="reason" className="input" required minLength={10} maxLength={3000} rows={3}/></label>
         <p className="change-note">Sau khi được duyệt, nhóm cập nhật Mẫu 1–3 và báo cáo theo đề tài mới. Mọi thành viên và GVHD liên quan cần đồng ý trước khi bộ môn xét duyệt.</p>
         <label className="change-checkbox"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>Tôi đồng ý nội dung đề nghị và việc cập nhật hồ sơ sau khi được duyệt.</span></label>
-      </>}
-      {op.kind==="extension"&&t&&<>
-        <p>Ghi nhận quyết định gia hạn đã được giải quyết. Áp dụng cho khóa luận này và các thành viên đang thực hiện.</p>
-        <div className="change-facts"><div><span>Hạn báo cáo của đợt</span><strong>{when(t.baseline_due)}</strong></div><div><span>Giới hạn tối đa</span><strong>{when(t.extension_max)}</strong></div></div>
-        <div className="change-field-grid"><label>Ngày quyết định<input name="day" type="date" className="input" required max={new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Ho_Chi_Minh"})}/></label>
-          <label>Hạn mới (giờ Việt Nam)<input name="until" type="datetime-local" className="input" required max={t.extension_max?local(t.extension_max):undefined}/></label></div>
-        <label>Số hoặc căn cứ quyết định<input name="reference" className="input" required minLength={5} maxLength={500}/></label>
-        <label>Lý do gia hạn<textarea name="reason" className="input" required minLength={10} maxLength={3000} rows={3}/></label>
-        <label>Minh chứng trong hồ sơ (nếu có)<select name="file" className="input"><option value="">Không có tệp đính kèm</option>
-          {t.evidence.map(file=><option value={file.id} key={file.id}>{file.name}</option>)}</select></label>
-        <p className="change-note">Có thể nộp quyết định tại tài liệu hỗ trợ để chọn ở đây. Giới hạn một lần, tối đa 5 tháng từ hạn cũ. Điểm tạm ghi nhận khi gia hạn là I.</p>
-        <label className="change-checkbox"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>Tôi đã đối chiếu quyết định và xác nhận các thông tin được ghi nhận.</span></label>
       </>}
       {op.kind==="start"&&<>
         <p>Mốc của cả đợt dùng tính 14 ngày đổi đề tài và xin thôi. Khi đã có yêu cầu, hệ thống khóa mốc để giữ đúng hạn.</p>
@@ -160,6 +149,8 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
 export default function ThesisChangesPage({context}:{context:Context}) {
   const [params,setParams]=useSearchParams();
   const [data,setData]=useState<Workspace>();
+  const [view,setView]=useState<"CHANGE"|"EXTENSION">(params.has("extension")?"EXTENSION":"CHANGE");
+  useEffect(()=>{if(params.has("extension"))setView("EXTENSION");},[params]);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState(false);
@@ -223,23 +214,26 @@ export default function ThesisChangesPage({context}:{context:Context}) {
             {selected.extension?<div className="extension-receipt"><span className="change-status change-status--approved">Đã ghi nhận một lần</span>
               <p>Hạn được gia hạn<strong>{when(selected.extension.until_at)}</strong></p>
               <details><summary>Xem quyết định</summary><dl><dt>Số / căn cứ</dt><dd>{selected.extension.reference}</dd><dt>Ngày quyết định</dt><dd>{shortDate(selected.extension.decision_on)}</dd>
-                <dt>Lý do</dt><dd>{selected.extension.reason}</dd><dt>Người ghi nhận</dt><dd>{selected.extension.recorded_by}</dd><dt>Thời điểm</dt><dd>{when(selected.extension.recorded_at)}</dd>
+                <dt>Bắt đầu theo quyết định</dt><dd>{when(selected.extension.extension_starts_at)}</dd><dt>Lý do</dt><dd>{selected.extension.reason}</dd><dt>Người ghi nhận</dt><dd>{selected.extension.recorded_by}</dd><dt>Thời điểm</dt><dd>{when(selected.extension.recorded_at)}</dd>
                 <dt>Minh chứng</dt><dd>{selected.extension.file?<button type="button" className="btn btn-secondary btn-sm" onClick={()=>{
                   void downloadEvaluationFile(`/theses/${selected.id}/extension/evidence`,selected.extension!.file!.name).catch(cause=>setError(errorMessage(cause)));
                 }}>Tải {selected.extension.file.name}</button>:"Chưa đính kèm"}</dd></dl></details></div>:<>
-              <p className="text-muted">Ghi nhận quyết định gia hạn đã được giải quyết, tối đa một lần và không quá 5 tháng từ hạn báo cáo cũ.</p>
-              {selected.can_extend?<button className="btn btn-secondary" onClick={()=>open({kind:"extension",thesis:selected})}>Ghi nhận gia hạn</button>:
-                <p className="change-note">{selected.extension_blocker||"Liên hệ TBM hoặc điều phối đợt khi đã có quyết định gia hạn."}</p>}
+              <p className="text-muted">Theo dõi nguyện vọng gia hạn và kết quả xử lý. Chỉ ghi nhận một lần; ngày bắt đầu gia hạn phải theo quyết định đã đối chiếu.</p>
+              <button className="btn btn-secondary" onClick={()=>setView("EXTENSION")}>{selected.can_request_extension?"Xin gia hạn / theo dõi":"Theo dõi yêu cầu gia hạn"}</button>
+              <p className="change-note">{selected.extension_request_blocker||"SV gửi yêu cầu; nhóm đồng thuận, GVHD cho ý kiến rồi TBM xét theo căn cứ quyết định."}</p>
             </>}
           </div></section>}
         </aside>
         <section className="changes-main">
+          <nav className="assignment-tabs" aria-label="Nghiệp vụ thay đổi"><button type="button" className={"assignment-tabs__link "+(view==="CHANGE"?"is-active":"")} onClick={()=>setView("CHANGE")}>Đổi / tách đề tài</button><button type="button" className={"assignment-tabs__link "+(view==="EXTENSION"?"is-active":"")} onClick={()=>setView("EXTENSION")}>Xin gia hạn KLTN</button></nav>
+          {view==="EXTENSION"?<ThesisExtensionRequests policyConfirmed={data.extension_policy_confirmed} userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
           <div className="changes-toolbar"><h2><History size={19} aria-hidden="true"/>Yêu cầu đổi đề tài</h2><div className="changes-tools">
             <label className="changes-search"><span className="sr-only">Tìm yêu cầu</span><Search size={16} aria-hidden="true"/><input className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm đề tài hoặc mã…"/></label>
             <label><span className="sr-only">Trạng thái yêu cầu</span><select className="input" value={filter} onChange={e=>setFilter(e.target.value)}><option value="OPEN">Đang xử lý</option><option value="ALL">Tất cả và lịch sử</option></select></label>
           </div></div>
           {!requests.length?<div className="changes-empty card"><CheckCircle2 size={32} aria-hidden="true"/><h3>Không có yêu cầu trong bộ lọc</h3><p>Yêu cầu mới và tiến trình xét duyệt sẽ hiển thị ở đây.</p></div>:
             requests.map(item=><ChangeCard key={item.id+":"+item.row_version} item={item} userId={context.user_id} open={open}/>)}
+          </>}
         </section>
       </div>}
     </>}

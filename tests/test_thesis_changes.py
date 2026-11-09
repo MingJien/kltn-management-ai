@@ -56,7 +56,7 @@ def test_change_requires_group_advisor_and_head_and_invalidates_old_evidence(wor
     ctx=workspace
     client,users,students,lecturers,session,path=ctx
     item=submit(ctx)
-    assert listing(ctx,2)=={"theses":[],"requests":[]}
+    assert listing(ctx,2)=={"theses":[],"requests":[],"extension_requests":[],"extension_policy_confirmed":False}
     act(ctx,item,"advisor-review",3,{"role":"CURRENT_ADVISOR","decision":"AGREE","reason":"Premature decision"},409)
     act(ctx,item,"decision",4,{"decision":"APPROVE","reason":"Missing agreements"},409)
     act(ctx,item,"decision",0,{"decision":"APPROVE","reason":"Student is not head"},403)
@@ -149,33 +149,14 @@ def test_change_deadline_is_inclusive_and_no_new_request_after_boundary(workspac
     assert result.status_code==409
 
 
-def test_extension_changes_only_this_report_deadline_and_requires_clean_own_evidence(workspace):
+def test_legacy_extension_endpoint_cannot_bypass_student_request(workspace):
     client,users,_,_,session,path=workspace
     thesis=session.get(m.Thesis,UUID(path.split("/")[-1]))
-    old_due=now()-timedelta(days=1)
-    baseline=m.DocumentDeadline(round_id=thesis.round_id,document_type="REPORT",due_at=old_due,state="CLOSED",
-        set_by=users[4].id,reason="Original synthetic report cutoff")
-    session.add(baseline);session.commit()
-    data={"decision_on":now().astimezone(service.VN).date().isoformat(),"until_at":(now()+timedelta(days=30)).isoformat(),
-        "reference":"QD-TEST-EXT-01","reason":"Extension granted following official review","confirm_decision":True}
-    endpoint=path+"/extension"
-    headers=version_headers(users[4],{"row_version":thesis.row_version})
-    assert client.post(endpoint,headers=version_headers(users[0],{"row_version":thesis.row_version}),json=data).status_code==403
-    assert client.post(endpoint,headers=headers,json={**data,"until_at":(now()+timedelta(days=170)).isoformat()}).status_code==422
-    assert client.post(endpoint,headers=headers,json={**data,"evidence_file_id":str(uuid4())}).status_code==404
-    response=client.post(endpoint,headers=headers,json=data)
-    assert response.status_code==201,response.text
-    assert response.json()["interim_grade"]=="I"
-    assert session.get(m.DocumentDeadline,baseline.id).due_at==old_due
-    thesis=session.get(m.Thesis,thesis.id)
-    assert thesis.state=="EXTENDED"
-    assert client.post(endpoint,headers=version_headers(users[4],{"row_version":thesis.row_version}),json=data).status_code==409
-    doc=client.post(path+"/documents",headers=hdr(users[0]),json={"document_type":"REPORT","title":"Extended report"}).json()
-    upload=client.post(path+f"/documents/{doc['id']}/versions",
-        headers={**version_headers(users[0],doc),"X-File-Name":"new-report.pdf"},content=synthetic_pdf())
-    assert upload.status_code==201,upload.text
-    assert not upload.json()["versions"][0]["late"]
-    assert client.get(path,headers=hdr(users[1])).json()["extension_until_at"]
+    response=client.post(path+"/extension",headers=version_headers(users[4],{"row_version":thesis.row_version}),json={
+        "decision_on":now().date().isoformat(),"until_at":(now()+timedelta(days=30)).isoformat(),
+        "reference":"SYN-OLD-API","reason":"Synthetic external recording","confirm_decision":True})
+    assert response.status_code==409 and "SV gửi yêu cầu" in response.json()["detail"]
+
 
 def test_approval_failure_rolls_back_title_forms_and_request(workspace,monkeypatch):
     from fastapi import HTTPException

@@ -109,3 +109,10 @@
   .change-card__heading>div {flex-basis:100%}
   .change-card__heading h3 {overflow-wrap:anywhere}
 }
+
+.extension-date-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.extension-date-grid>div {min-width:0;background:#f8fafc;border-radius:10px;padding:14px}
+.extension-date-grid span {font-size:.8rem;color:#475569}
+.extension-date-grid p {margin:6px 0 0;font-weight:600;line-height:1.7;overflow-wrap:anywhere}
+.change-status--expired {background:#fff7ed;color:#9a3412}
+@media(max-width:600px){.extension-date-grid {grid-template-columns:minmax(0,1fr)}}

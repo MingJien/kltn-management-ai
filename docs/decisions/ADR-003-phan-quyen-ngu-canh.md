@@ -34,4 +34,4 @@ Giữ ba base role ADMIN, LECTURER, STUDENT. Chức danh tổ chức, phân côn
 
 - [Actor và vai trò](../requirements/actors-and-roles.md)
 - [Ma trận phân quyền](../requirements/permission-matrix.md)
-- [Quyết định thiết kế hiện hành](quyet-dinh-du-an-2026-09-25.md)
+- [Yêu cầu và quy tắc nghiệp vụ](../requirements/business-rules.md)

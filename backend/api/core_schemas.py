@@ -18,6 +18,7 @@ class LecturerAssignment(BaseModel):
 
 
 class MilestoneCreate(BaseModel):
+    scope: Literal["ROUND", "THESIS"] = "ROUND"
     code: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Z0-9_-]{1,50}$")]
     title: ShortText
     due_at: AwareDatetime
@@ -143,6 +144,8 @@ class RegistrationFormsOut(BaseModel):
 
 
 class MilestoneOut(BaseModel):
+    scope: Literal["ROUND", "THESIS"] = "ROUND"
+    thesis_id: UUID | None = None
     id: UUID
     code: str
     title: str

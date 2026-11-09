@@ -592,11 +592,16 @@ class SignatureConfirmation(UuidPrimaryKeyMixin, TimestampMixin, Base):
 
 class ProgressMilestone(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "progress_milestone"
+    thesis_id: Mapped[Optional[uuid.UUID]] = fk("thesis.id", nullable=True)
     __table_args__ = (
-        UniqueConstraint("round_id", "code", "version_no"),
+        Index("uq_milestone_round_version", "round_id", "code", "version_no", unique=True,
+            postgresql_where=text("thesis_id IS NULL")),
+        Index("uq_milestone_thesis_version", "thesis_id", "code", "version_no", unique=True,
+            postgresql_where=text("thesis_id IS NOT NULL")),
+        CheckConstraint("(thesis_id IS NULL AND source_type IN ('ROUND_POLICY','STUDENT_PLAN')) OR (thesis_id IS NOT NULL AND source_type = 'ADVISOR')", name="scope"),
         CheckConstraint("version_no > 0", name="version_positive"),
         CheckConstraint("expected_ratio IS NULL OR (expected_ratio >= 0 AND expected_ratio <= 100)", name="expected_ratio"),
-        CheckConstraint("source_type IN ('ROUND_POLICY','STUDENT_PLAN')", name="source_type"),
+        CheckConstraint("source_type IN ('ROUND_POLICY','STUDENT_PLAN','ADVISOR')", name="source_type"),
         CheckConstraint("state IN ('DRAFT','OPEN','CLOSED','CANCELLED')", name="state"),
     )
     round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
@@ -895,8 +900,10 @@ class DefenseCouncil(UuidPrimaryKeyMixin, TimestampMixin, Base):
 
 class ThesisChangeRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "thesis_change_request"
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="GROUP", server_default="GROUP")
     __table_args__ = (
         CheckConstraint("kind IN ('ADJUSTMENT','REPLACEMENT')", name="kind"),
+        CheckConstraint("scope IN ('GROUP','INDIVIDUAL') AND (scope = 'GROUP' OR kind = 'REPLACEMENT')", name="scope"),
         CheckConstraint("state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')", name="state"),
         CheckConstraint("length(trim(reason)) >= 10", name="reason"),
         CheckConstraint("state != 'APPROVED' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL)", name="decision"),
@@ -957,3 +964,48 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     minutes: Mapped[dict] = mapped_column(JSONB, nullable=False)
     finalized_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class ThesisExtensionRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "thesis_extension_request"
+    __table_args__ = (
+        CheckConstraint("state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED','EXPIRED')", name="state"),
+        CheckConstraint("requested_until_at > original_due_at", name="requested_window"),
+        CheckConstraint("length(trim(reason)) >= 10", name="reason"),
+        CheckConstraint("consent_due_at IS NULL OR consent_due_at > submitted_at", name="consent_window"),
+        CheckConstraint("(state NOT IN ('APPROVED','REJECTED') OR (decided_by IS NOT NULL AND decided_at IS NOT NULL))", name="decision"),
+        CheckConstraint("state != 'APPROVED' OR (extension_id IS NOT NULL AND extension_starts_at IS NOT NULL)", name="approved_record"),
+        Index("uq_thesis_extension_request_open", "thesis_id", unique=True,
+            postgresql_where=text("state IN ('SUBMITTED','ADVISOR_REVIEWED')")),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    requested_by: Mapped[uuid.UUID] = fk("user_account.id")
+    original_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    requested_until_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str] = mapped_column(Text)
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    state: Mapped[str] = mapped_column(String(25), default="SUBMITTED")
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consent_due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    advisor_reviewed_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    advisor_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    advisor_reason: Mapped[Optional[str]] = mapped_column(Text)
+    decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[Optional[str]] = mapped_column(Text)
+    extension_starts_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    extension_id: Mapped[Optional[uuid.UUID]] = fk("thesis_extension.id", nullable=True)
+
+
+class ThesisExtensionConsent(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "thesis_extension_consent"
+    __table_args__ = (
+        UniqueConstraint("request_id", "student_id"),
+        CheckConstraint("decision IN ('PENDING','AGREE','DECLINE')", name="decision"),
+        CheckConstraint("(decision = 'PENDING' AND responded_by IS NULL AND responded_at IS NULL) OR (decision IN ('AGREE','DECLINE') AND responded_by IS NOT NULL AND responded_at IS NOT NULL)", name="response"),
+    )
+    request_id: Mapped[uuid.UUID] = fk("thesis_extension_request.id")
+    student_id: Mapped[uuid.UUID] = fk("student_profile.id")
+    decision: Mapped[str] = mapped_column(String(20), default="PENDING", server_default="PENDING")
+    responded_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    responded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

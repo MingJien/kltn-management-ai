@@ -52,6 +52,11 @@ def listing(department_id: UUID | None = None, offset: int = Query(default=0, ge
     return service.listing(session, user, department_id, offset, limit)
 
 
+@router.get("/available")
+def available(user=Depends(current_user), session=Depends(transaction)):
+    return service.available_appointments(session, user)
+
+
 @router.post("", status_code=201)
 def grant(data: Grant, user=Depends(current_user), session=Depends(transaction)):
     return service.grant(session, user, data)

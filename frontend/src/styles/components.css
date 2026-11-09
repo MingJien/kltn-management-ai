@@ -1967,3 +1967,9 @@ input[type="file"].input::file-selector-button:hover {
 .notifications__panel .notifications__item { display:grid;grid-template-columns:minmax(0,1fr);align-items:start;justify-items:stretch;gap:6px;line-height:1.55;min-width:0; }
 .notifications__panel .notifications__message { display:block;width:100%;min-width:0;white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.6;font-size:14px; }
 .notifications__panel .notifications__item time { display:block;white-space:nowrap;font-weight:400;font-size:12px;color:#52647b; }
+
+/* Keep progress controls and native file/select fields within narrow screens. */
+.core-form {min-width:0;grid-template-columns:minmax(0,1fr)}
+.core-form .input-group,.progress-form-row>* {min-width:0}
+.core-form .input {min-width:0;max-width:100%;width:100%}
+.core-fields {grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))}

@@ -14,7 +14,7 @@ from backend.db.metadata import target_metadata
 from backend.db.validate_schema import load_env
 from tools.official_schema import SELECTED_TABLES
 
-HEAD = "20261104_0022"
+HEAD = "20261108_0023"
 
 
 def main() -> int:

@@ -2,7 +2,7 @@ import WorkflowSteps from "./WorkflowSteps";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Lecturer, ProgressReport, Proposal, Thesis, ThesisDocument } from "../../api";
-import { Status } from "./CoreForms";
+import { Status, formatDate } from "./CoreForms";
 import DocumentDeadlines from "./DocumentDeadlines";
 import RegistrationSubmission from "./RegistrationSubmission";
 import ThesisDocuments, { type CoreRun } from "./ThesisDocuments";
@@ -24,6 +24,8 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
       {kind:"REPORT", label:"Cuốn báo cáo KLTN", code:"Báo cáo trước bảo vệ", description:"Bản báo cáo hoàn chỉnh của đề tài", state:docs.find(doc => doc.document_type === "REPORT")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "REPORT" && doc.versions[0]?.state === "SUBMITTED")},
     ] : []),
   ];
+  const effectiveDeadlines = deadlines.map(item => item.document_type === "REPORT" && thesis.extension_until_at && Date.parse(thesis.extension_until_at) > Date.parse(item.due_at)
+    ? {...item, due_at:thesis.extension_until_at, state:Date.now() <= Date.parse(thesis.extension_until_at) ? "OPEN" : "CLOSED"} as DocumentDeadline : item);
   const displayed = pendingOnly ? choices.filter(item => item.pending) : choices;
   const filter = canProcess && <label className="submission-filter"><input type="checkbox" checked={pendingOnly} onChange={event => setPendingOnly(event.target.checked)}/>Chờ tôi xử lý ({choices.filter(item => item.pending).length} loại hồ sơ)</label>;
   const current = displayed.find(item => item.kind === kind) || displayed.find(item => item.kind === "PLAN") || displayed[0];
@@ -50,7 +52,8 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
       </>}
       {["PLAN","REPORT"].includes(selected) && <>
         <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT"]} />
-        <ThesisDocuments thesis={thesis} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT"} pendingOnly={pendingOnly} />
+        {selected === "REPORT" && thesis.extension_until_at && <p className="alert alert-info">Hạn hoàn thành riêng đã được gia hạn đến <strong>{formatDate(thesis.extension_until_at)}</strong>. Hạn chung của đợt vẫn giữ nguyên; bản đã được tiếp nhận chỉ nộp lại khi GVHD yêu cầu sửa.</p>}
+        <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT"} pendingOnly={pendingOnly} />
       </>}
     </div>
     {docs.some(doc => doc.document_type === "SUPPORTING" && !doc.title.startsWith("Minh chứng tiến độ ")) && <details className="card"><summary>Hồ sơ tài liệu đã nộp trước đây</summary><div className="card-body"><ThesisDocuments thesis={{...thesis, actions: thesis.actions.filter(action => action !== "document:submit")}} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind="SUPPORTING" legacyOnly /></div></details>}

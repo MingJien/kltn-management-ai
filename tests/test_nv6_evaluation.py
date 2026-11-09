@@ -271,12 +271,16 @@ def test_reviewer_deadline_extension_has_authority_concurrency_and_notification(
     assert any("gia hạn gửi nhận xét" in item["message"] for item in inbox)
 
 
-def test_cross_department_reviewer_is_rejected(evaluation):
+def test_faculty_wide_reviewer_accepts_other_department_but_rejects_locked_account(evaluation):
     ctx,_=evaluation;client,users,_,lecturers,session,path=ctx
     original=session.get(m.Department,lecturers[2].department_id)
     other=m.Department(id=uuid4(),faculty_id=original.faculty_id,code="SYN-"+uuid4().hex[:12],name="Synthetic other department")
     session.add(other);session.flush();lecturers[2].department_id=other.id;session.commit()
-    assert assign(ctx).status_code==422
+    assigned=assign(ctx)
+    assert assigned.status_code==201,assigned.text
+    # End the first assignment before testing a locked candidate.
+    row=session.scalar(select(m.ReviewerAssignment).where(m.ReviewerAssignment.lecturer_id==lecturers[2].id,m.ReviewerAssignment.state=="ACTIVE"))
+    row.state="REVOKED"
     lecturers[2].department_id=original.id;users[5].status="LOCKED";session.commit()
     assert assign(ctx).status_code==422
 
@@ -368,7 +372,7 @@ def test_computing_departments_can_assign_cross_reviewer(evaluation, source_code
     assert "evaluation:reviewer" in get(ctx,5)["actions"]
 
 
-def test_cross_reviewer_rejects_other_faculty_and_unrelated_department(evaluation):
+def test_cross_reviewer_rejects_other_faculty_and_accepts_same_faculty(evaluation):
     ctx,_=evaluation
     _,_,_,lecturers,session,_=ctx
     source=session.get(m.Department,lecturers[0].department_id)
@@ -380,5 +384,10 @@ def test_cross_reviewer_rejects_other_faculty_and_unrelated_department(evaluatio
     session.add_all([outside,engineering]);session.flush()
     for department in [outside,engineering]:
         lecturers[2].department_id=department.id;session.commit()
-        assert str(lecturers[2].id) not in {candidate["id"] for candidate in get(ctx)["candidates"]}
-        assert assign(ctx).status_code==422
+        candidates={candidate["id"] for candidate in get(ctx)["candidates"]}
+        if department.id==outside.id:
+            assert str(lecturers[2].id) not in candidates
+            assert assign(ctx).status_code==422
+        else:
+            assert str(lecturers[2].id) in candidates
+            assert assign(ctx).status_code==201

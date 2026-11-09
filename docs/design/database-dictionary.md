@@ -227,7 +227,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 09. `document_version` — Phiên bản tài liệu
 
 **Mục đích và lý do tồn tại:** Nộp tài liệu bất biến. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiên bản tài liệu hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Nộp tài liệu bất biến; `backend/api/account_admin.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/review_form_export.py`, `backend/services/withdrawals.py`.
+**Use case/API/service:** Nộp tài liệu bất biến; `backend/api/account_admin.py`, `backend/services/activity.py`, `backend/services/documents.py`, `backend/services/evaluation.py`, `backend/services/progress.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/review_form_export.py`.
 **Vai trò thao tác:** SV thành viên nộp bản mới; GVHD nhận xét; chỉ actor có quyền trên khóa luận được tải.
 **Tình huống giả:** Lần nộp báo cáo thứ hai là v2, giữ nguyên v1 và SHA-256.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -257,7 +257,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 10. `eligibility_snapshot` — Kết quả điều kiện đăng ký
 
 **Mục đích và lý do tồn tại:** Xác nhận đủ điều kiện theo đợt. Nếu bỏ, mất dữ liệu/quan hệ riêng của kết quả điều kiện đăng ký hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`.
+**Use case/API/service:** Xác nhận đủ điều kiện theo đợt; `backend/api/account.py`, `backend/api/account_admin.py`, `backend/api/main.py`, `backend/api/roster.py`, `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/roster.py`, `backend/services/school_forms.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Người Khoa được giao ELIGIBILITY_IMPORTER/VERIFIER theo đợt; SV chỉ xem kết quả của mình.
 **Tình huống giả:** Khoa xác nhận SV-DEMO đủ điều kiện đợt chính theo danh sách nguồn; quyết định đặc biệt tạo snapshot v2 có số quyết định Hiệu trưởng.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -643,7 +643,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 23. `proposal` — Hồ sơ đề cương
 
 **Mục đích và lý do tồn tại:** Trạng thái xét duyệt đề cương. Nếu bỏ, mất dữ liệu/quan hệ riêng của hồ sơ đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Trạng thái xét duyệt đề cương; `backend/services/activity.py`, `backend/services/membership_revision.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/theses.py`, `backend/services/withdrawals.py`.
+**Use case/API/service:** Trạng thái xét duyệt đề cương; `backend/services/activity.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`, `backend/services/theses.py`, `backend/services/withdrawals.py`.
 **Vai trò thao tác:** SV thành viên nộp; GVHD xác nhận; GV được giao góp ý; TBM chốt; Trưởng khoa ghi bản ký.
 **Tình huống giả:** Khóa luận DEMO có một hồ sơ đề cương đang chờ GVHD xác nhận.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -694,7 +694,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 25. `proposal_version` — Phiên bản đề cương
 
 **Mục đích và lý do tồn tại:** Bản nộp đề cương bất biến. Nếu bỏ, mất dữ liệu/quan hệ riêng của phiên bản đề cương hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Bản nộp đề cương bất biến; `backend/services/activity.py`, `backend/services/membership_revision.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`.
+**Use case/API/service:** Bản nộp đề cương bất biến; `backend/services/activity.py`, `backend/services/progress_annotations.py`, `backend/services/proposal_export.py`, `backend/services/proposals.py`.
 **Vai trò thao tác:** SV thành viên nộp bản mới sau yêu cầu sửa; GVHD/GV góp ý và người chốt xem đúng phạm vi.
 **Tình huống giả:** SV-DEMO nộp đề cương v2 PDF; v1 vẫn tải được và có mã băm riêng.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -808,7 +808,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 29. `reviewer_assignment` — Phân công góp ý đề cương và phản biện KLTN
 
 **Mục đích và lý do tồn tại:** Người phản biện, căn cứ phân công và hạn gửi nhận xét. Nếu bỏ, mất dữ liệu/quan hệ riêng của phân công góp ý đề cương và phản biện kltn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Người phản biện, căn cứ phân công và hạn gửi nhận xét; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/lecturer_profiles.py`, `backend/services/proposals.py`, `backend/services/theses.py`, `backend/services/withdrawals.py`.
+**Use case/API/service:** Người phản biện, căn cứ phân công và hạn gửi nhận xét; `backend/services/account_directory.py`, `backend/services/activity.py`, `backend/services/evaluation.py`, `backend/services/lecturer_profiles.py`, `backend/services/proposals.py`, `backend/services/theses.py`.
 **Vai trò thao tác:** Trưởng bộ môn phân công giảng viên góp ý; chỉ người được giao và người trong hồ sơ xem.
 **Tình huống giả:** TBM giao GV khác GVHD góp ý đúng hồ sơ đề cương DEMO.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.
@@ -1045,7 +1045,7 @@ Sinh từ metadata SQLAlchemy của revision Alembic `20261102_0019`; 43 bảng 
 ## 37. `thesis_withdrawal_request` — Yêu cầu xin thôi thực hiện KLTN
 
 **Mục đích và lý do tồn tại:** Đơn theo từng SV, xác nhận GVHD và kết quả xử lý ngoài hệ thống; không xóa hồ sơ cũ. Nếu bỏ, mất dữ liệu/quan hệ riêng của yêu cầu xin thôi thực hiện kltn hoặc không còn kiểm được lịch sử và quyền liên quan.
-**Use case/API/service:** Đơn theo từng SV, xác nhận GVHD và kết quả xử lý ngoài hệ thống; không xóa hồ sơ cũ; `backend/services/activity.py`, `backend/services/membership_revision.py`, `backend/services/registration.py`, `backend/services/withdrawals.py`, `backend/services/workflow_notices.py`.
+**Use case/API/service:** Đơn theo từng SV, xác nhận GVHD và kết quả xử lý ngoài hệ thống; không xóa hồ sơ cũ; `backend/services/activity.py`, `backend/services/registration.py`, `backend/services/withdrawals.py`, `backend/services/workflow_notices.py`.
 **Vai trò thao tác:** SV gửi / hủy đơn của mình trước xác nhận; GVHD chính xác nhận / trả lại. KLTN_COORDINATOR đúng đợt ghi nhận kết quả ngoài hệ thống kèm bản đơn sạch và căn cứ. Admin không tự có quyền nghiệp vụ; thành viên khác không đọc đơn riêng của người xin thôi.
 **Tình huống giả:** SV-DEMO-01 xin thôi trong 02 tuần; GVHD xác nhận; điều phối đối chiếu bản ký và căn cứ bên ngoài để ghi nhận. SV-DEMO-02 tiếp tục cùng đề tài, nộp đề cương v2 để duyệt lại.
 **Trạng thái sử dụng:** Đọc/ghi trực tiếp trong API/service.

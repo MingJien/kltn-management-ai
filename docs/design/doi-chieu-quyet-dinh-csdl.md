@@ -1,23 +1,20 @@
-# Đối chiếu quyết định mới với CSDL PostgreSQL
+# Đối chiếu nghiệp vụ với CSDL đang dùng
 
-Tài liệu này trả lời câu hỏi “đổi nghiệp vụ thì bảng/cột nào chịu ảnh hưởng?”. Ngày đối chiếu: 04/10/2026. **Có bảng/cột không có nghĩa chức năng đã chạy**: CHECK/FK giữ tính hợp lệ cục bộ; quyền, chuyển trạng thái và nhiều quy tắc cần service/API và kiểm thử.
+Ngày kiểm tra gần nhất: 20/10/2026. Phạm vi vật lý là PostgreSQL `kltn_management`, revision `20261020_0002`: 32 bảng nghiệp vụ và `alembic_version`. Validator đối chiếu cột, khóa và ràng buộc với metadata chính thức.
 
-| Quyết định | Bảng/cột hiện có | Đã đủ cấu trúc? | Phần ứng dụng/nguồn còn thiếu |
-| --- | --- | --- | --- |
-| SV tự lập nhóm 1–3; từng bạn xác nhận trước gửi; GV không thêm sau gửi | `topic_registration.state`, `registration_member.registration_id/student_id/active/consent_status/responded_by_user_id/responded_at`, `thesis_member` | Migration 0007 có cột và CHECK chứng cứ phản hồi; unique chặn một SV trong nhiều đăng ký active/đợt. Service phải kiểm đúng tài khoản, đủ 1–3 ACCEPTED và khóa từ SUBMITTED. | API/UI đã kiểm từng SV tự xác nhận, nhóm trưởng gửi sau đủ đồng thuận, khóa thành viên từ SUBMITTED; chưa vận hành với dữ liệu thật. |
-| GVHD quản lý tiến độ; checkpoint đề cương và báo cáo nội bộ ~70% | `progress_milestone.round_id/code/due_at/expected_ratio/version_no`; `progress_report.thesis_id/milestone_id/reported_ratio`; `progress_review.reviewer_id/comment`; `advisor_assignment`, `resource_assignment` | Có chỗ lưu mốc, bài báo cáo và nhiều người nhận xét. Ngày tháng 12 là dữ liệu cấu hình theo đợt, không là CHECK cố định. | Migration 0005 đã thêm `COMMENT_ONLY` cho ý kiến chéo; chỉ GVHD chính được xác nhận tiến độ ở tầng service. Workflow service chưa có runtime. |
-| Chỉ áp dụng điều kiện bảo vệ cấp Trường ở đợt này | `defense_eligibility_check.discipline_result/completion_result/advisor_result/local_policy_result/result`, `round_policy` | Có chỗ lưu kết quả và chính sách có phiên bản. `local_policy_result` có thể để NULL khi không có tiêu chí Khoa. | Service phải tính đúng Điều 7 QĐ2919; không lấy ngưỡng đăng ký trong QĐ5964 làm điều kiện bảo vệ. |
-| Xuất biên bản Mẫu 9 lại và phân biệt bản cũ | `council_minute.minute_no/current_version_no/printed_at/signed_at`; `minute_version.version_no/stored_file_id/replacement_for_id/created_at`; `stored_file.sha256`; `audit_event` | Đủ cột để đánh mã phiên bản, thời gian, tệp và liên kết bản trước. Bản cũ không overwrite. | Được VOID/in version mới nếu Thư ký xác nhận giấy chưa ai ký; từ chữ ký đầu không sửa điểm/nội dung. Chưa có mẫu trắng an toàn và runtime export, nên nút chưa hoạt động. |
-| Chủ tịch và Thư ký ký Mẫu 9 | `council_member.role_code`, `minute_signature.minute_version_id/signer_member_id/signed_at` | Có. FK bảo đảm người ký tồn tại; service phải kiểm hai role thuộc đúng phiên và version. | Runtime Mẫu 9 chưa xuất đúng mẫu. Không gán TBM. |
-| Trích dẫn APA theo QĐ885 trong thiết kế | Metadata nguồn/quy tắc ở tầng tài liệu và policy; `document_version`, `stored_file` giữ bản nộp | Không cần thêm cột vật lý chỉ để chọn style. | QĐ885 ghi phạm vi sau đại học; hiệu lực cho KLTN đại học cần Khoa xác nhận trước auto-reject. Chưa có checker tự động đã kiểm chứng. |
-| IN4299N là lựa chọn của SV đủ điều kiện | `eligibility_snapshot`, `thesis_round`, `topic_registration` | Có; SV được xác nhận điều kiện rồi mới đăng ký. | Không ép mọi SV năm cuối vào KLTN; học phần thay thế không nằm trong workflow KLTN này. |
-| Ai xác nhận đủ điều kiện | `eligibility_snapshot.confirmed_by/confirmed_at`, `resource_assignment.assignment_type/round_id/user_id` | Có chỗ lưu người và phạm vi; QĐ2919 giao Khoa phối hợp Phòng Đào tạo ở cấp đơn vị. | Người Khoa được giao theo round sau đối chiếu nguồn Phòng Đào tạo; không mặc định Admin/TBM. |
-| Đề tài SV đề xuất: đăng ký trước, TBM xét đề tài sau | `topic.proposer_type/state/decided_by/decided_at`, `topic_registration.topic_id/state`, `advisor_assignment` | Các bảng/state hiện biểu diễn được thứ tự; không có CHECK yêu cầu Topic.APPROVED lúc tạo registration. Service rẽ nhánh theo proposer_type; GV tiếp nhận quyết định sau khi TBM duyệt, chưa phải phân công GVHD chính thức. | API/UI nhánh SV đã chạy: nhóm chọn GV mong muốn, gửi đăng ký trước, TBM duyệt và xác nhận/đổi GV, GV được từ chối có lý do. |
-| Chấm theo Mẫu 6 2/4/4, thưởng ≤1 và tổng ≤10 | `rubric_template.source_ref/version_no`; `rubric_criterion.parent_id/max_points/criterion_type`; `evaluation_item.points`; `evaluation.bonus_points/total_points`; `final_result` | Có hierarchy và CHECK tổng/bonus. Migration 0006 nạp [ba nhóm/12 tiêu chí](rubric-mau-6.md) đúng nhãn, thứ tự, max và source/version ở trạng thái DRAFT; service vẫn phải kiểm tổng item. | Mẫu 6 là baseline dự án đã chốt. Khác biệt với QĐ2919 được lưu để truy vết; chức năng chấm thật chưa triển khai và rubric chưa gán vào đợt. |
+| Nghiệp vụ hiện tại | Bảng chính | Ghi chú triển khai |
+| --- | --- | --- |
+| Tài khoản và phân quyền | `user_account`, `student_profile`, `lecturer_profile`, `position_assignment`, `resource_assignment` | Xác thực, phạm vi quyền và phân công được kiểm trong backend. |
+| Điều kiện theo đợt | `academic_year`, `thesis_round`, `eligibility_snapshot` | Kết quả được người có thẩm quyền xác nhận theo đợt. |
+| Tạo và duyệt đề tài | `topic`, `topic_title_version`, `topic_requirement` | Lưu đề tài, lịch sử đổi tên và yêu cầu bổ sung. |
+| Đăng ký cá nhân/nhóm | `topic_registration`, `registration_member` | Backend kiểm hạn, sức chứa, điều kiện, thành viên và đăng ký đang hiệu lực. |
+| Chốt đăng ký | `thesis`, `thesis_member`, `advisor_assignment` | Sinh hồ sơ khóa luận và GVHD sau khi Bộ môn chốt. |
+| Đề cương, tiến độ, tài liệu | `proposal`, `proposal_version`, `progress_milestone`, `progress_report`, `progress_review`, `document`, `document_version`, `stored_file` | Lưu phiên bản; quyền xem và thao tác được kiểm ở API. |
+| Nhật ký | `audit_event` | Lưu vết quyết định và thao tác nghiệp vụ quan trọng. |
 
-## Kết luận kỹ thuật
+Hội đồng, đánh giá/bảng điểm và chức năng AI chưa nằm trong revision hiện tại; các tài liệu tương ứng là nội dung thiết kế hoặc kế hoạch giai đoạn sau. Có bảng trong CSDL không đồng nghĩa mọi nghiệp vụ liên quan đã hoàn thiện.
 
-- SQL khởi tạo [kltn-db-baseline.sql](../../database/kltn-db-baseline.sql) dựng **database mới, trống** ở Alembic head `20261004_0011`; không chạy lại trên database đã có bảng. Bản [lõi 32 bảng](../../database/core/kltn-core-schema.sql) dành cho database riêng để trình bày/phát triển phạm vi ưu tiên, không dùng migration 62 bảng trên đó.
-- Database đã có bảng được nâng cấp bằng [Alembic migrations](../../backend/migrations/versions/). Mỗi thay đổi **cấu trúc chính thức** cần revision mới để không chạy lại lệnh cũ; một tệp `kltn-ai-updates.sql` chỉ là sổ thao tác pgAdmin cá nhân, Git bỏ qua.
-- Các quyết định vừa chốt có cấu trúc lưu trữ; migration 0005 bổ sung CHECK `COMMENT_ONLY` cho góp ý chéo. Quyền và chuyển trạng thái vẫn thuộc service chưa triển khai.
-- Có thể nộp bộ **phân tích và thiết kế hiện tại kèm các giới hạn ghi rõ**, nhưng không được gọi toàn hệ thống/API/UI/AI, biểu mẫu và toàn bộ runtime là hoàn tất 100%. Xem [quyết định thiết kế](../decisions/quyet-dinh-du-an-2026-09-25.md) và [minh chứng chạy](../evidence/prototype-validation.md).
+- [ERD hiện hành](erd-kltn-management.md)
+- [Từ điển dữ liệu hiện hành](database-dictionary.md)
+- [SQL schema-only](../../database/official/kltn-management-schema.sql) — chỉ để xem hoặc dựng database trống; không chạy trên database đang dùng.
+- [Migration chính thức](../../backend/migrations_official/) — nguồn cập nhật database hiện hành.

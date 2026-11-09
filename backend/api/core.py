@@ -204,7 +204,7 @@ def cross_reviewer(thesis_id: UUID, data: LecturerAssignment, if_match: int = He
 @router.get("/theses/{thesis_id}/milestones", response_model=list[MilestoneOut])
 def milestones(thesis_id: UUID, user=Depends(current_user), session=Depends(core_session)):
     thesis = theses.thesis_access(session, user, thesis_id)
-    return [progress.milestone_out(item) for item in progress.milestones(session, thesis)]
+    return [progress.milestone_out(item) for item in progress.milestones(session, thesis, user)]
 
 
 @router.get("/theses/{thesis_id}/document-deadlines", response_model=list[DocumentDeadlineOut])
@@ -421,7 +421,9 @@ def milestone_history(thesis_id: UUID, limit: int = Query(default=50, ge=1, le=1
         user=Depends(current_user), session=Depends(core_session)):
     thesis = theses.thesis_access(session, user, thesis_id)
     rows = session.scalars(select(m.AuditEvent).where(
-        m.AuditEvent.resource_type == "round", m.AuditEvent.resource_id == thesis.round_id,
+        or_(and_(m.AuditEvent.resource_type == "round", m.AuditEvent.resource_id == thesis.round_id),
+            and_(m.AuditEvent.resource_type == "progress_milestone",
+                m.AuditEvent.resource_id.in_([item.id for item in progress.milestones(session,thesis,user)]))),
         m.AuditEvent.action.in_(["MILESTONE_OPENED", "MILESTONE_EXTENDED", "MILESTONE_REOPENED", "MILESTONE_CLOSED"]),
     ).order_by(m.AuditEvent.occurred_at.desc()).limit(limit)).all()
     return [AuditOut(action=item.action, actor_name=_actor_name(session, item), reason=item.reason,

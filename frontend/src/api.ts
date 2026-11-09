@@ -61,7 +61,7 @@ export type TopicRegisteredStudent = {
   registration_state: string | null;
 };
 export type Requirement = {requirement_type: "PREFERRED_GPA" | "SKILL" | "TECHNOLOGY" | "KNOWLEDGE" | "OTHER"; value_text: string; preferred_gpa: number | null};
-export type Lecturer = {id: string; display_name: string; lecturer_code: string; department_name?: string | null; faculty_name?: string | null};
+export type Lecturer = {available?: boolean; recommended?: boolean; profile_verified?: boolean; recommendation_reasons?: string[]; id: string; display_name: string; lecturer_code: string; department_name?: string | null; faculty_name?: string | null};
 export type OpenRound = { id: string; code: string; closes_at: string; academic_year: string; label: string };
 export type EligibleStudent = { id: string; display_name: string; student_code: string };
 export type RegistrationMember = {
@@ -242,7 +242,7 @@ export type Thesis = {
   cross_reviewers: {lecturer_id: string; display_name: string}[];
   actions: string[];
 };
-export type Milestone = {id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
+export type Milestone = {scope?: "ROUND" | "THESIS"; thesis_id?: string | null; id: string; code: string; title: string; version_no: number; row_version: number; state: string; due_at: string | null; expected_ratio: number | null};
 export type DocumentDeadline = {id: string; document_type: "PROPOSAL" | "PLAN" | "REPORT" | "SUPPORTING"; due_at: string; state: "OPEN" | "CLOSED"; row_version: number; reason: string};
 export type Review = {reviewer_name: string; decision: string; comment: string; created_at: string};
 export type ProgressReport = {id: string; milestone_id: string; version_no: number; row_version: number; state: string; summary: string; reported_ratio: number | null; submitted_by_name: string; submitted_by_student_id: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; evidence_document_version_id: string | null; evidence_scan_state: string | null; evidence_file_name: string | null; reviews: Review[]};

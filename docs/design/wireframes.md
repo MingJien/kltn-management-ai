@@ -8,7 +8,7 @@ Wireframe low-fidelity; nút chỉ hiển thị khi backend trả action đượ
 | SCR-02 | Năm học/đợt/policy | MAIN/SUPPLEMENTARY, lịch, policy version, cảnh báo thiếu lịch đã duyệt | UC-ROUND-001 |
 | SCR-03 | Điều kiện SV | Snapshot tín chỉ/GPA/trạng thái/nguồn/xác nhận | UC-ELIG-001 |
 | SCR-04 | Expertise/topic | Giảng viên tự khai; topic requirements; TBM duyệt/chỉnh tên | UC-EXP-001, UC-TOPIC-001..003 |
-| SCR-05 | Đăng ký/nhóm/GVHD | Một topic, 1–3 SV, lời mời PENDING/ACCEPTED/DECLINED từng người, coordinator, xét Topic SV sau đăng ký, GVHD đồng ý, TBM finalize | UC-REG-001/002, UC-ASSIGN-001 |
+| SCR-05 | Đăng ký/nhóm/GVHD | Từng SV tự tham gia trong chỉ tiêu 1–3; SV đề xuất cá nhân trước, TBM xét sau; GV nhận/từ chối và TBM chốt | UC-REG-001/002, UC-ASSIGN-001 |
 | SCR-06 | Workspace KLTN | Member work allocation và GVHD duyệt | UC-WORK-001 |
 | SCR-07 | Đề cương | Timeline version/review; GVHD xác nhận; TBM chốt; Trưởng khoa ký; in | UC-PROP-001..004 |
 | SCR-08 | Tiến độ/thay đổi | Milestone, report/review; đổi topic; ghi kết quả rút/gia hạn | UC-PROG-001/002, UC-CHANGE-001, UC-EXT-001 |
@@ -79,7 +79,7 @@ Wireframe low-fidelity; nút chỉ hiển thị khi backend trả action đượ
 
 ## Bổ sung màn hình theo quyết định 25/09
 
-- SCR-05: SV chọn thành viên đủ điều kiện cùng bộ môn để lập nhóm 1–3; mỗi người được mời thấy nút tự ACCEPT/DECLINE. Nút gửi chỉ bật khi mọi thành viên active ACCEPTED. Với đề tài SV đề xuất, màn hiển thị đăng ký đã gửi và trạng thái TBM xét đề tài sau đó. Không có nút GV thêm/ghép; từ SUBMITTED danh sách chỉ đọc. React prototype /topics và /registrations hiện chưa có bước xác nhận từng người hay nhánh đề tài SV.
+- SCR-05: SV tự tham gia đề tài/nhóm khi còn hạn và chỉ tiêu; đại diện được gửi nhóm một người. Bổ sung sau GV nhận làm nhóm chờ GV xét lại. Đề tài SV đề xuất cá nhân được TBM xét sau khi gửi. Màn `/topics` và `/registrations` đã có các bước này; không có nút GV thêm người.
 - SCR-14: hiển thị riêng trạng thái chữ ký Chair và Secretary của đúng Hội đồng; nút xuất đúng mẫu chỉ bật khi template version đã kiểm, sau in và trước chữ ký đầu có thể VOID/replacement sau khi Thư ký đối chiếu giấy; từ chữ ký đầu khóa sửa. Runtime export hiện BLOCKED_SOURCE_TEMPLATE.
 - SCR-15 (AI): hiển thị source_type, title, provenance, score xếp hạng; báo rõ không phải tỉ lệ đạo văn. RAG trả citation/retrieval-only khi chưa có Gemini. React prototype: /ai (tìm đề tài).
 - SCR-16 (nguồn ngoài): nút link-out chỉ cho URL HTTPS allowlist; chưa hiển thị khi chưa có provider được duyệt.

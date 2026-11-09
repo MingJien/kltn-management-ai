@@ -153,15 +153,9 @@ def assignments(session, thesis):
 
 
 def reviewer_department_ids(session, thesis):
-    """Reviewer eligibility stays within the faculty; CNTT and KHMT can cross-review."""
-    department = session.get(m.Department, thesis.department_id)
-    eligible = {thesis.department_id}
-    if department and department.code in {"BM-CNTT", "BM-KHMT"}:
-        eligible.update(session.scalars(select(m.Department.id).where(
-            m.Department.faculty_id == department.faculty_id,
-            m.Department.code.in_(["BM-CNTT", "BM-KHMT"]),
-            m.Department.active.is_(True))))
-    return eligible
+    """Reviewers may be chosen from active departments of the same faculty."""
+    from backend.services.faculty_pool import department_ids
+    return department_ids(session, thesis.department_id)
 
 
 def assign(session, user, thesis_id, data, expected):
@@ -529,7 +523,11 @@ def workspace(session, user, thesis_id):
                 load = session.scalar(select(func.count()).select_from(m.ReviewerAssignment).where(
                     m.ReviewerAssignment.lecturer_id == lecturer.id, m.ReviewerAssignment.review_scope == "THESIS",
                     m.ReviewerAssignment.state == "ACTIVE"))
-                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load})
+                from backend.services.faculty_pool import suggestion
+                topic=session.get(m.Topic,thesis.topic_id)
+                candidates.append({"id": lecturer.id, "name": lecturer.display_name, "code": lecturer.lecturer_code, "department": session.get(m.Department, lecturer.department_id).name, "active_load": load,
+                    **suggestion(lecturer,thesis.current_title+" "+(topic.description or ""))})
+        candidates.sort(key=lambda row:(-len(row["recommendation_reasons"]),row["active_load"],row["name"]))
     history = []
     if "evaluation:eligibility" in actions or user.base_role == "STUDENT":
         member_ids = [member["id"] for member in visible_members]

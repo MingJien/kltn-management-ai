@@ -10,6 +10,7 @@ class Input(BaseModel):
 
 
 class ChangeCreate(Input):
+    scope: Literal["GROUP", "INDIVIDUAL"] = "GROUP"
     kind: Literal["ADJUSTMENT", "REPLACEMENT"]
     proposed_title: str = Field(default="", max_length=500)
     proposed_description: str = Field(default="", max_length=10000)
@@ -40,3 +41,29 @@ class ExtensionRecord(Input):
     reason: str = Field(min_length=10, max_length=3000)
     evidence_file_id: UUID | None = None
     confirm_decision: Literal[True]
+
+
+class ExtensionCreate(Input):
+    until_at: AwareDatetime
+    reason: str = Field(min_length=10,max_length=3000)
+    confirm_consequences: Literal[True]
+
+
+class ExtensionReview(Input):
+    decision: Literal["AGREE","REJECT"]
+    reason: str = Field(min_length=5,max_length=3000)
+
+
+class ExtensionDecision(Input):
+    decision: Literal["APPROVE","REJECT"]
+    reason: str = Field(min_length=5,max_length=3000)
+    decision_on: date | None = None
+    extension_starts_at: AwareDatetime | None = None
+    until_at: AwareDatetime | None = None
+    reference: str | None = Field(default=None,min_length=5,max_length=500)
+    confirm_decision: bool = False
+
+
+class ConsentDeadline(Input):
+    due_at: AwareDatetime | None = None
+    reason: str = Field(min_length=5,max_length=2000)

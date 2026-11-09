@@ -85,7 +85,7 @@
         <mxCell id="14" value="atomic create | system | invariants" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=11;" parent="1" edge="1" source="6" target="7">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="17" value="&lt;b&gt;Sơ đồ rút gọn:&lt;/b&gt;&lt;br&gt;Thesis lifecycle và CANCELLED xem state-contract.md; không thêm/đổi member sau SUBMITTED theo quyết định dự án." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+        <mxCell id="17" value="&lt;b&gt;Sơ đồ rút gọn:&lt;/b&gt;&lt;br&gt;Thesis lifecycle xem state-contract.md; SV tự bổ sung trước hạn/chỉ tiêu, GV xét lại; không bổ sung sau FINALIZED." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
           <mxGeometry x="70" y="690" width="1400" height="100" as="geometry" />
         </mxCell>
         <mxCell id="18" value="RETURNED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" parent="1" vertex="1">

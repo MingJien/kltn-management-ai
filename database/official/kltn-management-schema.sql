@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261104_0022.
--- 47 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261108_0023.
+-- 49 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -103,15 +103,17 @@ CREATE TABLE audit_event (
 	before_hash VARCHAR(64),
 	after_hash VARCHAR(64),
 	reason TEXT,
+	source_reference VARCHAR(500),
 	occurred_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	correlation_id UUID NOT NULL,
 	id UUID NOT NULL,
-	source_reference VARCHAR(500),
 	CONSTRAINT pk_audit_event PRIMARY KEY (id),
 	CONSTRAINT fk_audit_event_actor_id_user_account FOREIGN KEY(actor_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE INDEX ix_audit_event_correlation_id ON audit_event (correlation_id);
+
+CREATE INDEX ix_audit_event_occurred_id ON audit_event (occurred_at, id);
 
 CREATE INDEX ix_audit_event_resource_id ON audit_event (resource_id);
 
@@ -128,19 +130,6 @@ CREATE TABLE department (
 	CONSTRAINT uq_department_faculty_id_code UNIQUE (faculty_id, code),
 	CONSTRAINT fk_department_faculty_id_faculty FOREIGN KEY(faculty_id) REFERENCES faculty (id) ON DELETE RESTRICT
 );
-
-CREATE TABLE department_major (
-        department_id UUID NOT NULL,
-        code VARCHAR(32) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        active BOOLEAN DEFAULT true NOT NULL,
-        id UUID NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        CONSTRAINT pk_department_major PRIMARY KEY (id),
-        CONSTRAINT uq_department_major_department_id_code UNIQUE (department_id, code),
-        CONSTRAINT fk_department_major_department_id_department FOREIGN KEY (department_id) REFERENCES department (id) ON DELETE RESTRICT
-    );
 
 CREATE TABLE thesis_round (
 	academic_year_id UUID NOT NULL,
@@ -164,24 +153,55 @@ CREATE TABLE thesis_round (
 	CONSTRAINT fk_thesis_round_academic_year_id_academic_year FOREIGN KEY(academic_year_id) REFERENCES academic_year (id) ON DELETE RESTRICT
 );
 
+CREATE TABLE defense_council (
+	round_id UUID NOT NULL,
+	department_id UUID NOT NULL,
+	name VARCHAR(200) NOT NULL,
+	reference VARCHAR(300) NOT NULL,
+	members JSONB NOT NULL,
+	created_by UUID NOT NULL,
+	closed_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_defense_council PRIMARY KEY (id),
+	CONSTRAINT uq_defense_council_round_id_department_id_name UNIQUE (round_id, department_id, name),
+	CONSTRAINT fk_defense_council_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_council_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_council_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE department_major (
+	department_id UUID NOT NULL,
+	code VARCHAR(32) NOT NULL,
+	name VARCHAR(255) NOT NULL,
+	active BOOLEAN DEFAULT true NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_department_major PRIMARY KEY (id),
+	CONSTRAINT uq_department_major_department_id_code UNIQUE (department_id, code),
+	CONSTRAINT fk_department_major_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT
+);
+
 CREATE TABLE document_deadline (
-        round_id UUID NOT NULL,
-        document_type VARCHAR(30) NOT NULL,
-        due_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        state VARCHAR(20) DEFAULT 'OPEN' NOT NULL,
-        set_by UUID NOT NULL,
-        reason TEXT NOT NULL,
-        id UUID NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-        row_version INTEGER DEFAULT '1' NOT NULL,
-        CONSTRAINT pk_document_deadline PRIMARY KEY (id),
-        CONSTRAINT uq_document_deadline_round_id_document_type UNIQUE (round_id, document_type),
-        CONSTRAINT ck_document_deadline_document_type CHECK (document_type IN ('PROPOSAL','PLAN','REPORT','SUPPORTING')),
-        CONSTRAINT ck_document_deadline_state CHECK (state IN ('OPEN','CLOSED')),
-        CONSTRAINT fk_document_deadline_round_id_thesis_round FOREIGN KEY (round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
-        CONSTRAINT fk_document_deadline_set_by_user_account FOREIGN KEY (set_by) REFERENCES user_account (id) ON DELETE RESTRICT
-    );
+	round_id UUID NOT NULL,
+	document_type VARCHAR(30) NOT NULL,
+	due_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	state VARCHAR(20) DEFAULT 'OPEN' NOT NULL,
+	set_by UUID NOT NULL,
+	reason TEXT NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_document_deadline PRIMARY KEY (id),
+	CONSTRAINT uq_document_deadline_round_id_document_type UNIQUE (round_id, document_type),
+	CONSTRAINT ck_document_deadline_document_type CHECK (document_type IN ('PROPOSAL','PLAN','REPORT','SUPPORTING')),
+	CONSTRAINT ck_document_deadline_state CHECK (state IN ('OPEN','CLOSED')),
+	CONSTRAINT fk_document_deadline_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_document_deadline_set_by_user_account FOREIGN KEY(set_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
 
 CREATE TABLE lecturer_profile (
 	user_id UUID NOT NULL,
@@ -206,72 +226,90 @@ CREATE TABLE lecturer_profile (
 	CONSTRAINT fk_lecturer_profile_profile_verified_by_user_account FOREIGN KEY(profile_verified_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
-CREATE TABLE progress_milestone (
+CREATE TABLE official_form (
 	round_id UUID NOT NULL,
 	code VARCHAR(50) NOT NULL,
 	title VARCHAR(255) NOT NULL,
-	version_no INTEGER NOT NULL,
-	due_at TIMESTAMP WITH TIME ZONE,
-	expected_ratio NUMERIC(5, 2),
-	source_type VARCHAR(20) NOT NULL,
-	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	document_kind VARCHAR(20) NOT NULL,
+	audience VARCHAR(30) NOT NULL,
+	state VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL,
+	created_by UUID NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_progress_milestone PRIMARY KEY (id),
-	CONSTRAINT uq_progress_milestone_round_id_code_version_no UNIQUE (round_id, code, version_no),
-	CONSTRAINT ck_progress_milestone_version_positive CHECK (version_no > 0),
-	CONSTRAINT ck_progress_milestone_expected_ratio CHECK (expected_ratio IS NULL OR (expected_ratio >= 0 AND expected_ratio <= 100)),
-	CONSTRAINT ck_progress_milestone_source_type CHECK (source_type IN ('ROUND_POLICY','STUDENT_PLAN')),
-	CONSTRAINT ck_progress_milestone_state CHECK (state IN ('DRAFT','OPEN','CLOSED','CANCELLED')),
-	CONSTRAINT fk_progress_milestone_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT
+	CONSTRAINT pk_official_form PRIMARY KEY (id),
+	CONSTRAINT uq_official_form_round_id_code UNIQUE (round_id, code),
+	CONSTRAINT ck_official_form_document_kind CHECK (document_kind IN ('FORM','PUBLICATION')),
+	CONSTRAINT ck_official_form_audience CHECK (audience IN ('STUDENT_AND_LECTURER','LECTURER')),
+	CONSTRAINT ck_official_form_state CHECK (state IN ('ACTIVE','ARCHIVED')),
+	CONSTRAINT fk_official_form_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
-CREATE TABLE student_profile (
-	user_id UUID NOT NULL,
-	student_code VARCHAR(32) NOT NULL,
-	department_id UUID NOT NULL,
-	display_name VARCHAR(255) NOT NULL,
-	class_name VARCHAR(100),
-	major_code VARCHAR(32),
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_student_profile PRIMARY KEY (id),
-	CONSTRAINT uq_student_profile_user_id UNIQUE (user_id),
-	CONSTRAINT fk_student_profile_user_id_user_account FOREIGN KEY(user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT uq_student_profile_student_code UNIQUE (student_code),
-	CONSTRAINT fk_student_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_student_profile_department_major FOREIGN KEY (department_id, major_code) REFERENCES department_major (department_id, code) ON DELETE RESTRICT
-);
-
-CREATE TABLE eligibility_snapshot (
-	student_id UUID NOT NULL,
-	round_id UUID NOT NULL,
-	version INTEGER NOT NULL,
-	passed_credit_ratio NUMERIC(5, 4),
-	gpa_4 NUMERIC(3, 2),
-	evidence_ref VARCHAR(500) NOT NULL,
-	captured_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	confirmed_by UUID,
-	confirmed_at TIMESTAMP WITH TIME ZONE,
-	decision_reason TEXT,
+CREATE TABLE lecturer_profile_change (
+	lecturer_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	base_profile_version INTEGER NOT NULL,
+	proposed_data JSONB NOT NULL,
+	original_data JSONB NOT NULL,
+	avatar_file_id UUID,
+	original_avatar_file_id UUID,
 	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	submission_note TEXT,
+	submitted_at TIMESTAMP WITH TIME ZONE,
+	reviewed_by UUID,
+	reviewed_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_eligibility_snapshot PRIMARY KEY (id),
-	CONSTRAINT uq_eligibility_snapshot_student_id_round_id_version UNIQUE (student_id, round_id, version),
-	CONSTRAINT ck_eligibility_snapshot_version_positive CHECK (version > 0),
-	CONSTRAINT ck_eligibility_snapshot_credit_ratio CHECK (passed_credit_ratio >= 0 AND passed_credit_ratio <= 1),
-	CONSTRAINT ck_eligibility_snapshot_gpa CHECK (gpa_4 >= 0 AND gpa_4 <= 4),
-	CONSTRAINT ck_eligibility_snapshot_state CHECK (state IN ('DRAFT','SUBMITTED','CONFIRMED','REJECTED')),
-	CONSTRAINT ck_eligibility_snapshot_decision_metadata CHECK (state NOT IN ('CONFIRMED','REJECTED') OR (confirmed_by IS NOT NULL AND confirmed_at IS NOT NULL)),
-	CONSTRAINT fk_eligibility_snapshot_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_eligibility_snapshot_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_eligibility_snapshot_confirmed_by_user_account FOREIGN KEY(confirmed_by) REFERENCES user_account (id) ON DELETE RESTRICT
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_lecturer_profile_change PRIMARY KEY (id),
+	CONSTRAINT uq_lecturer_profile_change_lecturer_id_version_no UNIQUE (lecturer_id, version_no),
+	CONSTRAINT ck_lecturer_profile_change_version_positive CHECK (version_no > 0 AND base_profile_version > 0),
+	CONSTRAINT ck_lecturer_profile_change_state CHECK (state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')),
+	CONSTRAINT ck_lecturer_profile_change_data_objects CHECK (jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'),
+	CONSTRAINT ck_lecturer_profile_change_submitted_timestamp CHECK (state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL),
+	CONSTRAINT ck_lecturer_profile_change_decision_recorded CHECK (state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)),
+	CONSTRAINT fk_lecturer_profile_change_lecturer_id_lecturer_profile FOREIGN KEY(lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_avatar_file_id_stored_file FOREIGN KEY(avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_original_avatar_file_id_stored_file FOREIGN KEY(original_avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_lecturer_profile_change_reviewed_by_user_account FOREIGN KEY(reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
+
+CREATE INDEX ix_lecturer_profile_change_state_created ON lecturer_profile_change (state, created_at);
+
+CREATE UNIQUE INDEX uq_lecturer_profile_change_open ON lecturer_profile_change (lecturer_id) WHERE state IN ('DRAFT','SUBMITTED');
+
+CREATE TABLE official_form_version (
+	official_form_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	stored_file_id UUID NOT NULL,
+	uploaded_by UUID NOT NULL,
+	source_reference VARCHAR(500) NOT NULL,
+	change_reason TEXT NOT NULL,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	published_by UUID,
+	published_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_official_form_version PRIMARY KEY (id),
+	CONSTRAINT uq_official_form_version_official_form_id_version_no UNIQUE (official_form_id, version_no),
+	CONSTRAINT ck_official_form_version_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_official_form_version_state CHECK (state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')),
+	CONSTRAINT ck_official_form_version_publisher_pair CHECK ((published_at IS NULL) = (published_by IS NULL)),
+	CONSTRAINT ck_official_form_version_published_stamp CHECK (state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL),
+	CONSTRAINT ck_official_form_version_draft_stamp CHECK (state != 'DRAFT' OR published_at IS NULL),
+	CONSTRAINT fk_official_form_version_official_form_id_official_form FOREIGN KEY(official_form_id) REFERENCES official_form (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_uploaded_by_user_account FOREIGN KEY(uploaded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_official_form_version_published_by_user_account FOREIGN KEY(published_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_official_form_current ON official_form_version (official_form_id) WHERE state = 'PUBLISHED';
 
 CREATE TABLE position_assignment (
 	lecturer_id UUID NOT NULL,
@@ -298,6 +336,24 @@ CREATE TABLE position_assignment (
 CREATE UNIQUE INDEX uq_position_assignment_department_scope ON position_assignment (lecturer_id, position_id, department_id) WHERE department_id IS NOT NULL AND state = 'ACTIVE';
 
 CREATE UNIQUE INDEX uq_position_assignment_faculty_scope ON position_assignment (lecturer_id, position_id, faculty_id) WHERE faculty_id IS NOT NULL AND state = 'ACTIVE';
+
+CREATE TABLE student_profile (
+	user_id UUID NOT NULL,
+	student_code VARCHAR(32) NOT NULL,
+	department_id UUID NOT NULL,
+	display_name VARCHAR(255) NOT NULL,
+	class_name VARCHAR(100),
+	major_code VARCHAR(32),
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_student_profile PRIMARY KEY (id),
+	CONSTRAINT fk_student_profile_department_id_major_code_department_major FOREIGN KEY(department_id, major_code) REFERENCES department_major (department_id, code) ON DELETE RESTRICT,
+	CONSTRAINT uq_student_profile_user_id UNIQUE (user_id),
+	CONSTRAINT fk_student_profile_user_id_user_account FOREIGN KEY(user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT uq_student_profile_student_code UNIQUE (student_code),
+	CONSTRAINT fk_student_profile_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT
+);
 
 CREATE TABLE topic (
 	round_id UUID NOT NULL,
@@ -330,6 +386,33 @@ CREATE TABLE topic (
 	CONSTRAINT fk_topic_proposer_user_id_user_account FOREIGN KEY(proposer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_archived_by_user_account FOREIGN KEY(archived_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE eligibility_snapshot (
+	student_id UUID NOT NULL,
+	round_id UUID NOT NULL,
+	version INTEGER NOT NULL,
+	passed_credit_ratio NUMERIC(5, 4),
+	gpa_4 NUMERIC(3, 2),
+	evidence_ref VARCHAR(500) NOT NULL,
+	captured_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	confirmed_by UUID,
+	confirmed_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_eligibility_snapshot PRIMARY KEY (id),
+	CONSTRAINT uq_eligibility_snapshot_student_id_round_id_version UNIQUE (student_id, round_id, version),
+	CONSTRAINT ck_eligibility_snapshot_version_positive CHECK (version > 0),
+	CONSTRAINT ck_eligibility_snapshot_credit_ratio CHECK (passed_credit_ratio >= 0 AND passed_credit_ratio <= 1),
+	CONSTRAINT ck_eligibility_snapshot_gpa CHECK (gpa_4 >= 0 AND gpa_4 <= 4),
+	CONSTRAINT ck_eligibility_snapshot_state CHECK (state IN ('DRAFT','SUBMITTED','CONFIRMED','REJECTED')),
+	CONSTRAINT ck_eligibility_snapshot_decision_metadata CHECK (state NOT IN ('CONFIRMED','REJECTED') OR (confirmed_by IS NOT NULL AND confirmed_at IS NOT NULL)),
+	CONSTRAINT fk_eligibility_snapshot_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_eligibility_snapshot_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_eligibility_snapshot_confirmed_by_user_account FOREIGN KEY(confirmed_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE topic_registration (
@@ -389,6 +472,26 @@ CREATE TABLE topic_title_version (
 	CONSTRAINT ck_topic_title_version_version_positive CHECK (version_no > 0),
 	CONSTRAINT fk_topic_title_version_topic_id_topic FOREIGN KEY(topic_id) REFERENCES topic (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_topic_title_version_changed_by_user_account FOREIGN KEY(changed_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE registration_form_version (
+	registration_id UUID NOT NULL,
+	stored_file_id UUID NOT NULL,
+	submitted_by UUID NOT NULL,
+	form_code VARCHAR(2) NOT NULL,
+	version_no INTEGER NOT NULL,
+	content_sha256 VARCHAR(64) NOT NULL,
+	registration_fingerprint VARCHAR(64) NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	id UUID NOT NULL,
+	CONSTRAINT pk_registration_form_version PRIMARY KEY (id),
+	CONSTRAINT uq_registration_form_version_registration_id_version_no UNIQUE (registration_id, version_no),
+	CONSTRAINT ck_registration_form_version_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_registration_form_version_form_code CHECK (form_code IN ('1A','1B')),
+	CONSTRAINT ck_registration_form_version_hash_length CHECK (length(content_sha256) = 64 AND length(registration_fingerprint) = 64),
+	CONSTRAINT fk_registration_form_version_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_registration_form_version_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_registration_form_version_submitted_by_student_profile FOREIGN KEY(submitted_by) REFERENCES student_profile (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE registration_member (
@@ -476,30 +579,33 @@ CREATE TABLE document (
 	CONSTRAINT fk_document_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
 );
 
-CREATE TABLE progress_report (
-	thesis_id UUID NOT NULL,
-	milestone_id UUID NOT NULL,
+CREATE TABLE progress_milestone (
+	thesis_id UUID,
+	round_id UUID NOT NULL,
+	code VARCHAR(50) NOT NULL,
+	title VARCHAR(255) NOT NULL,
 	version_no INTEGER NOT NULL,
-	summary TEXT NOT NULL,
-	reported_ratio NUMERIC(5, 2),
-	evidence_file_id UUID,
-	submitted_by UUID NOT NULL,
-	state VARCHAR(30) DEFAULT 'DRAFT' NOT NULL,
+	due_at TIMESTAMP WITH TIME ZONE,
+	expected_ratio NUMERIC(5, 2),
+	source_type VARCHAR(20) NOT NULL,
+	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	row_version INTEGER DEFAULT '1' NOT NULL,
-	due_at_at_submission TIMESTAMP WITH TIME ZONE,
-	CONSTRAINT pk_progress_report PRIMARY KEY (id),
-	CONSTRAINT uq_progress_report_thesis_id_milestone_id_version_no UNIQUE (thesis_id, milestone_id, version_no),
-	CONSTRAINT ck_progress_report_version_positive CHECK (version_no > 0),
-	CONSTRAINT ck_progress_report_reported_ratio CHECK (reported_ratio IS NULL OR (reported_ratio >= 0 AND reported_ratio <= 100)),
-	CONSTRAINT ck_progress_report_state CHECK (state IN ('DRAFT','SUBMITTED','CONFIRMED','REVISION_REQUIRED')),
-	CONSTRAINT fk_progress_report_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_progress_report_milestone_id_progress_milestone FOREIGN KEY(milestone_id) REFERENCES progress_milestone (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_progress_report_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_progress_report_submitted_by_student_profile FOREIGN KEY(submitted_by) REFERENCES student_profile (id) ON DELETE RESTRICT
+	CONSTRAINT pk_progress_milestone PRIMARY KEY (id),
+	CONSTRAINT ck_progress_milestone_scope CHECK ((thesis_id IS NULL AND source_type IN ('ROUND_POLICY','STUDENT_PLAN')) OR (thesis_id IS NOT NULL AND source_type = 'ADVISOR')),
+	CONSTRAINT ck_progress_milestone_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_progress_milestone_expected_ratio CHECK (expected_ratio IS NULL OR (expected_ratio >= 0 AND expected_ratio <= 100)),
+	CONSTRAINT ck_progress_milestone_source_type CHECK (source_type IN ('ROUND_POLICY','STUDENT_PLAN','ADVISOR')),
+	CONSTRAINT ck_progress_milestone_state CHECK (state IN ('DRAFT','OPEN','CLOSED','CANCELLED')),
+	CONSTRAINT fk_progress_milestone_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_milestone_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT
 );
+
+CREATE UNIQUE INDEX uq_milestone_round_version ON progress_milestone (round_id, code, version_no) WHERE thesis_id IS NULL;
+
+CREATE UNIQUE INDEX uq_milestone_thesis_version ON progress_milestone (thesis_id, code, version_no) WHERE thesis_id IS NOT NULL;
 
 CREATE TABLE proposal (
 	thesis_id UUID NOT NULL,
@@ -540,6 +646,63 @@ CREATE UNIQUE INDEX uq_resource_assignment_round_scope ON resource_assignment (a
 
 CREATE UNIQUE INDEX uq_resource_assignment_thesis_scope ON resource_assignment (assignment_type, user_id, thesis_id) WHERE thesis_id IS NOT NULL AND state = 'ACTIVE';
 
+CREATE TABLE thesis_change_request (
+	scope VARCHAR(20) DEFAULT 'GROUP' NOT NULL,
+	thesis_id UUID NOT NULL,
+	kind VARCHAR(20) NOT NULL,
+	state VARCHAR(25) NOT NULL,
+	requested_by UUID NOT NULL,
+	reason TEXT NOT NULL,
+	proposed_title VARCHAR(500) NOT NULL,
+	proposed_description TEXT NOT NULL,
+	target_topic_id UUID,
+	snapshot JSONB NOT NULL,
+	consents JSONB NOT NULL,
+	reviews JSONB NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	decided_by UUID,
+	decided_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_change_request PRIMARY KEY (id),
+	CONSTRAINT ck_thesis_change_request_kind CHECK (kind IN ('ADJUSTMENT','REPLACEMENT')),
+	CONSTRAINT ck_thesis_change_request_scope CHECK (scope IN ('GROUP','INDIVIDUAL') AND (scope = 'GROUP' OR kind = 'REPLACEMENT')),
+	CONSTRAINT ck_thesis_change_request_state CHECK (state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')),
+	CONSTRAINT ck_thesis_change_request_reason CHECK (length(trim(reason)) >= 10),
+	CONSTRAINT ck_thesis_change_request_decision CHECK (state != 'APPROVED' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL)),
+	CONSTRAINT fk_thesis_change_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_requested_by_user_account FOREIGN KEY(requested_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_target_topic_id_topic FOREIGN KEY(target_topic_id) REFERENCES topic (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_change_request_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_thesis_change_open ON thesis_change_request (thesis_id) WHERE state IN ('SUBMITTED','ADVISOR_REVIEWED');
+
+CREATE TABLE thesis_extension (
+	thesis_id UUID NOT NULL,
+	original_due_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	until_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	decision_on DATE NOT NULL,
+	reference VARCHAR(500) NOT NULL,
+	reason TEXT NOT NULL,
+	recorded_by UUID NOT NULL,
+	recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	evidence_file_id UUID,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_thesis_extension PRIMARY KEY (id),
+	CONSTRAINT uq_thesis_extension_thesis_id UNIQUE (thesis_id),
+	CONSTRAINT ck_thesis_extension_later_due CHECK (until_at > original_due_at),
+	CONSTRAINT ck_thesis_extension_reference CHECK (length(trim(reference)) >= 5),
+	CONSTRAINT fk_thesis_extension_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
+);
+
 CREATE TABLE thesis_member (
 	thesis_id UUID NOT NULL,
 	student_id UUID NOT NULL,
@@ -558,19 +721,84 @@ CREATE TABLE thesis_member (
 
 CREATE UNIQUE INDEX uq_thesis_member_one_coordinator ON thesis_member (thesis_id) WHERE active AND is_coordinator;
 
+CREATE TABLE thesis_withdrawal_request (
+	thesis_id UUID NOT NULL,
+	student_id UUID NOT NULL,
+	reason TEXT NOT NULL,
+	application_data JSONB NOT NULL,
+	execution_starts_on DATE NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	state VARCHAR(25) DEFAULT 'SUBMITTED' NOT NULL,
+	advisor_reviewed_by UUID,
+	advisor_reviewed_at TIMESTAMP WITH TIME ZONE,
+	advisor_comment TEXT,
+	evidence_file_id UUID,
+	official_reference VARCHAR(500),
+	outcome_note TEXT,
+	effective_on DATE,
+	recorded_by UUID,
+	recorded_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_withdrawal_request PRIMARY KEY (id),
+	CONSTRAINT ck_thesis_withdrawal_request_state CHECK (state IN ('SUBMITTED','ADVISOR_CONFIRMED','RETURNED','CANCELLED','RECORDED','NOT_GRANTED')),
+	CONSTRAINT ck_thesis_withdrawal_request_reason CHECK (length(trim(reason)) >= 10),
+	CONSTRAINT ck_thesis_withdrawal_request_application_data CHECK (jsonb_typeof(application_data) = 'object'),
+	CONSTRAINT ck_thesis_withdrawal_request_advisor_stamp CHECK (state NOT IN ('ADVISOR_CONFIRMED','RETURNED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)),
+	CONSTRAINT ck_thesis_withdrawal_request_outcome_stamp CHECK (state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND effective_on IS NOT NULL)),
+	CONSTRAINT fk_thesis_withdrawal_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_advisor_reviewed_by_user_account FOREIGN KEY(advisor_reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_withdrawal_request_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_withdrawal_student_state ON thesis_withdrawal_request (student_id, state);
+
+CREATE UNIQUE INDEX uq_withdrawal_member_open ON thesis_withdrawal_request (thesis_id, student_id) WHERE state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED');
+
+CREATE TABLE user_notification (
+	recipient_user_id UUID NOT NULL,
+	actor_user_id UUID NOT NULL,
+	registration_id UUID,
+	thesis_id UUID,
+	subject_type VARCHAR(40),
+	subject_id UUID,
+	message TEXT,
+	url VARCHAR(300),
+	kind VARCHAR(32) NOT NULL,
+	read_at TIMESTAMP WITH TIME ZONE,
+	revoked_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_user_notification PRIMARY KEY (id),
+	CONSTRAINT ck_user_notification_kind CHECK (kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','PROPOSAL_REVIEWED','PROPOSAL_FINALIZED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED','MILESTONE_OPENED','MILESTONE_EXTENDED','MILESTONE_REOPENED','MILESTONE_CLOSED','DOCUMENT_DEADLINE_SET','DOCUMENT_DEADLINE_EXTENDED','DOCUMENT_DEADLINE_REOPENED','DOCUMENT_DEADLINE_CLOSED','PROGRESS_SUBMITTED','PROGRESS_CONFIRMED','PROGRESS_REVISION_REQUIRED','PROGRESS_COMMENT','DOCUMENT_SUBMITTED','DOCUMENT_ACCEPTED','DOCUMENT_REVISION_REQUESTED','WORK_SUBMITTED','WORK_APPROVED','WORK_REVISION_REQUIRED','ACCOUNT_LOCKED','ACCOUNT_UNLOCKED','ACCOUNT_DISABLED','ACCOUNT_RESTORED','ACCOUNT_LINK_REISSUED','ACCOUNT_EMAIL_CORRECTED','REGISTRATION_FORM_SUBMITTED','PROPOSAL_REVIEWER_ASSIGNED','PROGRESS_REVIEWER_ASSIGNED','PROPOSAL_DEAN_CONFIRMED','WORKFLOW_NOTICE')),
+	CONSTRAINT fk_user_notification_recipient_user_id_user_account FOREIGN KEY(recipient_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_actor_user_id_user_account FOREIGN KEY(actor_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_user_notification_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
+
+CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
+
 CREATE TABLE document_version (
 	document_id UUID NOT NULL,
 	version_no INTEGER NOT NULL,
 	stored_file_id UUID NOT NULL,
 	submitted_by UUID NOT NULL,
 	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	content_sha256 VARCHAR(64) NOT NULL,
 	state VARCHAR(30) DEFAULT 'DRAFT' NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	row_version INTEGER DEFAULT '1' NOT NULL,
-	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	CONSTRAINT pk_document_version PRIMARY KEY (id),
 	CONSTRAINT uq_document_version_document_id_version_no UNIQUE (document_id, version_no),
 	CONSTRAINT ck_document_version_version_positive CHECK (version_no > 0),
@@ -601,19 +829,29 @@ CREATE TABLE member_work_assignment (
 	CONSTRAINT fk_member_work_assignment_reviewed_by_lecturer_profile FOREIGN KEY(reviewed_by) REFERENCES lecturer_profile (id) ON DELETE RESTRICT
 );
 
-CREATE TABLE progress_review (
-	progress_report_id UUID NOT NULL,
-	reviewer_id UUID NOT NULL,
-	decision VARCHAR(30) NOT NULL,
-	comment TEXT NOT NULL,
+CREATE TABLE progress_report (
+	thesis_id UUID NOT NULL,
+	milestone_id UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	summary TEXT NOT NULL,
+	reported_ratio NUMERIC(5, 2),
+	evidence_file_id UUID,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
+	submitted_by UUID NOT NULL,
+	state VARCHAR(30) DEFAULT 'DRAFT' NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_progress_review PRIMARY KEY (id),
-	CONSTRAINT ck_progress_review_decision CHECK (decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED')),
-	CONSTRAINT uq_progress_review_progress_report_id_reviewer_id UNIQUE (progress_report_id, reviewer_id),
-	CONSTRAINT fk_progress_review_progress_report_id_progress_report FOREIGN KEY(progress_report_id) REFERENCES progress_report (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_progress_review_reviewer_id_lecturer_profile FOREIGN KEY(reviewer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_progress_report PRIMARY KEY (id),
+	CONSTRAINT uq_progress_report_thesis_id_milestone_id_version_no UNIQUE (thesis_id, milestone_id, version_no),
+	CONSTRAINT ck_progress_report_version_positive CHECK (version_no > 0),
+	CONSTRAINT ck_progress_report_reported_ratio CHECK (reported_ratio IS NULL OR (reported_ratio >= 0 AND reported_ratio <= 100)),
+	CONSTRAINT ck_progress_report_state CHECK (state IN ('DRAFT','SUBMITTED','CONFIRMED','REVISION_REQUIRED')),
+	CONSTRAINT fk_progress_report_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_report_milestone_id_progress_milestone FOREIGN KEY(milestone_id) REFERENCES progress_milestone (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_report_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_report_submitted_by_student_profile FOREIGN KEY(submitted_by) REFERENCES student_profile (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE proposal_version (
@@ -622,11 +860,11 @@ CREATE TABLE proposal_version (
 	stored_file_id UUID NOT NULL,
 	submitted_by UUID NOT NULL,
 	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	content_sha256 VARCHAR(64) NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	due_at_at_submission TIMESTAMP WITH TIME ZONE,
 	CONSTRAINT pk_proposal_version PRIMARY KEY (id),
 	CONSTRAINT uq_proposal_version_proposal_id_version_no UNIQUE (proposal_id, version_no),
 	CONSTRAINT ck_proposal_version_version_positive CHECK (version_no > 0),
@@ -665,89 +903,87 @@ CREATE UNIQUE INDEX uq_reviewer_assignment_proposal ON reviewer_assignment (lect
 
 CREATE UNIQUE INDEX uq_reviewer_assignment_thesis ON reviewer_assignment (lecturer_id, thesis_id) WHERE thesis_id IS NOT NULL AND state = 'ACTIVE';
 
-CREATE TABLE proposal_review (
-	proposal_version_id UUID NOT NULL,
-	reviewer_assignment_id UUID NOT NULL,
-	reviewer_user_id UUID NOT NULL,
+CREATE TABLE thesis_extension_request (
+	thesis_id UUID NOT NULL,
+	requested_by UUID NOT NULL,
+	original_due_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	requested_until_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	reason TEXT NOT NULL,
+	snapshot JSONB NOT NULL,
+	state VARCHAR(25) NOT NULL,
+	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	consent_due_at TIMESTAMP WITH TIME ZONE,
+	advisor_reviewed_by UUID,
+	advisor_reviewed_at TIMESTAMP WITH TIME ZONE,
+	advisor_reason TEXT,
+	decided_by UUID,
+	decided_at TIMESTAMP WITH TIME ZONE,
+	decision_reason TEXT,
+	extension_starts_at TIMESTAMP WITH TIME ZONE,
+	extension_id UUID,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_extension_request PRIMARY KEY (id),
+	CONSTRAINT ck_thesis_extension_request_state CHECK (state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED','EXPIRED')),
+	CONSTRAINT ck_thesis_extension_request_requested_window CHECK (requested_until_at > original_due_at),
+	CONSTRAINT ck_thesis_extension_request_reason CHECK (length(trim(reason)) >= 10),
+	CONSTRAINT ck_thesis_extension_request_consent_window CHECK (consent_due_at IS NULL OR consent_due_at > submitted_at),
+	CONSTRAINT ck_thesis_extension_request_decision CHECK ((state NOT IN ('APPROVED','REJECTED') OR (decided_by IS NOT NULL AND decided_at IS NOT NULL))),
+	CONSTRAINT ck_thesis_extension_request_approved_record CHECK (state != 'APPROVED' OR (extension_id IS NOT NULL AND extension_starts_at IS NOT NULL)),
+	CONSTRAINT fk_thesis_extension_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_request_requested_by_user_account FOREIGN KEY(requested_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_request_advisor_reviewed_by_user_account FOREIGN KEY(advisor_reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_request_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_request_extension_id_thesis_extension FOREIGN KEY(extension_id) REFERENCES thesis_extension (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_thesis_extension_request_open ON thesis_extension_request (thesis_id) WHERE state IN ('SUBMITTED','ADVISOR_REVIEWED');
+
+CREATE TABLE defense_slot (
+	thesis_id UUID NOT NULL,
+	council_id UUID NOT NULL,
+	report_version_id UUID NOT NULL,
+	starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	room VARCHAR(200) NOT NULL,
+	roster JSONB NOT NULL,
+	marks JSONB NOT NULL,
+	attendance JSONB NOT NULL,
+	minutes JSONB NOT NULL,
+	finalized_by UUID,
+	finalized_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_defense_slot PRIMARY KEY (id),
+	CONSTRAINT ck_defense_slot_time_order CHECK (ends_at > starts_at),
+	CONSTRAINT ck_defense_slot_finalized_stamp CHECK ((finalized_at IS NULL) = (finalized_by IS NULL)),
+	CONSTRAINT uq_defense_slot_thesis_id UNIQUE (thesis_id),
+	CONSTRAINT fk_defense_slot_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_slot_council_id_defense_council FOREIGN KEY(council_id) REFERENCES defense_council (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_slot_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_slot_finalized_by_user_account FOREIGN KEY(finalized_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_defense_slot_council_start ON defense_slot (council_id, starts_at);
+
+CREATE TABLE progress_review (
+	progress_report_id UUID NOT NULL,
+	reviewer_id UUID NOT NULL,
 	decision VARCHAR(30) NOT NULL,
 	comment TEXT NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_proposal_review PRIMARY KEY (id),
-	CONSTRAINT ck_proposal_review_decision CHECK (decision IN ('COMMENT','REVISION_REQUIRED','CONFIRM')),
-	CONSTRAINT fk_proposal_review_proposal_version_id_proposal_version FOREIGN KEY(proposal_version_id) REFERENCES proposal_version (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_proposal_review_reviewer_assignment_id_reviewer_assignment FOREIGN KEY(reviewer_assignment_id) REFERENCES reviewer_assignment (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_proposal_review_reviewer_user_id_user_account FOREIGN KEY(reviewer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
+	CONSTRAINT pk_progress_review PRIMARY KEY (id),
+	CONSTRAINT ck_progress_review_decision CHECK (decision IN ('COMMENT_ONLY','CONFIRM','REVISION_REQUIRED')),
+	CONSTRAINT uq_progress_review_progress_report_id_reviewer_id UNIQUE (progress_report_id, reviewer_id),
+	CONSTRAINT fk_progress_review_progress_report_id_progress_report FOREIGN KEY(progress_report_id) REFERENCES progress_report (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_progress_review_reviewer_id_lecturer_profile FOREIGN KEY(reviewer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT
 );
-
-CREATE TABLE signature_confirmation (
-	proposal_id UUID NOT NULL,
-	proposal_version_no INTEGER NOT NULL,
-	signature_type VARCHAR(40) NOT NULL,
-	signer_user_id UUID NOT NULL,
-	confirmed_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	official_ref VARCHAR(500),
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_signature_confirmation PRIMARY KEY (id),
-	CONSTRAINT ck_signature_confirmation_signature_type CHECK (signature_type IN ('DEPARTMENT_FINALIZATION','DEAN_CONFIRMATION')),
-	CONSTRAINT ck_signature_confirmation_proposal_version_positive CHECK (proposal_version_no > 0),
-	CONSTRAINT uq_signature_confirmation_proposal_version_type UNIQUE (proposal_id, proposal_version_no, signature_type),
-	CONSTRAINT fk_signature_confirmation_proposal_version_pair FOREIGN KEY(proposal_id, proposal_version_no) REFERENCES proposal_version (proposal_id, version_no) ON DELETE RESTRICT,
-	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE INDEX ix_audit_event_occurred_id ON audit_event (occurred_at, id);
-
-CREATE TABLE user_notification (
-	recipient_user_id UUID NOT NULL,
-	actor_user_id UUID NOT NULL,
-	registration_id UUID,
-	thesis_id UUID,
-	subject_type VARCHAR(40),
-	subject_id UUID,
-	message TEXT,
-	url VARCHAR(300),
-	kind VARCHAR(32) NOT NULL,
-	read_at TIMESTAMP WITH TIME ZONE,
-	revoked_at TIMESTAMP WITH TIME ZONE,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_user_notification PRIMARY KEY (id),
-	CONSTRAINT ck_user_notification_kind CHECK (kind IN ('PROPOSAL_SUBMITTED','PROPOSAL_APPROVED','PROPOSAL_REVIEWED','PROPOSAL_FINALIZED','REGISTRATION_SUBMITTED','REGISTRATION_JOINED','REGISTRATION_ACCEPTED','REGISTRATION_REJECTED','MILESTONE_OPENED','MILESTONE_EXTENDED','MILESTONE_REOPENED','MILESTONE_CLOSED','DOCUMENT_DEADLINE_SET','DOCUMENT_DEADLINE_EXTENDED','DOCUMENT_DEADLINE_REOPENED','DOCUMENT_DEADLINE_CLOSED','PROGRESS_SUBMITTED','PROGRESS_CONFIRMED','PROGRESS_REVISION_REQUIRED','PROGRESS_COMMENT','DOCUMENT_SUBMITTED','DOCUMENT_ACCEPTED','DOCUMENT_REVISION_REQUESTED','WORK_SUBMITTED','WORK_APPROVED','WORK_REVISION_REQUIRED','ACCOUNT_LOCKED','ACCOUNT_UNLOCKED','ACCOUNT_DISABLED','ACCOUNT_RESTORED','ACCOUNT_LINK_REISSUED','ACCOUNT_EMAIL_CORRECTED','REGISTRATION_FORM_SUBMITTED','PROPOSAL_REVIEWER_ASSIGNED','PROGRESS_REVIEWER_ASSIGNED','PROPOSAL_DEAN_CONFIRMED','WORKFLOW_NOTICE')),
-	CONSTRAINT fk_user_notification_recipient_user_id_user_account FOREIGN KEY(recipient_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_user_notification_actor_user_id_user_account FOREIGN KEY(actor_user_id) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_user_notification_registration_id_topic_registration FOREIGN KEY(registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_user_notification_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT
-);
-
-CREATE INDEX ix_user_notification_thesis_created ON user_notification (thesis_id, created_at);
-
-CREATE INDEX ix_user_notification_recipient_created ON user_notification (recipient_user_id, created_at);
-
-CREATE TABLE registration_form_version (
-        registration_id UUID NOT NULL,
-        stored_file_id UUID NOT NULL,
-        submitted_by UUID NOT NULL,
-        form_code VARCHAR(2) NOT NULL,
-        version_no INTEGER NOT NULL,
-        content_sha256 VARCHAR(64) NOT NULL,
-        registration_fingerprint VARCHAR(64) NOT NULL,
-        submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        id UUID NOT NULL,
-        CONSTRAINT pk_registration_form_version PRIMARY KEY (id),
-        CONSTRAINT uq_registration_form_version_registration_id_version_no UNIQUE (registration_id, version_no),
-        CONSTRAINT ck_registration_form_version_version_positive CHECK (version_no > 0),
-        CONSTRAINT ck_registration_form_version_form_code CHECK (form_code IN ('1A','1B')),
-        CONSTRAINT ck_registration_form_version_hash_length CHECK (length(content_sha256) = 64 AND length(registration_fingerprint) = 64),
-        CONSTRAINT fk_registration_form_version_registration_id_topic_registration FOREIGN KEY (registration_id) REFERENCES topic_registration (id) ON DELETE RESTRICT,
-        CONSTRAINT fk_registration_form_version_stored_file_id_stored_file FOREIGN KEY (stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-        CONSTRAINT fk_registration_form_version_submitted_by_student_profile FOREIGN KEY (submitted_by) REFERENCES student_profile (id) ON DELETE RESTRICT
-    );
 
 CREATE TABLE progress_review_annotation (
 	progress_report_id UUID,
@@ -786,67 +1022,70 @@ CREATE TABLE progress_review_annotation (
 	CONSTRAINT fk_progress_review_annotation_attachment_file_id_stored_file FOREIGN KEY(attachment_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
 );
 
+CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
+
+CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
+
+CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
+
 CREATE UNIQUE INDEX uq_review_summary_document ON progress_review_annotation (document_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND document_version_id IS NOT NULL;
 
 CREATE UNIQUE INDEX uq_review_summary_progress ON progress_review_annotation (progress_report_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND progress_report_id IS NOT NULL;
 
-CREATE INDEX ix_progress_review_annotation_report_reviewer ON progress_review_annotation (progress_report_id, reviewer_id, state);
-
 CREATE UNIQUE INDEX uq_review_summary_proposal ON progress_review_annotation (proposal_version_id, reviewer_id) WHERE annotation_kind = 'SUMMARY' AND proposal_version_id IS NOT NULL;
 
-CREATE INDEX ix_progress_review_annotation_proposal_reviewer ON progress_review_annotation (proposal_version_id, reviewer_id, state);
-
-CREATE INDEX ix_progress_review_annotation_document_reviewer ON progress_review_annotation (document_version_id, reviewer_id, state);
-
-CREATE TABLE official_form (
-	round_id UUID NOT NULL,
-	code VARCHAR(50) NOT NULL,
-	title VARCHAR(255) NOT NULL,
-	document_kind VARCHAR(20) NOT NULL,
-	audience VARCHAR(30) NOT NULL,
-	state VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL,
-	created_by UUID NOT NULL,
+CREATE TABLE proposal_review (
+	proposal_version_id UUID NOT NULL,
+	reviewer_assignment_id UUID NOT NULL,
+	reviewer_user_id UUID NOT NULL,
+	decision VARCHAR(30) NOT NULL,
+	comment TEXT NOT NULL,
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_official_form PRIMARY KEY (id),
-	CONSTRAINT uq_official_form_round_id_code UNIQUE (round_id, code),
-	CONSTRAINT ck_official_form_document_kind CHECK (document_kind IN ('FORM','PUBLICATION')),
-	CONSTRAINT ck_official_form_audience CHECK (audience IN ('STUDENT_AND_LECTURER','LECTURER')),
-	CONSTRAINT ck_official_form_state CHECK (state IN ('ACTIVE','ARCHIVED')),
-	CONSTRAINT fk_official_form_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_official_form_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
+	CONSTRAINT pk_proposal_review PRIMARY KEY (id),
+	CONSTRAINT ck_proposal_review_decision CHECK (decision IN ('COMMENT','REVISION_REQUIRED','CONFIRM')),
+	CONSTRAINT fk_proposal_review_proposal_version_id_proposal_version FOREIGN KEY(proposal_version_id) REFERENCES proposal_version (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_proposal_review_reviewer_assignment_id_reviewer_assignment FOREIGN KEY(reviewer_assignment_id) REFERENCES reviewer_assignment (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_proposal_review_reviewer_user_id_user_account FOREIGN KEY(reviewer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
-CREATE TABLE official_form_version (
-	official_form_id UUID NOT NULL,
-	version_no INTEGER NOT NULL,
-	stored_file_id UUID NOT NULL,
-	uploaded_by UUID NOT NULL,
-	source_reference VARCHAR(500) NOT NULL,
-	change_reason TEXT NOT NULL,
-	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
-	published_by UUID,
-	published_at TIMESTAMP WITH TIME ZONE,
+CREATE TABLE signature_confirmation (
+	proposal_id UUID NOT NULL,
+	proposal_version_no INTEGER NOT NULL,
+	signature_type VARCHAR(40) NOT NULL,
+	signer_user_id UUID NOT NULL,
+	confirmed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	official_ref VARCHAR(500),
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_official_form_version PRIMARY KEY (id),
-	CONSTRAINT uq_official_form_version_official_form_id_version_no UNIQUE (official_form_id, version_no),
-	CONSTRAINT ck_official_form_version_version_positive CHECK (version_no > 0),
-	CONSTRAINT ck_official_form_version_state CHECK (state IN ('DRAFT','PUBLISHED','SUPERSEDED','WITHDRAWN')),
-	CONSTRAINT ck_official_form_version_publisher_pair CHECK ((published_at IS NULL) = (published_by IS NULL)),
-	CONSTRAINT ck_official_form_version_published_stamp CHECK (state NOT IN ('PUBLISHED','SUPERSEDED') OR published_at IS NOT NULL),
-	CONSTRAINT ck_official_form_version_draft_stamp CHECK (state != 'DRAFT' OR published_at IS NULL),
-	CONSTRAINT fk_official_form_version_official_form_id_official_form FOREIGN KEY(official_form_id) REFERENCES official_form (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_official_form_version_stored_file_id_stored_file FOREIGN KEY(stored_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_official_form_version_uploaded_by_user_account FOREIGN KEY(uploaded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_official_form_version_published_by_user_account FOREIGN KEY(published_by) REFERENCES user_account (id) ON DELETE RESTRICT
+	CONSTRAINT pk_signature_confirmation PRIMARY KEY (id),
+	CONSTRAINT ck_signature_confirmation_signature_type CHECK (signature_type IN ('DEPARTMENT_FINALIZATION','DEAN_CONFIRMATION')),
+	CONSTRAINT ck_signature_confirmation_proposal_version_positive CHECK (proposal_version_no > 0),
+	CONSTRAINT uq_signature_confirmation_proposal_version_type UNIQUE (proposal_id, proposal_version_no, signature_type),
+	CONSTRAINT fk_signature_confirmation_proposal_version_pair FOREIGN KEY(proposal_id, proposal_version_no) REFERENCES proposal_version (proposal_id, version_no) ON DELETE RESTRICT,
+	CONSTRAINT fk_signature_confirmation_proposal_id_proposal FOREIGN KEY(proposal_id) REFERENCES proposal (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_signature_confirmation_signer_user_id_user_account FOREIGN KEY(signer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
-CREATE UNIQUE INDEX uq_official_form_current ON official_form_version (official_form_id) WHERE state = 'PUBLISHED';
+CREATE TABLE thesis_extension_consent (
+	request_id UUID NOT NULL,
+	student_id UUID NOT NULL,
+	decision VARCHAR(20) DEFAULT 'PENDING' NOT NULL,
+	responded_by UUID,
+	responded_at TIMESTAMP WITH TIME ZONE,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	CONSTRAINT pk_thesis_extension_consent PRIMARY KEY (id),
+	CONSTRAINT uq_thesis_extension_consent_request_id_student_id UNIQUE (request_id, student_id),
+	CONSTRAINT ck_thesis_extension_consent_decision CHECK (decision IN ('PENDING','AGREE','DECLINE')),
+	CONSTRAINT ck_thesis_extension_consent_response CHECK ((decision = 'PENDING' AND responded_by IS NULL AND responded_at IS NULL) OR (decision IN ('AGREE','DECLINE') AND responded_by IS NOT NULL AND responded_at IS NOT NULL)),
+	CONSTRAINT fk_thesis_extension_consent_request_id_thesis_extension_request FOREIGN KEY(request_id) REFERENCES thesis_extension_request (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_consent_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_extension_consent_responded_by_user_account FOREIGN KEY(responded_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
 
 CREATE TABLE thesis_review (
 	thesis_id UUID NOT NULL,
@@ -920,184 +1159,6 @@ CREATE TABLE defense_eligibility_check (
 
 CREATE INDEX ix_defense_eligibility_check_thesis_member ON defense_eligibility_check (thesis_id, thesis_member_id);
 
-CREATE TABLE lecturer_profile_change (
-	lecturer_id UUID NOT NULL,
-	version_no INTEGER NOT NULL,
-	base_profile_version INTEGER NOT NULL,
-	proposed_data JSONB NOT NULL,
-	original_data JSONB NOT NULL,
-	avatar_file_id UUID,
-	original_avatar_file_id UUID,
-	state VARCHAR(20) DEFAULT 'DRAFT' NOT NULL,
-	submission_note TEXT,
-	submitted_at TIMESTAMP WITH TIME ZONE,
-	reviewed_by UUID,
-	reviewed_at TIMESTAMP WITH TIME ZONE,
-	decision_reason TEXT,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_lecturer_profile_change PRIMARY KEY (id),
-	CONSTRAINT uq_lecturer_profile_change_lecturer_id_version_no UNIQUE (lecturer_id, version_no),
-	CONSTRAINT ck_lecturer_profile_change_version_positive CHECK (version_no > 0 AND base_profile_version > 0),
-	CONSTRAINT ck_lecturer_profile_change_state CHECK (state IN ('DRAFT','SUBMITTED','APPROVED','RETURNED','WITHDRAWN')),
-	CONSTRAINT ck_lecturer_profile_change_data_objects CHECK (jsonb_typeof(proposed_data) = 'object' AND jsonb_typeof(original_data) = 'object'),
-	CONSTRAINT ck_lecturer_profile_change_submitted_timestamp CHECK (state NOT IN ('SUBMITTED','APPROVED','RETURNED') OR submitted_at IS NOT NULL),
-	CONSTRAINT ck_lecturer_profile_change_decision_recorded CHECK (state NOT IN ('APPROVED','RETURNED') OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL AND decision_reason IS NOT NULL)),
-	CONSTRAINT fk_lecturer_profile_change_lecturer_id_lecturer_profile FOREIGN KEY(lecturer_id) REFERENCES lecturer_profile (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_lecturer_profile_change_avatar_file_id_stored_file FOREIGN KEY(avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_lecturer_profile_change_original_avatar_file_id_stored_file FOREIGN KEY(original_avatar_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_lecturer_profile_change_reviewed_by_user_account FOREIGN KEY(reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE UNIQUE INDEX uq_lecturer_profile_change_open ON lecturer_profile_change (lecturer_id) WHERE state IN ('DRAFT','SUBMITTED');
-
-CREATE INDEX ix_lecturer_profile_change_state_created ON lecturer_profile_change (state, created_at);
-
-CREATE TABLE thesis_withdrawal_request (
-	thesis_id UUID NOT NULL,
-	student_id UUID NOT NULL,
-	reason TEXT NOT NULL,
-	application_data JSONB NOT NULL,
-	execution_starts_on DATE NOT NULL,
-	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	state VARCHAR(25) DEFAULT 'SUBMITTED' NOT NULL,
-	advisor_reviewed_by UUID,
-	advisor_reviewed_at TIMESTAMP WITH TIME ZONE,
-	advisor_comment TEXT,
-	evidence_file_id UUID,
-	official_reference VARCHAR(500),
-	outcome_note TEXT,
-	effective_on DATE,
-	recorded_by UUID,
-	recorded_at TIMESTAMP WITH TIME ZONE,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_thesis_withdrawal_request PRIMARY KEY (id),
-	CONSTRAINT ck_thesis_withdrawal_request_state CHECK (state IN ('SUBMITTED','ADVISOR_CONFIRMED','RETURNED','CANCELLED','RECORDED','NOT_GRANTED')),
-	CONSTRAINT ck_thesis_withdrawal_request_reason CHECK (length(trim(reason)) >= 10),
-	CONSTRAINT ck_thesis_withdrawal_request_application_data CHECK (jsonb_typeof(application_data) = 'object'),
-	CONSTRAINT ck_thesis_withdrawal_request_advisor_stamp CHECK (state NOT IN ('ADVISOR_CONFIRMED','RETURNED') OR (advisor_reviewed_by IS NOT NULL AND advisor_reviewed_at IS NOT NULL AND advisor_comment IS NOT NULL)),
-	CONSTRAINT ck_thesis_withdrawal_request_outcome_stamp CHECK (state NOT IN ('RECORDED','NOT_GRANTED') OR (recorded_by IS NOT NULL AND recorded_at IS NOT NULL AND official_reference IS NOT NULL AND effective_on IS NOT NULL)),
-	CONSTRAINT fk_thesis_withdrawal_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_withdrawal_request_student_id_student_profile FOREIGN KEY(student_id) REFERENCES student_profile (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_withdrawal_request_advisor_reviewed_by_user_account FOREIGN KEY(advisor_reviewed_by) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_withdrawal_request_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_withdrawal_request_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE INDEX ix_withdrawal_student_state ON thesis_withdrawal_request (student_id, state);
-
-CREATE UNIQUE INDEX uq_withdrawal_member_open ON thesis_withdrawal_request (thesis_id, student_id) WHERE state IN ('SUBMITTED','ADVISOR_CONFIRMED','RECORDED');
-
-CREATE TABLE defense_council (
-	round_id UUID NOT NULL,
-	department_id UUID NOT NULL,
-	name VARCHAR(200) NOT NULL,
-	reference VARCHAR(300) NOT NULL,
-	members JSONB NOT NULL,
-	created_by UUID NOT NULL,
-	closed_at TIMESTAMP WITH TIME ZONE,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_defense_council PRIMARY KEY (id),
-	CONSTRAINT uq_defense_council_round_id_department_id_name UNIQUE (round_id, department_id, name),
-	CONSTRAINT fk_defense_council_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_defense_council_department_id_department FOREIGN KEY(department_id) REFERENCES department (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_defense_council_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE TABLE defense_slot (
-	thesis_id UUID NOT NULL,
-	council_id UUID NOT NULL,
-	report_version_id UUID NOT NULL,
-	starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	room VARCHAR(200) NOT NULL,
-	roster JSONB NOT NULL,
-	marks JSONB NOT NULL,
-	attendance JSONB NOT NULL,
-	minutes JSONB NOT NULL,
-	finalized_by UUID,
-	finalized_at TIMESTAMP WITH TIME ZONE,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_defense_slot PRIMARY KEY (id),
-	CONSTRAINT ck_defense_slot_time_order CHECK (ends_at > starts_at),
-	CONSTRAINT ck_defense_slot_finalized_stamp CHECK ((finalized_at IS NULL) = (finalized_by IS NULL)),
-	CONSTRAINT uq_defense_slot_thesis_id UNIQUE (thesis_id),
-	CONSTRAINT fk_defense_slot_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_defense_slot_council_id_defense_council FOREIGN KEY(council_id) REFERENCES defense_council (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_defense_slot_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_defense_slot_finalized_by_user_account FOREIGN KEY(finalized_by) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE INDEX ix_defense_slot_council_start ON defense_slot (council_id, starts_at);
-
-CREATE TABLE thesis_change_request (
-	thesis_id UUID NOT NULL,
-	kind VARCHAR(20) NOT NULL,
-	state VARCHAR(25) NOT NULL,
-	requested_by UUID NOT NULL,
-	reason TEXT NOT NULL,
-	proposed_title VARCHAR(500) NOT NULL,
-	proposed_description TEXT NOT NULL,
-	target_topic_id UUID,
-	snapshot JSONB NOT NULL,
-	consents JSONB NOT NULL,
-	reviews JSONB NOT NULL,
-	submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	decided_by UUID,
-	decided_at TIMESTAMP WITH TIME ZONE,
-	decision_reason TEXT,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	row_version INTEGER DEFAULT '1' NOT NULL,
-	CONSTRAINT pk_thesis_change_request PRIMARY KEY (id),
-	CONSTRAINT ck_thesis_change_request_kind CHECK (kind IN ('ADJUSTMENT','REPLACEMENT')),
-	CONSTRAINT ck_thesis_change_request_state CHECK (state IN ('SUBMITTED','ADVISOR_REVIEWED','APPROVED','REJECTED','CANCELLED')),
-	CONSTRAINT ck_thesis_change_request_reason CHECK (length(trim(reason)) >= 10),
-	CONSTRAINT ck_thesis_change_request_decision CHECK (state != 'APPROVED' OR (decided_by IS NOT NULL AND decided_at IS NOT NULL)),
-	CONSTRAINT fk_thesis_change_request_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_change_request_requested_by_user_account FOREIGN KEY(requested_by) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_change_request_target_topic_id_topic FOREIGN KEY(target_topic_id) REFERENCES topic (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_change_request_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
-);
-
-CREATE UNIQUE INDEX uq_thesis_change_open ON thesis_change_request (thesis_id) WHERE state IN ('SUBMITTED','ADVISOR_REVIEWED');
-
-CREATE TABLE thesis_extension (
-	thesis_id UUID NOT NULL,
-	original_due_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	until_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	decision_on DATE NOT NULL,
-	reference VARCHAR(500) NOT NULL,
-	reason TEXT NOT NULL,
-	recorded_by UUID NOT NULL,
-	recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	evidence_file_id UUID,
-	id UUID NOT NULL,
-	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
-	CONSTRAINT pk_thesis_extension PRIMARY KEY (id),
-	CONSTRAINT uq_thesis_extension_thesis_id UNIQUE (thesis_id),
-	CONSTRAINT ck_thesis_extension_later_due CHECK (until_at > original_due_at),
-	CONSTRAINT ck_thesis_extension_reference CHECK (length(trim(reference)) >= 5),
-	CONSTRAINT fk_thesis_extension_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_extension_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT,
-	CONSTRAINT fk_thesis_extension_evidence_file_id_stored_file FOREIGN KEY(evidence_file_id) REFERENCES stored_file (id) ON DELETE RESTRICT
-);
-
-CREATE TABLE alembic_version (
-    version_num VARCHAR(32) NOT NULL,
-    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
-);
+CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num));
 
 COMMIT;

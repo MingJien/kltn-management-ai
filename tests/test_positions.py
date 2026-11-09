@@ -38,6 +38,10 @@ def test_admin_listing_and_direct_endpoint_protection(profiles):
         assert client.post(base+f"/{row.id}/{action}",headers={**hdr(users[4]),"If-Match":str(row.row_version)},json=payload(profiles) if action=="replace" else {"basis_ref":"QĐ TEST","reason":"Không có quyền ghi nhận"}).status_code==403
     assert client.get(base,headers=hdr(admin)).status_code==200
     assert client.get(base+"/catalog",headers=hdr(admin)).json()["lecturers"]
+    assert client.get(base+"/available",headers=hdr(users[4])).status_code==403
+    available=client.get(base+"/available",headers=hdr(admin))
+    assert available.status_code==200
+    assert any(item["id"]==str(row.id) for item in available.json())
 
 
 def test_immediate_replacement_transfers_scoped_rights_and_preserves_history(profiles):

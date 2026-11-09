@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Context, Lecturer, OpenRound, Requirement, Topic } from "../../api";
+import {request,type Context,type Lecturer,type OpenRound,type Requirement,type Topic} from "../../api";
 import { RequirementEditor } from "./TopicRequirements";
 import RegistrationForm from "./RegistrationForm";
 
@@ -22,6 +22,19 @@ export default function TopicEditor({topic, rounds, lecturers, context, busy, on
       setRoundId("");
     }
   }, [topic, rounds, roundId]);
+  const [suggested,setSuggested]=useState<Lecturer[]|null>(null);
+  const [suggestionError,setSuggestionError]=useState("");
+  useEffect(()=>{
+    if(!student)return;
+    const controller=new AbortController();
+    const timeout=window.setTimeout(()=>{
+      void request<Lecturer[]>("/lecturers?query_text="+encodeURIComponent((title+" "+description).slice(0,1000)),context.user_id,{signal:controller.signal})
+        .then(rows=>{setSuggested(rows);setSuggestionError("");}).catch(()=>{if(!controller.signal.aborted)setSuggestionError("Chưa cập nhật được gợi ý chuyên môn. Bạn vẫn có thể chọn GV và thử lưu; hệ thống kiểm tra lại khi tiếp nhận.");});
+    },450);
+    return ()=>{window.clearTimeout(timeout);controller.abort();};
+  },[title,description,student,context.user_id]);
+  const lecturerChoices=suggested??lecturers;
+  const selectedLecturer=lecturerChoices.find(row=>row.id===lecturerId);
   const valid = title.trim().length >= 5 && (topic || roundId) && (!student || lecturerId);
   const soleOpenRound = !topic && rounds.length === 1 ? rounds[0] : null;
   function body() {
@@ -83,9 +96,11 @@ export default function TopicEditor({topic, rounds, lecturers, context, busy, on
           <div className="input-group">
             <label htmlFor="topic-lecturer">GV mong muốn tiếp nhận</label>
             <select id="topic-lecturer" className="input" required value={lecturerId} onChange={(event) => setLecturerId(event.target.value)}>
-              <option value="">Chọn GV trong bộ môn</option>
-              {lecturers.map((lecturer) => <option key={lecturer.id} value={lecturer.id}>{lecturer.display_name} — {lecturer.lecturer_code}</option>)}
+              <option value="">Chọn GV trong Khoa</option>
+              {lecturerChoices.map((lecturer) => <option key={lecturer.id} value={lecturer.id} disabled={lecturer.available === false}>{lecturer.recommended ? "★ Phù hợp · " : ""}{lecturer.display_name} — {lecturer.department_name} · {lecturer.lecturer_code}{lecturer.available === false ? " · Đã đủ 3 khóa luận" : ""}</option>)}
             </select>
+            {selectedLecturer?.recommended&&<span className="input-group__hint">Chuyên môn đã xác nhận phù hợp: {selectedLecturer.recommendation_reasons?.join("; ")}.</span>}
+            {suggestionError&&<span role="status" className="input-group__hint">{suggestionError}</span>}
             <span className="input-group__hint">Bộ môn xác nhận hoặc chọn GV phù hợp khi duyệt. GV có quyền từ chối tiếp nhận.</span>
           </div>
         ) : <RequirementEditor items={requirements} onChange={setRequirements} />}

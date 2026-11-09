@@ -152,6 +152,9 @@ def create(session, user, thesis_id, data):
     from backend.services.thesis_changes import open_request
     if open_request(session,thesis):
         raise HTTPException(409, "Hủy hoặc xử lý yêu cầu đổi đề tài trước khi gửi xin thôi")
+    from backend.services.thesis_extensions import pending as pending_extension
+    if pending_extension(session,thesis.id):
+        raise HTTPException(409,"Hủy hoặc xử lý yêu cầu gia hạn trước khi gửi xin thôi")
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if not round_.execution_starts_on:
         raise HTTPException(409, "Khoa chưa ghi nhận ngày bắt đầu thực hiện theo kế hoạch")

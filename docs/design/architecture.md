@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | identity_access | account, profile, position, assignment authorization | Duyệt topic/điểm/biên bản |
 | rounds_eligibility | year, round, policy, eligibility | Tự tạo ngoại lệ |
-| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | SV tự lập nhóm trước gửi; không thêm người sau SUBMITTED |
+| topics_registration | expertise, topic/requirement, registration, thesis/member/work assignment | Không thêm người thay SV; không bổ sung sau TBM chốt |
 | proposal_progress | proposal/version/review/signature, milestone/report/change/outcome | Duyệt rút/gia hạn online |
 | documents_similarity | file/document/version, policy/check/match | Kết luận đạo văn |
 | councils_evaluation | council/session/attendance/reviews/rubric/evaluation/result/minute | Tự chọn Chair; sửa từ chữ ký đầu |
@@ -95,4 +95,4 @@ flowchart TD
 
 ## Runtime prototype từ 25/09/2026
 
-Cấu trúc giữ modular monolith: `backend/api` nhận HTTP/validate DTO; `backend/services` thực thi use case và transaction; `backend/db` giữ mô hình và migration; `backend/ai` xử lý nguồn, embedding, truy xuất; `frontend` là React shell. PostgreSQL giữ nghiệp vụ và metadata corpus, Qdrant local/service giữ index có thể rebuild. Theo [quyết định đăng nhập 03/10](local-auth.md), hệ thống sẽ tự quản lý đăng ký/đăng nhập email và mật khẩu băm Argon2id; quyền SV/GV/TBM chỉ gắn sau khi đối chiếu hồ sơ. CSDL đã có cột/ràng buộc cho tài khoản local ở migration 0010, **runtime đăng nhập email/mật khẩu và cookie phiên đã chạy trên tài khoản giả**. Callback OIDC cũ chỉ là khả năng mở rộng và chưa kết nối Trường; xem [phương án SSO dự phòng](sso-deployment.md). UUID header vẫn chỉ được chấp nhận khi `KLTN_ENV=development|test` và `KLTN_DEV_AUTH=true`. Xuất biểu mẫu đi qua template adapter/version như [thiết kế riêng](xuat-bieu-mau.md); hiện không có runtime export exact Mẫu 9.
+Cấu trúc giữ modular monolith: `backend/api` nhận HTTP/validate DTO; `backend/services` thực thi use case và transaction; `backend/db` giữ mô hình và migration; `backend/ai` xử lý nguồn, embedding, truy xuất; `frontend` là React shell. PostgreSQL `kltn_management` giữ nghiệp vụ trong 34 bảng; Qdrant local/service giữ chỉ mục AI thử nghiệm có thể tạo lại từ corpus giả. Bản này chưa ghi metadata corpus vào PostgreSQL. Hệ thống dùng email/mật khẩu băm Argon2id; quyền SV/GV/TBM chỉ gắn sau khi đối chiếu hồ sơ. Runtime đăng nhập email/mật khẩu, kích hoạt email, đặt lại mật khẩu và cookie phiên đã được kiểm trên dữ liệu giả. Tích hợp SSO của Trường không thuộc phạm vi hiện tại. UUID header chỉ được chấp nhận khi `KLTN_ENV=development|test` và `KLTN_DEV_AUTH=true`. Xuất biểu mẫu đi qua template adapter/version như [thiết kế riêng](xuat-bieu-mau.md); hiện không có runtime export exact Mẫu 9.

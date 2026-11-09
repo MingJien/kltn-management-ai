@@ -8,6 +8,8 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 
 from backend.db.models import entities as m
+from backend.services.advisor_capacity import require_capacity
+from backend.services.faculty_pool import compatible
 from backend.services import documents, workflow_notices as notices
 from backend.services.registration import _is_department_head, confirmed_student_ids, profile, row_version
 from backend.services.theses import EDITABLE, audit, effective, now, primary_advisor, resource_role, thesis_access
@@ -37,7 +39,7 @@ def receiver(session,topic):
         session.scalar(select(m.LecturerProfile).where(m.LecturerProfile.user_id == topic.proposer_user_id))
         if topic.proposer_type == "LECTURER" else None)
     account = session.get(m.UserAccount,lecturer.user_id) if lecturer else None
-    return lecturer if lecturer and account.status == "ACTIVE" and lecturer.department_id == topic.department_id else None
+    return lecturer if lecturer and account and account.status == "ACTIVE" and compatible(session, topic.department_id, lecturer.department_id) else None
 
 
 def snapshot(session,thesis):
@@ -98,11 +100,11 @@ def get_request(session,user,identifier,expected=None):
     return item,thesis
 
 
-def topic_available(session,topic,thesis):
+def topic_available(session,topic,thesis,scope="GROUP"):
     if not topic or topic.id == thesis.topic_id or topic.round_id != thesis.round_id or (
         topic.department_id != thesis.department_id) or topic.state != "APPROVED" or topic.archived_at:
         raise HTTPException(409,"Đề tài mới phải đang được công bố trong cùng đợt và bộ môn")
-    if len(active_members(session,thesis)) > topic.max_students:
+    if (1 if scope=="INDIVIDUAL" else len(active_members(session,thesis))) > topic.max_students:
         raise HTTPException(409,"Số thành viên vượt sức chứa của đề tài mới")
     if session.scalar(select(m.Thesis.id).where(m.Thesis.topic_id == topic.id).limit(1)) or session.scalar(
         select(m.TopicRegistration.id).where(m.TopicRegistration.topic_id == topic.id,
@@ -111,6 +113,7 @@ def topic_available(session,topic,thesis):
     lecturer = receiver(session,topic)
     if not lecturer:
         raise HTTPException(409,"Đề tài mới chưa có giảng viên tiếp nhận đang hoạt động")
+    require_capacity(session, lecturer.id, excluding_thesis_id=thesis.id if scope=="GROUP" else None)
     return lecturer
 
 
@@ -121,7 +124,7 @@ def fresh(session,item,thesis):
             raise HTTPException(409,"Nhóm, đề tài hoặc GVHD đã thay đổi. Hủy yêu cầu cũ và lập lại theo hồ sơ hiện tại")
     if item.target_topic_id:
         topic = session.get(m.Topic,item.target_topic_id)
-        lecturer = topic_available(session,topic,thesis)
+        lecturer = topic_available(session,topic,thesis,item.scope)
         if topic.row_version != item.snapshot["target_topic_version"] or str(lecturer.user_id)!=item.snapshot["target_advisor_user_id"]:
             raise HTTPException(409,"Thông tin đề tài mới đã thay đổi. Lập lại yêu cầu để các bên xác nhận đúng nội dung")
     ids = [UUID(member["student_id"]) for member in item.snapshot["members"]]
@@ -173,12 +176,16 @@ def create(session,user,thesis_id,data,expected):
         raise HTTPException(409,"Đổi đề tài chỉ được gửi trong 14 ngày đầu kể từ mốc bắt đầu thực hiện")
     if open_request(session,thesis):
         raise HTTPException(409,"Nhóm đã có yêu cầu đổi đề tài chờ xử lý")
+    from backend.services.thesis_extensions import pending as pending_extension
+    if pending_extension(session,thesis.id):raise HTTPException(409,"Cần xử lý yêu cầu gia hạn trước khi đổi đề tài")
     before = snapshot(session,thesis)
+    if data.scope=="INDIVIDUAL" and (data.kind!="REPLACEMENT" or len(before["members"])<2):
+        raise HTTPException(422,"Tách cá nhân chỉ áp dụng cho nhóm từ hai người và phải chọn đề tài mới")
     if data.kind == "REPLACEMENT":
         if not data.target_topic_id or data.proposed_title or data.proposed_description:
             raise HTTPException(422,"Chọn đề tài đã công bố, không nhập tên hoặc nội dung thay thế")
         topic = session.get(m.Topic,data.target_topic_id)
-        lecturer = topic_available(session,topic,thesis)
+        lecturer = topic_available(session,topic,thesis,data.scope)
         before.update(target_topic_version=topic.row_version,target_advisor_user_id=str(lecturer.user_id),
             target_advisor_name=lecturer.display_name)
         title,description=topic.current_title,topic.description or ""
@@ -186,7 +193,7 @@ def create(session,user,thesis_id,data,expected):
         title,description=data.proposed_title,data.proposed_description
         if data.target_topic_id or len(title)<10 or len(description)<20 or (title==before["title"] and description==before["description"]):
             raise HTTPException(422,"Nhập tên từ 10 ký tự, phạm vi từ 20 ký tự và nội dung khác hồ sơ hiện tại")
-    item = m.ThesisChangeRequest(thesis_id=thesis.id,requested_by=user.id,kind=data.kind,
+    item = m.ThesisChangeRequest(thesis_id=thesis.id,requested_by=user.id,kind=data.kind,scope=data.scope,
         proposed_title=title,proposed_description=description,target_topic_id=data.target_topic_id,
         reason=data.reason,state="SUBMITTED",snapshot=before,submitted_at=now(),reviews={},
         consents={str(user.id):{"decision":"AGREE","at":now().isoformat()}})
@@ -279,6 +286,48 @@ def reset_evidence(session,user,thesis):
     thesis.row_version+=1
 
 
+def split_member(session,user,item,thesis,topic,lecturer,reason):
+    student=session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id==item.requested_by))
+    member=session.scalar(select(m.ThesisMember).where(m.ThesisMember.thesis_id==thesis.id,
+        m.ThesisMember.student_id==student.id,m.ThesisMember.active.is_(True)).with_for_update())
+    remaining=[row for row in active_members(session,thesis) if row.student_id!=student.id]
+    if not member or not remaining:raise HTTPException(409,"Thành viên đã thay đổi; không thể tách theo yêu cầu cũ")
+    # The old thesis remains active, so the new thesis consumes a new supervision slot.
+    require_capacity(session,lecturer.id,lock=True)
+    old_reg=session.scalar(select(m.TopicRegistration).where(m.TopicRegistration.id==thesis.registration_id).with_for_update())
+    reg_member=session.scalar(select(m.RegistrationMember).where(m.RegistrationMember.registration_id==old_reg.id,
+        m.RegistrationMember.student_id==student.id).with_for_update())
+    member.active,member.is_coordinator,member.left_at=False,False,now()
+    reg_member.active,reg_member.is_coordinator=False,False
+    session.flush()
+    if not any(row.is_coordinator for row in remaining):
+        remaining[0].is_coordinator=True
+        successor=session.scalar(select(m.RegistrationMember).where(m.RegistrationMember.registration_id==old_reg.id,
+            m.RegistrationMember.student_id==remaining[0].student_id))
+        successor.is_coordinator=True
+    old_reg.expected_member_count=len(remaining)
+    old_reg.row_version+=1
+    from uuid import uuid4
+    reg=m.TopicRegistration(id=uuid4(),round_id=thesis.round_id,topic_id=topic.id,created_by=student.id,
+        expected_member_count=1,state="FINALIZED",submitted_at=now(),lecturer_decided_by=lecturer.id,
+        lecturer_decided_at=now(),lecturer_reason=reason,department_finalized_by=user.id,department_finalized_at=now())
+    session.add(reg);session.flush()
+    session.add(m.RegistrationMember(registration_id=reg.id,round_id=reg.round_id,student_id=student.id,
+        active=True,is_coordinator=True,consent_status="ACCEPTED",responded_by_user_id=student.user_id,responded_at=now()))
+    new=m.Thesis(id=uuid4(),round_id=thesis.round_id,topic_id=topic.id,registration_id=reg.id,
+        department_id=thesis.department_id,current_title=topic.current_title,state="ACTIVE")
+    session.add(new);session.flush()
+    session.add(m.ThesisMember(thesis_id=new.id,student_id=student.id,active=True,is_coordinator=True,joined_at=now()))
+    session.add(m.AdvisorAssignment(thesis_id=new.id,lecturer_id=lecturer.id,assigned_by=user.id,effective_from=now(),state="ACTIVE"))
+    topic.state,topic.row_version="LOCKED",topic.row_version+1
+    reset_evidence(session,user,thesis)
+    # Source identity stays intact; add only the resulting resource link.
+    item.snapshot={**item.snapshot,"result_thesis_id":str(new.id)}
+    audit(session,user,"THESIS_CREATED_FROM_TOPIC_CHANGE","thesis",new.id,reason,source_reference=str(item.id))
+    notices.emit(session,user.id,{student.user_id},"THESIS_CREATED_FROM_TOPIC_CHANGE","account",student.user_id,
+        "Đổi đề tài đã được duyệt. Hồ sơ mới đã được tạo; bạn cần nộp Mẫu 1–3 theo đề tài mới.",f"/theses/{new.id}")
+
+
 def decide(session,user,identifier,data,expected):
     item,thesis=get_request(session,user,identifier,expected)
     if not head(session,user,thesis):
@@ -288,6 +337,12 @@ def decide(session,user,identifier,data,expected):
         fresh(session,item,thesis)
         if not ready(item):
             raise HTTPException(409,"Cần đủ đồng ý của nhóm, GVHD cũ và GVHD mới nếu thay đổi")
+        if item.scope=="INDIVIDUAL":
+            topic=session.get(m.Topic,item.target_topic_id)
+            lecturer=topic_available(session,topic,thesis,item.scope)
+            split_member(session,user,item,thesis,topic,lecturer,data.reason)
+            item.state,item.decided_at,item.decided_by,item.decision_reason="APPROVED",now(),user.id,data.reason
+            return finish(session,user,item,"THESIS_CHANGE_APPROVED","Bộ môn duyệt tách thành viên sang đề tài mới; nhóm còn lại tiếp tục đề tài cũ và cập nhật Mẫu 1–3")
         reg = session.get(m.TopicRegistration,thesis.registration_id)
         old_topic=session.get(m.Topic,thesis.topic_id)
         if item.target_topic_id:
@@ -295,6 +350,7 @@ def decide(session,user,identifier,data,expected):
             lecturer=topic_available(session,topic,thesis)
             advisor=primary_advisor(session,thesis.id)
             if advisor.lecturer_id!=lecturer.id:
+                require_capacity(session, lecturer.id, excluding_thesis_id=thesis.id, lock=True)
                 advisor.state,advisor.effective_to,advisor.row_version="ENDED",now(),advisor.row_version+1
                 session.flush()
                 session.add(m.AdvisorAssignment(thesis_id=thesis.id,lecturer_id=lecturer.id,
@@ -350,57 +406,17 @@ def extension_out(session,item):
     if not item:
         return None
     file=session.get(m.StoredFile,item.evidence_file_id) if item.evidence_file_id else None
-    return {"id":item.id,"original_due_at":item.original_due_at,"until_at":item.until_at,"decision_on":item.decision_on,
+    request=session.scalar(select(m.ThesisExtensionRequest).where(m.ThesisExtensionRequest.extension_id==item.id))
+    return {"extension_starts_at":request.extension_starts_at if request else None,"id":item.id,"original_due_at":item.original_due_at,"until_at":item.until_at,"decision_on":item.decision_on,
         "reference":item.reference,"reason":item.reason,"recorded_at":item.recorded_at,
         "recorded_by":notices.actor_name(session,item.recorded_by),"interim_grade":"I",
         "file":{"id":file.id,"name":file.original_name,"scan_state":file.scan_state} if file else None}
 
 
 def record_extension(session,user,thesis_id,data,expected):
-    thesis=thesis_access(session,user,thesis_id,lock=True)
-    row_version(expected,thesis.row_version)
-    if not manager(session,user,thesis):
-        raise HTTPException(403,"Chỉ TBM hoặc điều phối đúng đợt được ghi nhận gia hạn")
-    mutable(session,thesis)
-    if extension_for(session,thesis):
-        raise HTTPException(409,"Khóa luận đã được gia hạn một lần")
-    if open_request(session,thesis):
-        raise HTTPException(409,"Cần xử lý yêu cầu đổi đề tài trước khi gia hạn")
-    baseline=session.scalar(select(m.DocumentDeadline).where(m.DocumentDeadline.round_id==thesis.round_id,
-        m.DocumentDeadline.document_type=="REPORT").with_for_update())
-    if not baseline:
-        raise HTTPException(409,"Cần thiết lập hạn nộp báo cáo của đợt trước khi ghi gia hạn")
-    today=now().astimezone(VN).date()
-    if not thesis.created_at.astimezone(VN).date()<=data.decision_on<=today:
-        raise HTTPException(422,"Ngày quyết định phải từ ngày lập khóa luận đến hôm nay")
-    until=data.until_at.astimezone(VN)
-    if until<=now() or until<=baseline.due_at or until>add_months(baseline.due_at.astimezone(VN),5):
-        raise HTTPException(422,"Hạn mới phải sau hạn báo cáo và hiện tại, không quá 5 tháng tính từ hạn cũ")
-    if data.evidence_file_id:
-        owned=session.scalar(select(m.DocumentVersion).join(m.Document,m.Document.id==m.DocumentVersion.document_id)
-            .where(m.Document.thesis_id==thesis.id,m.DocumentVersion.stored_file_id==data.evidence_file_id).limit(1))
-        file=session.get(m.StoredFile,data.evidence_file_id)
-        if not owned:
-            raise HTTPException(404,"Minh chứng không thuộc hồ sơ này")
-        documents.require_clean(file,"ghi nhận gia hạn")
-        documents.stored_download(session,owned)
-    item=m.ThesisExtension(thesis_id=thesis.id,original_due_at=baseline.due_at,until_at=until,
-        decision_on=data.decision_on,reference=data.reference,reason=data.reason,recorded_by=user.id,
-        recorded_at=now(),evidence_file_id=data.evidence_file_id)
-    session.add(item)
-    thesis.state,thesis.row_version="EXTENDED",thesis.row_version+1
-    session.flush()
-    audit(session,user,"THESIS_EXTENSION_RECORDED","thesis",thesis.id,
-        f"{baseline.due_at.isoformat()} → {until.isoformat()}; {data.reason}",source_reference=data.reference)
-    recipients={session.get(m.StudentProfile,row.student_id).user_id for row in active_members(session,thesis)}
-    advisor=primary_advisor(session,thesis.id)
-    if advisor:
-        recipients.add(session.get(m.LecturerProfile,advisor.lecturer_id).user_id)
-    for recipient in recipients:
-        notices.emit(session,user.id,{recipient},"THESIS_EXTENSION_RECORDED","account",recipient,
-            f"Đã ghi nhận gia hạn KLTN đến {until:%d/%m/%Y %H:%M} · {thesis.current_title}",f"/changes?thesis={thesis.id}")
-    session.commit()
-    return extension_out(session,item)
+    thesis=thesis_access(session,user,thesis_id)
+    if not manager(session,user,thesis):raise HTTPException(403,"Chỉ người quản lý đúng phạm vi xử lý gia hạn")
+    raise HTTPException(409,"Cần SV gửi yêu cầu gia hạn, đủ đồng thuận nhóm và ý kiến GVHD trước khi TBM ghi nhận quyết định")
 
 
 def request_out(session,user,item):
@@ -408,7 +424,7 @@ def request_out(session,user,item):
     roles=required_roles(item)
     pending=item.state in OPEN
     return {"id":item.id,"code":"DOI-"+item.id.hex[:12].upper(),"thesis_id":item.thesis_id,
-        "kind":item.kind,"state":item.state,"reason":item.reason,"proposed_title":item.proposed_title,
+        "kind":item.kind,"requested_by":item.requested_by,"scope":item.scope,"result_thesis_id":item.snapshot.get("result_thesis_id"),"state":item.state,"reason":item.reason,"proposed_title":item.proposed_title,
         "proposed_description":item.proposed_description,"snapshot":item.snapshot,"consents":item.consents,
         "reviews":item.reviews,"submitted_at":item.submitted_at,"decided_at":item.decided_at,
         "decision_reason":item.decision_reason,"decided_by":notices.actor_name(session,item.decided_by) if item.decided_by else None,
@@ -448,7 +464,10 @@ def workspace(session,user):
         advised=select(m.AdvisorAssignment.thesis_id).where(m.AdvisorAssignment.lecturer_id==lecturer.id,effective(m.AdvisorAssignment))
         query=select(m.Thesis).where(or_(m.Thesis.id.in_(advised),m.Thesis.round_id.in_(managed_rounds),
             m.Thesis.department_id.in_(departments)))
-    for thesis in session.scalars(query.order_by(m.Thesis.created_at.desc())):
+    visible_theses=list(session.scalars(query.order_by(m.Thesis.created_at.desc())))
+    from backend.services.thesis_extensions import listing as extension_listing
+    extension_items=extension_listing(session,user,[thesis.id for thesis in visible_theses])
+    for thesis in visible_theses:
         try:
             thesis_access(session,user,thesis.id)
         except HTTPException:
@@ -462,6 +481,8 @@ def workspace(session,user):
         cutoff=deadline(round_.execution_starts_on) if round_.execution_starts_on else None
         pending=open_request(session,thesis)
         extension=extension_for(session,thesis)
+        from backend.services.thesis_extensions import pending as pending_extension
+        extension_request=pending_extension(session,thesis.id)
         baseline=session.scalar(select(m.DocumentDeadline).where(m.DocumentDeadline.round_id==thesis.round_id,m.DocumentDeadline.document_type=="REPORT"))
         block=""
         try:
@@ -473,15 +494,21 @@ def workspace(session,user):
         if own and not block and in_window and not pending:
             for topic in session.scalars(select(m.Topic).where(m.Topic.round_id==thesis.round_id,
                     m.Topic.department_id==thesis.department_id,m.Topic.state=="APPROVED").order_by(m.Topic.code)):
-                try:
-                    lecturer=topic_available(session,topic,thesis)
-                except HTTPException:
-                    continue
+                allowed={}
+                for scope in ("GROUP","INDIVIDUAL"):
+                    try:
+                        lecturer=topic_available(session,topic,thesis,scope)
+                        allowed[scope]=True
+                    except HTTPException:
+                        allowed[scope]=False
+                if not any(allowed.values()):continue
+                lecturer=receiver(session,topic)
                 candidates.append({"id":topic.id,"code":topic.code,"title":topic.current_title,
-                    "description":topic.description or "","advisor":lecturer.display_name,"capacity":topic.max_students})
+                    "description":topic.description or "","advisor":lecturer.display_name,"capacity":topic.max_students,
+                    "group_available":allowed["GROUP"],"individual_available":allowed["INDIVIDUAL"]})
         current_topic=session.get(m.Topic,thesis.topic_id)
         eligible=bool(own and own.student_id in confirmed_student_ids(session,thesis.round_id,[own.student_id]))
-        can_request=bool(eligible and not block and in_window and not pending)
+        can_request=bool(eligible and not block and in_window and not pending and not extension_request)
         evidence=[]
         if manager(session,user,thesis):
             evidence=[{"id":file.id,"name":file.original_name,"scan_state":file.scan_state} for file in session.scalars(
@@ -490,15 +517,17 @@ def workspace(session,user):
                 .where(m.Document.thesis_id==thesis.id,m.StoredFile.scan_state=="CLEAN").distinct())]
         theses.append({"id":thesis.id,"title":thesis.current_title,"description":current_topic.description or "",
             "round_label":round_.code,"round_id":round_.id,"round_version":round_.row_version,"state":thesis.state,"row_version":thesis.row_version,
-            "registration_id":thesis.registration_id,"starts_on":round_.execution_starts_on,"cutoff":cutoff,
-            "can_request":can_request,"message":block or ("Nhóm đang có yêu cầu chờ xử lý" if pending else
+            "registration_id":thesis.registration_id,"member_count":len(active_members(session,thesis)),"starts_on":round_.execution_starts_on,"cutoff":cutoff,
+            "can_request":can_request,"message":block or ("Nhóm đang có yêu cầu chờ xử lý" if pending or extension_request else
                 "Quyền tham gia đợt đã bị thu hồi. Liên hệ Khoa để đối chiếu." if own and not eligible else
                 "Chưa có ngày bắt đầu thực hiện" if not cutoff else "Ngoài thời hạn đổi đề tài" if not in_window else ""),
-            "can_extend":bool(manager(session,user,thesis) and not block and not pending and not extension and baseline),
+            "can_extend":False,
+            "can_request_extension":bool(eligible and not block and not pending and not extension_request and not extension and baseline),
+            "extension_request_blocker":block or ("Có yêu cầu đang chờ xử lý" if pending or extension_request else "Đã gia hạn một lần" if extension else "Khoa chưa thiết lập hạn báo cáo" if not baseline else ""),
             "extension_blocker":block or ("Đã gia hạn một lần" if extension else "Nhóm đang có yêu cầu đổi đề tài" if pending else
                 "Chưa thiết lập hạn báo cáo của đợt" if not baseline else ""),
             "can_set_start":manager(session,user,thesis) and bool(resource_role(session,user.id,"KLTN_COORDINATOR",round_id=thesis.round_id)),
-            "baseline_due":baseline.due_at if baseline else None,"extension_max":add_months(baseline.due_at.astimezone(VN),5) if baseline else None,
+            "baseline_due":baseline.due_at if baseline else None,"extension_max":None,
             "extension":extension_out(session,extension),"candidates":candidates,"evidence":evidence})
     # Filter request access in SQL before reading free text or exposing group information.
     ids=[row["id"] for row in theses]
@@ -509,4 +538,5 @@ def workspace(session,user):
         m.ThesisChangeRequest.snapshot["members"].contains([{"user_id":user_key}])))
     items=[request_out(session,user,item) for item in session.scalars(query.order_by(m.ThesisChangeRequest.submitted_at.desc()))
         if accessible(session,user,item)]
-    return {"theses":theses,"requests":items}
+    from backend.services.thesis_extensions import policy_confirmed
+    return {"theses":theses,"requests":items,"extension_requests":extension_items,"extension_policy_confirmed":policy_confirmed()}

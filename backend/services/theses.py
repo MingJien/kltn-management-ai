@@ -73,7 +73,7 @@ def rights(session, user, thesis):
         lecturer = profile(session, user, "LECTURER")
         advisor = primary_advisor(session, thesis.id)
         if advisor and advisor.lecturer_id == lecturer.id:
-            result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review", "proposal:view", "proposal:review"})
+            result.update({"view", "document:view", "progress:view", "work:view", "progress:review", "document:review", "work:review", "proposal:view", "proposal:review", "milestone:manage_own"})
         if _is_department_head(session, lecturer.id, thesis.department_id):
             result.update({"view", "document:view", "work:view", "audit:view", "proposal:view", "proposal:assign_reviewer", "proposal:finalize"})
         if is_faculty_dean(session, lecturer.id, thesis.department_id):

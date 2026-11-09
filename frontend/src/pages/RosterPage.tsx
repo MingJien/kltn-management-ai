@@ -358,17 +358,12 @@ export default function RosterPage({context}: {context:Context}) {
                   <input id="roster-reference" className="input" required minLength={3} maxLength={500} value={reference} onChange={e=>{setReference(e.target.value);setError("");}} placeholder="Demo: DEMO-DS-SV-DOT-1-2026" />
                 </label>
               </div>
-              <div className="roster-help-note"><strong>Mã bộ môn trong Excel</strong>
-                <p>Cột này xác định bộ môn quản lý sinh viên và phạm vi đề tài, GVHD; hãy điền đúng mã đã có trong hệ thống. Không dùng mã giả lập cho danh sách thật.</p>
-                <p>{departmentError||(!catalog.length?"Chưa có cặp bộ môn–ngành đang hoạt động; chưa thể nhập.":
-                  `Đã có ${new Set(catalog.map(item=>item.department_code)).size} bộ môn và ${catalog.length} ngành để đối chiếu.`)}</p>
-                <p>Mã BM-* là mã nội bộ trong danh mục Khoa, không phải mã bộ môn chính thức của Trường. Mỗi dòng Excel cần đủ MSSV, họ tên, email, mã bộ môn, lớp, mã ngành; cặp mã phải đúng danh mục.</p>
-                <details><summary>Xem mã bộ môn và ngành được chấp nhận</summary><div className="table-scroll" role="region" aria-label="Danh mục bộ môn và ngành" tabIndex={0}><table className="account-table"><thead><tr><th>Mã bộ môn</th><th>Tên bộ môn</th><th>Mã ngành</th><th>Tên ngành</th></tr></thead><tbody>
-                  {catalog.map(item=><tr key={`${item.department_code}-${item.major_code}`}><td>{item.department_code}</td><td>{item.department_name}</td><td>{item.major_code}</td><td>{item.major_name}</td></tr>)}
-                </tbody></table></div></details>
-                <a href="/templates/danh-sach-sinh-vien-kltn-mau.xlsx" download>Tải Excel mẫu (dữ liệu giả lập, mã hợp lệ)</a>
-              </div>
-              <div className="roster-help-note"><strong>Căn cứ nhập danh sách</strong><p>Với dữ liệu giả lập, dùng <strong>DEMO-DS-SV-DOT-1-2026</strong>. Khi dùng dữ liệu thật, ghi số văn bản; nếu không có số, ghi tên văn bản, đơn vị và ngày ban hành.</p></div>
+              {departmentError && <p role="alert" className="alert alert-danger">{departmentError}</p>}
+              {!departmentError && !catalog.length && <p role="alert" className="alert alert-warning">Chưa có danh mục bộ môn và ngành đang hoạt động, chưa thể nhập.</p>}
+              <details><summary>Xem mã bộ môn và ngành được chấp nhận</summary><div className="table-scroll" role="region" aria-label="Danh mục bộ môn và ngành" tabIndex={0}><table className="account-table"><thead><tr><th>Mã bộ môn</th><th>Tên bộ môn</th><th>Mã ngành</th><th>Tên ngành</th></tr></thead><tbody>
+                {catalog.map(item=><tr key={item.department_code+"-"+item.major_code}><td>{item.department_code}</td><td>{item.department_name}</td><td>{item.major_code}</td><td>{item.major_name}</td></tr>)}
+              </tbody></table></div></details>
+              <a href="/templates/danh-sach-sinh-vien-kltn-mau.xlsx" download>Tải Excel mẫu</a>
               <div className="account-actions"><button className="btn btn-secondary" disabled={!file||!catalog.length||busy} onClick={()=>{if(!file)return;void run(async()=>{
                 const data=await request<Preview>(`/rounds/${roundId}/roster/preview`,context.user_id,
                   {method:"POST",body:file,headers:fileHeaders(file)});setPreview(data);

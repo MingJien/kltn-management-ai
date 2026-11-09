@@ -1,6 +1,6 @@
 """Keep academic evidence tied to the group that actually continues the thesis."""
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from backend.db.models import entities as m
 
@@ -12,7 +12,9 @@ def changed_at(session, thesis_id):
         m.ThesisWithdrawalRequest.thesis_id == thesis_id,
         m.ThesisWithdrawalRequest.state == "RECORDED"))
     changed = session.scalar(select(func.max(m.ThesisChangeRequest.decided_at)).where(
-        m.ThesisChangeRequest.thesis_id == thesis_id, m.ThesisChangeRequest.state == "APPROVED"))
+        or_(m.ThesisChangeRequest.thesis_id == thesis_id,
+            m.ThesisChangeRequest.snapshot["result_thesis_id"].astext == str(thesis_id)),
+        m.ThesisChangeRequest.state == "APPROVED"))
     return max((instant for instant in (withdrawn,changed) if instant), default=None)
 
 

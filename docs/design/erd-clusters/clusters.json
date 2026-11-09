@@ -1,5 +1,5 @@
 {
-  "database": "kltn_ai",
+  "database": "kltn_management",
   "schema": "public",
   "clusters": [
     {
@@ -18,176 +18,102 @@
           "lecturer_profile",
           "position_assignment",
           "resource_assignment"
+        ],
+        [
+          "department_major",
+          "user_notification",
+          "audit_event"
         ]
       ],
       "context": []
     },
     {
       "id": "02",
-      "slug": "02-de-tai-dang-ky-va-khoa-luan",
-      "title": "Đề tài, đăng ký và khóa luận",
+      "slug": "02-nam-hoc-dot-va-dieu-kien",
+      "title": "Năm học, đợt và điều kiện",
       "rows": [
         [
           "academic_year",
           "thesis_round",
-          "round_policy",
-          "eligibility_snapshot",
-          "lecturer_profile"
-        ],
-        [
-          "lecturer_expertise",
-          "expertise_evidence",
-          "topic",
-          "topic_title_version"
-        ],
-        [
-          "eligibility_exception",
-          "topic_requirement",
-          "topic_registration",
-          "registration_member"
-        ],
-        [
-          "advisor_assignment",
-          "thesis",
-          "thesis_member",
-          "member_work_assignment",
-          "stored_file"
+          "eligibility_snapshot"
         ]
       ],
-      "context": [
-        "lecturer_profile",
-        "stored_file"
-      ]
+      "context": []
     },
     {
       "id": "03",
-      "slug": "03-de-cuong-tien-do-va-tai-lieu",
-      "title": "Đề cương, tiến độ và tài liệu",
+      "slug": "03-de-tai-va-dang-ky",
+      "title": "Đề tài và đăng ký",
       "rows": [
         [
-          "stored_file",
-          "thesis",
-          "advisor_assignment",
-          "progress_milestone"
+          "topic",
+          "topic_title_version",
+          "topic_requirement"
         ],
         [
-          "proposal",
-          "proposal_version",
-          "reviewer_assignment",
-          "proposal_review"
-        ],
-        [
-          "signature_confirmation",
-          "progress_report",
-          "progress_review",
-          "topic_change_request"
-        ],
-        [
-          "external_procedure_outcome",
-          "document",
-          "document_version"
+          "topic_registration",
+          "registration_member",
+          "registration_form_version"
         ]
       ],
-      "context": [
-        "thesis",
-        "advisor_assignment"
-      ]
+      "context": []
     },
     {
       "id": "04",
-      "slug": "04-tuong-dong-kho-tai-lieu-va-ai",
-      "title": "Tương đồng, kho tài liệu và AI",
-      "rows": [
-        [
-          "stored_file",
-          "document",
-          "document_version",
-          "thesis_round"
-        ],
-        [
-          "repository_item",
-          "search_index_metadata",
-          "similarity_policy",
-          "similarity_check"
-        ],
-        [
-          "similarity_match",
-          "retrieval_audit",
-          "audit_event"
-        ]
-      ],
-      "context": [
-        "stored_file",
-        "document",
-        "document_version",
-        "thesis_round"
-      ]
-    },
-    {
-      "id": "05",
-      "slug": "05-hoi-dong-bao-ve-va-cham-diem",
-      "title": "Hội đồng, bảo vệ và chấm điểm",
+      "slug": "04-khoa-luan-va-gvhd",
+      "title": "Khóa luận và GVHD",
       "rows": [
         [
           "thesis",
           "thesis_member",
-          "council",
-          "council_member",
-          "defense_session"
-        ],
-        [
-          "session_thesis",
-          "council_attendance",
-          "defense_eligibility_check",
-          "advisor_review",
-          "reviewer_review"
-        ],
-        [
-          "rubric_template",
-          "rubric_criterion",
-          "rubric_assignment",
-          "bonus_evidence",
-          "evaluation"
-        ],
-        [
-          "evaluation_item",
-          "final_result"
+          "advisor_assignment",
+          "member_work_assignment"
         ]
       ],
-      "context": [
-        "thesis",
-        "thesis_member"
-      ]
+      "context": []
+    },
+    {
+      "id": "05",
+      "slug": "05-de-cuong-va-ky-xac-nhan",
+      "title": "Đề cương và xác nhận phiên bản",
+      "rows": [
+        [
+          "stored_file",
+          "proposal",
+          "proposal_version"
+        ],
+        [
+          "reviewer_assignment",
+          "proposal_review",
+          "signature_confirmation"
+        ]
+      ],
+      "context": []
     },
     {
       "id": "06",
-      "slug": "06-bien-ban-chu-ky-va-ket-qua",
-      "title": "Biên bản, chữ ký và kết quả",
+      "slug": "06-tien-do-va-tai-lieu",
+      "title": "Tiến độ và tài liệu",
       "rows": [
         [
-          "council",
-          "council_member",
-          "defense_session",
-          "thesis_member"
+          "progress_milestone",
+          "progress_report",
+          "progress_review",
+          "progress_review_annotation"
         ],
         [
-          "council_minute",
-          "minute_version",
-          "minute_signature",
-          "final_result"
-        ],
-        [
+          "document",
+          "document_version",
           "stored_file",
-          "audit_event"
+          "document_deadline"
+        ],
+        [
+          "official_form",
+          "official_form_version"
         ]
       ],
       "context": [
-        "defense_session",
-        "council",
-        "council_member",
-        "thesis_member",
-        "stored_file",
-        "audit_event"
+        "stored_file"
       ]
     }
   ]
