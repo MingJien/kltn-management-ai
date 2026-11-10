@@ -92,17 +92,20 @@ def stamp(identifier, version, instant, base_url):
     return f"{identifier} · {version} · {instant.astimezone(defense.VN):%d/%m/%Y %H:%M} · {url}"
 
 
-def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_id=None):
+def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_id=None,*,blank=False):
     slot,council,member,own,manager = defense.load_slot(session,user,identifier)
     if own or not (member or manager):
         raise HTTPException(403,"Chỉ hội đồng và người phụ trách được tải mẫu")
-    if not slot.finalized_at:
+    blank=blank and form==6
+    if not slot.finalized_at and not blank:
         raise HTTPException(409,"Chỉ xuất bản dùng để ký sau khi chốt kết quả")
-    title = slot.minutes["title"]
+    title = slot.minutes.get("title") or session.get(m.Thesis,slot.thesis_id).current_title
     stamp_id = f"M{form}-{slot.id}"
     if form == 6:
         stamp_id += f"-{student_id}-{lecturer_id}"
-    footer = stamp(stamp_id,f"v{slot.row_version}",slot.finalized_at,base_url)
+    footer = stamp(stamp_id,f"v{slot.row_version}",slot.finalized_at or defense.now(),base_url)
+    if blank:
+        footer="PHIẾU CHẤM TRỐNG · CHƯA CÓ KẾT QUẢ · "+footer
     out = BytesIO()
     if form == 6:
         student = next((row for row in slot.roster if row["id"]==str(student_id)),None)
@@ -110,12 +113,12 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         if not student or not evaluator or not (manager or (member and (
             member["id"] == evaluator["id"] or member["role"] in {"CHAIR","SECRETARY"}))):
             raise HTTPException(404,"Không tìm thấy phiếu chấm trong phạm vi của bạn")
-        mark = slot.marks.get(student["id"],{}).get(evaluator["id"])
+        mark = {"scores":[None]*12,"note":""} if blank else slot.marks.get(student["id"],{}).get(evaluator["id"])
         if not mark:
             raise HTTPException(404,"Sinh viên không có phiếu chấm")
-        attendance = slot.attendance[student["id"]]
+        attendance = slot.attendance.get(student["id"],{})
         book,sheet = spreadsheet("Mẫu 6",footer)
-        write_row(sheet,["PHIẾU ĐÁNH GIÁ KHÓA LUẬN TỐT NGHIỆP"])
+        write_row(sheet,["PHIẾU CHẤM TRỐNG — CHƯA CÓ KẾT QUẢ" if blank else "PHIẾU ĐÁNH GIÁ KHÓA LUẬN TỐT NGHIỆP"])
         write_row(sheet,["Hội đồng",council.name])
         write_row(sheet,["Người đánh giá",evaluator["name"],defense.ROLES[evaluator["role"]]])
         write_row(sheet,["Sinh viên",student["name"],student["code"]])
@@ -126,20 +129,20 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         for (code,label,maximum),score in zip(defense.CRITERIA,mark["scores"]):
             if code in groups:
                 group,group_name,limit,start,end = groups[code]
-                row = write_row(sheet,[group,group_name,limit,sum(float(s) for s in mark["scores"][start:end])])
+                row = write_row(sheet,[group,group_name,limit,None if blank else sum(float(s) for s in mark["scores"][start:end])])
                 for cell in sheet[row]:
                     cell.font = Font(bold=True)
-            row = write_row(sheet,[code,label,float(maximum),float(score)])
+            row = write_row(sheet,[code,label,float(maximum),None if blank else float(score)])
             sheet.cell(row,2).alignment = Alignment(wrap_text=True,vertical="center")
             sheet.row_dimensions[row].height = max(29, 14 * ((len(label) + 62) // 63))
-        write_row(sheet,["4","Điểm thưởng",1,float(attendance.get("bonus","0"))])
+        write_row(sheet,["4","Điểm thưởng",1,None if blank else float(attendance.get("bonus","0"))])
         precision=".1" if slot.minutes.get("results_snapshot") else ".01"
-        write_row(sheet,["","Tổng điểm",10,float(defense.total(mark,attendance,precision))])
+        write_row(sheet,["","Tổng điểm",10,None if blank else float(defense.total(mark,attendance,precision))])
         write_row(sheet,["","Nhận xét",mark["note"]])
         write_row(sheet,["","Người đánh giá (Ký, ghi rõ họ tên)"])
         format_sheet(sheet,header,[12,70,19,19])
         book.save(out)
-        return response(out,f"Mau-06-{slot.id}-{student_id}-{lecturer_id}-v{slot.row_version}","xlsx")
+        return response(out,f"{'Phieu-trong' if blank else 'Mau-06'}-{slot.id}-{student_id}-{lecturer_id}-v{slot.row_version}","xlsx")
 
     doc = word("BIÊN BẢN HỌP HỘI ĐỒNG\nCHẤM KHÓA LUẬN TỐT NGHIỆP",footer)
     doc.add_heading("I. THÔNG TIN VỀ KHÓA LUẬN",2)
@@ -181,11 +184,12 @@ def export_council(session,user,identifier,form,base_url):
         raise HTTPException(409,"Khóa bảng điểm hội đồng trước khi xuất bản dùng để ký")
     slots = session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.council_id == identifier)
         .order_by(m.DefenseSlot.starts_at,m.DefenseSlot.id)).all()
-    rows = []
+    latest = {}
     for slot in slots:
         totals = defense.results(slot,council)
         for student in slot.roster:
-            rows.append((student,totals[student["id"]]["average"]))
+            latest[student["student_id"]]=(student,totals[student["id"]]["average"])
+    rows=list(latest.values())
     footer = stamp(f"M{form}-{council.id}","v1",council.closed_at,base_url)
     round_ = session.get(m.ThesisRound,council.round_id)
     out = BytesIO()

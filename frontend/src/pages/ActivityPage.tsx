@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { History, RefreshCw, Search } from "lucide-react";
 import { request, type Context } from "../api";
-import { actionLabel, resourceLabel, type ActivityResult } from "../activity";
+import { actionLabel, resourceLabel, activityReason, type ActivityResult } from "../activity";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
 
@@ -72,7 +72,7 @@ export default function ActivityPage({context}: {context: Context}) {
             <time dateTime={item.occurred_at}>{new Date(item.occurred_at).toLocaleString("vi-VN", {timeZone: "Asia/Ho_Chi_Minh"})}</time></div>
           <div><strong>{item.actor_name}</strong><span className="text-muted"> · {resourceLabel(item.resource_type)}</span></div>
           {item.resource_label !== item.resource_type && <p>{item.resource_label}</p>}
-          {item.reason && <p className="activity-item__text"><strong>Lý do / nội dung: </strong>{item.reason}</p>}
+          {item.reason && <p className="activity-item__text"><strong>Lý do / nội dung: </strong>{activityReason(item)}</p>}
           {item.source_reference && <p className="activity-item__text"><strong>Căn cứ / số văn bản: </strong>{item.source_reference}</p>}
           <details className="text-caption text-muted"><summary>Mã tra cứu</summary><p>Mã nhật ký: {item.id}<br />Mã hồ sơ: {item.resource_id}</p></details>
         </div>

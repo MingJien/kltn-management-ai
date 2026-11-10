@@ -951,8 +951,10 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
         CheckConstraint("ends_at > starts_at", name="time_order"),
         CheckConstraint("(finalized_at IS NULL) = (finalized_by IS NULL)", name="finalized_stamp"),
         Index("ix_defense_slot_council_start", "council_id", "starts_at"),
+        Index("uq_defense_slot_active_thesis", "thesis_id", unique=True, postgresql_where=text("finalized_at IS NULL")),
     )
-    thesis_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("thesis.id", ondelete="RESTRICT"), unique=True)
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    prior_slot_id: Mapped[Optional[uuid.UUID]] = fk("defense_slot.id", nullable=True)
     council_id: Mapped[uuid.UUID] = fk("defense_council.id")
     report_version_id: Mapped[uuid.UUID] = fk("document_version.id")
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -964,6 +966,21 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     minutes: Mapped[dict] = mapped_column(JSONB, nullable=False)
     finalized_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseAbsenceDecision(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "defense_absence_decision"
+    __table_args__ = (
+        UniqueConstraint("slot_id", "thesis_member_id"),
+        CheckConstraint("outcome IN ('NOT_PASSED','SUPPLEMENTARY')", name="outcome"),
+    )
+    slot_id: Mapped[uuid.UUID] = fk("defense_slot.id")
+    thesis_member_id: Mapped[uuid.UUID] = fk("thesis_member.id")
+    outcome: Mapped[str] = mapped_column(String(30))
+    reference: Mapped[str] = mapped_column(String(300))
+    reason: Mapped[str] = mapped_column(Text)
+    recorded_by: Mapped[uuid.UUID] = fk("user_account.id")
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ThesisExtensionRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):

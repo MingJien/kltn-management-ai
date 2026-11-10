@@ -1,6 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 from zoneinfo import ZoneInfo
+import hashlib
+import json
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -45,7 +47,7 @@ def student_for(session, user):
     return session.scalar(select(m.StudentProfile).where(m.StudentProfile.user_id == user.id)) if user.base_role == "STUDENT" else None
 
 
-def manage_council(session, user, data):
+def manage_council(session, user, data, identifier=None, signature=None):
     lecturer = lecturer_for(session, user)
     if not manages(session, user, lecturer, data.round_id, data.department_id):
         raise HTTPException(403, "Chỉ TBM hoặc điều phối được giao mới được lập hội đồng")
@@ -63,15 +65,38 @@ def manage_council(session, user, data):
     if ids != found.keys():
         raise HTTPException(422, "Có tài khoản giảng viên không hoạt động")
     session.execute(select(func.pg_advisory_xact_lock(66102)))
+    existing=session.get(m.DefenseCouncil,identifier) if identifier else None
+    slots=[]
+    if identifier:
+        if not existing or (existing.round_id,existing.department_id)!=(data.round_id,data.department_id):
+            raise HTTPException(404,"Không tìm thấy hội đồng trong phạm vi này")
+        if signature!=council_signature(existing):
+            raise HTTPException(409,"Hội đồng đã được cập nhật. Làm mới để đối chiếu trước khi sửa")
+        slots=session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.council_id==identifier).order_by(m.DefenseSlot.id).with_for_update()).all()
+        if existing.closed_at or any(s.finalized_at or s.marks or s.attendance or s.minutes for s in slots):
+            raise HTTPException(409,"Chỉ sửa thành phần trước khi nhập dữ liệu buổi bảo vệ")
     if session.scalar(select(m.DefenseCouncil.id).where(m.DefenseCouncil.round_id == data.round_id,
-            m.DefenseCouncil.department_id == data.department_id, m.DefenseCouncil.name == data.name)):
+            m.DefenseCouncil.department_id == data.department_id, m.DefenseCouncil.name == data.name,
+            m.DefenseCouncil.id != identifier if identifier else True)):
         raise HTTPException(409, "Tên hội đồng đã tồn tại trong đợt và bộ môn")
-    council = m.DefenseCouncil(round_id=data.round_id, department_id=data.department_id, name=data.name,
+    council = existing or m.DefenseCouncil(round_id=data.round_id, department_id=data.department_id, name=data.name,
         reference=data.reference, created_by=user.id, members=[
             {"id":str(member.lecturer_id), "name":found[member.lecturer_id], "role":member.role} for member in data.members])
+    if existing:
+        audit(session,user,"DEFENSE_COUNCIL_BEFORE_REVISION","defense_council",existing.id,json.dumps(council_out(existing),default=str,ensure_ascii=False))
+        council.name,council.reference=data.name,data.reference
+        council.members=[{"id":str(p.lecturer_id),"name":found[p.lecturer_id],"role":p.role} for p in data.members]
+        for slot in slots:
+            validate_ready(session,session.get(m.Thesis,slot.thesis_id),council,{r["id"] for r in slot.roster} if slot.prior_slot_id else None)
+            for other,other_council in session.execute(select(m.DefenseSlot,m.DefenseCouncil).join(m.DefenseCouncil,m.DefenseSlot.council_id==m.DefenseCouncil.id).where(
+                m.DefenseSlot.council_id!=council.id,m.DefenseSlot.starts_at<slot.ends_at,m.DefenseSlot.ends_at>slot.starts_at)):
+                if ids.intersection(UUID(p["id"]) for p in other_council.members):
+                    raise HTTPException(409,"Thành viên mới bị trùng lịch ở hội đồng khác")
+            slot.row_version+=1
+            notify(session,user,slot,council,"DEFENSE_COUNCIL_REVISED","Đã cập nhật thành phần hội đồng")
     session.add(council)
     session.flush()
-    audit(session, user, "DEFENSE_COUNCIL_CREATED", "defense_council", council.id, data.reference)
+    audit(session, user, "DEFENSE_COUNCIL_REVISED" if existing else "DEFENSE_COUNCIL_CREATED", "defense_council", council.id, data.reference)
     session.commit()
     return {"id":council.id}
 
@@ -91,12 +116,19 @@ def load_slot(session, user, identifier, *, write=False):
     return slot, council, member, own, manager
 
 
-def validate_ready(session, thesis, council):
+def thesis_state_allows_schedule(thesis, extension):
+    return thesis.state == "READY_FOR_DEFENSE" or (thesis.state == "EXTENDED" and extension is not None)
+
+
+def validate_ready(session, thesis, council, member_ids=None):
     if (thesis.round_id, thesis.department_id) != (council.round_id, council.department_id):
         raise HTTPException(422, "Đề tài và hội đồng phải cùng đợt và bộ môn")
     active = evaluation.members(session, thesis)
+    if member_ids is not None:
+        active=[row for row in active if str(row.id) in member_ids]
     report = evaluation.report(session, thesis)
-    if not active or not report or thesis.state != "READY_FOR_DEFENSE" or any(
+    extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == thesis.id))
+    if not active or not report or not (thesis_state_allows_schedule(thesis, extension) or (member_ids is not None and thesis.state=="DEFENDED")) or any(
         evaluation.eligibility_out(session, thesis, row, report)["state"] != "ELIGIBLE" for row in active):
         raise HTTPException(409, "Đề tài cần được chốt đủ điều kiện trên phiên bản báo cáo hiện tại")
     advisor_ids = set(session.scalars(select(m.AdvisorAssignment.lecturer_id).where(
@@ -104,6 +136,14 @@ def validate_ready(session, thesis, council):
     if any(UUID(row["id"]) in advisor_ids for row in council.members):
         raise HTTPException(409, "GVHD không được chấm đề tài mình hướng dẫn trong hội đồng này")
     return active, report
+
+
+def validate_extension_window(extension, request, starts_at, ends_at):
+    if not extension:
+        return
+    from backend.services.extension_policy import validate_defense_window
+    validate_defense_window(request.extension_starts_at if request else None,
+        extension.until_at, starts_at, ends_at)
 
 
 def schedule(session, user, data, identifier=None, expected=None):
@@ -124,9 +164,33 @@ def schedule(session, user, data, identifier=None, expected=None):
         raise HTTPException(409, "Hội đồng đã khóa bảng điểm")
     if data.ends_at <= data.starts_at:
         raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
-    if not slot and session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
+    if not slot and not data.prior_slot_id and session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
         raise HTTPException(409, "Đề tài đã có lịch bảo vệ")
-    active, report = validate_ready(session, thesis, council)
+    prior_id=slot.prior_slot_id if slot else data.prior_slot_id
+    chosen={str(row) for row in data.thesis_member_ids}
+    if slot and prior_id:
+        chosen={row["id"] for row in slot.roster}
+    if prior_id:
+        prior=session.get(m.DefenseSlot,prior_id)
+        if not prior or prior.thesis_id!=thesis.id or not prior.finalized_at or not chosen or data.starts_at<prior.ends_at:
+            raise HTTPException(422,"Chọn phiên đã chốt và SV được Khoa cho bảo vệ bổ sung; lịch phải sau phiên cũ")
+        allowed={str(d.thesis_member_id) for d in session.scalars(select(m.DefenseAbsenceDecision).where(
+            m.DefenseAbsenceDecision.slot_id==prior_id,m.DefenseAbsenceDecision.outcome=="SUPPLEMENTARY"))}
+        if not chosen<=allowed or any(prior.attendance.get(key,{}).get("status")!="ABSENT" for key in chosen):
+            raise HTTPException(409,"Chỉ xếp bổ sung cho SV vắng có quyết định cho phép của Khoa")
+        for previous in session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.thesis_id==thesis.id)):
+            if slot and previous.id==slot.id:continue
+            if not previous.finalized_at or (previous.prior_slot_id==prior_id and chosen.intersection(r["id"] for r in previous.roster)):
+                raise HTTPException(409,"Sinh viên đã có lịch bổ sung hoặc đề tài còn phiên chưa chốt")
+    elif chosen:
+        raise HTTPException(422,"Danh sách SV riêng chỉ dùng cho phiên bảo vệ bổ sung")
+    active, report = validate_ready(session, thesis, council,chosen if prior_id else None)
+    if prior_id and {str(row.id) for row in active}!=chosen:
+        raise HTTPException(409,"Thành viên đã thay đổi, Khoa cần đối chiếu lại hồ sơ")
+    extension=session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id==thesis.id))
+    extension_request=session.scalar(select(m.ThesisExtensionRequest).where(
+        m.ThesisExtensionRequest.extension_id==extension.id)) if extension else None
+    validate_extension_window(extension,extension_request,data.starts_at,data.ends_at)
     lecturer_ids = {item["id"] for item in council.members}
     overlaps = session.execute(select(m.DefenseSlot, m.DefenseCouncil)
         .join(m.DefenseCouncil, m.DefenseCouncil.id == m.DefenseSlot.council_id)
@@ -143,7 +207,7 @@ def schedule(session, user, data, identifier=None, expected=None):
         roster.append({"id":str(member.id),"student_id":str(student.id),"name":student.display_name,
             "code":student.student_code,"class_name":student.class_name or "", "major":student.major_code or ""})
     if not slot:
-        slot = m.DefenseSlot(thesis_id=thesis.id, marks={}, attendance={}, minutes={})
+        slot = m.DefenseSlot(thesis_id=thesis.id, prior_slot_id=prior_id, marks={}, attendance={}, minutes={})
         session.add(slot)
     else:
         slot.row_version += 1
@@ -181,12 +245,13 @@ def cancel_schedule(session,user,identifier,expected,reason):
     session.commit()
 
 
-def edit(session, user, identifier, expected, *, secretary=False):
+def edit(session, user, identifier, expected, *, secretary=False, independent=False):
     slot,council,member,_,_ = load_slot(session,user,identifier,write=True)
-    row_version(expected,slot.row_version)
+    if not independent:
+        row_version(expected,slot.row_version)
     if not member or (secretary and member["role"] != "SECRETARY"):
         raise HTTPException(403,"Thao tác cần đúng vai trò được phân công trong hội đồng")
-    if slot.finalized_at:
+    if slot.finalized_at or council.closed_at:
         raise HTTPException(409,"Hồ sơ đã chốt")
     return slot,council,member
 
@@ -199,10 +264,14 @@ def student_id(slot, identifier):
 
 
 def save_marks(session,user,identifier,expected,data):
-    slot,council,member = edit(session,user,identifier,expected)
+    independent=data.ballot_revision is not None
+    slot,council,member = edit(session,user,identifier,expected,independent=independent)
     ensure_quorum(slot,council)
     student = student_id(slot,data.thesis_member_id)
     lecturer = str(data.lecturer_id)
+    old=slot.marks.get(student,{}).get(lecturer,{})
+    if independent and (data.context_token != context_token(slot,council) or data.ballot_revision != old.get("revision",0)):
+        raise HTTPException(409,"Phiếu hoặc thành phần/điểm thưởng đã thay đổi. Nội dung đang nhập được giữ lại; hãy đối chiếu trước khi lưu lại.")
     if lecturer not in {row["id"] for row in council.members}:
         raise HTTPException(422,"Giảng viên không thuộc hội đồng")
     if lecturer not in slot.attendance["_council"]["present_ids"]:
@@ -215,7 +284,9 @@ def save_marks(session,user,identifier,expected,data):
         if not score.is_finite() or score < 0 or score > Decimal(maximum) or score != score.quantize(Decimal(".01")):
             raise HTTPException(422,f"Tiêu chí {key} cần điểm từ 0 đến {maximum}, tối đa 2 chữ số thập phân")
     marks = dict(slot.marks.get(student,{}))
-    marks[lecturer] = {"scores":[str(value) for value in data.scores],"note":data.note,
+    if old:
+        audit(session,user,"DEFENSE_MARK_REVISED","defense_slot",slot.id,json.dumps({"student":student,"lecturer":lecturer,"previous":old},ensure_ascii=False))
+    marks[lecturer] = {"scores":[str(value) for value in data.scores],"note":data.note,"revision":old.get("revision",0)+1,
         "recorded_at":now().isoformat(),"recorded_by":str(user.id),"paper_entry_reason":data.paper_entry_reason}
     slot.marks = {**slot.marks, student:marks}
     finish_edit(session,user,slot,"DEFENSE_MARK_SUBMITTED",f"{student} · {lecturer} · {data.paper_entry_reason}")
@@ -269,9 +340,15 @@ def reopen_unsigned(session,user,identifier,expected,data):
         "reason":data.reason,"previous_version":slot.row_version,"marks":slot.marks,
         "attendance":slot.attendance,"minutes":slot.minutes,"finalized_at":slot.finalized_at.isoformat(),
         "finalized_by":str(slot.finalized_by)},ensure_ascii=False))
+    if session.scalar(select(m.DefenseAbsenceDecision.id).where(m.DefenseAbsenceDecision.slot_id==slot.id)):
+        raise HTTPException(409,"Phiên đã được Khoa dùng làm căn cứ xử lý SV vắng; giữ nguyên hồ sơ gốc")
     slot.finalized_at,slot.finalized_by=None,None
     slot.minutes={key:value for key,value in slot.minutes.items() if key!="results_snapshot"}
-    thesis.state,thesis.row_version="READY_FOR_DEFENSE",thesis.row_version+1
+    slot.attendance={**slot.attendance,"_revision_epoch":slot.row_version+1}
+    other_completed=any(any(r["average"] is not None for r in results(other,session.get(m.DefenseCouncil,other.council_id)).values())
+        for other in session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.thesis_id==thesis.id,m.DefenseSlot.id!=slot.id,m.DefenseSlot.finalized_at.is_not(None))))
+    thesis.state,thesis.row_version=("DEFENDED" if other_completed else "READY_FOR_DEFENSE"),thesis.row_version+1
+    notify(session,user,slot,council,"DEFENSE_REOPENED","Kết quả đang điều chỉnh trước ký; bản xuất trước đó đã hết hiệu lực")
     finish_edit(session,user,slot,"DEFENSE_REOPENED",data.reason)
 
 
@@ -297,6 +374,12 @@ def blockers(slot,council):
     return pending
 
 
+def invalid_bonus(session,slot):
+    available={str(row["id"]) for row in evidence_options(session,slot.thesis_id)}
+    return any(Decimal(slot.attendance.get(r["id"],{}).get("bonus","0"))>0 and
+        slot.attendance.get(r["id"],{}).get("bonus_evidence_version_id") not in available for r in slot.roster)
+
+
 def save_bonus(session,user,identifier,expected,member_id,data):
     slot,council,member = edit(session,user,identifier,expected)
     if member["role"] != "CHAIR":
@@ -304,8 +387,15 @@ def save_bonus(session,user,identifier,expected,member_id,data):
     student = student_id(slot,member_id)
     if data.points and len(data.reference) < 5:
         raise HTTPException(422,"Cần căn cứ minh chứng công bố")
+    if data.points:
+        version=session.get(m.DocumentVersion,data.evidence_version_id) if data.evidence_version_id else None
+        document=session.get(m.Document,version.document_id) if version else None
+        file=session.get(m.StoredFile,version.stored_file_id) if version else None
+        if not document or document.thesis_id!=slot.thesis_id or document.document_type not in {"SUPPORTING"} or not file or file.scan_state!="CLEAN":
+            raise HTTPException(422,"Chọn phiên bản tài liệu minh chứng đã được quét an toàn trong hồ sơ khóa luận")
     old = slot.attendance.get(student,{})
-    slot.attendance = {**slot.attendance,student:{**old,"bonus":str(data.points),"bonus_reference":data.reference}}
+    slot.attendance = {**slot.attendance,student:{**old,"bonus":str(data.points),"bonus_reference":data.reference,
+        "bonus_evidence_version_id":str(data.evidence_version_id) if data.points else None,"bonus_confirmed_by":str(user.id),"bonus_confirmed_at":now().isoformat()}}
     finish_edit(session,user,slot,"DEFENSE_BONUS_CONFIRMED",f"{student} · {data.points} · {data.reference}")
 
 
@@ -349,8 +439,10 @@ def finalize(session,user,identifier,expected):
     if member["role"] not in {"CHAIR","SECRETARY"}:
         raise HTTPException(403,"Chỉ chủ tịch hoặc thư ký được chốt")
     ensure_quorum(slot,council)
+    if invalid_bonus(session,slot):
+        raise HTTPException(409,"Cần đối chiếu lại minh chứng điểm thưởng còn an toàn và đúng hồ sơ trước khi chốt")
     thesis = session.scalar(select(m.Thesis).where(m.Thesis.id == slot.thesis_id).with_for_update())
-    active,report = validate_ready(session,thesis,council)
+    active,report = validate_ready(session,thesis,council,{row["id"] for row in slot.roster} if slot.prior_slot_id else None)
     if {str(row.id) for row in active} != {row["id"] for row in slot.roster}:
         raise HTTPException(409,"Thành viên đã thay đổi. Cần đối chiếu lại lịch bảo vệ")
     if report.id != slot.report_version_id:
@@ -390,18 +482,20 @@ def workspace(session,user):
         privileged = slot.council_id in managed or (member and member["role"] in {"CHAIR","SECRETARY"})
         totals = results(slot,council)
         if own:
-            totals = {own["id"]:{"attendance":{"status":totals[own["id"]]["attendance"].get("status")},"average":totals[own["id"]]["average"]}} if slot.finalized_at else {}
+            totals = {own["id"]:{"attendance":totals[own["id"]]["attendance"],"average":totals[own["id"]]["average"] if slot.finalized_at else None}}
         elif not privileged and not slot.finalized_at:
             totals = {k:{"attendance":v["attendance"]} for k,v in totals.items()}
         marks = {} if own else slot.marks if privileged else {
             key:{lecturer_id:mark for lecturer_id,mark in values.items() if member and lecturer_id == member["id"]}
             for key,values in slot.marks.items()}
-        slots.append({"id":slot.id,"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
+        slots.append({"id":slot.id,"prior_slot_id":slot.prior_slot_id,"absence_decisions":absence_out(session,slot,own),"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
+            "report_filename":session.get(m.StoredFile,session.get(m.DocumentVersion,slot.report_version_id).stored_file_id).original_name,
             "starts_at":slot.starts_at,"ends_at":slot.ends_at,"room":slot.room,"version":slot.row_version,
             "roster":[own] if own else slot.roster,"results":totals,"marks":marks,
+            "context_token":context_token(slot,council),"bonus_evidence":evidence_options(session,slot.thesis_id),
             "minutes":slot.minutes if privileged else {}, "finalized_at":slot.finalized_at,
             "council_attendance":slot.attendance.get("_council",{}) if not own else {},
-            "blockers":blockers(slot,council) if privileged and not slot.finalized_at else [],
+            "blockers":(blockers(slot,council)+(["Chủ tịch cần đối chiếu lại minh chứng điểm thưởng"] if invalid_bonus(session,slot) else [])) if privileged and not slot.finalized_at else [],
             "role":member["role"] if member else None,"lecturer_id":member["id"] if member else None,
             "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or slot.attendance or slot.minutes)})
     scopes = []
@@ -412,9 +506,21 @@ def workspace(session,user):
         scopes = [{"round_id":r.id,"round_code":r.code,"department_id":d.id,"department_name":d.name}
             for r in rounds for d in departments if manages(session,user,lecturer,r.id,d.id)]
         allowed = {(row["round_id"],row["department_id"]) for row in scopes}
-        eligible = [{"id":t.id,"title":t.current_title,"round_id":t.round_id,"department_id":t.department_id}
-            for t in session.scalars(select(m.Thesis).where(m.Thesis.state == "READY_FOR_DEFENSE"))
-            if (t.round_id,t.department_id) in allowed]
+        eligible = []
+        for t in session.scalars(select(m.Thesis).where(m.Thesis.state.in_(["READY_FOR_DEFENSE", "EXTENDED"]))):
+            if (t.round_id, t.department_id) not in allowed:
+                continue
+            extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == t.id))
+            report = evaluation.report(session, t)
+            members = evaluation.members(session, t)
+            if not report or not members or any(evaluation.eligibility_out(session, t, member, report)["state"] != "ELIGIBLE" for member in members):
+                continue
+            if extension and extension.until_at < now():
+                continue
+            request = session.scalar(select(m.ThesisExtensionRequest).where(m.ThesisExtensionRequest.extension_id == extension.id)) if extension else None
+            eligible.append({"id":t.id,"title":t.current_title,"round_id":t.round_id,"department_id":t.department_id,
+                "extension_starts_at":request.extension_starts_at if request else None,
+                "extension_until_at":extension.until_at if extension else None})
     candidates = [{"id":l.id,"name":l.display_name,"code":l.lecturer_code} for l in session.scalars(
         select(m.LecturerProfile).join(m.UserAccount,m.UserAccount.id==m.LecturerProfile.user_id)
         .where(m.UserAccount.status=="ACTIVE").order_by(m.LecturerProfile.display_name))] if scopes else []
@@ -425,7 +531,11 @@ def workspace(session,user):
 def council_out(council, can_manage=False):
     return {"id":council.id,"round_id":council.round_id,"department_id":council.department_id,
         "name":council.name,"reference":council.reference,"members":council.members,
-        "can_manage":can_manage,"closed_at":council.closed_at}
+        "can_manage":can_manage,"closed_at":council.closed_at,"signature":council_signature(council)}
+
+
+def council_signature(council):
+    return hashlib.sha256(json.dumps([council.name,council.reference,council.members],sort_keys=True).encode()).hexdigest()
 
 
 def close_council(session,user,identifier):
@@ -441,4 +551,75 @@ def close_council(session,user,identifier):
         raise HTTPException(409,"Cần chốt toàn bộ lịch của hội đồng trước khi khóa bảng điểm")
     council.closed_at = now()
     audit(session,user,"DEFENSE_COUNCIL_CLOSED","defense_council",identifier)
+    session.commit()
+
+
+def context_token(slot,council):
+    # Independent ballots may merge only while the common scoring context is unchanged.
+    return hashlib.sha256(json.dumps([slot.attendance,council.members,str(slot.report_version_id),
+        slot.minutes.get("revision_epoch",0)],sort_keys=True,default=str).encode()).hexdigest()
+
+
+def evidence_options(session,thesis_id):
+    rows=session.execute(select(m.DocumentVersion,m.Document,m.StoredFile)
+        .join(m.Document,m.Document.id==m.DocumentVersion.document_id)
+        .join(m.StoredFile,m.StoredFile.id==m.DocumentVersion.stored_file_id)
+        .where(m.Document.thesis_id==thesis_id,m.Document.document_type.in_(["SUPPORTING"]),m.StoredFile.scan_state=="CLEAN")
+        .order_by(m.DocumentVersion.created_at.desc())).all()
+    return [{"id":v.id,"name":f"{d.title} · {f.original_name} · v{v.version_no}","filename":f.original_name} for v,d,f in rows]
+
+
+def report_download(session,user,identifier):
+    from backend.services import documents
+    slot,_,_,_,_=load_slot(session,user,identifier)
+    version=session.get(m.DocumentVersion,slot.report_version_id)
+    return documents.stored_download(session,version)
+
+
+def clear_mark(session,user,identifier,expected,student,lecturer,reason):
+    slot,_,member=edit(session,user,identifier,expected)
+    if member["role"] not in {"CHAIR","SECRETARY"}:
+        raise HTTPException(403,"Chỉ chủ tịch hoặc thư ký hủy phiếu nhập nhầm trước khi chốt")
+    key=student_id(slot,student)
+    marks=dict(slot.marks.get(key,{}))
+    old=marks.pop(str(lecturer),None)
+    if not old:
+        raise HTTPException(404,"Phiếu không còn tồn tại; hãy làm mới dữ liệu")
+    audit(session,user,"DEFENSE_MARK_VOIDED","defense_slot",slot.id,json.dumps({"student":key,
+        "lecturer":str(lecturer),"reason":reason,"previous":old},ensure_ascii=False))
+    slot.marks={**slot.marks,key:marks}
+    # Change the context to reject drafts started before a ballot was voided.
+    slot.attendance={**slot.attendance,"_revision_epoch":slot.row_version+1}
+    finish_edit(session,user,slot,"DEFENSE_MARK_CLEARED",reason)
+
+
+def absence_out(session,slot,own=None):
+    return {str(d.thesis_member_id):{"outcome":d.outcome,"reference":d.reference,"reason":d.reason,
+        "recorded_at":d.recorded_at,"recorded_by":notices.actor_name(session,d.recorded_by),"revision":d.row_version}
+        for d in session.scalars(select(m.DefenseAbsenceDecision).where(m.DefenseAbsenceDecision.slot_id==slot.id))
+        if own is None or own["id"]==str(d.thesis_member_id)}
+
+
+def decide_absence(session,user,identifier,student,data):
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
+    slot,council,_,_,manager=load_slot(session,user,identifier,write=True)
+    if not manager:
+        raise HTTPException(403,"Chỉ TBM hoặc người quản lý KLTN được Khoa phân công ghi nhận quyết định")
+    key=student_id(slot,student)
+    if not slot.finalized_at or slot.attendance.get(key,{}).get("status")!="ABSENT":
+        raise HTTPException(409,"Chỉ xử lý SV được ghi nhận vắng trong phiên đã chốt")
+    if any(key in {r["id"] for r in child.roster} for child in session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.prior_slot_id==slot.id))):
+        raise HTTPException(409,"Đã dùng quyết định để xếp lịch bổ sung; không được thay đổi căn cứ")
+    row=session.scalar(select(m.DefenseAbsenceDecision).where(m.DefenseAbsenceDecision.slot_id==slot.id,m.DefenseAbsenceDecision.thesis_member_id==student))
+    row_version(data.revision,row.row_version if row else 0)
+    if row:
+        audit(session,user,"DEFENSE_ABSENCE_BEFORE_REVISION","defense_slot",slot.id,json.dumps(absence_out(session,slot),default=str,ensure_ascii=False))
+        row.row_version+=1
+    else:
+        row=m.DefenseAbsenceDecision(slot_id=slot.id,thesis_member_id=student)
+        session.add(row)
+    row.outcome,row.reference,row.reason=data.outcome,data.reference,data.reason
+    row.recorded_at,row.recorded_by=now(),user.id
+    audit(session,user,"DEFENSE_ABSENCE_DECIDED","defense_slot",slot.id,f"{key} · {data.outcome} · {data.reason}",source_reference=data.reference)
+    notify(session,user,slot,council,"DEFENSE_ABSENCE_DECIDED","Khoa đã ghi nhận quyết định xử lý SV vắng; xem chi tiết theo từng sinh viên")
     session.commit()

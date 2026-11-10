@@ -5,6 +5,14 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  DEFENSE_COUNCIL_CREATED:"Lập hội đồng bảo vệ", DEFENSE_COUNCIL_REVISED:"Điều chỉnh hội đồng", DEFENSE_COUNCIL_BEFORE_REVISION:"Lưu thành phần hội đồng trước sửa",
+  DEFENSE_SCHEDULED:"Xếp / đổi lịch bảo vệ", DEFENSE_CANCELLED:"Hủy lịch bảo vệ", DEFENSE_COUNCIL_ATTENDANCE:"Điểm danh hội đồng",
+  DEFENSE_ATTENDANCE_RECORDED:"Điểm danh sinh viên", DEFENSE_MARK_SUBMITTED:"Lưu phiếu chấm", DEFENSE_MARK_REVISED:"Lưu phiên bản phiếu trước sửa",
+  DEFENSE_MARK_VOIDED:"Hủy hiệu lực phiếu nhập nhầm", DEFENSE_MARK_CLEARED:"Ghi nhận hủy phiếu", DEFENSE_BONUS_CONFIRMED:"Xác nhận điểm thưởng và minh chứng",
+  DEFENSE_MINUTES_SAVED:"Lưu biên bản bảo vệ", DEFENSE_FINALIZED:"Chốt kết quả bảo vệ", DEFENSE_UNSIGNED_REVISION:"Lưu bản chốt trước điều chỉnh",
+  DEFENSE_REOPENED:"Mở sửa hồ sơ chưa ký", DEFENSE_COUNCIL_CLOSED:"Khóa bảng điểm hội đồng", DEFENSE_ABSENCE_DECIDED:"Khoa xử lý SV vắng",
+  DEFENSE_ABSENCE_BEFORE_REVISION:"Lưu quyết định xử lý vắng trước sửa",
+
   THESIS_CHANGE_SUBMITTED: "Gửi đề nghị đổi đề tài", THESIS_CHANGE_CONSENT: "Xác nhận nguyện vọng đổi đề tài",
   THESIS_CHANGE_REVIEWED: "GVHD xem xét đổi đề tài", THESIS_CHANGE_APPROVED: "Duyệt đổi đề tài",
   THESIS_CHANGE_REJECTED: "Từ chối đổi đề tài", THESIS_CHANGE_CANCELLED: "Hủy đề nghị đổi đề tài",
@@ -80,8 +88,19 @@ const actions: Record<string, string> = {
   WORK_APPROVE: "Duyệt phân công công việc", WORK_REVISION_REQUIRED: "Yêu cầu sửa phân công công việc",
 };
 export const actionLabel = (code: string) => actions[code] || code.replaceAll("_", " ");
-export const resourceLabel = (code: string) => ({thesis_withdrawal_request:"Đơn xin thôi KLTN", official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
+export const resourceLabel = (code: string) => ({defense_slot:"Phiên bảo vệ",defense_council:"Hội đồng bảo vệ",thesis_withdrawal_request:"Đơn xin thôi KLTN", official_form: "Biểu mẫu / tài liệu Khoa", user_account: "Tài khoản", student_profile: "Hồ sơ sinh viên",
   lecturer_profile: "Hồ sơ giảng viên", topic: "Đề tài", topic_registration: "Đăng ký", registration: "Đăng ký", thesis: "Khóa luận",
   round: "Đợt KLTN", thesis_round: "Đợt KLTN", resource_assignment: "Phân công", eligibility_snapshot: "Điều kiện đăng ký",
   document: "Tài liệu", document_version: "Phiên bản tài liệu", proposal: "Đề cương", proposal_version: "Phiên bản đề cương",
   document_deadline: "Hạn tài liệu", progress_report: "Báo cáo tiến độ"} as Record<string,string>)[code] || code;
+
+export function activityReason(item:ActivityItem):string|null {
+  if(!item.reason||!item.action.startsWith("DEFENSE_"))return item.reason;
+  try {
+    const value=JSON.parse(item.reason);
+    if(value.previous?.scores)return `Điểm từng tiêu chí trước sửa: ${value.previous.scores.join("; ")}. Nhận xét: ${value.previous.note||"Không có"}. ${value.reason||""}`;
+    if(value.previous_version)return `Bản trước: v${value.previous_version}. Lý do: ${value.reason}. Nội dung biên bản trước: ${value.minutes?.discussion||""}. Kết luận trước: ${value.minutes?.conclusion||""}.`;
+    if(value.members)return `${value.name} · ${value.reference}. Thành phần trước: ${value.members.map((p:{name:string})=>p.name).join(", ")}.`;
+    return Object.values(value).map((v:unknown)=>{const d=v as {outcome?:string;reference?:string;reason?:string};return `${d.outcome==="SUPPLEMENTARY"?"Cho phép bảo vệ bổ sung":"Không đạt do vắng"} · ${d.reference||""} · ${d.reason||""}`;}).join("; ");
+  }catch{return item.reason;}
+}

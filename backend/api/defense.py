@@ -9,6 +9,7 @@ from backend.api.evaluation import transaction
 from backend.api.evaluation_schemas import Reason
 from backend.services import defense, defense_export
 from backend.api.defense_schemas import CouncilAttendance, ReopenInput
+from backend.api.defense_schemas import AbsenceDecision
 
 router = APIRouter(prefix="/api/v1/defense", tags=["Hội đồng và bảo vệ"])
 
@@ -21,6 +22,11 @@ def workspace(user=Depends(current_user),session=Depends(transaction)):
 @router.post("/councils",status_code=201)
 def council(data:CouncilInput,user=Depends(current_user),session=Depends(transaction)):
     return defense.manage_council(session,user,data)
+
+
+@router.put("/councils/{identifier}")
+def update_council(identifier:UUID,data:CouncilInput,signature:str=Header(alias="If-Match"),user=Depends(current_user),session=Depends(transaction)):
+    return defense.manage_council(session,user,data,identifier,signature)
 
 
 @router.post("/councils/{identifier}/close",status_code=204)
@@ -76,9 +82,36 @@ def finalize(identifier:UUID,version:int=Header(alias="If-Match",ge=1),
 
 
 @router.get("/slots/{identifier}/forms/{form}")
-def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:UUID|None=None,lecturer_id:UUID|None=None,
+def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:UUID|None=None,lecturer_id:UUID|None=None,blank:bool=False,
               user=Depends(current_user),session=Depends(transaction)):
-    return defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id)
+    return defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank)
+
+
+@router.get("/slots/{identifier}/report")
+def report(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense.report_download(session,user,identifier)
+
+
+@router.get("/slots/{identifier}/evidence/{version_id}")
+def bonus_evidence(identifier:UUID,version_id:UUID,user=Depends(current_user),session=Depends(transaction)):
+    from backend.db.models import entities as m
+    from backend.services import documents
+    slot,_,_,_,_=defense.load_slot(session,user,identifier)
+    if str(version_id) not in {str(row["id"]) for row in defense.evidence_options(session,slot.thesis_id)}:
+        from fastapi import HTTPException
+        raise HTTPException(404,"Không tìm thấy minh chứng trong hồ sơ này")
+    return documents.stored_download(session,session.get(m.DocumentVersion,version_id))
+
+
+@router.post("/slots/{identifier}/marks/{student}/{lecturer}/void",status_code=204)
+def void_mark(identifier:UUID,student:UUID,lecturer:UUID,data:Reason,version:int=Header(alias="If-Match",ge=1),
+              user=Depends(current_user),session=Depends(transaction)):
+    defense.clear_mark(session,user,identifier,version,student,lecturer,data.reason)
+
+
+@router.post("/slots/{identifier}/absence/{student}",status_code=204)
+def absence_decision(identifier:UUID,student:UUID,data:AbsenceDecision,user=Depends(current_user),session=Depends(transaction)):
+    defense.decide_absence(session,user,identifier,student,data)
 
 
 @router.put("/slots/{identifier}/council-attendance",status_code=204)

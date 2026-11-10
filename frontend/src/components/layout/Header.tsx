@@ -33,6 +33,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   "/notifications": "Thông báo",
   "/activity": "Nhật ký hoạt động",
   "/review-records": "Tiếp nhận hồ sơ phản biện",
+  "/defense": "Hội đồng và bảo vệ",
   "/evaluation": "Phản biện & điều kiện bảo vệ",
 };
 

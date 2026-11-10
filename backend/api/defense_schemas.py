@@ -28,6 +28,15 @@ class SlotInput(Input):
     starts_at: AwareDatetime
     ends_at: AwareDatetime
     room: str = Field(min_length=2, max_length=200)
+    prior_slot_id: UUID | None = None
+    thesis_member_ids: list[UUID] = Field(default_factory=list, max_length=3)
+
+
+class AbsenceDecision(Input):
+    outcome: Literal["NOT_PASSED", "SUPPLEMENTARY"]
+    reference: str = Field(min_length=5, max_length=300)
+    reason: str = Field(min_length=10, max_length=1000)
+    revision: int = Field(default=0, ge=0)
 
 
 class MarkInput(Input):
@@ -36,6 +45,8 @@ class MarkInput(Input):
     scores: list[Decimal] = Field(min_length=12, max_length=12)
     note: str = Field(default="", max_length=3000)
     paper_entry_reason: str = Field(default="", max_length=500)
+    ballot_revision: int | None = Field(default=None, ge=0)
+    context_token: str | None = Field(default=None, max_length=64)
 
 
 class AttendanceInput(Input):
@@ -46,6 +57,7 @@ class AttendanceInput(Input):
 class BonusInput(Input):
     points: Decimal = Field(ge=0, le=1, decimal_places=2)
     reference: str = Field(default="", max_length=500)
+    evidence_version_id: UUID | None = None
 
 
 class MinutesInput(Input):

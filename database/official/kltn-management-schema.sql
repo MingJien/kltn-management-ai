@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261108_0023.
--- 49 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261110_0024.
+-- 50 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -943,6 +943,7 @@ CREATE UNIQUE INDEX uq_thesis_extension_request_open ON thesis_extension_request
 
 CREATE TABLE defense_slot (
 	thesis_id UUID NOT NULL,
+	prior_slot_id UUID,
 	council_id UUID NOT NULL,
 	report_version_id UUID NOT NULL,
 	starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -961,14 +962,16 @@ CREATE TABLE defense_slot (
 	CONSTRAINT pk_defense_slot PRIMARY KEY (id),
 	CONSTRAINT ck_defense_slot_time_order CHECK (ends_at > starts_at),
 	CONSTRAINT ck_defense_slot_finalized_stamp CHECK ((finalized_at IS NULL) = (finalized_by IS NULL)),
-	CONSTRAINT uq_defense_slot_thesis_id UNIQUE (thesis_id),
 	CONSTRAINT fk_defense_slot_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_slot_prior_slot_id_defense_slot FOREIGN KEY(prior_slot_id) REFERENCES defense_slot (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_defense_slot_council_id_defense_council FOREIGN KEY(council_id) REFERENCES defense_council (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_defense_slot_report_version_id_document_version FOREIGN KEY(report_version_id) REFERENCES document_version (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_defense_slot_finalized_by_user_account FOREIGN KEY(finalized_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE INDEX ix_defense_slot_council_start ON defense_slot (council_id, starts_at);
+
+CREATE UNIQUE INDEX uq_defense_slot_active_thesis ON defense_slot (thesis_id) WHERE finalized_at IS NULL;
 
 CREATE TABLE progress_review (
 	progress_report_id UUID NOT NULL,
@@ -1131,6 +1134,26 @@ CREATE TABLE thesis_review (
 );
 
 CREATE INDEX ix_thesis_review_thesis_member ON thesis_review (thesis_id, thesis_member_id);
+
+CREATE TABLE defense_absence_decision (
+	slot_id UUID NOT NULL,
+	thesis_member_id UUID NOT NULL,
+	outcome VARCHAR(30) NOT NULL,
+	reference VARCHAR(300) NOT NULL,
+	reason TEXT NOT NULL,
+	recorded_by UUID NOT NULL,
+	recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_defense_absence_decision PRIMARY KEY (id),
+	CONSTRAINT uq_defense_absence_decision_slot_id_thesis_member_id UNIQUE (slot_id, thesis_member_id),
+	CONSTRAINT ck_defense_absence_decision_outcome CHECK (outcome IN ('NOT_PASSED','SUPPLEMENTARY')),
+	CONSTRAINT fk_defense_absence_decision_slot_id_defense_slot FOREIGN KEY(slot_id) REFERENCES defense_slot (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_absence_decision_thesis_member_id_thesis_member FOREIGN KEY(thesis_member_id) REFERENCES thesis_member (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_absence_decision_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
 
 CREATE TABLE defense_eligibility_check (
 	thesis_id UUID NOT NULL,

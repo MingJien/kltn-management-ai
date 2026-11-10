@@ -16,7 +16,7 @@ SELECTED_TABLES = frozenset(
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
-        "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "thesis_change_request", "thesis_extension", "thesis_extension_request", "thesis_extension_consent",
+        "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "defense_absence_decision", "thesis_change_request", "thesis_extension", "thesis_extension_request", "thesis_extension_consent",
     }
 )
 
@@ -26,6 +26,7 @@ TABLE_INFO = {
     "thesis_change_request": ("Đổi đề tài", "Đồng ý của nhóm, GVHD và quyết định TBM, dữ liệu trước thay đổi"),
     "thesis_extension": ("Gia hạn thực hiện KLTN", "Một lần theo quyết định, hạn cũ và mới cùng căn cứ, minh chứng"),
     "defense_council": ("Hội đồng bảo vệ", "Thành viên, vai trò, quyết định và mốc khóa bảng điểm"),
+    "defense_absence_decision": ("Quyết định xử lý sinh viên vắng bảo vệ", "Căn cứ và người ghi nhận kết quả học vụ hoặc cho bảo vệ bổ sung theo từng SV"),
     "defense_slot": ("Lịch và kết quả bảo vệ", "Lịch, báo cáo, phiếu chấm theo SV, điểm danh và biên bản đã chốt"),
     "thesis_withdrawal_request": ("Yêu cầu xin thôi thực hiện KLTN", "Yêu cầu theo từng SV và quyết định của điều phối trên hệ thống"),
     "lecturer_profile_change": ("Yêu cầu cập nhật hồ sơ giảng viên", "Nháp riêng, gửi TBM duyệt, công bố và lịch sử xử lý theo phiên bản"),

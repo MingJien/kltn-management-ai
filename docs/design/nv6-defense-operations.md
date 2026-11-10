@@ -20,9 +20,21 @@ Trong **Tra cứu AI → Đối chiếu báo cáo**, TBM hoặc điều phối c
 
 Máy chủ cần Tesseract và dữ liệu ngôn ngữ `vie+eng`. Trên Windows, ứng dụng tìm trong PATH hoặc thư mục cài Tesseract mặc định. Có thể cấu hình `KLTN_TESSERACT`, `KLTN_OCR_DATA_DIR` và `KLTN_OCR_LANG`. Mỗi báo cáo được xử lý tối đa 60 trang PDF, 24 ảnh và 24 giây OCR. Trang/ảnh không đọc đủ có cảnh báo phạm vi. Ảnh giống nhau là tín hiệu theo dấu vân tay ảnh, chưa có phân tích ngữ nghĩa hình ảnh. [Hướng dẫn cài Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html).
 
-Cập nhật PostgreSQL qua Alembic đến revision `20261104_0021`.
+Cập nhật PostgreSQL qua Alembic đến revision `20261110_0024`.
 
 
 Bổ sung rà soát ngày 09/11/2026. Trang bảo vệ có ô tìm theo đề tài/phòng/hội đồng, phần tạo hội đồng và xếp lịch thu gọn, tổng điểm dự kiến khi nhập Mẫu 6, danh sách phiếu/điểm danh/biên bản còn thiếu trước khi chốt. Chủ tịch hoặc thư ký có thể mở sửa bản chưa ký trước khi khóa bảng điểm hội đồng, bắt buộc lý do và xác nhận chưa ký. Dữ liệu cũ được lưu trong sự kiện lịch sử, bản in mới có phiên bản mới. Bảng điểm đã khóa được giữ nguyên.
 
 Hệ thống lưu kết quả tổng hợp cùng bản chốt để tránh tính lại kết quả đã công bố khi quy tắc phần mềm thay đổi. Với bản cũ trước lần cập nhật này, bản tổng hợp vẫn giữ định dạng độ chính xác lịch sử.
+
+
+## Luồng giao diện cập nhật ngày 10/11/2026
+
+- Mở Hội đồng và bảo vệ, tìm theo tên đề tài, phòng, hội đồng, tên SV hoặc MSSV. Mỗi phiên mở riêng và có năm mục: Tổng quan, Điểm danh, Phiếu chấm, Biên bản, Kết quả & xuất. Nháp vẫn giữ khi đổi mục hoặc lưu biểu mẫu khác; lưu thành công được báo ngay tại biểu mẫu. Trước khi chốt cần lưu hết phần đang nhập.
+- Trước buổi họp, người quản lý có thể điều chỉnh thành phần nếu chưa nhập dữ liệu họp. Trong Phiếu chấm, dùng **In phiếu chấm trước buổi họp** để phát phiếu giấy. Bản trống có nhãn chưa có kết quả. Nút tải báo cáo giữ đúng bản đã gắn lịch và đúng tên tệp.
+- SV nộp minh chứng công bố khoa học vào hồ sơ tài liệu hỗ trợ của khóa luận. Chủ tịch mở **Điểm danh**, xem các tệp đã quét an toàn, chọn đúng phiên bản và ghi căn cứ/mức thưởng theo từng SV. Các thành viên thấy mức đã xác nhận trong phiếu; hệ thống chặn chốt nếu minh chứng không còn hợp lệ.
+- Khi có xung đột cùng phiếu, nội dung đang nhập được giữ. Đọc dữ liệu đã lưu, đối chiếu rồi bấm xác nhận tiếp tục chỉnh sửa. Hai GV chấm hai phiếu khác nhau không phải tải lại chỉ vì người kia vừa lưu. Để sửa nhầm người, chủ tịch/thư ký hủy hiệu lực phiếu kèm lý do trước khi chốt; bản cũ vẫn ở lịch sử.
+- Trong Kết quả & xuất, xem bảng từng SV và phần còn thiếu trước khi chốt. Trên thẻ hội đồng, mở **Đối chiếu bảng điểm trước khi khóa**, kiểm tra số phiên đã chốt rồi mới khóa để xuất Mẫu 10/11. Lịch sử phiên có liên kết tới nhật ký theo đúng quyền. Đã khóa thì không mở sửa như bản chưa ký.
+- Với SV vắng trong phiên đã chốt: TBM/điều phối được giao mở Kết quả & xuất, ghi quyết định của Khoa (không đạt do vắng hoặc cho bảo vệ bổ sung), số/căn cứ và lý do. Hệ thống lưu người và thời điểm riêng, không sửa hồ sơ buổi cũ hay tự cho 0. Nếu được phép bổ sung, mở **Xếp lịch bảo vệ bổ sung theo quyết định**, chọn hội đồng còn mở, chọn đúng SV, giờ và phòng. Phiên mới chỉ điểm danh/chấm/lập biên bản cho các SV này; bạn đã bảo vệ giữ nguyên điểm. Khi đã dùng quyết định xếp lịch, không sửa lại căn cứ cũ.
+
+Làm tròn theo Khoản 2 Điều 11 QĐ 2919: từng phiếu một chữ số, lấy trung bình các phiếu hợp lệ rồi làm tròn một chữ số. Xem [dẫn chứng và phạm vi kiểm chứng](../evidence/defense-delivery-validation-2026-11-10.md).

@@ -121,6 +121,14 @@ def visibility(session, user):
     scopes["topic_registration"] |= registrations
     scopes["registration"] |= registrations  # Earlier evidence events used this resource name.
     scopes["thesis"] |= full_theses
+    if user.base_role == "LECTURER":
+        from backend.services import defense
+        person=defense.lecturer_for(session,user)
+        for council in session.scalars(select(m.DefenseCouncil)):
+            assigned=defense.membership(council,person)
+            if defense.manages(session,user,person,council.round_id,council.department_id) or (assigned and assigned["role"] in {"CHAIR","SECRETARY"}):
+                scopes["defense_council"].add(council.id)
+                scopes["defense_slot"] |= _ids(session,m.DefenseSlot.id,m.DefenseSlot.council_id==council.id)
     from backend.services.lecturer_profiles import scopes as profile_scopes
     profile_departments,profile_faculties=profile_scopes(session,user)
     profile_ids=select(m.LecturerProfile.id).join(m.Department,m.Department.id==m.LecturerProfile.department_id).where(

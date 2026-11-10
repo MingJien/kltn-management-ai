@@ -1,5 +1,7 @@
 # Rà soát UI và luồng hội đồng, bảo vệ ngày 09/11/2026
 
+Cập nhật xử lý ngày 10/11: xem [mã đã triển khai, dẫn chứng quy định và kiểm chứng mới](defense-delivery-validation-2026-11-10.md). Phần dưới giữ kết quả rà soát tại thời điểm 09/11.
+
 ## Phạm vi và cách kiểm chứng
 
 Rà mã phân hệ `/defense`, quyền truy cập báo cáo, tính điểm và xuất Mẫu 6/9/10/11. Kiểm thử trình duyệt dùng ứng dụng React thực tế với phản hồi API giả lập: một hội đồng năm người, hai sinh viên, vai trò thư ký, đủ 12 tiêu chí chấm. Không dùng tài khoản hoặc hồ sơ sinh viên thật.
