@@ -2,11 +2,17 @@
 
 ## Thao tác theo vai trò
 
-1. **TBM hoặc điều phối đợt** mở **Bảo vệ và đánh giá → Hội đồng và bảo vệ**. Lập hội đồng theo đợt, bộ môn và căn cứ phân công. Chọn đúng 5 người khác nhau gồm chủ tịch, thư ký, hai phản biện Hội đồng và một ủy viên. Phản biện Hội đồng là vai trò riêng với người viết Mẫu 8 trước bảo vệ.
-2. **Người quản lý lịch** chọn đề tài đã chốt đủ điều kiện trên bản báo cáo hiện tại, nhập giờ bắt đầu, giờ kết thúc và phòng theo giờ Việt Nam. Hệ thống kiểm tra trùng phòng, trùng giảng viên và xung đột GVHD. SV và các thành viên hội đồng nhận thông báo trong tài khoản.
+1. **TBM hoặc điều phối đợt** mở **Bảo vệ và đánh giá → Hội đồng và bảo vệ → Lập hội đồng mới**. Chọn đợt và mã bộ môn. Chọn một hoặc nhiều đề tài để đối chiếu thành phần, điền tên hội đồng và số quyết định, rồi chọn chủ tịch, thư ký, hai phản biện hội đồng và một ủy viên. Danh sách vô hiệu hóa GVHD của đề tài đã chọn. Đối chiếu quan hệ thân nhân theo quyết định và xác nhận căn cứ đối với người được mời ngoài Khoa. Phản biện hội đồng là vai trò riêng với người viết Mẫu 8 trước bảo vệ. Mỗi bộ môn có thể lập nhiều hội đồng.
+2. **Người quản lý lịch** chọn hội đồng và đề tài đã chốt đủ điều kiện trên bản báo cáo hiện tại, nhập giờ bắt đầu, giờ kết thúc và phòng theo giờ Việt Nam. Lưu từng lịch để gắn đề tài với hội đồng. Hệ thống kiểm tra trùng phòng, trùng giảng viên và xung đột GVHD. SV và các thành viên hội đồng nhận thông báo trong tài khoản.
 3. **Thư ký** ghi nhận thành phần hội đồng dự họp sau giờ bắt đầu. Cần ít nhất 3/5 người và có chủ tịch, thư ký. Chỉ người hiện diện được chấm. Sau đó ghi điểm danh từng SV. Có mặt thì mở phiếu chấm. Vắng thì ghi lý do và giữ ô điểm trống. **Chủ tịch** có thể xác nhận một mức thưởng chung cho SV (0–1), có căn cứ khi có thưởng. **Thành viên hội đồng** lưu đủ 12 tiêu chí Mẫu 6 cho từng SV. Nếu nhập hộ từ phiếu giấy, thư ký chọn đúng giảng viên và ghi căn cứ.
 4. **Thư ký** nhập nội dung họp và kết luận. **Chủ tịch hoặc thư ký** chốt sau khi đủ biên bản, điểm của mọi thành viên cho từng SV có mặt và lý do của SV vắng. Điểm mỗi phiếu tối đa 10 sau khi tính thưởng. Điểm tổng hợp là trung bình các phiếu, làm tròn 1 chữ số thập phân, sau khi làm tròn mỗi phiếu 1 chữ số.
 5. **Hội đồng** tải Mẫu 6 và Mẫu 9 từ bản đã chốt. **Người quản lý** khóa bảng điểm khi mọi lịch của hội đồng đã chốt, sau đó tải Mẫu 10 (Word) và Mẫu 11 (Excel). Bản in mang mã và phiên bản dữ liệu đã khóa. Việc ký diễn ra tại hội đồng. Mẫu 11 để trống ngày sinh vì hồ sơ SV hiện chưa có trường này. Bộ xuất dựng theo đề mục và cột đã đối chiếu; cần so bản in với mẫu Khoa trước khi dùng chính thức.
+
+## Quyền điều phối và chuẩn bị hồ sơ bảo vệ
+
+Admin cấp **Điều phối KLTN theo đợt** cho giảng viên phụ trách, kể cả khi đợt đã đóng đăng ký. Điều phối mở **Hồ sơ nộp & xét duyệt**, chọn một hồ sơ thuộc đợt và mở đúng loại để đặt hạn chung. Mẫu 2, Mẫu 3, cuốn báo cáo và tài liệu hỗ trợ có lịch nhận riêng. Hạn Mẫu 1a/1b dùng cửa đăng ký đề tài do Admin quản lý. Thông báo hạn chung dẫn tới hồ sơ của đợt và loại tài liệu tương ứng.
+
+Khi thành viên thay đổi, đối chiếu Mẫu 1b, Mẫu 2 và Mẫu 3 theo danh sách hiện tại. Màn **Đánh giá** hiển thị mục còn vướng trước khi GVHD lập Mẫu 7. Với từng SV, TBM ghi nhận tình trạng kỷ luật. GVHD xác nhận hoàn thành trên phiên bản cuốn báo cáo hiện tại, lập Mẫu 7 và ký bản xuất. TBM hoặc người được giao **Tiếp nhận hồ sơ phản biện** ghi nhận bản giấy bằng mã bản xuất. TBM xét và lưu điều kiện sau khi có đủ hồ sơ. [QĐ 2919, Điều 7–9](https://aao.dthu.edu.vn/New.aspx?id=2627).
 
 ## Xin thôi KLTN trên hệ thống
 

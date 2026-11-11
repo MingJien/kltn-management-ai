@@ -35,8 +35,29 @@ def lecturer_for(session, user):
 
 
 def manages(session, user, lecturer, round_id, department_id):
-    return bool(lecturer and (_is_department_head(session, lecturer.id, department_id) or
-        resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_id)))
+    from backend.services.faculty_pool import compatible
+    return bool(lecturer and (_is_department_head(session, lecturer.id, department_id) or (
+        resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_id)
+        and compatible(session, lecturer.department_id, department_id))))
+
+
+def demo_department(code):
+    return code == "SYN-DEMO-DEP"
+
+
+def valid_council_scope(round_, department):
+    return (round_.code == "SYN-DEMO") == demo_department(department.code)
+
+
+def supervising_ids(session, thesis_id):
+    from backend.services.theses import effective
+    return set(session.scalars(select(m.AdvisorAssignment.lecturer_id).where(
+        m.AdvisorAssignment.thesis_id == thesis_id, effective(m.AdvisorAssignment))))
+
+
+def check_supervision_conflict(session, thesis, lecturer_ids):
+    if lecturer_ids & supervising_ids(session, thesis.id):
+        raise HTTPException(409, f"GVHD không được chấm đề tài mình hướng dẫn: {thesis.current_title}")
 
 
 def membership(council, lecturer):
@@ -53,17 +74,23 @@ def manage_council(session, user, data, identifier=None, signature=None):
         raise HTTPException(403, "Chỉ TBM hoặc điều phối được giao mới được lập hội đồng")
     round_ = session.get(m.ThesisRound, data.round_id)
     department = session.get(m.Department, data.department_id)
-    if not round_ or round_.state == "ARCHIVED" or not department:
+    if not round_ or round_.state == "ARCHIVED" or not department or not department.active:
         raise HTTPException(409, "Đợt hoặc bộ môn không còn khả dụng")
+    if not valid_council_scope(round_, department):
+        raise HTTPException(422, "Chọn bộ môn giả lập cho đợt SYN-DEMO, hoặc bộ môn chính thức cho đợt thực tế")
     roles = [member.role for member in data.members]
     ids = {member.lecturer_id for member in data.members}
     if len(ids) != 5 or sorted(roles) != sorted(["CHAIR","SECRETARY","REVIEWER","REVIEWER","MEMBER"]):
         raise HTTPException(422, "Hội đồng gồm 5 người khác nhau: chủ tịch, thư ký, hai phản biện và một ủy viên")
-    found = dict(session.execute(select(m.LecturerProfile.id, m.LecturerProfile.display_name)
+    found = {row.id: (row.display_name, faculty_id, code) for row, faculty_id, code in session.execute(
+        select(m.LecturerProfile, m.Department.faculty_id, m.Department.code)
         .join(m.UserAccount, m.UserAccount.id == m.LecturerProfile.user_id)
-        .where(m.LecturerProfile.id.in_(ids), m.UserAccount.status == "ACTIVE")).all())
+        .outerjoin(m.Department, m.Department.id == m.LecturerProfile.department_id)
+        .where(m.LecturerProfile.id.in_(ids), m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER"))}
     if ids != found.keys():
         raise HTTPException(422, "Có tài khoản giảng viên không hoạt động")
+    if any(demo_department(code) != demo_department(department.code) for _, _, code in found.values()):
+        raise HTTPException(422, "Thành viên phải thuộc cùng phạm vi giả lập hoặc chính thức với hội đồng")
     session.execute(select(func.pg_advisory_xact_lock(66102)))
     existing=session.get(m.DefenseCouncil,identifier) if identifier else None
     slots=[]
@@ -75,17 +102,34 @@ def manage_council(session, user, data, identifier=None, signature=None):
         slots=session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.council_id==identifier).order_by(m.DefenseSlot.id).with_for_update()).all()
         if existing.closed_at or any(s.finalized_at or s.marks or s.attendance or s.minutes for s in slots):
             raise HTTPException(409,"Chỉ sửa thành phần trước khi nhập dữ liệu buổi bảo vệ")
+    if data.thesis_ids and not data.confirmed_no_conflict:
+        raise HTTPException(422, "Cần xác nhận đã đối chiếu quan hệ thân nhân trước khi lập hội đồng")
+    if len(set(data.thesis_ids)) != len(data.thesis_ids):
+        raise HTTPException(422, "Danh sách đề tài đối chiếu có mục trùng")
+    for thesis_id in sorted(data.thesis_ids):
+        thesis = session.scalar(select(m.Thesis).where(m.Thesis.id == thesis_id).with_for_update())
+        if not thesis or (thesis.round_id, thesis.department_id) != (data.round_id, data.department_id) or thesis.state == "WITHDRAWN":
+            raise HTTPException(422, "Đề tài đối chiếu phải còn hiệu lực trong đúng đợt và bộ môn")
+        check_supervision_conflict(session, thesis, ids)
+    guests = {member_id for member_id, (_, faculty_id, _) in found.items() if faculty_id != department.faculty_id}
+    if guests and not data.confirmed_guests:
+        raise HTTPException(422, "Cần xác nhận quyết định có ghi các thành viên được mời ngoài Khoa")
+    member_records = []
+    for member in data.members:
+        record = {"id":str(member.lecturer_id), "name":found[member.lecturer_id][0], "role":member.role}
+        if member.lecturer_id in guests:
+            record["invitation_reference"] = data.reference
+        member_records.append(record)
     if session.scalar(select(m.DefenseCouncil.id).where(m.DefenseCouncil.round_id == data.round_id,
             m.DefenseCouncil.department_id == data.department_id, m.DefenseCouncil.name == data.name,
             m.DefenseCouncil.id != identifier if identifier else True)):
         raise HTTPException(409, "Tên hội đồng đã tồn tại trong đợt và bộ môn")
     council = existing or m.DefenseCouncil(round_id=data.round_id, department_id=data.department_id, name=data.name,
-        reference=data.reference, created_by=user.id, members=[
-            {"id":str(member.lecturer_id), "name":found[member.lecturer_id], "role":member.role} for member in data.members])
+        reference=data.reference, created_by=user.id, members=member_records)
     if existing:
         audit(session,user,"DEFENSE_COUNCIL_BEFORE_REVISION","defense_council",existing.id,json.dumps(council_out(existing),default=str,ensure_ascii=False))
         council.name,council.reference=data.name,data.reference
-        council.members=[{"id":str(p.lecturer_id),"name":found[p.lecturer_id],"role":p.role} for p in data.members]
+        council.members=member_records
         for slot in slots:
             validate_ready(session,session.get(m.Thesis,slot.thesis_id),council,{r["id"] for r in slot.roster} if slot.prior_slot_id else None)
             for other,other_council in session.execute(select(m.DefenseSlot,m.DefenseCouncil).join(m.DefenseCouncil,m.DefenseSlot.council_id==m.DefenseCouncil.id).where(
@@ -96,7 +140,8 @@ def manage_council(session, user, data, identifier=None, signature=None):
             notify(session,user,slot,council,"DEFENSE_COUNCIL_REVISED","Đã cập nhật thành phần hội đồng")
     session.add(council)
     session.flush()
-    audit(session, user, "DEFENSE_COUNCIL_REVISED" if existing else "DEFENSE_COUNCIL_CREATED", "defense_council", council.id, data.reference)
+    detail = f"Đã đối chiếu {len(data.thesis_ids)} đề tài. Xác nhận quan hệ thân nhân: {'Có' if data.confirmed_no_conflict else 'Chưa ghi nhận'}."
+    audit(session, user, "DEFENSE_COUNCIL_REVISED" if existing else "DEFENSE_COUNCIL_CREATED", "defense_council", council.id, detail, source_reference=data.reference)
     session.commit()
     return {"id":council.id}
 
@@ -123,6 +168,10 @@ def thesis_state_allows_schedule(thesis, extension):
 def validate_ready(session, thesis, council, member_ids=None):
     if (thesis.round_id, thesis.department_id) != (council.round_id, council.department_id):
         raise HTTPException(422, "Đề tài và hội đồng phải cùng đợt và bộ môn")
+    round_ = session.get(m.ThesisRound, council.round_id)
+    department = session.get(m.Department, council.department_id)
+    if not department.active or round_.state == "ARCHIVED" or not valid_council_scope(round_, department):
+        raise HTTPException(409, "Đợt hoặc bộ môn của hội đồng không còn phù hợp để bảo vệ")
     active = evaluation.members(session, thesis)
     if member_ids is not None:
         active=[row for row in active if str(row.id) in member_ids]
@@ -131,10 +180,7 @@ def validate_ready(session, thesis, council, member_ids=None):
     if not active or not report or not (thesis_state_allows_schedule(thesis, extension) or (member_ids is not None and thesis.state=="DEFENDED")) or any(
         evaluation.eligibility_out(session, thesis, row, report)["state"] != "ELIGIBLE" for row in active):
         raise HTTPException(409, "Đề tài cần được chốt đủ điều kiện trên phiên bản báo cáo hiện tại")
-    advisor_ids = set(session.scalars(select(m.AdvisorAssignment.lecturer_id).where(
-        m.AdvisorAssignment.thesis_id == thesis.id, m.AdvisorAssignment.state == "ACTIVE")))
-    if any(UUID(row["id"]) in advisor_ids for row in council.members):
-        raise HTTPException(409, "GVHD không được chấm đề tài mình hướng dẫn trong hội đồng này")
+    check_supervision_conflict(session, thesis, {UUID(row["id"]) for row in council.members})
     return active, report
 
 
@@ -266,6 +312,8 @@ def student_id(slot, identifier):
 def save_marks(session,user,identifier,expected,data):
     independent=data.ballot_revision is not None
     slot,council,member = edit(session,user,identifier,expected,independent=independent)
+    check_supervision_conflict(session, session.get(m.Thesis, slot.thesis_id),
+        {UUID(row["id"]) for row in council.members})
     ensure_quorum(slot,council)
     student = student_id(slot,data.thesis_member_id)
     lecturer = str(data.lecturer_id)
@@ -500,15 +548,22 @@ def workspace(session,user):
             "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or slot.attendance or slot.minutes)})
     scopes = []
     eligible = []
+    planning_theses = []
     if lecturer:
-        departments = session.scalars(select(m.Department).order_by(m.Department.name)).all()
+        departments = session.scalars(select(m.Department).where(m.Department.active.is_(True)).order_by(m.Department.code)).all()
         rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.state != "ARCHIVED")).all()
-        scopes = [{"round_id":r.id,"round_code":r.code,"department_id":d.id,"department_name":d.name}
-            for r in rounds for d in departments if manages(session,user,lecturer,r.id,d.id)]
+        scopes = [{"round_id":r.id,"round_code":r.code,"department_id":d.id,"department_name":d.name,
+            "department_code":d.code,"faculty_id":d.faculty_id}
+            for r in rounds for d in departments if valid_council_scope(r,d) and manages(session,user,lecturer,r.id,d.id)]
         allowed = {(row["round_id"],row["department_id"]) for row in scopes}
-        eligible = []
-        for t in session.scalars(select(m.Thesis).where(m.Thesis.state.in_(["READY_FOR_DEFENSE", "EXTENDED"]))):
+        for t in session.scalars(select(m.Thesis).where(m.Thesis.state.in_([
+            "ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "READY_FOR_DEFENSE", "EXTENDED", "DEFENDED"])).order_by(m.Thesis.current_title)):
             if (t.round_id, t.department_id) not in allowed:
+                continue
+            row = {"id":t.id,"title":t.current_title,"round_id":t.round_id,"department_id":t.department_id,
+                "advisor_ids":sorted(supervising_ids(session,t.id))}
+            planning_theses.append(row)
+            if t.state not in {"READY_FOR_DEFENSE", "EXTENDED"}:
                 continue
             extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == t.id))
             report = evaluation.report(session, t)
@@ -518,14 +573,20 @@ def workspace(session,user):
             if extension and extension.until_at < now():
                 continue
             request = session.scalar(select(m.ThesisExtensionRequest).where(m.ThesisExtensionRequest.extension_id == extension.id)) if extension else None
-            eligible.append({"id":t.id,"title":t.current_title,"round_id":t.round_id,"department_id":t.department_id,
+            eligible.append({**row,
                 "extension_starts_at":request.extension_starts_at if request else None,
                 "extension_until_at":extension.until_at if extension else None})
-    candidates = [{"id":l.id,"name":l.display_name,"code":l.lecturer_code} for l in session.scalars(
-        select(m.LecturerProfile).join(m.UserAccount,m.UserAccount.id==m.LecturerProfile.user_id)
-        .where(m.UserAccount.status=="ACTIVE").order_by(m.LecturerProfile.display_name))] if scopes else []
+    allowed_demo = {demo_department(scope["department_code"]) for scope in scopes}
+    candidates = [{"id":l.id,"name":l.display_name,"code":l.lecturer_code,"faculty_id":d.faculty_id if d else None,
+        "department_code":d.code if d else None,
+        "specializations":l.profile_data.get("specializations",[]) if l.profile_verified_at else []}
+        for l,d in session.execute(select(m.LecturerProfile,m.Department)
+        .join(m.UserAccount,m.UserAccount.id==m.LecturerProfile.user_id)
+        .outerjoin(m.Department,m.Department.id==m.LecturerProfile.department_id)
+        .where(m.UserAccount.status=="ACTIVE",m.UserAccount.base_role=="LECTURER")
+        .order_by(m.LecturerProfile.display_name)) if demo_department(d.code if d else None) in allowed_demo] if scopes else []
     return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,
-        "eligible":eligible,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES}
+        "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES}
 
 
 def council_out(council, can_manage=False):

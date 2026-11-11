@@ -51,7 +51,7 @@ def ensure_submission_allowed(item: m.DocumentDeadline, *, revision_requested: b
 
 
 def set_deadline(session, user, thesis_id, data, expected: int | None):
-    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", lock=True, write=True)
+    thesis = thesis_access(session, user, thesis_id, action="milestone:manage")
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if round_.state == "ARCHIVED":
         raise HTTPException(409, "Đợt đã lưu trữ; không thể thay đổi hạn tài liệu")
@@ -104,7 +104,7 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
         else:
             message = f"Khoa đã gia hạn {label} đến {format_due(data.due_at)}."
         notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
-                                  kind=notice_kind, message=message, section="documents")
+                                  kind=notice_kind, message=message, section=f"submissions?kind={data.document_type}&round_id={thesis.round_id}")
         result = output(item)
         session.commit()
     except IntegrityError:
@@ -114,7 +114,7 @@ def set_deadline(session, user, thesis_id, data, expected: int | None):
 
 
 def close_deadline(session, user, thesis_id, document_type: str, reason: str, expected: int):
-    thesis = thesis_access(session, user, thesis_id, action="milestone:manage", lock=True, write=True)
+    thesis = thesis_access(session, user, thesis_id, action="milestone:manage")
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if round_.state == "ARCHIVED":
         raise HTTPException(409, "Đợt đã lưu trữ; không thể đóng hạn tài liệu")
@@ -138,7 +138,7 @@ def close_deadline(session, user, thesis_id, document_type: str, reason: str, ex
     notify_round_participants(session, round_id=thesis.round_id, actor_user_id=user.id,
         kind="DOCUMENT_DEADLINE_CLOSED",
         message=f"Khoa đã đóng nhận {label}. Chỉ nộp lại khi GVHD yêu cầu sửa.",
-        section="documents")
+        section=f"submissions?kind={document_type}&round_id={thesis.round_id}")
     result = output(item)
     session.commit()
     return result

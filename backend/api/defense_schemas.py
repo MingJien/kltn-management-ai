@@ -20,6 +20,9 @@ class CouncilInput(Input):
     name: str = Field(min_length=3, max_length=200)
     reference: str = Field(min_length=3, max_length=300)
     members: list[CouncilMember] = Field(min_length=5, max_length=5)
+    thesis_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    confirmed_no_conflict: bool = False
+    confirmed_guests: bool = False
 
 
 class SlotInput(Input):

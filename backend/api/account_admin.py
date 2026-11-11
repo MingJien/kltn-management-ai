@@ -295,7 +295,7 @@ def extend_round_registration(round_id: UUID, payload: RoundExtension,
         reason=f"Hạn cũ: {previous_end.isoformat()} · Hạn mới: {new_end.isoformat()} · {reason}",
         occurred_at=instant, correlation_id=uuid4()))
     round_announcement(session, user.id, round_.id, event,
-        f"Khoa đã {'gia hạn và mở lại' if reopening else 'gia hạn'} đăng ký KLTN đợt {round_.code} đến {format_due(new_end)}.", "/topics")
+        f"Khoa đã {'gia hạn và mở lại' if reopening else 'gia hạn'} đăng ký KLTN đợt {round_.code} đến {format_due(new_end)}. Hạn nộp đơn Mẫu 1a/1b áp dụng theo lịch đăng ký này.", "/topics")
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version,
             "closes_at": round_.closes_at}
@@ -347,11 +347,11 @@ def change_round_state(round_id: UUID, payload: RoundStateChange,
         correlation_id=uuid4()))
     if payload.state == "OPEN":
         round_announcement(session, user.id, round_.id, "ROUND_OPENED",
-            f"Khoa đã mở đợt đăng ký KLTN {round_.code}. Thời gian đăng ký từ {format_due(round_.opens_at)} đến {format_due(round_.closes_at)}.",
+            f"Khoa đã mở đợt đăng ký KLTN {round_.code}. Đăng ký và nộp đơn Mẫu 1a/1b từ {format_due(round_.opens_at)} đến {format_due(round_.closes_at)}.",
             "/topics")
     else:
         round_announcement(session, user.id, round_.id, "ROUND_CLOSED",
-            f"Khoa đã đóng đợt đăng ký KLTN {round_.code}.", "/topics")
+            f"Khoa đã đóng đợt đăng ký KLTN {round_.code}. Đã kết thúc hạn nhận đơn Mẫu 1a/1b của đợt.", "/topics")
     session.commit()
     return {"id": str(round_.id), "state": round_.state, "row_version": round_.row_version}
 
@@ -485,7 +485,7 @@ def grant_round_assignment(payload: RoundAssignment,
         raise HTTPException(422, "An active staff account is required")
     if payload.assignment_type in {"ACCOUNT_MANAGER", "KLTN_COORDINATOR", "REVIEW_RECORDS_MANAGER"} and target.base_role != "LECTURER":
         raise HTTPException(422, "Round account/progress coordination must be assigned to a lecturer")
-    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type in {"FORM_MANAGER","REVIEW_RECORDS_MANAGER"} else {"DRAFT", "OPEN"}
+    allowed_states = {"DRAFT", "OPEN", "CLOSED"} if payload.assignment_type in {"FORM_MANAGER","REVIEW_RECORDS_MANAGER","KLTN_COORDINATOR"} else {"DRAFT", "OPEN"}
     if not round_ or round_.state not in allowed_states:
         raise HTTPException(422, "Round is unavailable")
     existing = session.scalar(select(m.ResourceAssignment.id).where(

@@ -50,8 +50,10 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await expect(sv).toHaveURL(new RegExp(reg.thesis_id+".*kind=REGISTRATION"));
     await expect(sv.getByRole("button",{name:"Tải đơn gốc v1",exact:true})).toBeEnabled({timeout:60000});
 
-    await post(admin,"/admin/round-assignments",{round_id:round.id,user_id:(await get(tbm,"/me/context")).user_id,assignment_type:"KLTN_COORDINATOR",basis_ref:"Khoa giao điều phối để kiểm thử hồ sơ"});
-    for(const kind of ["PLAN","PROPOSAL"]){
+    if (!(await get(tbm,base)).actions.includes("milestone:manage")) {
+      await post(admin,"/admin/round-assignments",{round_id:round.id,user_id:(await get(tbm,"/me/context")).user_id,assignment_type:"KLTN_COORDINATOR",basis_ref:"Khoa giao điều phối để kiểm thử hồ sơ"});
+    }
+    for(const kind of ["PLAN","PROPOSAL","SUPPORTING"]){
       await tbm.goto(base+"?section=submissions&kind="+kind);
       const deadline=tbm.locator("section.card").filter({has:tbm.getByRole("heading",{name:kind==="PROPOSAL"?"Lịch nhận đề cương của đợt":"Lịch nhận tài liệu của đợt",exact:true})});
       await expect(deadline.getByLabel("Loại tài liệu",{exact:true}).locator("option")).toHaveCount(1);
@@ -96,9 +98,14 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await sv.getByLabel("Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)").setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
     await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
     await expect(sv.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled({timeout:60000});
-    await sv.getByRole("link",{name:/Tài liệu bổ sung/}).filter({hasText:"Khảo sát"}).click();
-    await expect(sv.getByRole("heading",{name:"Tài liệu bổ sung",exact:true})).toBeVisible();
+    await sv.locator(".submission-kinds").getByRole("link",{name:/Tài liệu hỗ trợ/}).click();
+    await expect(sv.getByRole("heading",{name:"Tài liệu hỗ trợ",exact:true})).toBeVisible();
     await expect(sv.getByText(/Phiên bản 1 ·/)).toHaveCount(0);
+    await sv.getByLabel("Nội dung tài liệu",{exact:true}).selectOption("SUPPORTING_PUBLICATION");
+    await sv.getByLabel(/Tệp cần nộp/).setInputFiles(process.env.KLTN_E2E_NV6_FILE!);
+    await sv.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
+    await expect(sv.locator(".submission-attachment > summary")).toContainText("Minh chứng công bố khoa học để xét điểm thưởng");
+    expect((await get(sv,base+"/documents")).filter((doc:any)=>doc.document_type==="SUPPORTING")[0].versions).toHaveLength(1);
     await sv.setViewportSize({width:600,height:900});
     expect(await sv.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
     await sv.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click();

@@ -35,3 +35,6 @@
 .defense-session>summary{line-height:1.7}
 @media(max-width:600px){.defense-tabs .btn{flex:1 1 120px}.defense-page .defense-criterion label{grid-template-columns:1fr;gap:10px}.defense-page .defense-criterion input{grid-column:1;width:120px}.defense-results th,.defense-results td{padding:8px;font-size:.82rem}.defense-session{padding:10px}}
 .defense-page .defense-score-preview{position:static}
+.defense-planning { grid-column: 1 / -1; min-width: 0; border: 1px solid #dbe3eb; border-radius: 8px; padding: 12px; }
+.defense-plan-list { max-height: 12rem; overflow: auto; margin-top: 8px; }
+.defense-plan-list label { padding: 6px 0; overflow-wrap: anywhere; }

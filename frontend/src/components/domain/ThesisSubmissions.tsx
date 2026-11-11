@@ -8,7 +8,7 @@ import RegistrationSubmission from "./RegistrationSubmission";
 import ThesisDocuments, { type CoreRun } from "./ThesisDocuments";
 import ThesisProposal from "./ThesisProposal";
 
-export type SubmissionKind = "REGISTRATION" | "PLAN" | "PROPOSAL" | "REPORT";
+export type SubmissionKind = "REGISTRATION" | "PLAN" | "PROPOSAL" | "REPORT" | "SUPPORTING";
 export default function ThesisSubmissions({thesis, proposal, docs, deadlines, history, lecturers, reports, userId, busy, run, kind}: {
   thesis: Thesis; proposal: Proposal | null; docs: ThesisDocument[]; deadlines: DocumentDeadline[];
   history: AuditEvent[]; lecturers: Lecturer[]; reports: ProgressReport[]; userId: string;
@@ -16,12 +16,15 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
 }) {
   const [pendingOnly, setPendingOnly] = useState(false);
   const canProcess = thesis.actions.some(action => ["document:review","proposal:review","proposal:finalize","proposal:dean_confirm"].includes(action));
+  const managesDeadlines = thesis.actions.includes("milestone:manage");
+  const canReadDocuments = thesis.actions.includes("document:view");
   const choices = [
     ...(thesis.registration_id && thesis.actions.some(action => ["document:submit","document:review","proposal:finalize","proposal:dean_confirm"].includes(action)) ? [{kind:"REGISTRATION", label:"Đơn đăng ký", code:"Mẫu 1a / 1b", description:"Hồ sơ trước khi GV tiếp nhận", state:null, pending:false}] : []),
-    ...(thesis.actions.includes("document:view") ? [{kind:"PLAN", label:"Kế hoạch thực hiện", code:"Mẫu 2", description:"GVHD nhận xét và tiếp nhận", state:docs.find(doc => doc.document_type === "PLAN")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "PLAN" && doc.versions[0]?.state === "SUBMITTED")}] : []),
-    ...(proposal ? [{kind:"PROPOSAL", label:"Đề cương", code:"Mẫu 3", description:"GVHD xác nhận · TBM chốt", state:proposal.state, pending:(thesis.actions.includes("proposal:review") && ["SUBMITTED","UNDER_REVIEW"].includes(proposal.state)) || (thesis.actions.includes("proposal:finalize") && proposal.state === "ADVISOR_CONFIRMED") || (thesis.actions.includes("proposal:dean_confirm") && proposal.state === "DEPARTMENT_FINALIZED")}] : []),
-    ...(thesis.actions.includes("document:view") ? [
+    ...((canReadDocuments || managesDeadlines) ? [{kind:"PLAN", label:"Kế hoạch thực hiện", code:"Mẫu 2", description:"GVHD nhận xét và tiếp nhận", state:docs.find(doc => doc.document_type === "PLAN")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "PLAN" && doc.versions[0]?.state === "SUBMITTED")}] : []),
+    ...((proposal || managesDeadlines) ? [{kind:"PROPOSAL", label:"Đề cương", code:"Mẫu 3", description:"GVHD xác nhận · TBM chốt", state:proposal?.state, pending:!!proposal && ((thesis.actions.includes("proposal:review") && ["SUBMITTED","UNDER_REVIEW"].includes(proposal.state)) || (thesis.actions.includes("proposal:finalize") && proposal.state === "ADVISOR_CONFIRMED") || (thesis.actions.includes("proposal:dean_confirm") && proposal.state === "DEPARTMENT_FINALIZED"))}] : []),
+    ...((canReadDocuments || managesDeadlines) ? [
       {kind:"REPORT", label:"Cuốn báo cáo KLTN", code:"Báo cáo trước bảo vệ", description:"Bản báo cáo hoàn chỉnh của đề tài", state:docs.find(doc => doc.document_type === "REPORT")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "REPORT" && doc.versions[0]?.state === "SUBMITTED")},
+      {kind:"SUPPORTING", label:"Tài liệu hỗ trợ", code:"Minh chứng", description:"Minh chứng công bố khoa học và tệp bổ sung", state:null, pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "SUPPORTING" && doc.versions[0]?.state === "SUBMITTED")},
     ] : []),
   ];
   const effectiveDeadlines = deadlines.map(item => item.document_type === "REPORT" && thesis.extension_until_at && Date.parse(thesis.extension_until_at) > Date.parse(item.due_at)
@@ -46,17 +49,16 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
       {selected === "REGISTRATION" && (thesis.registration_id
         ? <RegistrationSubmission registrationId={thesis.registration_id} userId={userId} />
         : <p className="alert alert-info">Hồ sơ này chưa có liên kết đơn đăng ký. <Link to="/registrations">Xem hồ sơ đăng ký</Link></p>)}
-      {selected === "PROPOSAL" && proposal && <>
+      {selected === "PROPOSAL" && <>
         <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={["PROPOSAL"]} />
-        <ThesisProposal thesis={thesis} proposal={proposal} deadline={deadlines.find(item => item.document_type === "PROPOSAL")} lecturers={lecturers} userId={userId} busy={busy} run={run} />
+        {proposal && <ThesisProposal thesis={thesis} proposal={proposal} deadline={deadlines.find(item => item.document_type === "PROPOSAL")} lecturers={lecturers} userId={userId} busy={busy} run={run} />}
       </>}
-      {["PLAN","REPORT"].includes(selected) && <>
-        <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT"]} />
+      {["PLAN","REPORT","SUPPORTING"].includes(selected) && <>
+        <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT" | "SUPPORTING"]} />
         {selected === "REPORT" && thesis.extension_until_at && <p className="alert alert-info">Hạn hoàn thành riêng đã được gia hạn đến <strong>{formatDate(thesis.extension_until_at)}</strong>. Hạn chung của đợt vẫn giữ nguyên; bản đã được tiếp nhận chỉ nộp lại khi GVHD yêu cầu sửa.</p>}
-        <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT"} pendingOnly={pendingOnly} />
+        {canReadDocuments && <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT" | "SUPPORTING"} pendingOnly={pendingOnly} />}
       </>}
     </div>
-    {docs.some(doc => doc.document_type === "SUPPORTING" && !doc.title.startsWith("Minh chứng tiến độ ")) && <details className="card"><summary>Hồ sơ tài liệu đã nộp trước đây</summary><div className="card-body"><ThesisDocuments thesis={{...thesis, actions: thesis.actions.filter(action => action !== "document:submit")}} docs={docs} deadlines={deadlines} reports={reports} userId={userId} busy={busy} run={run} kind="SUPPORTING" legacyOnly /></div></details>}
     <p className="submission-help text-body-sm text-muted">Cần mẫu trắng hoặc tài liệu Khoa công bố? <Link to={"/forms?round_id=" + thesis.round_id}>Mở kho biểu mẫu & tài liệu Khoa</Link>. Báo cáo định kỳ nộp tại <Link to={"/theses/" + thesis.id + "?section=progress"}>Báo cáo tiến độ</Link>.</p>
   </section>;
 }

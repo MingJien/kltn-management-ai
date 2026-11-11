@@ -407,7 +407,7 @@ def create_work(session, user, thesis_id, data):
     member_student = session.get(m.StudentProfile, member.student_id)
     notify_thesis_advisor(session, thesis=thesis, actor_user_id=user.id, kind="WORK_SUBMITTED",
         message=f"{student.display_name} đã gửi phân công công việc cho {member_student.display_name}.",
-        section="progress")
+        section="overview#work-assignments")
     result = work_out(session, item)
     session.commit()
     return result
@@ -417,8 +417,8 @@ def review_work(session, user, thesis_id, work_id, data, expected):
     thesis = thesis_access(session, user, thesis_id, action="work:review", lock=True, write=True)
     item = session.scalar(select(m.MemberWorkAssignment).join(m.ThesisMember, m.ThesisMember.id == m.MemberWorkAssignment.thesis_member_id)
         .where(m.MemberWorkAssignment.id == work_id, m.ThesisMember.thesis_id == thesis.id).with_for_update())
-    if not item:
-        raise HTTPException(404, "Không tìm thấy phân công")
+    if not item or not session.get(m.ThesisMember,item.thesis_member_id).active:
+        raise HTTPException(404, "Không tìm thấy phân công của thành viên hiện tại")
     row_version(expected, item.row_version)
     latest = session.scalar(select(func.max(m.MemberWorkAssignment.version_no)).where(m.MemberWorkAssignment.thesis_member_id == item.thesis_member_id))
     if item.state != "SUBMITTED" or item.version_no != latest:
@@ -440,7 +440,7 @@ def review_work(session, user, thesis_id, work_id, data, expected):
             message=(f"GVHD đã duyệt phân công công việc của bạn: {data.comment[:200]}"
                      if data.decision == "APPROVE" else
                      f"GVHD yêu cầu sửa phân công công việc: {data.comment[:200]}"),
-            url=f"/theses/{thesis.id}")
+            url=f"/theses/{thesis.id}?section=overview#work-assignments")
     result = work_out(session, item)
     session.commit()
     return result

@@ -19,7 +19,7 @@ RESOURCE_ROLE_LABELS = {
     "ELIGIBILITY_IMPORTER": "Nhập danh sách đủ điều kiện",
     "ELIGIBILITY_VERIFIER": "Điều chỉnh/thu hồi danh sách",
     "ACCOUNT_MANAGER": "Quản lý tài khoản sinh viên",
-    "KLTN_COORDINATOR": "Điều phối mốc tiến độ",
+    "KLTN_COORDINATOR": "Điều phối KLTN theo đợt",
     "PROGRESS_REVIEWER": "Góp ý chéo tiến độ",
 }
 

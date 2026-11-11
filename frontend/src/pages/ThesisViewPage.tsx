@@ -65,6 +65,12 @@ function ThesisWorkspace({context}: {context: Context}) {
     return () => controller.abort();
   }, [load]);
 
+  useEffect(() => {
+    if (data && location.hash === "#work-assignments") {
+      document.getElementById("work-assignments")?.scrollIntoView({block: "start"});
+    }
+  }, [data, location.hash]);
+
   async function run(action: () => Promise<unknown>, success: string) {
     if (busy) return false;
     setBusy(true); setError(""); setMessage("");
@@ -81,7 +87,7 @@ function ThesisWorkspace({context}: {context: Context}) {
 
   if (!data) return <><Link to="/theses">Quay lại khóa luận</Link>{error ? <div className="alert alert-danger" role="alert">{error} <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void refresh()}>Thử tải lại hồ sơ</button></div> : <p role="status">Đang tải hồ sơ khóa luận…</p>}</>;
   const {thesis, docs, milestones, deadlines, deadlineHistory, reports, work, lecturers, audit, milestoneHistory, proposal} = data;
-  const tabs = ["overview", ...(proposal || thesis.actions.includes("document:view") ? ["submissions"] : []),
+  const tabs = ["overview", ...(proposal || thesis.actions.includes("document:view") || thesis.actions.includes("milestone:manage") ? ["submissions"] : []),
     ...(thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? ["progress"] : [])];
   const requested = params.get("section") || "overview";
   const normalized = ["proposal", "documents"].includes(requested) ? "submissions" : requested;
@@ -210,14 +216,14 @@ function ThesisWorkspace({context}: {context: Context}) {
               <p className="text-body-sm text-muted" style={{margin: "2px 0 0"}}>Chuyển nhanh tới phân hệ để nộp và kiểm tra hồ sơ</p>
             </div>
             <div className="flex gap-2" style={{flexWrap: "wrap"}}>
-              {proposal || thesis.actions.includes("document:view") ? <Link className="btn btn-secondary btn-sm" to={"/theses/" + thesis.id + "?section=submissions"}>Mở hồ sơ nộp & xét duyệt</Link> : null}
+              {proposal || thesis.actions.includes("document:view") || thesis.actions.includes("milestone:manage") ? <Link className="btn btn-secondary btn-sm" to={"/theses/" + thesis.id + "?section=submissions"}>Mở hồ sơ nộp & xét duyệt</Link> : null}
               {thesis.actions.includes("progress:view") || thesis.actions.includes("milestone:manage") ? <Link className="btn btn-secondary btn-sm" to={`/theses/${thesis.id}?section=progress`}>Mở mốc và báo cáo tiến độ</Link> : null}
 
             </div>
           </div>
         </div>
       </div>
-      {thesis.actions.includes("work:view") && <div className="card"><div className="card-body"><ThesisWork thesis={thesis} assignments={work} context={context} busy={busy} run={run} /></div></div>}
+      {thesis.actions.includes("work:view") && <div className="card" id="work-assignments"><div className="card-body"><ThesisWork thesis={thesis} assignments={work} context={context} busy={busy} run={run} /></div></div>}
       {thesis.actions.includes("audit:view") && <details className="card"><summary className="card-body">Lịch sử thao tác nghiệp vụ</summary><div className="card-body stack">{audit.map((event, index) => <p key={`${event.occurred_at}-${index}`}><strong>{event.actor_name}</strong> · {event.action} · {formatDate(event.occurred_at)}<br />{event.reason}</p>)}</div></details>}
     </div>}
     {section === "progress" && <div className="stack"><ThesisProgress thesis={thesis} milestones={milestones} reports={reports} docs={docs} milestoneHistory={milestoneHistory} userId={context.user_id} studentId={context.student_id} busy={busy} run={run} /></div>}

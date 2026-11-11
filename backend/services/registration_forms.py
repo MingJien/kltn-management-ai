@@ -118,6 +118,14 @@ async def upload(session, user, registration_id, request, expected):
                            url=url, subject_type="registration", subject_id=reg.id)
             notify_department_heads(session, topic=topic, actor_user_id=user.id,
                 registration_id=reg.id, kind="REGISTRATION_FORM_SUBMITTED", message=message, url=url)
+        else:
+            thesis = session.scalar(select(m.Thesis).where(m.Thesis.registration_id == reg.id))
+            if thesis:
+                from backend.services.notifications import notify_thesis_students
+                notify_thesis_students(session, thesis=thesis, actor_user_id=user.id,
+                    kind="REGISTRATION_FORM_SUBMITTED",
+                    message=f"Nhóm đã nộp Mẫu {code.lower()} v{item.version_no} theo thành viên hiện tại.",
+                    section="submissions&kind=REGISTRATION", include_advisor=True)
         result = output(session, user, reg)
         session.commit()
         return result

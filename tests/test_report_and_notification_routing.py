@@ -1,6 +1,6 @@
 """Report-book deadline and per-person notification routing on PostgreSQL."""
 from datetime import timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from test_core_workspace import workspace, open_milestone, synthetic_pdf, version_headers
 from test_registration import hdr, scenario
@@ -20,7 +20,8 @@ def messages(client, user):
 
 
 def test_round_deadline_is_public_but_report_submission_is_private(workspace):
-    client, users, _, _, _, path = workspace
+    client, users, _, _, session, path = workspace
+    thesis = session.get(m.Thesis, UUID(path.rsplit("/", 1)[-1]))
     requested = client.post(path + "/document-deadlines", headers=hdr(users[4]), json={
         "document_type": "REPORT",
         "due_at": (now() + timedelta(days=5)).isoformat(),
@@ -32,7 +33,7 @@ def test_round_deadline_is_public_but_report_submission_is_private(workspace):
         announcements = [item for item in notices(client, user)
                          if "đã thiết lập hạn nộp Cuốn báo cáo KLTN" in item["message"]]
         assert len(announcements) == 1
-        assert announcements[0]["url"] == "/documents"
+        assert announcements[0]["url"] == f"/submissions?kind=REPORT&round_id={thesis.round_id}"
 
     doc = client.post(path + "/documents", headers=hdr(users[0]),
         json={"title": "Cuốn báo cáo KLTN", "document_type": "REPORT"}).json()
@@ -47,6 +48,31 @@ def test_round_deadline_is_public_but_report_submission_is_private(workspace):
     # The thesis advisor alone receives the submission; other students/lecturers do not.
     assert not any("đã nộp Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[2]))
     assert not any("đã nộp Cuốn báo cáo KLTN" in item["message"] for item in notices(client, users[5]))
+
+
+def test_coordinator_can_open_report_window_after_registration_closes(workspace):
+    client, users, _, _, session, path = workspace
+    thesis = session.get(m.Thesis, UUID(path.rsplit("/", 1)[-1]))
+    round_ = session.get(m.ThesisRound, thesis.round_id)
+    round_.state = "CLOSED"
+    thesis.state = "READY_FOR_DEFENSE"
+    admin = m.UserAccount(id=uuid4(), external_subject=f"deadline-admin-{uuid4()}", base_role="ADMIN", status="ACTIVE")
+    session.add(admin)
+    session.commit()
+
+    grant = client.post("/api/v1/admin/round-assignments", headers=hdr(admin), json={
+        "round_id": str(round_.id), "user_id": str(users[5].id), "assignment_type": "KLTN_COORDINATOR",
+        "basis_ref": "Synthetic assignment after registration closed",
+    })
+    assert grant.status_code == 201, grant.text
+    actions = client.get(path, headers=hdr(users[5])).json()["actions"]
+    assert "milestone:manage" in actions and "document:view" not in actions
+    response = client.post(path + "/document-deadlines", headers=hdr(users[5]), json={
+        "document_type": "REPORT", "due_at": (now() + timedelta(days=5)).isoformat(),
+        "reason": "Synthetic report window",
+    })
+    assert response.status_code == 200, response.text
+    assert client.get(path + "/documents", headers=hdr(users[5])).status_code == 403
 
 
 def test_progress_submission_notice_is_private_to_the_thesis_advisor(workspace):

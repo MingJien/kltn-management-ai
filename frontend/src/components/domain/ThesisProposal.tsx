@@ -79,7 +79,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
       return <section className="core-version stack" key={version.id}>
       <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong>{index === 0 && <Status value={proposal.state} />}</div>
       <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
-      {version.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+      {version.late && <strong className="late-badge" aria-label="Nộp trễ">Nộp trễ</strong>}
       {version.due_at_at_submission && <p className="text-caption">Hạn áp dụng lúc nộp: {formatDate(version.due_at_at_submission)}</p>}
       <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
       {["QUARANTINED", "FAILED"].includes(version.scan_state) && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}

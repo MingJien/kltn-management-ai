@@ -19,7 +19,10 @@ export default function ThesisWork({thesis, assignments, context, busy, run}: {
   }
   return <section className="stack">
     <h2>Phân công công việc theo sinh viên</h2>
-    <p className="text-body-sm text-muted">Lưu sản phẩm từng người và xác nhận của GVHD để làm căn cứ đánh giá cá nhân.</p>
+    <p className="text-body-sm text-muted">Sinh viên khai phần việc của mình, nhóm trưởng có thể khai cho từng thành viên. GVHD duyệt hoặc yêu cầu sửa để lưu căn cứ đánh giá cá nhân.</p>
+    {!active && <p>Giai đoạn thực hiện đã đóng. Bạn có thể xem các phân công đã lưu.</p>}
+    {active && thesis.actions.includes("work:review") && assignments.length === 0 &&
+      <p>Chờ sinh viên hoặc nhóm trưởng gửi phân công. Khi có bản gửi, nút duyệt sẽ xuất hiện tại đây.</p>}
     {thesis.actions.includes("work:submit") && active && <form className="core-form core-version" onSubmit={async event => {
       event.preventDefault();
       if (await run(() => request(`/theses/${thesis.id}/work-assignments`, context.user_id, {method: "POST", body: JSON.stringify({
@@ -42,6 +45,6 @@ export default function ThesisWork({thesis, assignments, context, busy, run}: {
           method: "POST", headers: {"If-Match": String(assignment.row_version)}, body: JSON.stringify({decision, comment}),
         }), "Đã lưu nhận xét phân công.")} />}
     </article>)}
-    {assignments.length === 0 && <EmptyState title="Chưa khai phân công công việc." />}
+    {assignments.length === 0 && !(active && thesis.actions.includes("work:submit")) && <EmptyState title="Chưa có phân công được gửi" />}
   </section>;
 }

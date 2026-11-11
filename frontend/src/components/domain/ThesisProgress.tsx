@@ -89,7 +89,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
   const milestoneAudit = milestoneHistory;
   const milestoneAction: Record<string, string> = {MILESTONE_OPENED: "Mở mốc", MILESTONE_EXTENDED: "Gia hạn mốc", MILESTONE_REOPENED: "Gia hạn và mở lại mốc", MILESTONE_CLOSED: "Đóng mốc"};
   const renderReportDetails = (report: ProgressReport, isCurrent: boolean) => <>
-      <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}</p>
+      <p className="text-body-sm text-muted">{report.submitted_by_name} · {formatDate(report.submitted_at)} · Tự báo cáo {report.reported_ratio}% {report.late && <strong className="late-badge" aria-label="Nộp trễ">Nộp trễ</strong>}</p>
       <p className="text-body-sm text-muted">Hạn áp dụng lúc nộp: {formatDate(report.due_at_at_submission)}</p>
       <p className="core-prewrap">{report.summary}</p>
       {report.evidence_document_version_id && <ProgressEvidence report={report} thesis={thesis} userId={userId} busy={busy} run={run} readOnly={!isCurrent} />}
@@ -230,7 +230,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
           <p className="text-body-sm text-muted">Các bản trước được giữ để đối chiếu nội dung và nhận xét. GVHD xử lý bản mới nhất ở phía trên.</p>
           <div className="progress-report-history__list">{previousVersions.map(previous => <details className="progress-report-history__version" key={previous.id}>
             <summary><span>Lần nộp {previous.version_no} · {formatDate(previous.submitted_at)} · {previous.submitted_by_name}</span>
-              {previous.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+              {previous.late && <strong className="late-badge" aria-label="Nộp trễ">Nộp trễ</strong>}
               {previous.reviews.length > 0 && <span className="badge">{previous.reviews.length} nhận xét</span>}
             </summary>
             <div className="stack progress-report-history__content">{renderReportDetails(previous, false)}</div>

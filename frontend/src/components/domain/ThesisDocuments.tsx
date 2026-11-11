@@ -10,6 +10,7 @@ import VersionTimeline from "./VersionTimeline";
 
 const documentPresets: Record<string, string> = {
   PLAN: "Kế hoạch thực hiện (Mẫu 2)",
+  SUPPORTING_PUBLICATION: "Minh chứng công bố khoa học để xét điểm thưởng",
   SUPPORTING_REFERENCES: "Tài liệu tham khảo",
   SUPPORTING_SURVEY: "Phiếu khảo sát / kết quả khảo sát",
   SUPPORTING_DESIGN: "Đặc tả yêu cầu / tài liệu thiết kế",
@@ -100,7 +101,7 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
       return <section className="core-version stack" key={version.id}>
         <div className="flex justify-between gap-3"><strong>Phiên bản {version.version_no} · {version.file_name}</strong><Status value={version.state} /></div>
         <p className="text-body-sm text-muted">{version.submitted_by_name} · {formatDate(version.submitted_at)} · {(version.byte_size/1024).toFixed(1)} KB</p>
-        {version.late && <strong className="late-badge" aria-label="Nộp trễ">! Nộp trễ</strong>}
+        {version.late && <strong className="late-badge" aria-label="Nộp trễ">Nộp trễ</strong>}
         {version.due_at_at_submission && <p className="text-caption">Hạn áp dụng lúc nộp: {formatDate(version.due_at_at_submission)}</p>}
         <p className={`text-body-sm ${clean ? "text-muted" : "alert alert-warning"}`}>{scanLabel(version.scan_state)}{!clean ? " — bản này chưa thể tải xuống hoặc dùng để duyệt." : ""}</p>
         {["QUARANTINED", "FAILED"].includes(version.scan_state) && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
@@ -150,7 +151,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
   thesis: Thesis; docs: ThesisDocument[]; deadlines: DocumentDeadline[]; reports: ProgressReport[]; userId: string;
   busy: boolean; run: CoreRun; kind?: "PLAN" | "REPORT" | "SUPPORTING"; pendingOnly?: boolean; legacyOnly?: boolean;
 }) {
-  const heading = kind === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : kind === "REPORT" ? "Cuốn báo cáo KLTN" : "Tài liệu đã nộp trước đây";
+  const heading = kind === "PLAN" ? "Kế hoạch thực hiện · Mẫu 2" : kind === "REPORT" ? "Cuốn báo cáo KLTN" : "Tài liệu hỗ trợ";
   const [title, setTitle] = useState(kind === "PLAN" ? documentPresets.PLAN : kind === "REPORT" ? "Cuốn báo cáo KLTN" : documentPresets.SUPPORTING_REFERENCES);
   const [preset, setPreset] = useState("SUPPORTING_REFERENCES");
   const [file, setFile] = useState<File | null>(null);

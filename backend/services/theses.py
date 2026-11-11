@@ -136,7 +136,9 @@ def workspace_out(session, user, thesis):
     actions = rights(session, user, thesis)
     if thesis.state not in EDITABLE:
         actions.difference_update({"progress:submit", "document:submit", "work:submit", "progress:review", "document:review",
-            "work:review", "progress:assign_reviewer", "progress:comment", "milestone:manage", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
+            "work:review", "progress:assign_reviewer", "progress:comment", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})
+    if round_.state == "ARCHIVED":
+        actions.discard("milestone:manage")
     return ThesisWorkspaceOut(id=thesis.id, registration_id=thesis.registration_id, title=thesis.current_title, state=thesis.state,
         row_version=thesis.row_version, round_id=thesis.round_id, round_label=f"{year.code} / {round_.code}",
         extension_until_at=extension.until_at if extension else None,

@@ -20,7 +20,7 @@ export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,
   const labels:Record<string,string> = {DOCUMENT_DEADLINE_SET:"Thiết lập hạn",DOCUMENT_DEADLINE_EXTENDED:"Gia hạn",DOCUMENT_DEADLINE_REOPENED:"Gia hạn và mở nhận lại",DOCUMENT_DEADLINE_CLOSED:"Đóng nhận"};
   return <section className="card"><div className="card-body stack">
     <h2>{kinds.length===1 && kinds[0]==="PROPOSAL" ? "Lịch nhận đề cương của đợt" : "Lịch nhận tài liệu của đợt"}</h2>
-    <p className="text-body-sm text-muted">Áp dụng cho toàn đợt {thesis.round_label}. Cửa nhận còn mở vẫn nhận bài trễ và đánh dấu ! đỏ; gia hạn giữ nguyên hạn đã ghi trên bản nộp cũ.</p>
+    <p className="text-body-sm text-muted">Áp dụng cho toàn đợt {thesis.round_label}. Khi cửa nhận còn mở, lần nộp đầu sau hạn được đánh dấu Nộp trễ bằng chữ đỏ.</p>
     {kinds.map(type => {
       const item = deadlines.find(row=>row.document_type===type);
       return <p key={type}><strong>{names[type]}:</strong> {item ? `${formatDate(item.due_at)} · ${item.state === "OPEN" ? "Đang nhận" : "Đã đóng"}` : "Chưa thiết lập — chưa nhận tệp"}</p>;

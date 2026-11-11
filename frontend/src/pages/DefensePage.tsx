@@ -9,15 +9,16 @@ import PageHeader from "../components/layout/PageHeader";
 type Person={id:string;name:string;role:string};
 type Student={id:string;name:string;code:string};
 type Council={id:string;name:string;reference:string;round_id:string;department_id:string;members:Person[];can_manage:boolean;closed_at:string|null;signature?:string};
-type Scope={round_id:string;round_code:string;department_id:string;department_name:string};
+type Scope={round_id:string;round_code:string;department_id:string;department_name:string;department_code?:string;faculty_id?:string};
+type PlanningThesis={id:string;title:string;round_id:string;department_id:string;advisor_ids?:string[]};
 type Mark={scores:string[];note:string;revision?:number};
 type Result={average?:string|null;attendance:{status?:string;reason?:string;bonus?:string;bonus_reference?:string;bonus_evidence_version_id?:string};scores?:Array<string|null>};
 type Slot={report_filename?:string;prior_slot_id?:string|null;absence_decisions?:Record<string,{outcome:string;reference:string;reason:string;recorded_by:string;recorded_at:string;revision:number}>;context_token:string;bonus_evidence:{id:string;name:string;filename?:string}[];id:string;thesis_id:string;title:string;council:Council;starts_at:string;ends_at:string;room:string;version:number;
   roster:Student[];results:Record<string,Result>;marks:Record<string,Record<string,Mark>>;
   role:string|null;lecturer_id:string|null;minutes:{discussion?:string;conclusion?:string};finalized_at:string|null;
   can_manage:boolean;schedule_editable:boolean;blockers:string[];council_attendance:{present_ids?:string[];reason?:string}};
-type Workspace={scopes:Scope[];councils:Council[];eligible:{id:string;title:string;round_id:string;department_id:string;extension_starts_at:string|null;extension_until_at:string|null}[];
-  candidates:{id:string;name:string;code:string}[];slots:Slot[];criteria:[string,string,string][];roles:Record<string,string>};
+type Workspace={scopes:Scope[];councils:Council[];eligible:{id:string;title:string;round_id:string;department_id:string;extension_starts_at:string|null;extension_until_at:string|null;advisor_ids?:string[]}[];
+  planning_theses?:PlanningThesis[];candidates:{id:string;name:string;code:string;department_code?:string;faculty_id?:string|null;specializations?:string[]}[];slots:Slot[];criteria:[string,string,string][];roles:Record<string,string>};
 type Act=(path:string,body:unknown,version?:number|string,method?:string)=>Promise<boolean>;
 type Download=(path:string,name:string)=>void;
 const root="/defense";
@@ -51,27 +52,64 @@ function Card({title,children}:{title:string;children:ReactNode}) {
 
 function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolean;council?:Council}) {
   const [chosen,setChosen]=useState<string[]>(["CHAIR","SECRETARY","REVIEWER","REVIEWER","MEMBER"].map((role,i)=>council?.members.filter(m=>m.role===role)[role==="REVIEWER"?i-2:0]?.id??""));
-  const [roles]=useState(["CHAIR","SECRETARY","REVIEWER","REVIEWER","MEMBER"]);
+  const roles = ["CHAIR", "SECRETARY", "REVIEWER", "REVIEWER", "MEMBER"];
+  const [scopeIndex, setScopeIndex] = useState(Math.max(0, data.scopes.findIndex(r =>
+    r.round_id === council?.round_id && r.department_id === council?.department_id)));
+  const [checkedTheses, setCheckedTheses] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const scope = council ? data.scopes.find(r => r.round_id === council.round_id && r.department_id === council.department_id) : data.scopes[scopeIndex];
+  const plans = (data.planning_theses ?? data.eligible).filter(t =>
+    t.round_id === scope?.round_id && t.department_id === scope?.department_id);
+  const blockedAdvisors = new Set(plans.filter(t => checkedTheses.includes(t.id)).flatMap(t => t.advisor_ids ?? []));
+  const hasAdvisorConflict = chosen.some(id => blockedAdvisors.has(id));
+  const isGuest = (candidate: Workspace["candidates"][number]) => !!scope?.faculty_id && candidate.faculty_id !== scope.faculty_id;
+  const hasGuest = data.candidates.some(c => chosen.includes(c.id) && isGuest(c));
+  const memberSelection = chosen.filter(Boolean).sort().join(",");
+  const conflictSelection = [scope?.round_id, scope?.department_id, memberSelection, ...[...checkedTheses].sort()].join("|");
+  const candidates = data.candidates.filter(c => (c.department_code === "SYN-DEMO-DEP") === (scope?.department_code === "SYN-DEMO-DEP")).sort((a, b) =>
+    Number(isGuest(a)) - Number(isGuest(b)) || Number(b.department_code === scope?.department_code) - Number(a.department_code === scope?.department_code));
+
   function submit(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form=new FormData(e.currentTarget);
-    const scope=council?data.scopes.find(r=>r.round_id===council.round_id&&r.department_id===council.department_id):data.scopes[Number(form.get("scope"))];
-    if(!scope)return;
+    if (!scope || hasAdvisorConflict || (!council && plans.length > 0 && checkedTheses.length === 0)) return;
     act(council?councilPath(council):root+"/councils",{round_id:scope.round_id,department_id:scope.department_id,name:text(form,"name"),
-      reference:text(form,"reference"),members:roles.map((role,i)=>({role,lecturer_id:text(form,"lecturer"+i)}))},council?.signature,council?"PUT":"POST");
+      reference:text(form,"reference"),thesis_ids:checkedTheses,confirmed_no_conflict:form.has("conflict_checked"),
+      confirmed_guests:form.has("guests_checked"),members:roles.map((role,i)=>({role,lecturer_id:text(form,"lecturer"+i)}))},council?.signature,council?"PUT":"POST");
   }
   return <Card title="Lập hội đồng"><DraftForm className="stack" onSubmit={submit}>
-    <label>Đợt và bộ môn<select name="scope" className="input" defaultValue={String(Math.max(0,data.scopes.findIndex(r=>r.round_id===council?.round_id&&r.department_id===council?.department_id)))} disabled={!!council}>{data.scopes.map((r,i)=>option(String(i),r.round_code+" · "+r.department_name))}</select></label>
+    <label>Đợt và bộ môn<select name="scope" className="input" value={scopeIndex} disabled={!!council}
+      onChange={e => {setScopeIndex(Number(e.target.value)); setCheckedTheses([]); setChosen(Array(5).fill("")); setSearch("");}}>
+      {data.scopes.map((r,i)=>option(String(i), [r.round_code, r.department_code, r.department_name].filter(Boolean).join(" · ")))}
+    </select></label>
+    <fieldset className="defense-planning">
+      <legend>Đề tài đối chiếu thành phần ({checkedTheses.length} đã chọn)</legend>
+      <p>Chọn một hoặc nhiều đề tài để loại GVHD của các đề tài đó. Mỗi đề tài sẽ có giờ và phòng riêng ở bước xếp lịch.</p>
+      {plans.length ? <>
+        <label>Tìm đề tài<input className="input" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+        <div className="defense-plan-list">{plans.filter(t=>t.title.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi"))).map(t=>
+          <label key={t.id} className="defense-check"><input type="checkbox" checked={checkedTheses.includes(t.id)}
+            disabled={checkedTheses.length >= 100 && !checkedTheses.includes(t.id)}
+            onChange={e=>setCheckedTheses(ids=>e.target.checked?[...ids,t.id]:ids.filter(id=>id!==t.id))}/>{t.title}</label>)}</div>
+      </> : <p>Chưa có đề tài trong phạm vi này. Có thể lập danh sách hội đồng theo quyết định và xếp lịch sau.</p>}
+    </fieldset>
     <label>Tên hội đồng<input name="name" defaultValue={council?.name} className="input" minLength={3} maxLength={200} required/></label>
     <label>Số quyết định hoặc căn cứ phân công<input name="reference" defaultValue={council?.reference} className="input" minLength={3} maxLength={300} required/></label>
     {roles.map((role,i)=><label key={i}>{data.roles[role]}{role==="REVIEWER"?` ${i-1}`:""}
       <select name={"lecturer"+i} className="input" value={chosen[i]} onChange={e=>setChosen(values=>values.map((v,index)=>index===i?e.target.value:v))} required>
         <option value="" disabled>Chọn giảng viên</option>
-        {data.candidates.filter(c=>c.id===chosen[i]||!chosen.includes(c.id)).map(c=>option(c.id,c.name+" · "+c.code))}
+        {candidates.filter(c=>c.id===chosen[i]||!chosen.includes(c.id)).map(c=>
+          <option key={c.id} value={c.id} disabled={blockedAdvisors.has(c.id)}>
+            {[c.name, c.code, c.department_code, isGuest(c) ? "Ngoài Khoa" : "", c.specializations?.slice(0, 2).join(", "),
+              blockedAdvisors.has(c.id) ? "GVHD của đề tài đã chọn" : ""].filter(Boolean).join(" · ")}
+          </option>)}
       </select>
     </label>)}
+    {hasAdvisorConflict && <p className="alert alert-danger" role="alert">Hãy thay thành viên đang hướng dẫn một đề tài đã chọn.</p>}
+    <label className="defense-check"><input key={conflictSelection} name="conflict_checked" type="checkbox" required/>Đã đối chiếu thành viên không có quan hệ thân nhân với SV bảo vệ.</label>
+    {hasGuest && <label className="defense-check"><input key={memberSelection} name="guests_checked" type="checkbox" required/>Đã đối chiếu người được mời ngoài Khoa với quyết định ghi trên.</label>}
     <div className="flex gap-3">
-      <button className="btn btn-primary" disabled={busy}>{council?"Lưu điều chỉnh hội đồng":"Tạo hội đồng"}</button>
+      <button className="btn btn-primary" disabled={busy || !scope || hasAdvisorConflict || (!council && plans.length > 0 && checkedTheses.length === 0)}>{council?"Lưu điều chỉnh hội đồng":"Tạo hội đồng"}</button>
     </div>
   </DraftForm></Card>;
 }
@@ -83,12 +121,17 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
   const selected=data.eligible.find(t=>t.id===thesisId);
   const council=available.find(c=>c.id===councilId);
   const taken=new Set(data.slots.map(s=>s.thesis_id));
-  const theses=supplementary?[{id:supplementary.thesis_id,title:supplementary.title}]:data.eligible.filter(t=>t.round_id===council?.round_id&&t.department_id===council?.department_id&&
-    (slot?t.id===slot.thesis_id:!taken.has(t.id)));
+  const hasConflict = (t: PlanningThesis) => council?.members.some(m => t.advisor_ids?.includes(m.id));
+  const options = supplementary
+    ? [data.planning_theses?.find(t=>t.id===supplementary.thesis_id) ?? {id:supplementary.thesis_id,title:supplementary.title,round_id:supplementary.council.round_id,department_id:supplementary.council.department_id}]
+    : data.eligible.filter(t=>t.round_id===council?.round_id&&t.department_id===council?.department_id&&
+      (slot?t.id===slot.thesis_id:!taken.has(t.id)));
+  const theses = options.filter(t => !hasConflict(t));
   function submit(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form=new FormData(e.currentTarget);
     const end=e.currentTarget.elements.namedItem("end") as HTMLInputElement;
+    if (!council || !theses.some(t=>t.id===text(form,"thesis"))) return;
     if(text(form,"end")<=text(form,"start")){end.setCustomValidity("Giờ kết thúc phải sau giờ bắt đầu.");end.reportValidity();return;}
     act(slot?slotPath(slot):root+"/slots",{council_id:councilId,thesis_id:text(form,"thesis"),
       starts_at:text(form,"start")+":00+07:00",ends_at:text(form,"end")+":00+07:00",room:text(form,"room"),prior_slot_id:supplementary?.id??slot?.prior_slot_id??null,thesis_member_ids:form.getAll("member")},
@@ -100,6 +143,7 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
     <label>Đề tài đủ điều kiện<select key={councilId} name="thesis" className="input" required value={theses.some(t=>t.id===thesisId)?thesisId:""} onChange={e=>setThesisId(e.target.value)}><option value="" disabled>Chọn đề tài đủ điều kiện</option>
       {theses.map(t=>option(t.id,t.title))}</select></label>
     {supplementary&&<fieldset><legend>Sinh viên được Khoa cho bảo vệ bổ sung</legend>{supplementary.roster.filter(r=>supplementary.absence_decisions?.[r.id]?.outcome==="SUPPLEMENTARY"&&!data.slots.some(s=>s.prior_slot_id===supplementary.id&&s.roster.some(m=>m.id===r.id))).map(r=><label className="defense-check" key={r.id}><input type="checkbox" name="member" value={r.id}/>{r.name} · {r.code}</label>)}<p>Chỉ xếp lịch cho các SV được chọn. Điểm của thành viên đã bảo vệ được giữ nguyên.</p></fieldset>}
+    {council && options.some(hasConflict) && <p>Đã loại đề tài có GVHD trong hội đồng. Chọn hội đồng khác cho đề tài đó.</p>}
     {council&&!theses.length&&<p>Chưa có đề tài phù hợp trong phạm vi hội đồng.</p>}
     {selected?.extension_until_at&&<p className="alert alert-info">Hồ sơ đã gia hạn: {when(selected.extension_starts_at)} → <strong>{when(selected.extension_until_at)}</strong>. Chọn kỳ bảo vệ thực tế của Khoa trong khoảng này; không kéo dài hạn khi đổi lịch.</p>}
     <label>Bắt đầu (giờ Việt Nam)<input name="start" className="input" type="datetime-local" min={selected?.extension_starts_at?dateLocal(selected.extension_starts_at):undefined} max={selected?.extension_until_at?dateLocal(selected.extension_until_at):undefined} defaultValue={slot?dateLocal(slot.starts_at):""} required/></label>
@@ -293,7 +337,7 @@ export default function DefensePage({context}:{context:Context}) {
             <p>{c.reference} · {c.closed_at?"Đã khóa bảng điểm":"Đang xử lý"}</p>
             <p>{data.slots.filter(s=>s.council.id===c.id&&s.finalized_at).length}/{data.slots.filter(s=>s.council.id===c.id).length} phiên đã chốt</p><ul>{c.members.map(m=><li key={m.id}>{data.roles[m.role]} · {m.name}</li>)}</ul>
             <button className="btn btn-secondary" onClick={()=>{if(mayDiscard()){setFilter(c.id);document.getElementById("defense-schedules")?.scrollIntoView({behavior:"smooth"});}}}>Xem lịch hội đồng này</button>
-            {c.can_manage&&!c.closed_at&&!data.slots.some(s=>s.council.id===c.id&&!s.schedule_editable)&&<details className="defense-operation"><summary>Điều chỉnh hội đồng trước buổi họp</summary><CouncilForm council={c} data={data} act={act} busy={busy}/></details>}
+            {c.can_manage&&!c.closed_at&&data.scopes.some(s=>s.round_id===c.round_id&&s.department_id===c.department_id)&&!data.slots.some(s=>s.council.id===c.id&&!s.schedule_editable)&&<details className="defense-operation"><summary>Điều chỉnh hội đồng trước buổi họp</summary><CouncilForm council={c} data={data} act={act} busy={busy}/></details>}
             {(c.can_manage||["CHAIR","SECRETARY"].includes(ownRole??""))&&<details className="defense-operation"><summary>Đối chiếu bảng điểm trước khi khóa</summary><div className="defense-results"><table><thead><tr><th>Sinh viên</th><th>Điểm</th><th>Trạng thái</th></tr></thead><tbody>{data.slots.filter(s=>s.council.id===c.id).flatMap(s=>s.roster.map(r=><tr key={s.id+r.id}><td>{r.name} · {r.code}</td><td>{s.results[r.id]?.average??"—"}</td><td>{s.finalized_at?"Đã chốt":"Chưa chốt"}{s.results[r.id]?.attendance.status==="ABSENT"&&" · Vắng, chưa có kết quả học vụ"}</td></tr>))}</tbody></table></div></details>}
             {c.can_manage&&!c.closed_at&&<button className="btn btn-primary" disabled={busy||!data.slots.some(s=>s.council.id===c.id)||data.slots.some(s=>s.council.id===c.id&&!s.finalized_at)}
               onClick={()=>{if(window.confirm("Khóa danh sách và điểm của hội đồng để xuất Mẫu 10 và 11?"))act(path+"/close",{});}}>Khóa bảng điểm hội đồng</button>}

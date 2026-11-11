@@ -92,16 +92,16 @@ export default function AdministrationPage({
   const isAdmin = context.base_role === "ADMIN";
 
   const assignmentDescriptions: Record<string, string> = {
-    REVIEW_RECORDS_MANAGER: "Được tiếp nhận và ghi nhận bản giấy Mẫu 7–8 trong đợt được giao. Không được sửa nhận xét, phân công phản biện hoặc xét điều kiện thay TBM.",
-    FORM_MANAGER: "Được thêm, cập nhật, phát hành và thu hồi biểu mẫu/tài liệu Khoa của đợt được giao; không có quyền duyệt đề tài hoặc gia hạn mốc.",
+    REVIEW_RECORDS_MANAGER: "Mở Tiếp nhận hồ sơ phản biện để đối chiếu bản giấy đã ký với đúng mã xuất Mẫu 7 hoặc Mẫu 8, rồi lưu biên nhận. TBM xét điều kiện dự bảo vệ.",
+    FORM_MANAGER: "Mở Quản lý kho biểu mẫu Khoa để thêm bản mới, phát hành hoặc thu hồi biểu mẫu và tài liệu của đợt được giao.",
     ELIGIBILITY_IMPORTER:
-      "Được nhập danh sách chính thức của Khoa; sinh viên được ghi nhận đủ điều kiện ngay. Sinh viên vẫn phải kích hoạt tài khoản trước khi gửi đăng ký.",
+      "Mở Danh sách sinh viên, nhập danh sách được Khoa duyệt để xác nhận đủ điều kiện đăng ký KLTN. Sinh viên kích hoạt tài khoản trước khi gửi đăng ký.",
     ELIGIBILITY_VERIFIER:
-      "Được đính chính hoặc thu hồi kết quả đủ điều kiện khi có căn cứ; không còn bước xác nhận riêng sau khi nhập danh sách.",
+      "Mở Danh sách sinh viên để đính chính hoặc thu hồi điều kiện đăng ký đã ghi nhận. Quyền xét dự bảo vệ của TBM nằm trong hồ sơ phản biện.",
     ACCOUNT_MANAGER:
-      "Được quản lý tài khoản sinh viên trong phạm vi đợt được giao, gồm khóa, mở hoặc hỗ trợ kích hoạt tài khoản.",
+      "Mở Tài khoản để khóa, mở hoặc hỗ trợ kích hoạt tài khoản sinh viên thuộc đợt được giao.",
     KLTN_COORDINATOR:
-      "Được mở, gia hạn và đóng các mốc tiến độ chung của đợt; không thay giảng viên hướng dẫn nhận xét hoặc xác nhận báo cáo.",
+      "Mở, gia hạn và đóng mốc tiến độ và hạn nhận tài liệu chung, xử lý hồ sơ xin thôi, điều phối hội đồng và lịch bảo vệ trong phạm vi được giao. Mở Mốc & báo cáo tiến độ, Hồ sơ nộp & xét duyệt hoặc Hội đồng và bảo vệ.",
   };
 
   const eligibleStaff = (a: Account, task: string) =>
@@ -110,7 +110,7 @@ export default function AdministrationPage({
 
   function changeKind(next: string) {
     setKind(next);
-    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && !["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(next)) {setRoundId("");setAssignmentHint("Nhiệm vụ mới cần chọn đợt chưa đóng đăng ký.");}
+    if (rounds.find(r => r.id === roundId)?.state === "CLOSED" && !["FORM_MANAGER","REVIEW_RECORDS_MANAGER","KLTN_COORDINATOR"].includes(next)) {setRoundId("");setAssignmentHint("Chọn đợt còn nhận phân công cho nhiệm vụ này.");}
     if (userId && !staffAccounts.some((a) => a.id === userId && eligibleStaff(a, next))) {
       setUserId("");
       setAssignmentHint("Người đã chọn không phù hợp nhiệm vụ mới. Vui lòng chọn lại người được giao.");
@@ -400,7 +400,7 @@ export default function AdministrationPage({
                     <select className="input" required value={roundId} onChange={(e) => setRoundId(e.target.value)}>
                       <option value="">Chọn đợt khóa luận áp dụng</option>
                       {rounds
-                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (["FORM_MANAGER","REVIEW_RECORDS_MANAGER"].includes(kind) && r.state === "CLOSED"))
+                        .filter((r) => r.state === "DRAFT" || r.state === "OPEN" || (["FORM_MANAGER","REVIEW_RECORDS_MANAGER","KLTN_COORDINATOR"].includes(kind) && r.state === "CLOSED"))
                         .map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.code} · {r.state}
@@ -455,7 +455,7 @@ export default function AdministrationPage({
                       <option value="ELIGIBILITY_IMPORTER">Nhập danh sách SV</option>
                       <option value="ELIGIBILITY_VERIFIER">Điều chỉnh/thu hồi điều kiện</option>
                       <option value="ACCOUNT_MANAGER">Quản lý tài khoản SV theo đợt</option>
-                      <option value="KLTN_COORDINATOR">Quản lý mốc tiến độ toàn đợt</option>
+                      <option value="KLTN_COORDINATOR">Điều phối KLTN theo đợt</option>
                       <option value="REVIEW_RECORDS_MANAGER">Tiếp nhận hồ sơ phản biện (cán bộ/thư ký)</option>
                       <option value="FORM_MANAGER">Quản lý biểu mẫu và tài liệu Khoa</option>
                     </select>
@@ -568,7 +568,7 @@ export default function AdministrationPage({
                             : a.assignment_type === "ACCOUNT_MANAGER"
                             ? "Quản lý tài khoản SV"
                             : a.assignment_type === "KLTN_COORDINATOR"
-                            ? "Quản lý mốc tiến độ toàn đợt"
+                            ? "Điều phối KLTN theo đợt"
                             : "Nhập danh sách SV"}
                         </span>
                       </div>

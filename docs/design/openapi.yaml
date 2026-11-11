@@ -20080,6 +20080,25 @@
             "maxItems": 5,
             "minItems": 5,
             "title": "Members"
+          },
+          "thesis_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Thesis Ids"
+          },
+          "confirmed_no_conflict": {
+            "type": "boolean",
+            "title": "Confirmed No Conflict",
+            "default": false
+          },
+          "confirmed_guests": {
+            "type": "boolean",
+            "title": "Confirmed Guests",
+            "default": false
           }
         },
         "additionalProperties": false,

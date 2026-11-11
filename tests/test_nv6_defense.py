@@ -39,21 +39,38 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     session.flush()
     session.add(extra)
     session.commit()
+    visiting_faculty = m.Faculty(id=uuid4(), code="VF-"+uuid4().hex[:10], name="Synthetic visiting faculty")
+    visiting_department = m.Department(id=uuid4(), faculty_id=visiting_faculty.id,
+        code="VD-"+uuid4().hex[:10], name="Synthetic visiting department")
+    session.add(visiting_faculty)
+    session.flush()
+    session.add(visiting_department)
+    session.flush()
     extras=[]
     for index in range(2):
         account2=m.UserAccount(id=uuid4(),external_subject="council-"+uuid4().hex,base_role="LECTURER",status="ACTIVE")
-        person=m.LecturerProfile(id=uuid4(),user_id=account2.id,department_id=lecturers[1].department_id,
+        person=m.LecturerProfile(id=uuid4(),user_id=account2.id,
+            department_id=visiting_department.id if index==1 else lecturers[1].department_id,
             lecturer_code="C-"+uuid4().hex[:10],display_name=f"Synthetic council extra {index}")
         session.add(account2);session.flush();session.add(person);session.flush()
         extras.append((account2,person))
     session.commit()
     base = "/api/v1/defense"
-    created = client.post(base+"/councils",headers=hdr(users[4]),json={"round_id":thesis["round_id"],
+    council_input = {"round_id":thesis["round_id"],
         "department_id":str(lecturers[1].department_id),"name":"Synthetic council","reference":"QD-DEFENSE-TEST",
+        "thesis_ids":[thesis["thesis_id"]],"confirmed_no_conflict":True,
         "members":[{"lecturer_id":str(person.id),"role":role} for person,role in
-            [(lecturers[1],"CHAIR"),(lecturers[2],"SECRETARY"),(extra,"REVIEWER"),(extras[0][1],"REVIEWER"),(extras[1][1],"MEMBER")]]})
+            [(lecturers[1],"CHAIR"),(lecturers[2],"SECRETARY"),(extra,"REVIEWER"),(extras[0][1],"REVIEWER"),(extras[1][1],"MEMBER")]]}
+    conflicted = {**council_input, "members": [*council_input["members"][:-1],
+        {"lecturer_id":str(lecturers[0].id),"role":"MEMBER"}]}
+    conflict_response = client.post(base+"/councils",headers=hdr(users[4]),json=conflicted)
+    assert conflict_response.status_code==409 and "GVHD" in conflict_response.json()["detail"]
+    unconfirmed = client.post(base+"/councils",headers=hdr(users[4]),json=council_input)
+    assert unconfirmed.status_code==422 and "ngoài Khoa" in unconfirmed.json()["detail"]
+    created = client.post(base+"/councils",headers=hdr(users[4]),json={**council_input,"confirmed_guests":True})
     assert created.status_code==201,created.text
     council = created.json()["id"]
+    assert session.get(m.DefenseCouncil,UUID(council)).members[-1]["invitation_reference"]==council_input["reference"]
     body = {"council_id":council,"thesis_id":thesis["thesis_id"],"room":"Synthetic room",
         "starts_at":(now()-timedelta(hours=2)).isoformat(),"ends_at":(now()-timedelta(hours=1)).isoformat()}
     assert client.post(base+"/slots",headers=hdr(users[4]),json=body).status_code == 409
@@ -75,6 +92,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     second = client.get(base,headers=hdr(users[1])).json()["slots"][0]["roster"][0]["id"]
     record=client.get(base,headers=hdr(users[4])).json()["councils"][0]
     edited={"round_id":record["round_id"],"department_id":record["department_id"],"name":"Synthetic council revised","reference":"QD-REVISED",
+        "confirmed_guests":True,
         "members":[{"lecturer_id":p["id"],"role":p["role"]} for p in record["members"]]}
     response=client.put(base+"/councils/"+council,headers={**hdr(users[4]),"If-Match":record["signature"]},json=edited)
     assert response.status_code==200,response.text
