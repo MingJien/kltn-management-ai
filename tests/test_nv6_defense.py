@@ -18,6 +18,59 @@ from test_nv6_evaluation import check, complete_review, evaluation, get
 from test_registration import hdr, scenario
 
 
+def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
+    from backend.services.account_tokens import make_token
+    from backend.services.passwords import unusable_password
+
+    ctx, _ = evaluation
+    client, users, _, lecturers, session, _ = ctx
+    thesis = get(ctx)
+    round_ = session.get(m.ThesisRound, UUID(thesis["round_id"]))
+    department = session.get(m.Department, lecturers[1].department_id)
+    round_.code, department.code = "SYN-DEMO", "SYN-DEMO-DEP"
+    faculty = m.Faculty(id=uuid4(), code="FAC-" + uuid4().hex[:8], name="Synthetic visiting faculty")
+    unit = m.Department(id=uuid4(), faculty_id=faculty.id, code="BM-CNTT", name="Công nghệ thông tin")
+    session.add(faculty)
+    session.flush()
+    session.add(unit)
+    session.flush()
+    guests = []
+    for index in range(3):
+        account = m.UserAccount(id=uuid4(), email=f"synthetic-{uuid4().hex}@example.invalid",
+            password_hash=unusable_password(), base_role="LECTURER", status="DISABLED" if index == 0 else "ACTIVE",
+            email_verified_at=None if index == 0 else now())
+        person = m.LecturerProfile(id=uuid4(), user_id=account.id, department_id=unit.id,
+            lecturer_code="GV-" + uuid4().hex[:8], display_name="Synthetic guest lecturer")
+        session.add(account)
+        session.flush()
+        session.add(person)
+        guests.append((account, person))
+    session.commit()
+    base = "/api/v1/defense"
+
+    def candidate_ids():
+        response = client.get(base, headers=hdr(users[4]))
+        assert response.status_code == 200, response.text
+        return {item["id"] for item in response.json()["candidates"]}
+
+    account, invited = guests[0]
+    assert str(lecturers[1].id) in candidate_ids()
+    assert str(invited.id) not in candidate_ids()
+    activated = client.post("/api/v1/account/activate", json={
+        "token": make_token(account, "activate"), "password": "Synthetic-Demo-Password-42"})
+    assert activated.status_code == 204, activated.text
+    assert str(invited.id) in candidate_ids()
+
+    members = [lecturers[1], lecturers[2], *[person for _, person in guests]]
+    payload = {"round_id": str(round_.id), "department_id": str(department.id), "name": "Synthetic demo council",
+        "reference": "QD-SYNTHETIC", "thesis_ids": [thesis["thesis_id"]], "confirmed_no_conflict": True,
+        "members": [{"lecturer_id": str(person.id), "role": role} for person, role in zip(
+            members, ["CHAIR", "SECRETARY", "REVIEWER", "REVIEWER", "MEMBER"])]}
+    assert client.post(base + "/councils", headers=hdr(users[4]), json=payload).status_code == 422
+    created = client.post(base + "/councils", headers=hdr(users[4]), json={**payload, "confirmed_guests": True})
+    assert created.status_code == 201, created.text
+
+
 def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     ctx,_ = evaluation
     client,users,students,lecturers,session,path = ctx

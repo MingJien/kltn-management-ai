@@ -27,6 +27,7 @@ const councilPath=(council:Council)=>root+"/councils/"+council.id;
 const dateLocal=(iso:string)=>new Date(Date.parse(iso)+7*3600000).toISOString().slice(0,16);
 const option=(value:string,label:string)=><option value={value} key={value}>{label}</option>;
 const text=(form:FormData,key:string)=>String(form.get(key)??"");
+const searchText = (value: string) => value.toLocaleLowerCase("vi").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/đ/g, "d").trim();
 
 const hasDrafts=()=>!!document.querySelector('form[data-dirty="true"]');
 const mayDiscard=()=>!hasDrafts()||window.confirm("Còn nội dung chưa lưu. Bạn có muốn bỏ nội dung đang nhập?");
@@ -60,14 +61,18 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
   const scope = council ? data.scopes.find(r => r.round_id === council.round_id && r.department_id === council.department_id) : data.scopes[scopeIndex];
   const plans = (data.planning_theses ?? data.eligible).filter(t =>
     t.round_id === scope?.round_id && t.department_id === scope?.department_id);
-  const blockedAdvisors = new Set(plans.filter(t => checkedTheses.includes(t.id)).flatMap(t => t.advisor_ids ?? []));
+  const selectedPlans = plans.filter(t => checkedTheses.includes(t.id));
+  const query = searchText(search);
+  const matchingPlans = plans.filter(t => !checkedTheses.includes(t.id) && searchText(t.title).includes(query));
+  const blockedAdvisors = new Set(selectedPlans.flatMap(t => t.advisor_ids ?? []));
   const hasAdvisorConflict = chosen.some(id => blockedAdvisors.has(id));
   const isGuest = (candidate: Workspace["candidates"][number]) => !!scope?.faculty_id && candidate.faculty_id !== scope.faculty_id;
   const hasGuest = data.candidates.some(c => chosen.includes(c.id) && isGuest(c));
   const memberSelection = chosen.filter(Boolean).sort().join(",");
   const conflictSelection = [scope?.round_id, scope?.department_id, memberSelection, ...[...checkedTheses].sort()].join("|");
-  const candidates = data.candidates.filter(c => (c.department_code === "SYN-DEMO-DEP") === (scope?.department_code === "SYN-DEMO-DEP")).sort((a, b) =>
+  const candidates = data.candidates.filter(c => scope?.department_code === "SYN-DEMO-DEP" || c.department_code !== "SYN-DEMO-DEP").sort((a, b) =>
     Number(isGuest(a)) - Number(isGuest(b)) || Number(b.department_code === scope?.department_code) - Number(a.department_code === scope?.department_code));
+  const availableCount = candidates.filter(c => !blockedAdvisors.has(c.id)).length;
 
   function submit(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -80,29 +85,41 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
   return <Card title="Lập hội đồng"><DraftForm className="stack" onSubmit={submit}>
     <label>Đợt và bộ môn<select name="scope" className="input" value={scopeIndex} disabled={!!council}
       onChange={e => {setScopeIndex(Number(e.target.value)); setCheckedTheses([]); setChosen(Array(5).fill("")); setSearch("");}}>
-      {data.scopes.map((r,i)=>option(String(i), [r.round_code, r.department_code, r.department_name].filter(Boolean).join(" · ")))}
+      {data.scopes.map((r,i)=>option(String(i), [r.round_code, r.department_code === "SYN-DEMO-DEP" ? null : r.department_code, r.department_name].filter(Boolean).join(" · ")))}
     </select></label>
     <fieldset className="defense-planning">
       <legend>Đề tài đối chiếu thành phần ({checkedTheses.length} đã chọn)</legend>
       <p>Chọn một hoặc nhiều đề tài để loại GVHD của các đề tài đó. Mỗi đề tài sẽ có giờ và phòng riêng ở bước xếp lịch.</p>
       {plans.length ? <>
-        <label>Tìm đề tài<input className="input" value={search} onChange={e=>setSearch(e.target.value)}/></label>
-        <div className="defense-plan-list">{plans.filter(t=>t.title.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi"))).map(t=>
-          <label key={t.id} className="defense-check"><input type="checkbox" checked={checkedTheses.includes(t.id)}
-            disabled={checkedTheses.length >= 100 && !checkedTheses.includes(t.id)}
-            onChange={e=>setCheckedTheses(ids=>e.target.checked?[...ids,t.id]:ids.filter(id=>id!==t.id))}/>{t.title}</label>)}</div>
+        <div className="defense-plan-search">
+          <label>Tìm đề tài<input className="input" type="search" placeholder="Nhập một phần tên đề tài" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+          <label>Thêm đề tài<select className="input" value="" disabled={!matchingPlans.length || checkedTheses.length >= 100}
+            onChange={e=>{const id=e.target.value; if(id) setCheckedTheses(ids=>[...ids,id]);}}>
+            <option value="">{matchingPlans.length ? `Chọn trong ${matchingPlans.length} đề tài` : "Không có đề tài phù hợp"}</option>
+            {matchingPlans.map(t=>option(t.id,t.title))}
+          </select></label>
+        </div>
+        {selectedPlans.length > 0 && <details className="defense-selected-plans">
+          <summary>Xem đề tài đã chọn ({selectedPlans.length})</summary>
+          <ul>{selectedPlans.map(t=><li key={t.id}><span>{t.title}</span><button type="button" className="btn btn-secondary btn-sm"
+            aria-label={`Bỏ đề tài ${t.title}`} onClick={()=>setCheckedTheses(ids=>ids.filter(id=>id!==t.id))}>Bỏ</button></li>)}</ul>
+        </details>}
       </> : <p>Chưa có đề tài trong phạm vi này. Có thể lập danh sách hội đồng theo quyết định và xếp lịch sau.</p>}
     </fieldset>
     <label>Tên hội đồng<input name="name" defaultValue={council?.name} className="input" minLength={3} maxLength={200} required/></label>
     <label>Số quyết định hoặc căn cứ phân công<input name="reference" defaultValue={council?.reference} className="input" minLength={3} maxLength={300} required/></label>
+    {availableCount < roles.length && <p className="alert alert-warning">Có {availableCount}/{roles.length} giảng viên phù hợp với các đề tài đã chọn. Cần thêm giảng viên có tài khoản hoạt động hoặc điều chỉnh nhóm đề tài.</p>}
     {roles.map((role,i)=><label key={i}>{data.roles[role]}{role==="REVIEWER"?` ${i-1}`:""}
       <select name={"lecturer"+i} className="input" value={chosen[i]} onChange={e=>setChosen(values=>values.map((v,index)=>index===i?e.target.value:v))} required>
-        <option value="" disabled>Chọn giảng viên</option>
-        {candidates.filter(c=>c.id===chosen[i]||!chosen.includes(c.id)).map(c=>
-          <option key={c.id} value={c.id} disabled={blockedAdvisors.has(c.id)}>
-            {[c.name, c.code, c.department_code, isGuest(c) ? "Ngoài Khoa" : "", c.specializations?.slice(0, 2).join(", "),
-              blockedAdvisors.has(c.id) ? "GVHD của đề tài đã chọn" : ""].filter(Boolean).join(" · ")}
-          </option>)}
+        <option value="">Chọn giảng viên</option>
+        {candidates.map(c=>{
+          const usedIndex = chosen.findIndex((id, index) => id === c.id && index !== i);
+          const unavailable = blockedAdvisors.has(c.id) ? "GVHD của đề tài đã chọn" : usedIndex >= 0 ? "Đã chọn ở vai trò khác" : "";
+          return <option key={c.id} value={c.id} disabled={!!unavailable}>
+            {[c.name, c.code, c.department_code === "SYN-DEMO-DEP" ? "Giảng viên demo" : c.department_code, isGuest(c) ? "Ngoài Khoa" : "", c.specializations?.slice(0, 2).join(", "),
+              unavailable].filter(Boolean).join(" · ")}
+          </option>;
+        })}
       </select>
     </label>)}
     {hasAdvisorConflict && <p className="alert alert-danger" role="alert">Hãy thay thành viên đang hướng dẫn một đề tài đã chọn.</p>}

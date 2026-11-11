@@ -10,6 +10,10 @@
 
 ## Quyền điều phối và chuẩn bị hồ sơ bảo vệ
 
+Mục **Đợt và bộ môn** dùng mã bộ môn theo danh mục Khoa, với bộ môn giả lập cho hồ sơ của đợt demo. Trong **Lập hội đồng mới**, nhập tên vào ô **Tìm đề tài** rồi chọn ở danh sách **Thêm đề tài**. Mở **Xem đề tài đã chọn** để kiểm tra và bỏ từng đề tài.
+
+TBM có thể giữ một vai trò trong hội đồng nếu không hướng dẫn đề tài hội đồng đánh giá. Giảng viên có tài khoản hoạt động xuất hiện sau khi kích hoạt bằng link email và làm mới trang. Giảng viên thuộc danh sách Khoa có thể được chọn khi kiêm nhiệm ở phòng ban khác. Người được mời ngoài Khoa phải có tên trong quyết định thành lập. Hội đồng demo cho phép chọn giảng viên đã kích hoạt từ các bộ môn chính thức.
+
 Admin cấp **Điều phối KLTN theo đợt** cho giảng viên phụ trách, kể cả khi đợt đã đóng đăng ký. Điều phối mở **Hồ sơ nộp & xét duyệt**, chọn một hồ sơ thuộc đợt và mở đúng loại để đặt hạn chung. Mẫu 2, Mẫu 3, cuốn báo cáo và tài liệu hỗ trợ có lịch nhận riêng. Hạn Mẫu 1a/1b dùng cửa đăng ký đề tài do Admin quản lý. Thông báo hạn chung dẫn tới hồ sơ của đợt và loại tài liệu tương ứng.
 
 Khi thành viên thay đổi, đối chiếu Mẫu 1b, Mẫu 2 và Mẫu 3 theo danh sách hiện tại. Màn **Đánh giá** hiển thị mục còn vướng trước khi GVHD lập Mẫu 7. Với từng SV, TBM ghi nhận tình trạng kỷ luật. GVHD xác nhận hoàn thành trên phiên bản cuốn báo cáo hiện tại, lập Mẫu 7 và ký bản xuất. Người viết phiếu, TBM hoặc người được giao **Tiếp nhận hồ sơ phản biện** xác nhận văn bản đã ký bằng mã bản xuất. TBM xét và lưu điều kiện sau khi có đủ hồ sơ. [QĐ 2919, Điều 7–9](https://aao.dthu.edu.vn/New.aspx?id=2627).

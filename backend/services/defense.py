@@ -89,8 +89,8 @@ def manage_council(session, user, data, identifier=None, signature=None):
         .where(m.LecturerProfile.id.in_(ids), m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER"))}
     if ids != found.keys():
         raise HTTPException(422, "Có tài khoản giảng viên không hoạt động")
-    if any(demo_department(code) != demo_department(department.code) for _, _, code in found.values()):
-        raise HTTPException(422, "Thành viên phải thuộc cùng phạm vi giả lập hoặc chính thức với hội đồng")
+    if not demo_department(department.code) and any(demo_department(code) for _, _, code in found.values()):
+        raise HTTPException(422, "Tài khoản thuộc bộ môn giả lập chỉ tham gia hội đồng demo")
     session.execute(select(func.pg_advisory_xact_lock(66102)))
     existing=session.get(m.DefenseCouncil,identifier) if identifier else None
     slots=[]
@@ -576,7 +576,7 @@ def workspace(session,user):
             eligible.append({**row,
                 "extension_starts_at":request.extension_starts_at if request else None,
                 "extension_until_at":extension.until_at if extension else None})
-    allowed_demo = {demo_department(scope["department_code"]) for scope in scopes}
+    can_plan_demo = any(demo_department(scope["department_code"]) for scope in scopes)
     candidates = [{"id":l.id,"name":l.display_name,"code":l.lecturer_code,"faculty_id":d.faculty_id if d else None,
         "department_code":d.code if d else None,
         "specializations":l.profile_data.get("specializations",[]) if l.profile_verified_at else []}
@@ -584,7 +584,7 @@ def workspace(session,user):
         .join(m.UserAccount,m.UserAccount.id==m.LecturerProfile.user_id)
         .outerjoin(m.Department,m.Department.id==m.LecturerProfile.department_id)
         .where(m.UserAccount.status=="ACTIVE",m.UserAccount.base_role=="LECTURER")
-        .order_by(m.LecturerProfile.display_name)) if demo_department(d.code if d else None) in allowed_demo] if scopes else []
+        .order_by(m.LecturerProfile.display_name)) if can_plan_demo or not demo_department(d.code if d else None)] if scopes else []
     return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,
         "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES}
 

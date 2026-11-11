@@ -65,8 +65,19 @@ test("Cuốn báo cáo trước bảo vệ, chuông đúng nhóm/GVHD/TBM và da
     await other.getByText("Lập hội đồng mới",{exact:true}).click();
     const scope=other.getByRole("combobox",{name:"Đợt và bộ môn",exact:true});
     await expect(scope.locator("option")).toHaveCount(1);
-    await expect(scope.locator("option")).toContainText("SYN-DEMO-DEP");
-    await other.getByRole("checkbox",{name:"DEMO thông báo và cuốn báo cáo KLTN",exact:true}).check();
+    await expect(scope.locator("option")).toContainText("SYN-DEMO · Bộ môn giả lập");
+    await other.getByRole("searchbox",{name:"Tìm đề tài"}).fill("thong bao va cuon");
+    const thesisPicker=other.getByRole("combobox",{name:"Thêm đề tài"});
+    await expect(thesisPicker.locator("option")).toHaveCount(2);
+    await thesisPicker.selectOption(reg.thesis_id);
+    await expect(other.getByText("Xem đề tài đã chọn (1)",{exact:true})).toBeVisible();
     await expect(other.getByRole("combobox",{name:"Chủ tịch",exact:true}).locator(`option[value="${advisorId}"]`)).toHaveJSProperty("disabled", true);
+    const headId=(await read(tbm,"/me/context")).lecturer_id;
+    const chair=other.getByRole("combobox",{name:"Chủ tịch",exact:true});
+    const secretary=other.getByRole("combobox",{name:"Thư ký",exact:true});
+    await chair.selectOption(headId);
+    await expect(secretary.locator(`option[value="${headId}"]`)).toHaveText(/Đã chọn ở vai trò khác/);
+    await chair.selectOption("");
+    await secretary.selectOption(headId);
   }finally{for(const actor of actors)await actor.context.close();}
 });

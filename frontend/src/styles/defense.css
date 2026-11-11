@@ -36,5 +36,9 @@
 @media(max-width:600px){.defense-tabs .btn{flex:1 1 120px}.defense-page .defense-criterion label{grid-template-columns:1fr;gap:10px}.defense-page .defense-criterion input{grid-column:1;width:120px}.defense-results th,.defense-results td{padding:8px;font-size:.82rem}.defense-session{padding:10px}}
 .defense-page .defense-score-preview{position:static}
 .defense-planning { grid-column: 1 / -1; min-width: 0; border: 1px solid #dbe3eb; border-radius: 8px; padding: 12px; }
-.defense-plan-list { max-height: 12rem; overflow: auto; margin-top: 8px; }
-.defense-plan-list label { padding: 6px 0; overflow-wrap: anywhere; }
+.defense-plan-search { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.defense-selected-plans { margin-top:12px; }
+.defense-selected-plans summary { cursor:pointer; }
+.defense-selected-plans ul { max-height:12rem; overflow:auto; padding:0; }
+.defense-selected-plans li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; }
+@media(max-width:600px) { .defense-plan-search { grid-template-columns:1fr; } }
