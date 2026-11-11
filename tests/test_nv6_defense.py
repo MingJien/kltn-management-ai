@@ -53,6 +53,10 @@ def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
         assert response.status_code == 200, response.text
         return {item["id"] for item in response.json()["candidates"]}
 
+    catalog = client.get(base, headers=hdr(users[4])).json()["scope_catalog"]
+    assert {row["department_code"] for row in catalog if row["round_code"] == "SYN-DEMO"} >= {"BM-CNTT", "SYN-DEMO-DEP"}
+    assert all(row["can_manage"] for row in catalog if row["round_code"] == "SYN-DEMO")
+
     account, invited = guests[0]
     assert str(lecturers[1].id) in candidate_ids()
     assert str(invited.id) not in candidate_ids()
@@ -175,6 +179,59 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
         res = client.request(method,endpoint+suffix,headers={**hdr(user),"If-Match":str(current)},json=data)
         assert res.status_code==status,res.text
 
+    current_slot = lambda: next(s for s in client.get(base, headers=hdr(users[4])).json()["slots"] if s["id"] == slot)
+    old = current_slot()
+    new_time = {**body, "starts_at": (now()+timedelta(days=1)).isoformat(),
+        "ends_at": (now()+timedelta(days=1, hours=1)).isoformat(), "room": "New synthetic room"}
+    mutate("PUT", "", users[4], new_time, 200)
+    assert current_slot()["room"] == "New synthetic room"
+    assert client.put(endpoint, headers={**hdr(users[4]),"If-Match":str(old["version"])}, json=body).status_code == 409
+    for recipient in (users[0], users[1], users[3], users[5]):
+        inbox = client.get("/api/v1/notifications", headers=hdr(recipient)).json()["items"]
+        assert any("New synthetic room" in n["message"] for n in inbox)
+    mutate("PUT", "", users[4], body, 200)
+
+    alternative = m.Topic(id=uuid4(), round_id=UUID(thesis["round_id"]), department_id=lecturers[1].department_id,
+        proposer_user_id=users[3].id, proposer_type="LECTURER", code="ALT-"+uuid4().hex,
+        current_title="Synthetic replacement thesis", max_students=1, state="APPROVED")
+    session.add(alternative)
+    session.commit()
+    registration = client.post("/api/v1/topic-registrations", headers=hdr(users[2]), json={
+        "topic_id":str(alternative.id),"member_student_ids":[str(students[2].id)],"confirm_creator":True})
+    assert registration.status_code==201,registration.text
+    reg_url="/api/v1/topic-registrations/"+registration.json()["id"]
+    submitted=client.post(reg_url+"/submit",headers=hdr(users[2]))
+    assert submitted.status_code==200,submitted.text
+    accepted=client.post(reg_url+"/lecturer-decision",headers=version_headers(users[3],submitted.json()),json={"decision":"ACCEPT"})
+    assert accepted.status_code==200,accepted.text
+    replacement_id=accepted.json()["thesis_id"]
+    replacement_path="/api/v1/theses/"+replacement_id
+    replacement_ctx=(*ctx[:-1],replacement_path)
+    change={**new_time,"thesis_id":replacement_id}
+    mutate("PUT","",users[4],change,409)
+    report_doc=client.post(replacement_path+"/documents",headers=hdr(users[2]),
+        json={"document_type":"REPORT","title":"Replacement thesis report"})
+    assert report_doc.status_code==201,report_doc.text
+    upload=client.post(replacement_path+"/documents/"+report_doc.json()["id"]+"/versions",
+        headers={**version_headers(users[2],report_doc.json()),"X-File-Name":"replacement.pdf","Content-Type":"application/octet-stream"},
+        content=synthetic_pdf())
+    assert upload.status_code==201,upload.text
+    version=session.get(m.DocumentVersion,UUID(upload.json()["versions"][0]["id"]))
+    session.get(m.StoredFile,version.stored_file_id).scan_state="CLEAN"
+    session.commit()
+    complete_review(replacement_ctx)
+    checked=check(replacement_ctx)
+    assert checked.status_code==200,checked.text
+    mutate("PUT","",users[4],change,200)
+    assert current_slot()["thesis_id"]==replacement_id
+    assert current_slot()["report_filename"]=="replacement.pdf"
+    assert client.get(base,headers=hdr(users[0])).json()["slots"]==[]
+    assert client.get(base,headers=hdr(users[2])).json()["slots"][0]["thesis_id"]==replacement_id
+    inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
+    assert any("không còn được xếp" in notice["message"] for notice in inbox)
+    mutate("PUT","",users[4],body,200)
+    assert current_slot()["results"][first]["attendance"]["bonus"]=="1"
+
     mutate("POST","/finalize",users[4],{},409)
     mutate("PUT","/council-attendance",users[5],{
         "present_ids":[str(lecturers[1].id),str(extra.id),str(extras[0][1].id)],
@@ -183,6 +240,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("PUT","/council-attendance",users[5],{"present_ids":present,"reason":"Four members present, member absent"})
     updated=client.get(base,headers=hdr(users[4])).json()["councils"][0]
     assert client.put(base+"/councils/"+council,headers={**hdr(users[4]),"If-Match":updated["signature"]},json=edited).status_code==409
+    mutate("PUT", "", users[4], new_time, 409)
     mutate("PUT","/attendance/"+first,users[5],{"status":"PRESENT"})
     mutate("PUT","/attendance/"+second,users[5],{"status":"ABSENT","reason":"Có báo vắng"})
     mutate("PUT","/bonus/"+first,users[4],{"points":"1","reference":"Synthetic research publication"},422)

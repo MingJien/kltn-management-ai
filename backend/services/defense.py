@@ -35,10 +35,20 @@ def lecturer_for(session, user):
 
 
 def manages(session, user, lecturer, round_id, department_id):
-    from backend.services.faculty_pool import compatible
-    return bool(lecturer and (_is_department_head(session, lecturer.id, department_id) or (
-        resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_id)
-        and compatible(session, lecturer.department_id, department_id))))
+    if not lecturer:
+        return False
+    if _is_department_head(session, lecturer.id, department_id):
+        return True
+    if not resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_id):
+        return False
+    home = session.get(m.Department, lecturer.department_id) if lecturer.department_id else None
+    target = session.get(m.Department, department_id)
+    round_ = session.get(m.ThesisRound, round_id)
+    if not home or not target or not round_:
+        return False
+    if round_.code == "SYN-DEMO":
+        return council_faculty_id(session, home) == council_faculty_id(session, target)
+    return not demo_department(home.code) and home.faculty_id == target.faculty_id
 
 
 def demo_department(code):
@@ -54,7 +64,7 @@ def council_faculty_id(session, department):
 
 
 def valid_council_scope(round_, department):
-    return (round_.code == "SYN-DEMO") == demo_department(department.code)
+    return round_.code == "SYN-DEMO" or not demo_department(department.code)
 
 
 def supervising_ids(session, thesis_id):
@@ -85,7 +95,7 @@ def manage_council(session, user, data, identifier=None, signature=None):
     if not round_ or round_.state == "ARCHIVED" or not department or not department.active:
         raise HTTPException(409, "Đợt hoặc bộ môn không còn khả dụng")
     if not valid_council_scope(round_, department):
-        raise HTTPException(422, "Chọn bộ môn giả lập cho đợt SYN-DEMO, hoặc bộ môn chính thức cho đợt thực tế")
+        raise HTTPException(422, "Bộ môn giả lập chỉ dùng trong đợt SYN-DEMO")
     roles = [member.role for member in data.members]
     ids = {member.lecturer_id for member in data.members}
     if len(ids) != 5 or sorted(roles) != sorted(["CHAIR","SECRETARY","REVIEWER","REVIEWER","MEMBER"]):
@@ -97,7 +107,7 @@ def manage_council(session, user, data, identifier=None, signature=None):
         .where(m.LecturerProfile.id.in_(ids), m.UserAccount.status == "ACTIVE", m.UserAccount.base_role == "LECTURER"))}
     if ids != found.keys():
         raise HTTPException(422, "Có tài khoản giảng viên không hoạt động")
-    if not demo_department(department.code) and any(demo_department(code) for _, _, code in found.values()):
+    if round_.code != "SYN-DEMO" and any(demo_department(code) for _, _, code in found.values()):
         raise HTTPException(422, "Tài khoản thuộc bộ môn giả lập chỉ tham gia hội đồng demo")
     session.execute(select(func.pg_advisory_xact_lock(66102)))
     existing=session.get(m.DefenseCouncil,identifier) if identifier else None
@@ -121,7 +131,7 @@ def manage_council(session, user, data, identifier=None, signature=None):
         check_supervision_conflict(session, thesis, ids)
     reference_faculty_id = council_faculty_id(session, department)
     guests = {member_id for member_id, (_, faculty_id, code) in found.items()
-        if faculty_id != reference_faculty_id and not (demo_department(department.code) and demo_department(code))}
+        if faculty_id != reference_faculty_id and not (round_.code == "SYN-DEMO" and demo_department(code))}
     if guests and not data.confirmed_guests:
         raise HTTPException(422, "Cần xác nhận quyết định có ghi các thành viên được mời ngoài Khoa")
     member_records = []
@@ -137,6 +147,7 @@ def manage_council(session, user, data, identifier=None, signature=None):
     council = existing or m.DefenseCouncil(round_id=data.round_id, department_id=data.department_id, name=data.name,
         reference=data.reference, created_by=user.id, members=member_records)
     if existing:
+        removed = {row["id"] for row in existing.members} - {row["id"] for row in member_records}
         audit(session,user,"DEFENSE_COUNCIL_BEFORE_REVISION","defense_council",existing.id,json.dumps(council_out(existing),default=str,ensure_ascii=False))
         council.name,council.reference=data.name,data.reference
         council.members=member_records
@@ -147,7 +158,8 @@ def manage_council(session, user, data, identifier=None, signature=None):
                 if ids.intersection(UUID(p["id"]) for p in other_council.members):
                     raise HTTPException(409,"Thành viên mới bị trùng lịch ở hội đồng khác")
             slot.row_version+=1
-            notify(session,user,slot,council,"DEFENSE_COUNCIL_REVISED","Đã cập nhật thành phần hội đồng")
+            notify(session,user,slot,council,"DEFENSE_COUNCIL_REVISED","Đã cập nhật hội đồng bảo vệ")
+            notify_removed(session, user, lecturer_accounts(session, removed), "Bạn đã được rút khỏi hội đồng của lịch này")
     session.add(council)
     session.flush()
     detail = f"Đã đối chiếu {len(data.thesis_ids)} đề tài. Xác nhận quan hệ thân nhân: {'Có' if data.confirmed_no_conflict else 'Chưa ghi nhận'}."
@@ -163,7 +175,7 @@ def meeting_started(slot):
 
 def load_slot(session, user, identifier, *, write=False):
     query = select(m.DefenseSlot).where(m.DefenseSlot.id == identifier)
-    slot = session.scalar(query.with_for_update() if write else query)
+    slot = session.scalar(query.with_for_update().execution_options(populate_existing=True) if write else query)
     if not slot:
         raise HTTPException(404, "Không tìm thấy lịch bảo vệ")
     council = session.get(m.DefenseCouncil, slot.council_id)
@@ -210,22 +222,34 @@ def validate_extension_window(extension, request, starts_at, ends_at):
 def schedule(session, user, data, identifier=None, expected=None):
     session.execute(select(func.pg_advisory_xact_lock(66102)))
     slot = None
+    old_council = None
+    thesis_ids = {data.thesis_id}
     if identifier:
-        slot, _, _, _, old_manager = load_slot(session, user, identifier, write=True)
+        original, _, _, _, old_manager = load_slot(session, user, identifier)
+        if not old_manager:
+            raise HTTPException(403, "Bạn không quản lý lịch này")
+        thesis_ids.add(original.thesis_id)
+    locked_theses = {t.id: t for t in session.scalars(select(m.Thesis)
+        .where(m.Thesis.id.in_(thesis_ids)).order_by(m.Thesis.id).with_for_update())}
+    if identifier:
+        slot, old_council, _, _, old_manager = load_slot(session, user, identifier, write=True)
         if not old_manager:
             raise HTTPException(403, "Bạn không quản lý lịch này")
         row_version(expected, slot.row_version)
-        if slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes or slot.thesis_id != data.thesis_id:
-            raise HTTPException(409, "Chỉ đổi lịch của cùng đề tài trước khi nhập nội dung buổi bảo vệ")
+        if not schedule_editable(slot, old_council):
+            raise HTTPException(409, "Chỉ đổi lịch trước khi ghi nhận buổi bảo vệ và khi hội đồng còn mở")
+        if slot.prior_slot_id and slot.thesis_id != data.thesis_id:
+            raise HTTPException(422, "Phiên bảo vệ bổ sung phải giữ nguyên đề tài và sinh viên đã được Khoa cho phép")
     council = session.get(m.DefenseCouncil, data.council_id)
-    thesis = session.scalar(select(m.Thesis).where(m.Thesis.id == data.thesis_id).with_for_update())
+    thesis = locked_theses.get(data.thesis_id)
     if not council or not thesis or not manages(session,user,lecturer_for(session,user),council.round_id,council.department_id):
         raise HTTPException(404, "Không tìm thấy hội đồng hoặc đề tài trong phạm vi quản lý")
     if council.closed_at:
         raise HTTPException(409, "Hội đồng đã khóa bảng điểm")
     if data.ends_at <= data.starts_at:
         raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
-    if not slot and not data.prior_slot_id and session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
+    if not (slot.prior_slot_id if slot else data.prior_slot_id) and session.scalar(select(m.DefenseSlot.id).where(
+            m.DefenseSlot.thesis_id == thesis.id, m.DefenseSlot.id != slot.id if slot else True).limit(1)):
         raise HTTPException(409, "Đề tài đã có lịch bảo vệ")
     prior_id=slot.prior_slot_id if slot else data.prior_slot_id
     chosen={str(row) for row in data.thesis_member_ids}
@@ -267,32 +291,74 @@ def schedule(session, user, data, identifier=None, expected=None):
         student = session.get(m.StudentProfile, member.student_id)
         roster.append({"id":str(member.id),"student_id":str(student.id),"name":student.display_name,
             "code":student.student_code,"class_name":student.class_name or "", "major":student.major_code or ""})
+    old_recipients = set()
+    if slot:
+        old_recipients = schedule_recipients(session, slot, old_council)
+        old_title = locked_theses[slot.thesis_id].current_title
+        audit(session, user, "DEFENSE_SCHEDULE_BEFORE_REVISION", "defense_slot", slot.id,
+            json.dumps({"thesis_id": slot.thesis_id, "council_id": slot.council_id, "room": slot.room,
+                "starts_at": slot.starts_at, "ends_at": slot.ends_at}, default=str, ensure_ascii=False))
+        if slot.thesis_id != thesis.id:
+            slot.attendance = {}
     if not slot:
         slot = m.DefenseSlot(thesis_id=thesis.id, prior_slot_id=prior_id, marks={}, attendance={}, minutes={})
         session.add(slot)
     else:
         slot.row_version += 1
-    slot.council_id, slot.report_version_id = council.id, report.id
+    slot.thesis_id, slot.council_id, slot.report_version_id = thesis.id, council.id, report.id
     slot.starts_at, slot.ends_at, slot.room, slot.roster = data.starts_at, data.ends_at, data.room, roster
     session.flush()
     from backend.services.publications import sync_slot
     sync_slot(session, slot)
-    audit(session,user,"DEFENSE_SCHEDULED","defense_slot",slot.id,data.room)
-    notify(session,user,slot,council,"DEFENSE_SCHEDULED","Đã cập nhật lịch bảo vệ")
+    event = "DEFENSE_RESCHEDULED" if identifier else "DEFENSE_SCHEDULED"
+    audit(session,user,event,"defense_slot",slot.id,data.room)
+    notify(session,user,slot,council,event,"Lịch bảo vệ đã thay đổi" if identifier else "Đã xếp lịch bảo vệ")
+    if identifier:
+        notify_removed(session, user, old_recipients - schedule_recipients(session, slot, council),
+            f"Bạn không còn được xếp trong lịch bảo vệ đã thay đổi · {old_title}")
     session.commit()
     return {"id":slot.id}
 
 
-def notify(session, user, slot, council, event, message):
-    thesis = session.get(m.Thesis, slot.thesis_id)
+def lecturer_accounts(session, ids):
+    return set(session.scalars(select(m.LecturerProfile.user_id).where(
+        m.LecturerProfile.id.in_([UUID(value) for value in ids]))))
+
+
+def schedule_recipients(session, slot, council):
     recipients = set(session.scalars(select(m.StudentProfile.user_id).where(
         m.StudentProfile.id.in_([UUID(row["student_id"]) for row in slot.roster]))))
-    recipients.update(session.scalars(select(m.LecturerProfile.user_id).where(
-        m.LecturerProfile.id.in_([UUID(row["id"]) for row in council.members]))))
+    recipients |= lecturer_accounts(session, {row["id"] for row in council.members})
+    recipients |= lecturer_accounts(session, {str(identifier) for identifier in supervising_ids(session, slot.thesis_id)})
+    return recipients | notices.department_heads(session, council.department_id)
+
+
+def notify(session, user, slot, council, event, message):
+    thesis = session.get(m.Thesis, slot.thesis_id)
+    starts = slot.starts_at.astimezone(VN)
+    ends = slot.ends_at.astimezone(VN)
+    council_accounts = lecturer_accounts(session, {row["id"] for row in council.members})
+    student_accounts = set(session.scalars(select(m.StudentProfile.user_id).where(
+        m.StudentProfile.id.in_([UUID(row["student_id"]) for row in slot.roster]))))
+    participants = council_accounts | student_accounts
+    schedule_event = event in {"DEFENSE_SCHEDULED", "DEFENSE_RESCHEDULED", "DEFENSE_CANCELLED", "DEFENSE_COUNCIL_REVISED"}
+    recipients = schedule_recipients(session, slot, council) if schedule_event else participants
     for recipient in recipients:
+        url = "/defense" if event == "DEFENSE_CANCELLED" else (
+            f"/defense?slot={slot.id}" if recipient in participants else f"/theses/{thesis.id}")
         notices.emit(session,user.id,{recipient},event,"account",recipient,
-            f"{message} · {thesis.current_title} · {slot.starts_at.astimezone(VN):%d/%m/%Y %H:%M} · {slot.room}",
-            f"/defense?slot={slot.id}")
+            f"{message} · {thesis.current_title} · {council.name} · {starts:%d/%m/%Y %H:%M} → {ends:%d/%m/%Y %H:%M} · {slot.room}",
+            url)
+
+
+def notify_removed(session, user, recipients, message):
+    for recipient in recipients:
+        notices.emit(session, user.id, {recipient}, "DEFENSE_ASSIGNMENT_REMOVED", "account", recipient,
+            message, "/defense")
+
+
+def schedule_editable(slot, council):
+    return not (council.closed_at or slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes)
 
 
 def cancel_schedule(session,user,identifier,expected,reason):
@@ -300,8 +366,8 @@ def cancel_schedule(session,user,identifier,expected,reason):
     row_version(expected,slot.row_version)
     if not manager:
         raise HTTPException(403,"Bạn không quản lý lịch này")
-    if slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes:
-        raise HTTPException(409,"Lịch đã có dữ liệu bảo vệ")
+    if not schedule_editable(slot, council):
+        raise HTTPException(409,"Lịch đã có dữ liệu bảo vệ hoặc hội đồng đã khóa")
     audit(session,user,"DEFENSE_CANCELLED","defense_slot",slot.id,reason)
     notify(session,user,slot,council,"DEFENSE_CANCELLED","Đã hủy lịch bảo vệ")
     session.delete(slot)
@@ -572,16 +638,29 @@ def workspace(session,user):
             "council_attendance":slot.attendance.get("_council",{}) if not own else {},
             "blockers":(blockers(slot,council)+(["Chủ tịch cần đối chiếu lại minh chứng điểm thưởng"] if invalid_bonus(session,slot) else [])) if privileged and not slot.finalized_at else [],
             "role":member["role"] if member else None,"lecturer_id":member["id"] if member else None,
-            "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes)})
+            "can_manage":slot.council_id in managed,"schedule_editable":schedule_editable(slot,council)})
     scopes = []
+    catalog = []
     eligible = []
     planning_theses = []
     if lecturer:
         departments = session.scalars(select(m.Department).where(m.Department.active.is_(True)).order_by(m.Department.code)).all()
         rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.state != "ARCHIVED")).all()
-        scopes = [{"round_id":r.id,"round_code":r.code,"department_id":d.id,"department_name":d.name,
-            "department_code":d.code,"faculty_id":council_faculty_id(session,d)}
-            for r in rounds for d in departments if valid_council_scope(r,d) and manages(session,user,lecturer,r.id,d.id)]
+        home = session.get(m.Department, lecturer.department_id) if lecturer.department_id else None
+        for round_ in rounds:
+            for department in departments:
+                if not valid_council_scope(round_, department):
+                    continue
+                can_manage = manages(session, user, lecturer, round_.id, department.id)
+                same_faculty = home and council_faculty_id(session, home) == council_faculty_id(session, department)
+                if not (can_manage or same_faculty):
+                    continue
+                row = {"round_id": round_.id, "round_code": round_.code, "department_id": department.id,
+                    "department_name": department.name, "department_code": department.code,
+                    "faculty_id": council_faculty_id(session, department), "can_manage": can_manage}
+                catalog.append(row)
+                if can_manage:
+                    scopes.append(row)
         allowed = {(row["round_id"],row["department_id"]) for row in scopes}
         for t in session.scalars(select(m.Thesis).where(m.Thesis.state.in_([
             "ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "READY_FOR_DEFENSE", "EXTENDED", "DEFENDED"])).order_by(m.Thesis.current_title)):
@@ -615,7 +694,7 @@ def workspace(session,user):
             eligible.append({**row,
                 "extension_starts_at":request.extension_starts_at if request else None,
                 "extension_until_at":extension.until_at if extension else None})
-    can_plan_demo = any(demo_department(scope["department_code"]) for scope in scopes)
+    can_plan_demo = any(scope["round_code"] == "SYN-DEMO" for scope in scopes)
     candidates = [{"id":l.id,"name":l.display_name,"code":l.lecturer_code,"faculty_id":d.faculty_id if d else None,
         "department_code":d.code if d else None,
         "specializations":l.profile_data.get("specializations",[]) if l.profile_verified_at else []}
@@ -624,7 +703,7 @@ def workspace(session,user):
         .outerjoin(m.Department,m.Department.id==m.LecturerProfile.department_id)
         .where(m.UserAccount.status=="ACTIVE",m.UserAccount.base_role=="LECTURER")
         .order_by(m.LecturerProfile.display_name)) if can_plan_demo or not demo_department(d.code if d else None)] if scopes else []
-    return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,
+    return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,"scope_catalog":catalog,
         "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES}
 
 

@@ -48,3 +48,9 @@ Hệ thống lưu kết quả tổng hợp cùng bản chốt để tránh tính
 - Với SV vắng trong phiên đã chốt: TBM/điều phối được giao mở Kết quả & xuất, ghi quyết định của Khoa (không đạt do vắng hoặc cho bảo vệ bổ sung), số/căn cứ và lý do. Hệ thống lưu người và thời điểm riêng, không sửa hồ sơ buổi cũ hay tự cho 0. Nếu được phép bổ sung, mở **Xếp lịch bảo vệ bổ sung theo quyết định**, chọn hội đồng còn mở, chọn đúng SV, giờ và phòng. Phiên mới chỉ điểm danh/chấm/lập biên bản cho các SV này; bạn đã bảo vệ giữ nguyên điểm. Khi đã dùng quyết định xếp lịch, không sửa lại căn cứ cũ.
 
 Làm tròn theo Khoản 2 Điều 11 QĐ 2919: từng phiếu một chữ số, lấy trung bình các phiếu hợp lệ rồi làm tròn một chữ số. Xem [dẫn chứng và phạm vi kiểm chứng](../evidence/defense-delivery-validation-2026-11-10.md).
+
+## Điều chỉnh lịch trước buổi bảo vệ
+
+Mở **Hội đồng và bảo vệ → Lịch và kết quả bảo vệ**, chọn phiên cần sửa và mở **Đổi đề tài, giờ, phòng hoặc hủy lịch**. Có thể chọn đề tài khác đã chốt đủ điều kiện, đúng đợt và bộ môn của hội đồng được chọn, chưa có lịch, không xung đột GVHD. Phiên bổ sung giữ đề tài và SV theo quyết định của Khoa. Khi đã ghi nhận buổi bảo vệ hoặc khóa hội đồng, lịch không còn được sửa.
+
+Khi lưu thay đổi, SV, thành viên hội đồng, GVHD và TBM liên quan nhận giờ, phòng và tên hội đồng mới trong tài khoản. Người rời lịch nhận thông báo riêng. Danh mục hiện bốn bộ môn BM-CNTT, BM-KHMT, BM-KT, BM-CNSTP theo danh mục Khoa. Các lựa chọn ngoài phạm vi phân công được hiển thị nhưng khóa; bộ môn giả lập chỉ xuất hiện với đợt SYN-DEMO.
