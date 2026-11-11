@@ -412,6 +412,37 @@ def test_local_demo_login_uses_only_seeded_identity_and_real_session(scenario, m
     assert client.get("/api/v1/auth/demo-accounts", headers=origin).status_code == 404
 
 
+def test_local_demo_login_lists_only_active_verified_demo_accounts(scenario, monkeypatch):
+    from backend.services.passwords import unusable_password
+
+    _, users, students, lecturers, _, session = scenario
+    for index in (0, 1, 2, 3, 4):
+        users[index].email = f"synthetic-{index}@demo.test"
+        users[index].password_hash = unusable_password()
+        users[index].email_verified_at = datetime.now(timezone.utc)
+    users[1].status = "DISABLED"
+    users[4].email = "synthetic-real@example.org"
+    users[2].email = "demo-student@example.org"
+    students[2].student_code = "SYN-DEMO-101"
+    session.commit()
+    monkeypatch.setenv("KLTN_ENV", "development")
+    monkeypatch.setenv("KLTN_DEMO_MODE", "true")
+    monkeypatch.setenv("KLTN_DEV_AUTH", "false")
+    origin = {"Origin": "http://127.0.0.1:5173"}
+    with TestClient(app, client=("127.0.0.1", 53001)) as local:
+        accounts = local.get("/api/v1/auth/demo-accounts", headers=origin).json()
+        assert {item["key"] for item in accounts} == {str(users[0].id), str(users[2].id), str(users[3].id)}
+        assert students[0].student_code in next(item["label"] for item in accounts if item["key"] == str(users[0].id))
+        assert lecturers[0].lecturer_code in next(item["label"] for item in accounts if item["key"] == str(users[3].id))
+        assert local.post("/api/v1/auth/demo-login", json={"key": str(users[4].id)}, headers=origin).status_code == 404
+        assert local.post("/api/v1/auth/demo-login", json={"key": str(users[1].id)}, headers=origin).status_code == 404
+        assert local.post("/api/v1/auth/demo-login", json={"key": str(users[3].id)}, headers=origin).status_code == 204
+        assert local.get("/api/v1/me/context").json()["user_id"] == str(users[3].id)
+        users[3].status = "LOCKED"
+        session.commit()
+        assert local.post("/api/v1/auth/demo-login", json={"key": str(users[3].id)}, headers=origin).status_code == 404
+
+
 def test_registration_vertical_slice(scenario):
     client, users, students, lecturers, topic, session = scenario
     reg = client.post("/api/v1/topic-registrations", headers=hdr(users[0]), json={"topic_id":str(topic.id)}).json()

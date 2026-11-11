@@ -20172,14 +20172,8 @@
         "properties": {
           "key": {
             "type": "string",
-            "enum": [
-              "sv1",
-              "sv2",
-              "sv3",
-              "gv",
-              "tbm",
-              "gv2"
-            ],
+            "maxLength": 41,
+            "minLength": 1,
             "title": "Key"
           }
         },

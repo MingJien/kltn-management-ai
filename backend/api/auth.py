@@ -8,17 +8,16 @@ import time
 from collections import deque
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import get_session
-from backend.db.models.entities import AuditEvent, UserAccount
+from backend.db.models.entities import AuditEvent, LecturerProfile, StudentProfile, UserAccount
 from backend.services.account_mail import frontend_origin
 from backend.services.passwords import needs_rehash, verify_password
 
@@ -39,11 +38,19 @@ class LocalLogin(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-DemoKey = Literal["sv1", "sv2", "sv3", "gv", "tbm", "gv2"]
-
-
 class DemoLogin(BaseModel):
-    key: DemoKey
+    key: str = Field(min_length=1, max_length=41)
+
+    @field_validator("key")
+    @classmethod
+    def valid_key(cls, value: str) -> str:
+        if value in _DEMO_ACCOUNTS:
+            return value
+        try:
+            UUID(value)
+        except ValueError:
+            raise ValueError("Invalid demo account") from None
+        return value
 
 
 _DEMO_ACCOUNTS = {
@@ -68,14 +75,23 @@ def _require_local_demo(request: Request) -> None:
         raise HTTPException(403, "Request origin is not allowed")
 
 
-def _demo_user(session: Session, key: DemoKey) -> UserAccount | None:
-    subject, email, role, _ = _DEMO_ACCOUNTS[key]
-    return session.scalar(select(UserAccount).where(
-        UserAccount.external_subject == subject,
-        UserAccount.email == email,
-        UserAccount.base_role == role,
-        UserAccount.status == "ACTIVE",
-    ))
+def _demo_user(session: Session, key: str) -> UserAccount | None:
+    conditions = [UserAccount.status == "ACTIVE", UserAccount.email_verified_at.is_not(None), UserAccount.email.is_not(None)]
+    if key in _DEMO_ACCOUNTS:
+        subject, email, role, _ = _DEMO_ACCOUNTS[key]
+        conditions.extend([UserAccount.external_subject == subject, UserAccount.email == email, UserAccount.base_role == role])
+    else:
+        try:
+            identifier = UUID(key)
+        except ValueError:
+            return None
+        conditions.extend([UserAccount.id == identifier,
+            or_(func.lower(UserAccount.email).like("%@demo.test"),
+                select(StudentProfile.id).where(StudentProfile.user_id == UserAccount.id, StudentProfile.student_code.like("SYN-DEMO-%")).exists(),
+                select(LecturerProfile.id).where(LecturerProfile.user_id == UserAccount.id, LecturerProfile.lecturer_code.like("SYN-DEMO-%")).exists()),
+            or_(and_(UserAccount.base_role == "STUDENT", select(StudentProfile.id).where(StudentProfile.user_id == UserAccount.id).exists()),
+                and_(UserAccount.base_role == "LECTURER", select(LecturerProfile.id).where(LecturerProfile.user_id == UserAccount.id).exists()))])
+    return session.scalar(select(UserAccount).where(*conditions))
 
 
 def allowed_frontend_origins() -> list[str]:
@@ -182,11 +198,28 @@ def auth_config() -> dict[str, str]:
 @router.get("/demo-accounts")
 def demo_accounts(request: Request, session: Session = Depends(get_session)) -> list[dict[str, str]]:
     _require_local_demo(request)
-    return [
+    accounts = [
         {"key": key, "email": email, "role": role, "label": label}
         for key, (_, email, role, label) in _DEMO_ACCOUNTS.items()
         if _demo_user(session, key) is not None
     ]
+    known_emails = {item["email"].lower() for item in accounts}
+    rows = session.execute(select(UserAccount, StudentProfile, LecturerProfile)
+        .outerjoin(StudentProfile, StudentProfile.user_id == UserAccount.id)
+        .outerjoin(LecturerProfile, LecturerProfile.user_id == UserAccount.id)
+        .where(UserAccount.status == "ACTIVE", UserAccount.email_verified_at.is_not(None), UserAccount.email.is_not(None),
+            UserAccount.base_role.in_(["STUDENT", "LECTURER"]),
+            or_(func.lower(UserAccount.email).like("%@demo.test"), StudentProfile.student_code.like("SYN-DEMO-%"),
+                LecturerProfile.lecturer_code.like("SYN-DEMO-%")))
+        .order_by(UserAccount.base_role, UserAccount.email)).all()
+    for user, student, lecturer in rows:
+        profile = student if user.base_role == "STUDENT" else lecturer
+        if not profile or user.email.lower() in known_emails:
+            continue
+        code = student.student_code if student else lecturer.lecturer_code
+        accounts.append({"key": str(user.id), "email": user.email, "role": user.base_role,
+            "label": f"{'SV' if student else 'GV'} · {profile.display_name} · {code}"})
+    return accounts
 
 
 @router.post("/demo-login", status_code=204)
