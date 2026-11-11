@@ -998,7 +998,7 @@ class ThesisExtensionRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin
     thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
     requested_by: Mapped[uuid.UUID] = fk("user_account.id")
     original_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    requested_until_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    requested_until_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     reason: Mapped[str] = mapped_column(Text)
     snapshot: Mapped[dict] = mapped_column(JSONB)
     state: Mapped[str] = mapped_column(String(25), default="SUBMITTED")
