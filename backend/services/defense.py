@@ -45,6 +45,14 @@ def demo_department(code):
     return code == "SYN-DEMO-DEP"
 
 
+def council_faculty_id(session, department):
+    if demo_department(department.code):
+        faculty_id = session.scalar(select(m.Faculty.id).where(m.Faculty.code == "KHOA-CNKT"))
+        if faculty_id:
+            return faculty_id
+    return department.faculty_id
+
+
 def valid_council_scope(round_, department):
     return (round_.code == "SYN-DEMO") == demo_department(department.code)
 
@@ -111,7 +119,9 @@ def manage_council(session, user, data, identifier=None, signature=None):
         if not thesis or (thesis.round_id, thesis.department_id) != (data.round_id, data.department_id) or thesis.state == "WITHDRAWN":
             raise HTTPException(422, "Đề tài đối chiếu phải còn hiệu lực trong đúng đợt và bộ môn")
         check_supervision_conflict(session, thesis, ids)
-    guests = {member_id for member_id, (_, faculty_id, _) in found.items() if faculty_id != department.faculty_id}
+    reference_faculty_id = council_faculty_id(session, department)
+    guests = {member_id for member_id, (_, faculty_id, code) in found.items()
+        if faculty_id != reference_faculty_id and not (demo_department(department.code) and demo_department(code))}
     if guests and not data.confirmed_guests:
         raise HTTPException(422, "Cần xác nhận quyết định có ghi các thành viên được mời ngoài Khoa")
     member_records = []
@@ -553,7 +563,7 @@ def workspace(session,user):
         departments = session.scalars(select(m.Department).where(m.Department.active.is_(True)).order_by(m.Department.code)).all()
         rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.state != "ARCHIVED")).all()
         scopes = [{"round_id":r.id,"round_code":r.code,"department_id":d.id,"department_name":d.name,
-            "department_code":d.code,"faculty_id":d.faculty_id}
+            "department_code":d.code,"faculty_id":council_faculty_id(session,d)}
             for r in rounds for d in departments if valid_council_scope(r,d) and manages(session,user,lecturer,r.id,d.id)]
         allowed = {(row["round_id"],row["department_id"]) for row in scopes}
         for t in session.scalars(select(m.Thesis).where(m.Thesis.state.in_([

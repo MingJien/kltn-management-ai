@@ -28,7 +28,7 @@ def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
     round_ = session.get(m.ThesisRound, UUID(thesis["round_id"]))
     department = session.get(m.Department, lecturers[1].department_id)
     round_.code, department.code = "SYN-DEMO", "SYN-DEMO-DEP"
-    faculty = m.Faculty(id=uuid4(), code="FAC-" + uuid4().hex[:8], name="Synthetic visiting faculty")
+    faculty = m.Faculty(id=uuid4(), code="KHOA-CNKT", name="Synthetic faculty of technology")
     unit = m.Department(id=uuid4(), faculty_id=faculty.id, code="BM-CNTT", name="Công nghệ thông tin")
     session.add(faculty)
     session.flush()
@@ -66,9 +66,10 @@ def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
         "reference": "QD-SYNTHETIC", "thesis_ids": [thesis["thesis_id"]], "confirmed_no_conflict": True,
         "members": [{"lecturer_id": str(person.id), "role": role} for person, role in zip(
             members, ["CHAIR", "SECRETARY", "REVIEWER", "REVIEWER", "MEMBER"])]}
-    assert client.post(base + "/councils", headers=hdr(users[4]), json=payload).status_code == 422
-    created = client.post(base + "/councils", headers=hdr(users[4]), json={**payload, "confirmed_guests": True})
+    created = client.post(base + "/councils", headers=hdr(users[4]), json=payload)
     assert created.status_code == 201, created.text
+    saved = session.get(m.DefenseCouncil, UUID(created.json()["id"]))
+    assert all("invitation_reference" not in member for member in saved.members)
 
 
 def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):

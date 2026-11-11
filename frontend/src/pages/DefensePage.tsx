@@ -66,7 +66,8 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
   const matchingPlans = plans.filter(t => !checkedTheses.includes(t.id) && searchText(t.title).includes(query));
   const blockedAdvisors = new Set(selectedPlans.flatMap(t => t.advisor_ids ?? []));
   const hasAdvisorConflict = chosen.some(id => blockedAdvisors.has(id));
-  const isGuest = (candidate: Workspace["candidates"][number]) => !!scope?.faculty_id && candidate.faculty_id !== scope.faculty_id;
+  const isGuest = (candidate: Workspace["candidates"][number]) => !!scope?.faculty_id && candidate.faculty_id !== scope.faculty_id &&
+    !(scope.department_code === "SYN-DEMO-DEP" && candidate.department_code === "SYN-DEMO-DEP");
   const hasGuest = data.candidates.some(c => chosen.includes(c.id) && isGuest(c));
   const memberSelection = chosen.filter(Boolean).sort().join(",");
   const conflictSelection = [scope?.round_id, scope?.department_id, memberSelection, ...[...checkedTheses].sort()].join("|");
@@ -116,7 +117,7 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
           const usedIndex = chosen.findIndex((id, index) => id === c.id && index !== i);
           const unavailable = blockedAdvisors.has(c.id) ? "GVHD của đề tài đã chọn" : usedIndex >= 0 ? "Đã chọn ở vai trò khác" : "";
           return <option key={c.id} value={c.id} disabled={!!unavailable}>
-            {[c.name, c.code, c.department_code === "SYN-DEMO-DEP" ? "Giảng viên demo" : c.department_code, isGuest(c) ? "Ngoài Khoa" : "", c.specializations?.slice(0, 2).join(", "),
+            {[c.name, c.code, c.department_code === "SYN-DEMO-DEP" ? "Giảng viên demo" : c.department_code, isGuest(c) ? "Ngoài Khoa" : c.department_code !== scope?.department_code ? "Khác bộ môn" : "", c.specializations?.slice(0, 2).join(", "),
               unavailable].filter(Boolean).join(" · ")}
           </option>;
         })}
