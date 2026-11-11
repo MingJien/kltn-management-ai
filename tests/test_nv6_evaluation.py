@@ -86,6 +86,31 @@ def check(ctx, member=0, discipline="CLEAR", data_override=None):
         "source_reference":"SYNTHETIC-STUDENT-AFFAIRS-01","reason":"Verified against synthetic official source",**(data_override or {})})
 
 
+def test_discipline_can_be_recorded_while_changed_membership_needs_review(evaluation, monkeypatch):
+    from backend.services import membership_revision
+
+    ctx, _ = evaluation
+    client, users, _, _, _, path = ctx
+    monkeypatch.setattr(membership_revision, "changed_at", lambda session, thesis_id: now())
+    before = get(ctx)
+    assert before["workflow_blockers"]
+    assert create(ctx).status_code == 409
+
+    recorded = check(ctx)
+    assert recorded.status_code == 200, recorded.text
+    result = recorded.json()
+    eligibility = result["members"][0]["eligibility"]
+    assert eligibility["discipline_status"] == "CLEAR"
+    assert next(item for item in eligibility["conditions"] if item["key"] == "discipline")["met"]
+    assert eligibility["state"] != "ELIGIBLE"
+    assert result["state"] != "READY_FOR_DEFENSE"
+    assert client.post(path + "/evaluation/eligibility", headers=version_headers(users[3], result), json={
+        "thesis_member_id": result["members"][0]["id"], "report_version_id": result["report"]["id"],
+        "advisor_review_id": None, "discipline_status": "CLEAR", "source_reference": "SYNTHETIC",
+        "reason": "No department authority",
+    }).status_code == 403
+
+
 def test_assignment_authority_conflict_concurrency_and_revoked_access(evaluation):
     ctx,_=evaluation;client,users,_,lecturers,session,path=ctx
     initial=get(ctx)

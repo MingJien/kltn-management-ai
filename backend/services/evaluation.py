@@ -430,8 +430,8 @@ def check_eligibility(session, user, thesis_id, data, expected):
         raise HTTPException(409, "Cần xử lý yêu cầu xin thôi đang chờ trước khi xét bảo vệ")
     member = member_for(session, thesis, data.thesis_member_id)
     current = report(session, thesis)
-    membership_revision.ensure_ready(session, thesis, current)
-    review = review_current(session, thesis, member, current)
+    blocked = membership_revision.blockers(session, thesis, current)
+    review = review_current(session, thesis, member, current) if not blocked else None
     if data.report_version_id != (current.id if current else None) or data.advisor_review_id != (review.id if review else None):
         raise HTTPException(409, "Báo cáo hoặc Mẫu 7 đã đổi; tải lại trước khi xét điều kiện")
     conditions = requirements(session, current, review, data.discipline_status)
@@ -440,7 +440,7 @@ def check_eligibility(session, user, thesis_id, data, expected):
         report_version_id=current.id if current else None, advisor_review_id=review.id if review else None,
         version_no=previous.version_no+1 if previous else 1, discipline_status=data.discipline_status,
         source_reference=data.source_reference, reason=data.reason, checked_by=user.id, checked_at=now(),
-        state="ELIGIBLE" if all(c["met"] for c in conditions) else "BLOCKED")
+        state="ELIGIBLE" if not blocked and all(c["met"] for c in conditions) else "BLOCKED")
     session.add(item)
     session.flush()
     ready = all(eligibility_out(session, thesis, mem, current)["state"] == "ELIGIBLE" for mem in members(session, thesis))
