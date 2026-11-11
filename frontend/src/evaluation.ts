@@ -1,4 +1,4 @@
-import {fetchReviewFile, request} from "./api";
+import {downloadFile, request} from "./api";
 
 export type Kind = "ADVISOR" | "REVIEWER";
 export type Review = {id:string;thesis_member_id:string;lecturer_id:string;lecturer_name:string;report_version_id:string;kind:Kind;version_no:number;row_version:number;sections:Record<string,string>;state:string;thesis_completed:boolean|null;allow_defense:boolean|null;source_reference:string|null;revision_reason:string;signed_file:{name:string;scan_state:string}|null;submitted_at:string|null;can_edit:boolean;paper_receipt:{reference:string;export_code:string;confirmed_at:string;confirmed_by:string}|null;export_history:{code:string;at:string}[]};
@@ -11,8 +11,5 @@ export function mutate<T>(path:string,userId:string,data:unknown,version?:number
   return request<T>(path,userId,{method,body:JSON.stringify(data),headers:version ? {"If-Match":String(version)} : undefined});
 }
 export async function downloadEvaluationFile(path:string,name:string) {
-  const bytes=await fetchReviewFile(path);
-  const url=URL.createObjectURL(new Blob([bytes]));
-  const anchor=document.createElement("a");anchor.href=url;anchor.download=name;anchor.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  await downloadFile(path,name);
 }

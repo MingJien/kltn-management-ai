@@ -134,6 +134,9 @@ def workspace_out(session, user, thesis):
         return ThesisMemberOut(student_id=student.id, display_name=student.display_name,
             student_code=student.student_code, is_coordinator=member.is_coordinator)
     actions = rights(session, user, thesis)
+    from backend.services.documents import supporting_open
+    if "document:submit" in actions and supporting_open(session, thesis):
+        actions.add("document:supporting_submit")
     if thesis.state not in EDITABLE:
         actions.difference_update({"progress:submit", "document:submit", "work:submit", "progress:review", "document:review",
             "work:review", "progress:assign_reviewer", "progress:comment", "proposal:submit", "proposal:review", "proposal:comment", "proposal:assign_reviewer", "proposal:finalize", "proposal:dean_confirm"})

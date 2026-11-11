@@ -186,6 +186,8 @@ def export_mau_04(session, user, round_id):
     audit(session, user, "ROUND_MAU04_EXPORTED", "thesis_round", round_id,
           f"Xuất danh sách Mẫu 4: {len(records)} sinh viên; {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).isoformat()}")
     session.commit()
+    from backend.services.download_names import filename
+    name=filename("Mau-04-Danh-sach-SV-GVHD",round_.code,extension=".xlsx")
     return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="danh-sach-sv-gvhd-mau-04.xlsx"',
+        headers={"Content-Disposition": f'attachment; filename="{name}"',
                  "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})

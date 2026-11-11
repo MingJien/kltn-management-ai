@@ -405,7 +405,13 @@ def signed_download(session, user, thesis_id, review_id):
     stored = session.get(m.StoredFile, item.signed_file_id) if item.signed_file_id else None
     # Reuse checksum and path validation after checking the exact review ACL.
     from types import SimpleNamespace
-    return documents.stored_download(session, SimpleNamespace(stored_file_id=stored.id, content_sha256=stored.sha256) if stored else None)
+    response = documents.stored_download(session, SimpleNamespace(stored_file_id=stored.id, content_sha256=stored.sha256) if stored else None)
+    from backend.services.download_names import filename
+    from urllib.parse import quote
+    student = session.get(m.StudentProfile,session.get(m.ThesisMember,item.thesis_member_id).student_id)
+    name = filename("Mau-07-GVHD-Da-ky" if item.kind=="ADVISOR" else "Mau-08-Phan-bien-Da-ky", student.student_code,item.version_no,Path(stored.original_name).suffix)
+    response.headers["Content-Disposition"] = "attachment; filename*=UTF-8''" + quote(name)
+    return response
 
 
 def report_download(session, user, thesis_id, version_id):

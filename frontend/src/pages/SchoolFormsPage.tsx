@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {Link,useSearchParams} from "react-router-dom";
 import {Archive,BookOpen,ChevronDown,Download,Eye,FilePlus2,History,RefreshCw,RotateCcw,Upload} from "lucide-react";
-import {fetchReviewFile,request,type Context,type SchoolForm,type SchoolFormRound,type SchoolFormVersion} from "../api";
+import {downloadFile,request,type Context,type SchoolForm,type SchoolFormRound,type SchoolFormVersion} from "../api";
 import PageHeader from "../components/layout/PageHeader";
 import {formatDate} from "../components/domain/CoreForms";
 import {ReadOnlyFilePreview} from "../components/domain/ReviewAttachmentPreview";
@@ -54,8 +54,7 @@ function FormCard({item,userId,manage,run,busy,onPreview,action}:{action:Catalog
   useEffect(()=>{setTitle(item.title);setAudience(item.audience);},[item.title,item.audience,item.state]);
   const endpoint=`/school-forms/${item.id}`;
   const download=(version:SchoolFormVersion)=>run(async()=>{
-    const buffer=await fetchReviewFile(`${endpoint}/versions/${version.id}/download`),url=URL.createObjectURL(new Blob([buffer]));
-    const link=document.createElement("a");link.href=url;link.download=version.file_name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+    await downloadFile(`${endpoint}/versions/${version.id}/download`,version.file_name);
   },"Đã tải đúng phiên bản tệp gốc.");
   const render=(version:SchoolFormVersion)=><div key={version.id} className="core-version stack">
     <div className="flex justify-between gap-2"><strong>v{version.version_no} · {version.file_name}</strong><span className="badge badge-primary">{{DRAFT:"Bản nháp",PUBLISHED:"Đang áp dụng",SUPERSEDED:"Bản cũ",WITHDRAWN:"Đã thu hồi"}[version.state] || version.state}</span></div>
@@ -151,8 +150,7 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   const displayed=items.filter(item=>(!showCategory || category==="ALL" || item.document_kind===category) && `${item.code} ${item.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));
   const selected=rounds.find(row=>row.id===roundId),manage=!!selected?.can_manage;
   const downloadPublished=(item:SchoolForm,version:SchoolFormVersion)=>run(async()=>{
-    const buffer=await fetchReviewFile(`/school-forms/${item.id}/versions/${version.id}/download`);
-    const url=URL.createObjectURL(new Blob([buffer]));const link=document.createElement("a");link.href=url;link.download=version.file_name;link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+    await downloadFile(`/school-forms/${item.id}/versions/${version.id}/download`,version.file_name);
   },"Đã tải bản đang áp dụng.");
   useEffect(()=>{setSelectedId(null);setCategory("ALL");},[roundId,context.user_id]);
   useEffect(()=>{

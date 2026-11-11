@@ -182,7 +182,7 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     await expect(dialog.getByRole("button",{name:"Lưu nháp",exact:true})).toBeDisabled();
     const exported=advisor.waitForEvent("download");
     await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
-    const download=await exported;expect(download.suggestedFilename()).toMatch(/^Mau-7-GVHD-/);
+    const download=await exported;expect(download.suggestedFilename()).toMatch(/^Mau-07-GVHD-.+-v\d+\.docx$/);
     await download.saveAs(path.join(output,"nv6-paper-review.docx"));
     await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
     await dialog.getByRole("checkbox",{name:/Tôi xác nhận nội dung nhận xét này/}).check();

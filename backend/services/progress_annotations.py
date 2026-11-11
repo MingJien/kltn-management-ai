@@ -274,7 +274,9 @@ def download_attachment(session, user, thesis_id, version_id, annotation_id, *, 
     from types import SimpleNamespace
     from backend.services.documents import stored_download
     note, file = attachment_note(session, user, thesis_id, version_id, annotation_id, kind=kind, document_id=document_id)
-    return stored_download(session, SimpleNamespace(stored_file_id=file.id, content_sha256=file.sha256))
+    from backend.services.download_names import thesis_identity
+    return stored_download(session, SimpleNamespace(stored_file_id=file.id, content_sha256=file.sha256,
+        download_label="Gop-y-dinh-kem",download_identity=thesis_identity(session,thesis_id)))
 
 
 def rescan_attachment(session, user, thesis_id, version_id, annotation_id, expected, *, kind, document_id=None):

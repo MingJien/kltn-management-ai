@@ -1,5 +1,10 @@
 function responseFileName(response:Response,fallback:string) {
-  return decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1]||fallback);
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const encoded = disposition.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1];
+  const plain = disposition.match(/filename="([^"]+)"|filename=([^;]+)/i);
+  let name = plain?.[1] || plain?.[2]?.trim() || fallback;
+  if (encoded) {try {name = decodeURIComponent(encoded);} catch {name = fallback;}}
+  return name.replace(/[\\/:*?"<>|\x00-\x1f]/g, "-").slice(0, 180);
 }
 import { ApiError, apiMessage } from "./errors";
 
@@ -127,7 +132,7 @@ export async function downloadRegistrationForm(registrationId:string,version:Reg
     method:printCopy?"POST":"GET",credentials:"include",headers:{...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})}});
   if(!response.ok) {const body=await response.json().catch(()=>null);throw new Error(body?.detail||`HTTP ${response.status}`);}
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");link.href=url;
-  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
+  link.download=responseFileName(response, "Ban-goc-v"+version.version_no+"-"+version.file_name);
   link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
@@ -265,6 +270,20 @@ export async function fetchReviewFile(path: string, signal?: AbortSignal): Promi
   return response.arrayBuffer();
 }
 
+export async function downloadFile(path: string, fallback: string): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include"});
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = responseFileName(response, fallback);
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function uploadProgressEvidence(thesisId: string, report: ProgressReport, userId: string, file: File) {
   return request<ProgressReport>(`/theses/${thesisId}/progress-reports/${report.id}/evidence`, userId, {
     method: "POST", body: file,
@@ -287,7 +306,7 @@ export async function downloadProgressEvidence(thesisId: string, report: Progres
     throw new Error(body?.detail || `HTTP ${response.status}`);
   }
   const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement("a"); link.href=url; link.download=report.evidence_file_name || "minh-chung"; link.click();
+  const link = document.createElement("a"); link.href=url; link.download=responseFileName(response, report.evidence_file_name || "minh-chung"); link.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 export type DocumentVersion = {id: string; version_no: number; row_version: number; state: string; file_name: string; byte_size: number; sha256: string; scan_state: string; submitted_at: string; due_at_at_submission: string | null; late: boolean; submitted_by_name: string; reviews: Review[]};
@@ -326,7 +345,7 @@ export async function downloadProposal(thesisId: string, version: Proposal["vers
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
+  link.download=responseFileName(response, "Ban-goc-v"+version.version_no+"-"+version.file_name);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -359,7 +378,7 @@ export async function downloadOfficialTemplate(templateId: string, filename: str
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\'\'([^;]+)/i)?.[1] || filename);
+  link.download = responseFileName(response, filename);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -370,7 +389,7 @@ export async function exportThesisReview(thesisId:string, reviewId:string, versi
   });
   if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
   const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
-  anchor.href=url;anchor.download=decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\x27\x27([^;]+)/i)?.[1] || (response.headers.get("X-Document-Code")||"phieu-nhan-xet")+".docx");anchor.click();
+  anchor.href=url;anchor.download=responseFileName(response,"Phieu-nhan-xet.docx");anchor.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
@@ -383,7 +402,7 @@ async function downloadFormTemplate(kind: "plan" | "proposal", name: string, rou
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download = decodeURIComponent(response.headers.get("Content-Disposition")?.match(/filename\*=UTF-8\'\'([^;]+)/i)?.[1] || name);
+  link.download = responseFileName(response, name);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -403,7 +422,7 @@ export async function downloadDocument(thesisId: string, doc: ThesisDocument, ve
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
-  link.download=printCopy?responseFileName(response,"Ban-in-v"+version.version_no+"-"+version.file_name):version.file_name;
+  link.download=responseFileName(response, "Ban-goc-v"+version.version_no+"-"+version.file_name);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -427,7 +446,7 @@ export async function exportRoundMau04(roundId:string) {
   });
   if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");
-  link.href=url;link.download="danh-sach-sv-gvhd-mau-04.xlsx";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  link.href=url;link.download=responseFileName(response,"Mau-04-Danh-sach-SV-GVHD.xlsx");link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 export type SchoolFormVersion = {id:string;version_no:number;row_version:number;state:string;file_name:string;byte_size:number;scan_state:string;uploaded_at:string;uploaded_by_name:string;source_reference:string;change_reason:string;published_at:string|null};
 export type SchoolForm = {id:string;round_id:string;code:string;title:string;document_kind:"FORM"|"PUBLICATION";audience:"STUDENT_AND_LECTURER"|"LECTURER";state:string;row_version:number;versions:SchoolFormVersion[]};

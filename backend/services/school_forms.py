@@ -290,6 +290,11 @@ def downloadable(session,user,form_id,version_id):
         raise HTTPException(404,"Phiên bản chưa phát hành hoặc đã thu hồi")
     file=session.get(m.StoredFile,version.stored_file_id)
     response=documents.stored_download(session,SimpleNamespace(stored_file_id=file.id,content_sha256=file.sha256))
+    from backend.services.download_names import filename
+    from urllib.parse import quote
+    round_ = session.get(m.ThesisRound,item.round_id)
+    name = filename(item.title,round_.code,version.version_no,Path(file.original_name).suffix)
+    response.headers["Content-Disposition"] = "attachment; filename*=UTF-8''" + quote(name)
     response.media_type=file.media_type
     response.headers["content-type"]=file.media_type
     return item,version,file,response

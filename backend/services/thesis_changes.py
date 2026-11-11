@@ -444,7 +444,8 @@ def extension_download(session,user,thesis_id):
         raise HTTPException(404,"Không tìm thấy minh chứng")
     item=extension_for(session,thesis)
     file=session.get(m.StoredFile,item.evidence_file_id) if item and item.evidence_file_id else None
-    return documents.stored_download(session,SimpleNamespace(stored_file_id=file.id,content_sha256=file.sha256) if file else None)
+    return documents.stored_download(session,SimpleNamespace(stored_file_id=file.id,content_sha256=file.sha256,
+        download_label="Minh-chung-gia-han",download_identity=thesis.current_title) if file else None)
 
 
 def workspace(session,user):

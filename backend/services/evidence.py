@@ -153,5 +153,7 @@ def download_evidence(session: Session, user: m.UserAccount, registration_id: UU
         raise HTTPException(409, "Minh chứng chưa quét an toàn hoặc không an toàn; chưa thể tải xuống. "
             "Xem trạng thái tệp và chọn quét lại nếu khả dụng.")
     # Forced attachment: never render unscanned PDFs/images as active application content.
-    return FileResponse(path, media_type="application/octet-stream", filename=file.original_name,
+    from backend.services.download_names import filename
+    student = session.get(m.StudentProfile, student_id)
+    return FileResponse(path, media_type="application/octet-stream", filename=filename("Minh-chung-dang-ky",student.student_code,extension=Path(file.original_name).suffix),
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})

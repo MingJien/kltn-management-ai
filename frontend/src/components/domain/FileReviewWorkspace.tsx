@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Download, MapPin, MessageSquare, Plus, Save, Send, Trash2, Paperclip, ZoomIn, ZoomOut } from "lucide-react";
 import type { ProgressAnnotation, ProgressAnnotationData, ProgressAnnotations, Review } from "../../api";
-import { fetchReviewFile, request } from "../../api";
+import { downloadFile, fetchReviewFile, request } from "../../api";
 import { formatDate, Reviews } from "./CoreForms";
 import type { CoreRun } from "./ThesisDocuments";
 import ReviewPdfPage from "./ReviewPdfPage";
@@ -262,7 +262,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
               <button type="button" className="review-icon" aria-label="Trang sau" disabled={page >= pages} onClick={() => setPage(value => value + 1)}><ChevronRight size={18} /></button></div>
               <div className="review-zoom-controls"><button type="button" className="review-icon" aria-label="Thu nhỏ PDF" disabled={zoom <= .75} onClick={() => setZoom(value => Math.max(.75, value - .25))}><ZoomOut size={17} /></button>
                 <span>{Math.round(zoom * 100)}%</span><button type="button" className="review-icon" aria-label="Phóng to PDF" disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, value + .25))}><ZoomIn size={17} /></button></div></>}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void fetchReviewFile(target.downloadPath).then(buffer => {const url = URL.createObjectURL(new Blob([buffer])); const a = document.createElement("a"); a.href = url; a.download = target.fileName; a.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);}).catch(cause => setError(String(cause)))}><Download size={16} /> Tải bản gốc</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadFile(target.downloadPath, target.fileName).catch(cause => setError(String(cause)))}><Download size={16} /> Tải bản gốc</button>
           </div>
           {loaded && <div className={`review-pin-hint${pinMode ? " review-pin-hint--active" : ""}`} role="note"><MapPin size={17} /><span>{canEdit ? pinMode ? "Bấm vào vị trí cần góp ý. Ô nhập nhận xét sẽ mở bên phải." : "Bôi chọn đoạn văn → ô Góp ý cần thực hiện tự mở bên phải. Hoặc bật Đặt ghim để chọn một vị trí." : readOnlyReason}</span></div>}
           <div className="review-document-scroll" ref={pane} onScroll={() => {if (pane.current) {scroll.current = pane.current.scrollTop / Math.max(1, pane.current.scrollHeight - pane.current.clientHeight); persist();}}}>
@@ -293,7 +293,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
                 <strong>{note.attachment?.file_name}</strong><small>{note.reviewer_name} · {((note.attachment?.byte_size || 0)/1024).toFixed(1)} KB</small>
                 <span>{note.state === "DRAFT" ? "Nháp riêng — SV chưa thấy" : "Đã gửi cho SV"}</span>
                 <div><button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>setPreview(note)}>Xem bản GV nhận xét</button>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>void fetchReviewFile(`${target.annotationsPath}/${note.id}/attachment`).then(buffer=>{const url=URL.createObjectURL(new Blob([buffer]));const a=document.createElement("a");a.href=url;a.download=note.attachment!.file_name;a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}).catch(cause=>setError(String(cause)))}>Tải tệp phản hồi</button></div>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>void downloadFile(`${target.annotationsPath}/${note.id}/attachment`,note.attachment!.file_name).catch(cause=>setError(String(cause)))}>Tải tệp phản hồi</button></div>
                 {note.attachment?.scan_state !== "CLEAN" && <p role="status">{note.attachment?.scan_state === "INFECTED" ? "Tệp có mã độc, không thể sử dụng." : "Tệp chưa quét sạch; chưa được xem hoặc gửi cho SV."}</p>}
                 {canEdit && note.state === "DRAFT" && <div>
                   {["QUARANTINED","FAILED"].includes(note.attachment?.scan_state || "") && <button type="button" className="btn btn-secondary btn-sm" disabled={submitting || uploading} onClick={()=>void rescanFeedback(note)}>Quét lại tệp phản hồi</button>}

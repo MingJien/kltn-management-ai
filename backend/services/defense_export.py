@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from backend.db.models import entities as m
 from backend.services import defense
+from backend.services.download_names import filename
 
 MIME = {
     "docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -148,7 +149,9 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
             sheet["F29"] = float(defense.total(mark,attendance,".1"))
         sheet.oddFooter.left.text = ("CHUA CHOT · " if not slot.finalized_at else "") + footer
         book.save(out)
-        return response(out,f"{'Phieu-trong' if blank else 'Mau-06'}-{slot.id}-{student_id}-{lecturer_id}-v{slot.row_version}","xlsx")
+        lecturer = session.get(m.LecturerProfile, lecturer_id)
+        name = filename("Mau-06-Phieu-trong" if blank else "Mau-06-Phieu-cham", student["code"]+"-"+lecturer.lecturer_code, slot.row_version)
+        return response(out,name,"xlsx")
 
     doc = word("BIÊN BẢN HỌP HỘI ĐỒNG\nCHẤM KHÓA LUẬN TỐT NGHIỆP",footer)
     doc.add_heading("I. THÔNG TIN VỀ KHÓA LUẬN",2)
@@ -176,7 +179,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     doc.add_paragraph(slot.minutes["conclusion"])
     signature(doc,council,"CHỦ TỊCH HỘI ĐỒNG")
     doc.save(out)
-    return response(out,f"Mau-09-{slot.id}-v{slot.row_version}","docx")
+    return response(out,filename("Mau-09-Bien-ban",council.name,slot.row_version)+f"-{slot.starts_at.astimezone(defense.VN):%Y%m%d-%H%M}","docx")
 
 
 def export_council(session,user,identifier,form,base_url):
@@ -207,7 +210,7 @@ def export_council(session,user,identifier,form,base_url):
             for i,(s,score) in enumerate(rows,1)])
         signature(doc,council,"TRƯỞNG KHOA")
         doc.save(out)
-        return response(out,f"Mau-10-{council.id}-v1","docx")
+        return response(out,filename("Mau-10-Bang-diem-tong-hop",council.name,1),"docx")
     book,sheet = spreadsheet("Mẫu 11",footer)
     write_row(sheet,["BẢNG GHI ĐIỂM CỦA HỌC PHẦN"])
     write_row(sheet,["Học phần","Khóa luận tốt nghiệp"])
@@ -221,4 +224,4 @@ def export_council(session,user,identifier,form,base_url):
     write_row(sheet,["","Trưởng khoa (Ký, ghi rõ họ tên)","","","Thư ký (Ký, ghi rõ họ tên)"])
     format_sheet(sheet,header,[9,20,26,17,17,20,28])
     book.save(out)
-    return response(out,f"Mau-11-{council.id}-v1","xlsx")
+    return response(out,filename("Mau-11-Bang-diem-chinh-thuc",council.name,1),"xlsx")

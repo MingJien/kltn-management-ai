@@ -111,6 +111,36 @@ def test_discipline_can_be_recorded_while_changed_membership_needs_review(evalua
     }).status_code == 403
 
 
+def test_supporting_upload_remains_open_after_eligibility_is_finalized(evaluation):
+    ctx, _ = evaluation
+    client, users, _, _, session, path = ctx
+    for member in range(len(get(ctx)["members"])):
+        complete_review(ctx, member=member)
+        assert check(ctx, member=member).status_code == 200
+    assert get(ctx)["state"] == "READY_FOR_DEFENSE"
+    workspace = client.get(path, headers=hdr(users[0])).json()
+    assert "document:supporting_submit" in workspace["actions"]
+    assert "document:submit" not in workspace["actions"]
+    made = client.post(path+"/documents", headers=hdr(users[0]), json={
+        "document_type":"SUPPORTING", "title":"Minh chứng công bố khoa học"})
+    assert made.status_code == 201, made.text
+    document = made.json()
+    uploaded = client.post(path+f"/documents/{document['id']}/versions", headers={
+        **version_headers(users[0], document), "X-File-Name":"supporting.pdf", "Content-Type":"application/octet-stream"},
+        content=synthetic_pdf())
+    assert uploaded.status_code == 201, uploaded.text
+    version = session.get(m.DocumentVersion, UUID(uploaded.json()["versions"][0]["id"]))
+    session.get(m.StoredFile, version.stored_file_id).scan_state = "CLEAN"
+    session.commit()
+    downloaded = client.get(path+f"/documents/{document['id']}/versions/{version.id}/download", headers=hdr(users[0]))
+    assert downloaded.status_code == 200
+    assert "Minh-chung-cong-bo-khoa-hoc-" in downloaded.headers["Content-Disposition"]
+    assert "-v1.pdf" in downloaded.headers["Content-Disposition"]
+    assert downloaded.content == synthetic_pdf()
+    assert client.post(path+"/documents", headers=hdr(users[0]), json={
+        "document_type":"REPORT", "title":"Wrong stage report"}).status_code == 409
+
+
 def test_assignment_authority_conflict_concurrency_and_revoked_access(evaluation):
     ctx,_=evaluation;client,users,_,lecturers,session,path=ctx
     initial=get(ctx)

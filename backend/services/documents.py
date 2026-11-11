@@ -135,8 +135,10 @@ def document_out(session, item):
 
 
 def rescan_version(session, user, thesis_id, document_id, version_id):
-    thesis_access(session, user, thesis_id, action="document:view", lock=True, write=True)
+    thesis = thesis_access(session, user, thesis_id, action="document:view", lock=True)
     item = document(session, thesis_id, document_id, lock=True,user=user)
+    if item.document_type != "SUPPORTING" or not supporting_open(session, thesis):
+        thesis_access(session, user, thesis_id, action="document:view", write=True)
     version = session.scalar(select(m.DocumentVersion).where(
         m.DocumentVersion.id == version_id, m.DocumentVersion.document_id == item.id).with_for_update())
     if not version:
@@ -155,8 +157,20 @@ def rescan_version(session, user, thesis_id, document_id, version_id):
     return result
 
 
+def supporting_open(session, thesis):
+    return thesis.state == "READY_FOR_DEFENSE" and session.get(m.ThesisRound, thesis.round_id).state != "ARCHIVED" and not session.scalar(
+        select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id, m.DefenseSlot.finalized_at.is_not(None)).limit(1))
+
+
+def submission_access(session, user, thesis_id, document_type):
+    thesis = thesis_access(session, user, thesis_id, action="document:submit", lock=True)
+    if document_type == "SUPPORTING" and supporting_open(session, thesis):
+        return thesis
+    return thesis_access(session, user, thesis_id, action="document:submit", write=True)
+
+
 def create_document(session, user, thesis_id, data):
-    thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
+    submission_access(session, user, thesis_id, data.document_type)
     if data.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải nộp tại luồng đề cương có xét duyệt riêng")
     if data.document_type in {"PLAN", "REPORT"} and session.scalar(select(m.Document.id).where(
@@ -206,8 +220,9 @@ def withdraw_document(session, user, thesis_id, document_id, data, expected):
 async def upload_version(session, user, thesis_id, document_id, request, expected):
     path = None
     try:
-        thesis = thesis_access(session, user, thesis_id, action="document:submit", lock=True, write=True)
+        thesis_access(session, user, thesis_id, action="document:submit", lock=True)
         item = document(session, thesis_id, document_id, lock=True,user=user)
+        thesis = submission_access(session, user, thesis_id, item.document_type)
         row_version(expected, item.row_version)
         if item.document_type == "PROPOSAL":
             raise HTTPException(409, "Đề cương phải nộp tại mục Đề cương")
@@ -327,5 +342,6 @@ def stored_download(session, version):
         raise HTTPException(404, "Tệp không khả dụng")
     if path.stat().st_size != file.byte_size or hashlib.sha256(path.read_bytes()).hexdigest() != version.content_sha256:
         raise HTTPException(409, "Tệp lưu trữ không khớp mã kiểm tra; cần phục hồi bản gốc")
-    return FileResponse(path, media_type="application/octet-stream", filename=file.original_name,
+    from backend.services.download_names import document_filename
+    return FileResponse(path, media_type="application/octet-stream", filename=document_filename(session, version, file.original_name),
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})

@@ -40,7 +40,7 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
   const officialFile = ["PLAN", "REPORT"].includes(doc.document_type);
   const validFileType = !file || (officialFile ? /\.(pdf|docx)$/i : /\.(pdf|docx|txt)$/i).test(file.name);
   const beforeDue = deadline?.state === "OPEN" && Date.now() <= new Date(deadline.due_at).getTime();
-  const canSubmit = doc.document_type !== "PROPOSAL" && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && !!deadline && (
+  const canSubmit = doc.document_type !== "PROPOSAL" && ((doc.document_type === "SUPPORTING" && thesis.actions.includes("document:supporting_submit")) || (thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state))) && !!deadline && (
     latest?.state === "REVISION_REQUESTED" ||
     (deadline.state === "OPEN" && !latest) ||
     (beforeDue && latest?.state === "SUBMITTED" && latest.reviews.length === 0));
@@ -159,7 +159,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
   const progressEvidenceIds = new Set(reports.map(report => report.evidence_document_version_id).filter((id): id is string => !!id));
   const visibleDocs = docs.filter(doc => doc.document_type === kind && (!pendingOnly || doc.versions[0]?.state === "SUBMITTED") && !(kind === "SUPPORTING" && doc.title.startsWith("Minh chứng tiến độ ") && doc.versions.some(version => progressEvidenceIds.has(version.id))));
   const active = ["ACTIVE","PROPOSAL_APPROVED","IN_PROGRESS","EXTENDED"].includes(thesis.state);
-  const canCreate = !legacyOnly && thesis.actions.includes("document:submit") && active && (kind === "SUPPORTING" || visibleDocs.length === 0);
+  const canCreate = !legacyOnly && ((kind === "SUPPORTING" && thesis.actions.includes("document:supporting_submit")) || (thesis.actions.includes("document:submit") && active)) && (kind === "SUPPORTING" || visibleDocs.length === 0);
   const validFile = !!file && file.size > 0 && file.size <= 10*1024*1024 && (kind === "SUPPORTING" ? /\.(pdf|docx|txt)$/i : /\.(pdf|docx)$/i).test(file.name);
   const deadline = deadlines.find(item => item.document_type === kind);
   const canFirstSubmit = deadline?.state === "OPEN";

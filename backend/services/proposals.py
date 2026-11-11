@@ -389,5 +389,6 @@ def download_version(session, user, thesis_id, version_id):
         raise HTTPException(404, "Tệp không khả dụng")
     if path.stat().st_size != file.byte_size or hashlib.sha256(path.read_bytes()).hexdigest() != version.content_sha256:
         raise HTTPException(409, "Tệp lưu trữ không khớp mã kiểm tra")
-    return FileResponse(path, media_type="application/octet-stream", filename=file.original_name,
+    from backend.services.download_names import filename, thesis_identity
+    return FileResponse(path, media_type="application/octet-stream", filename=filename("Mau-03-De-cuong", thesis_identity(session, thesis_id), version.version_no, Path(file.original_name).suffix),
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})

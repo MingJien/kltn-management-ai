@@ -189,7 +189,9 @@ def print_copy(session, user, registration_id, version_id):
         f"code={code}; version={item.version_no}; version_id={item.id}; receipt_only; exported_at={instant.isoformat()}",
         before_hash=item.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, mime, code, suffix, instant, filename="Don-dang-ky-"+form_code+"-v"+str(item.version_no)+"-"+file.original_name)
+    from backend.services.download_names import filename
+    topic = session.get(m.Topic, reg.topic_id)
+    return _print_response(result, mime, code, suffix, instant, filename=filename(f"Mau-{form_code}-Don-dang-ky-Ban-in", topic.current_title, item.version_no, suffix))
 
 
 def print_history(session, user, registration_id, version_id):

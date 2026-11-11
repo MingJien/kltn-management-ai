@@ -299,8 +299,8 @@ def export_review(session, user, thesis_id, review_id, expected):
         before_hash=hashlib.sha256(source).hexdigest(), after_hash=hashlib.sha256(content).hexdigest(), source_reference=code)
     session.commit()
     from urllib.parse import quote
-    filename=f"Mau-{'7-GVHD' if item.kind=='ADVISOR' else '8-Phan-bien'}-{student.student_code}-v{item.version_no}-{instant:%Y%m%d-%H%M%S}.docx"
-    filename=re.sub(r'[\\/:*?"<>|\x00-\x1f]',"_",filename)
+    from backend.services.download_names import filename as download_name
+    filename=download_name(f"Mau-{'07-GVHD' if item.kind=='ADVISOR' else '08-Phan-bien'}", student.student_code, item.version_no, ".docx")
     response=_print_response(content,"application/vnd.openxmlformats-officedocument.wordprocessingml.document",code,".docx",instant)
     response.headers["Content-Disposition"]="attachment; filename*=UTF-8''"+quote(filename)
     return response

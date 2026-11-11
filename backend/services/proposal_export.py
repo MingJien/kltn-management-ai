@@ -297,7 +297,8 @@ def export_proposal(session, user, thesis_id, version_id) -> Response:
         f"exporter={user.id}; code={code}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, media_type, code, suffix, instant, filename="De-cuong-v"+str(version.version_no)+"-"+original.original_name)
+    from backend.services.download_names import filename
+    return _print_response(result, media_type, code, suffix, instant, filename=filename("Mau-03-De-cuong-Ban-in", thesis.current_title, version.version_no, suffix))
 
 
 def export_document(session, user, thesis_id, document_id, version_id) -> Response:
@@ -332,4 +333,5 @@ def export_document(session, user, thesis_id, document_id, version_id) -> Respon
         f"exporter={user.id}; code={code}; document={item.id}; version={version.version_no}; version_id={version.id}; exported_at={instant.isoformat()}; url={public_url}/theses/{thesis_id}; file_sha256={version.content_sha256}",
         before_hash=version.content_sha256, after_hash=hashlib.sha256(result).hexdigest())
     session.commit()
-    return _print_response(result, media_type, code, suffix, instant, filename=("Ke-hoach" if item.document_type=="PLAN" else "Bao-cao")+"-v"+str(version.version_no)+"-"+original.original_name)
+    from backend.services.download_names import filename
+    return _print_response(result, media_type, code, suffix, instant, filename=filename("Mau-02-Ke-hoach-Ban-in" if item.document_type=="PLAN" else "Cuon-bao-cao-Ban-in", thesis.current_title, version.version_no, suffix))
