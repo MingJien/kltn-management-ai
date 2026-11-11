@@ -174,9 +174,9 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("POST","/finalize",users[4],{},409)
     blank = client.get(endpoint+"/forms/6",headers=hdr(users[5]),params={"student_id":first,"lecturer_id":str(lecturers[1].id),"blank":True})
     assert blank.status_code==200,blank.text
-    blank_rows=list(load_workbook(BytesIO(blank.content),read_only=True).active.values)
-    assert any(r[0]=="1.1" and r[3] is None for r in blank_rows)
-    assert client.get(endpoint+"/forms/6",headers=hdr(users[5])).status_code==409
+    blank_sheet=load_workbook(BytesIO(blank.content)).active
+    assert str(blank_sheet["A14"].value)=="1.1" and blank_sheet["F14"].value is None
+    assert client.get(endpoint+"/forms/6",headers=hdr(users[5])).status_code==404
     assert client.get(endpoint+"/report",headers=hdr(users[2])).status_code==404
     assert client.get(endpoint+"/report",headers=hdr(account)).status_code==200
     shared=client.get(base,headers=hdr(users[4])).json()["slots"][0]
@@ -185,6 +185,11 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
         res=client.put(endpoint+"/marks",headers={**hdr(account),"If-Match":str(shared["version"])},json={
             "thesis_member_id":first,"lecturer_id":str(person.id),"scores":scores,"ballot_revision":0,"context_token":shared["context_token"]})
         assert res.status_code==204,res.text
+    pending_form=client.get(endpoint+"/forms/6",headers=hdr(users[4]),params={"student_id":first,"lecturer_id":str(lecturers[1].id)})
+    assert pending_form.status_code==200,pending_form.text
+    pending_sheet=load_workbook(BytesIO(pending_form.content)).active
+    assert pending_sheet["F28"].value==1 and pending_sheet["F29"].value==10
+    assert "CHUA CHOT" in pending_sheet.oddFooter.left.text
     stale=client.put(endpoint+"/marks",headers={**hdr(users[4]),"If-Match":str(shared["version"])},json={
         "thesis_member_id":first,"lecturer_id":str(lecturers[1].id),"scores":scores,"ballot_revision":0,"context_token":shared["context_token"]})
     assert stale.status_code==409
@@ -210,7 +215,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
         "student_id":first,"lecturer_id":str(lecturers[1].id)})
     assert form6.status_code==200,form6.text
     sheet = load_workbook(BytesIO(form6.content)).active
-    assert any(row[1]=="Tổng điểm" and row[3]==10 for row in sheet.values)
+    assert sheet["F29"].value==10 and sheet["F28"].value==1
     assert client.get(base+"/councils/"+council+"/forms/11",headers=hdr(users[4])).status_code==409
     assert client.post(base+"/councils/"+council+"/close",headers=hdr(users[4])).status_code==204
     form10 = client.get(base+"/councils/"+council+"/forms/10",headers=hdr(users[4]))

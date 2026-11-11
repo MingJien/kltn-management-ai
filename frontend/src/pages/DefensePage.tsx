@@ -228,9 +228,9 @@ function StudentMarks({slot,student,data,act,download,busy,mode}:{slot:Slot;stud
     {slot.role&&<details className="defense-operation"><summary>In phiếu chấm trước buổi họp</summary><p>Phiếu trống có sẵn thông tin để chấm giấy; chưa phải bản kết quả đã chốt.</p>{slot.council.members.filter(m=>canExport||m.id===slot.lecturer_id).map(m=><button className="btn btn-secondary" key={m.id} onClick={()=>download(endpoint+"/forms/6?blank=true&student_id="+student.id+"&lecturer_id="+m.id,`Phieu-trong-${student.code}-${m.id}.xlsx`)}>In phiếu trống · {m.name}</button>)}</details>}
     {!slot.role&&<p>Minh chứng công bố khoa học nộp cùng tài liệu khóa luận ở mục Hồ sơ nộp & xét duyệt. Chủ tịch đối chiếu và xác nhận mức thưởng trước khi chốt.</p>}
     {!slot.finalized_at&&["CHAIR","SECRETARY"].includes(slot.role??"")&&Object.keys(slot.marks[student.id]??{}).length>0&&<details className="defense-operation"><summary>Hủy phiếu nhập nhầm</summary><DraftForm className="stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);if(window.confirm("Hủy hiệu lực phiếu này? Bản cũ vẫn được lưu trong lịch sử."))act(endpoint+"/marks/"+student.id+"/"+text(f,"lecturer")+"/void",{reason:text(f,"reason")},slot.version);}}><label>Phiếu cần hủy<select name="lecturer" className="input">{slot.council.members.filter(m=>slot.marks[student.id]?.[m.id]).map(m=>option(m.id,m.name))}</select></label><label>Lý do<input className="input" name="reason" required minLength={5} maxLength={500}/></label><button className="btn btn-secondary" disabled={busy}>Hủy hiệu lực phiếu</button></DraftForm></details>}
-    {slot.finalized_at&&recorded?.status==="PRESENT"&&slot.council.members.filter(m=>(canExport||m.id===slot.lecturer_id)&&!!slot.marks[student.id]?.[m.id]).map(m=>
+    {recorded?.status==="PRESENT"&&slot.council.members.filter(m=>(canExport||m.id===slot.lecturer_id)&&!!slot.marks[student.id]?.[m.id]).map(m=>
       <button key={m.id} className="btn btn-secondary" onClick={()=>download(endpoint+"/forms/6?student_id="+student.id+"&lecturer_id="+m.id,
-        `Mau-06-${student.code}-${m.id.slice(0,8)}-v${slot.version}.xlsx`)}>Mẫu 6 · {m.name}</button>)}
+        `Mau-06-${student.code}-${m.id.slice(0,8)}-v${slot.version}.xlsx`)}>Mẫu 6 {slot.finalized_at?"đã chốt":"đã lưu · chưa chốt"} · {m.name}</button>)}
     </div>
   </Card>;
 }
@@ -241,6 +241,7 @@ function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Ac
   return <Card title={slot.title}>
     <div className="defense-session-head"><strong>{slot.council.name} · {slot.room}</strong><span>{when(slot.starts_at)} → {when(slot.ends_at)}</span>
     <button className="btn btn-secondary" onClick={()=>download(endpoint+"/report",slot.report_filename??"Bao-cao-bao-ve")}>Tải báo cáo dùng để bảo vệ</button></div>
+    {slot.report_filename&&<p>Tệp báo cáo đã gắn lịch: <strong>{slot.report_filename}</strong></p>}
     <nav className="defense-tabs" aria-label="Các bước buổi bảo vệ">{[["overview","Tổng quan"],["attendance","Điểm danh"],["marks","Phiếu chấm"],["minutes","Biên bản"],["results","Kết quả & xuất"]].filter(([id])=>slot.role||id==="overview"||id==="results").map(([id,label])=><button className={"btn "+(tab===id?"btn-primary":"btn-secondary")} aria-pressed={tab===id} key={id} onClick={()=>setTab(id)}>{label}</button>)}</nav>
     <div hidden={tab!=="attendance"}>
     {!slot.finalized_at&&slot.role==="SECRETARY"&&<DraftForm className="stack defense-attendance" onSubmit={e=>{

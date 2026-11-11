@@ -1,10 +1,11 @@
 from io import BytesIO
+from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 from fastapi import HTTPException, Response
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from sqlalchemy import select
@@ -97,7 +98,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     if own or not (member or manager):
         raise HTTPException(403,"Chỉ hội đồng và người phụ trách được tải mẫu")
     blank=blank and form==6
-    if not slot.finalized_at and not blank:
+    if not slot.finalized_at and not blank and form != 6:
         raise HTTPException(409,"Chỉ xuất bản dùng để ký sau khi chốt kết quả")
     title = slot.minutes.get("title") or session.get(m.Thesis,slot.thesis_id).current_title
     stamp_id = f"M{form}-{slot.id}"
@@ -117,30 +118,35 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         if not mark:
             raise HTTPException(404,"Sinh viên không có phiếu chấm")
         attendance = slot.attendance.get(student["id"],{})
-        book,sheet = spreadsheet("Mẫu 6",footer)
-        write_row(sheet,["PHIẾU CHẤM TRỐNG — CHƯA CÓ KẾT QUẢ" if blank else "PHIẾU ĐÁNH GIÁ KHÓA LUẬN TỐT NGHIỆP"])
-        write_row(sheet,["Hội đồng",council.name])
-        write_row(sheet,["Người đánh giá",evaluator["name"],defense.ROLES[evaluator["role"]]])
-        write_row(sheet,["Sinh viên",student["name"],student["code"]])
-        write_row(sheet,["Đề tài",title])
-        header = write_row(sheet,["Mã","Các tiêu chí đánh giá","Điểm tối đa","Điểm đạt"])
-        groups = {"1.1":("1","Hình thức",2,0,3), "2.1":("2","Nội dung",4,3,9),
-            "3.1":("3","Demo và trả lời câu hỏi",4,9,12)}
-        for (code,label,maximum),score in zip(defense.CRITERIA,mark["scores"]):
-            if code in groups:
-                group,group_name,limit,start,end = groups[code]
-                row = write_row(sheet,[group,group_name,limit,None if blank else sum(float(s) for s in mark["scores"][start:end])])
-                for cell in sheet[row]:
-                    cell.font = Font(bold=True)
-            row = write_row(sheet,[code,label,float(maximum),None if blank else float(score)])
-            sheet.cell(row,2).alignment = Alignment(wrap_text=True,vertical="center")
-            sheet.row_dimensions[row].height = max(29, 14 * ((len(label) + 62) // 63))
-        write_row(sheet,["4","Điểm thưởng",1,None if blank else float(attendance.get("bonus","0"))])
-        precision=".1" if slot.minutes.get("results_snapshot") else ".01"
-        write_row(sheet,["","Tổng điểm",10,None if blank else float(defense.total(mark,attendance,precision))])
-        write_row(sheet,["","Nhận xét",mark["note"]])
-        write_row(sheet,["","Người đánh giá (Ký, ghi rõ họ tên)"])
-        format_sheet(sheet,header,[12,70,19,19])
+        from backend.services import form_templates, school_forms
+        managed = school_forms.compatibility_download(session,user,"mau-06",council.round_id)
+        source = Path(managed.path) if managed else form_templates.OFFICIAL_DIR / next(
+            item["filename"] for item in form_templates.OFFICIAL_FORMS if item["id"] == "mau-06")
+        if not source.is_file():
+            raise HTTPException(409,"Chưa có biểu mẫu Mẫu 6 của Khoa để xuất")
+        book = load_workbook(source)
+        sheet = book.active
+        from backend.services.theses import primary_advisor
+        advisor = primary_advisor(session,slot.thesis_id)
+        advisor_name = session.get(m.LecturerProfile,advisor.lecturer_id).display_name if advisor else "Chưa cập nhật"
+        fields = {"A5":f"Họ và tên (học hàm, học vị) người đánh giá: {evaluator['name']}    Nhiệm vụ trong hội đồng: {defense.ROLES[evaluator['role']]}",
+            "A6":f"Họ và tên sinh viên: {student['name']}    Mã sinh viên: {student['code']}",
+            "A7":f"Lớp: {student['class_name']}    Ngành: {student['major']}", "A8":f"Tên đề tài: {title}",
+            "A9":"", "A10":f"Người hướng dẫn khoa học: {advisor_name}", "A30":f"III. Đề nghị (nếu có): {mark.get('note','')}"}
+        for address,value in fields.items():
+            sheet[address] = value
+            sheet[address].data_type = "s"
+            sheet[address].alignment = Alignment(horizontal="left",vertical="center",wrap_text=True)
+        for row,score in zip([14,15,16,18,19,20,21,22,23,25,26,27],mark["scores"]):
+            sheet[f"F{row}"] = None if blank else float(score)
+        sheet["F28"] = None if blank else float(attendance.get("bonus","0"))
+        for address in ("F13","F17","F24","F29"):
+            sheet[address] = None
+        if not blank:
+            scores = [float(score) for score in mark["scores"]]
+            sheet["F13"],sheet["F17"],sheet["F24"] = sum(scores[:3]),sum(scores[3:9]),sum(scores[9:])
+            sheet["F29"] = float(defense.total(mark,attendance,".1"))
+        sheet.oddFooter.left.text = ("CHUA CHOT · " if not slot.finalized_at else "") + footer
         book.save(out)
         return response(out,f"{'Phieu-trong' if blank else 'Mau-06'}-{slot.id}-{student_id}-{lecturer_id}-v{slot.row_version}","xlsx")
 
