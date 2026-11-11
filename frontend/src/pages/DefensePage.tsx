@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState,useRef,type FormEvent,type ReactNode,type ComponentProps} from "react";
-import {useSearchParams} from "react-router-dom";
+import {Link,useSearchParams} from "react-router-dom";
 import {request,type Context} from "../api";
 import {downloadEvaluationFile,when} from "../evaluation";
 import {errorMessage} from "../errors";
@@ -10,7 +10,7 @@ type Person={id:string;name:string;role:string};
 type Student={id:string;name:string;code:string};
 type Council={id:string;name:string;reference:string;round_id:string;department_id:string;members:Person[];can_manage:boolean;closed_at:string|null;signature?:string};
 type Scope={round_id:string;round_code:string;department_id:string;department_name:string;department_code?:string;faculty_id?:string};
-type PlanningThesis={id:string;title:string;round_id:string;department_id:string;advisor_ids?:string[]};
+type PlanningThesis={id:string;title:string;round_id:string;department_id:string;advisor_ids?:string[];schedule_reason?:string|null;can_review_eligibility?:boolean};
 type Mark={scores:string[];note:string;revision?:number};
 type Result={average?:string|null;attendance:{status?:string;reason?:string;bonus?:string;bonus_reference?:string;bonus_evidence_version_id?:string};scores?:Array<string|null>};
 type Slot={report_filename?:string;prior_slot_id?:string|null;absence_decisions?:Record<string,{outcome:string;reference:string;reason:string;recorded_by:string;recorded_at:string;revision:number}>;context_token:string;bonus_evidence:{id:string;name:string;filename?:string}[];id:string;thesis_id:string;title:string;council:Council;starts_at:string;ends_at:string;room:string;version:number;
@@ -145,6 +145,8 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
     : data.eligible.filter(t=>t.round_id===council?.round_id&&t.department_id===council?.department_id&&
       (slot?t.id===slot.thesis_id:!taken.has(t.id)));
   const theses = options.filter(t => !hasConflict(t));
+  const pending = (data.planning_theses ?? []).filter(t => t.round_id === council?.round_id && t.department_id === council?.department_id &&
+    t.schedule_reason && !taken.has(t.id));
   function submit(e:FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form=new FormData(e.currentTarget);
@@ -158,11 +160,12 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
   return <DraftForm className="stack" onSubmit={submit}>
     <label>Hội đồng<select className="input" value={councilId} required onChange={e=>{setCouncilId(e.target.value);setThesisId(supplementary?.thesis_id??"");}}>
       <option value="" disabled>Chọn hội đồng</option>{available.map(c=>option(c.id,c.name))}</select></label>
-    <label>Đề tài đủ điều kiện<select key={councilId} name="thesis" className="input" required value={theses.some(t=>t.id===thesisId)?thesisId:""} onChange={e=>setThesisId(e.target.value)}><option value="" disabled>Chọn đề tài đủ điều kiện</option>
+    <label>Đề tài đủ điều kiện<select key={councilId} name="thesis" className="input" required disabled={!council || !theses.length} value={theses.some(t=>t.id===thesisId)?thesisId:""} onChange={e=>setThesisId(e.target.value)}><option value="" disabled>{!council ? "Chọn hội đồng trước" : theses.length ? "Chọn đề tài đủ điều kiện" : "Chưa có đề tài đủ điều kiện"}</option>
       {theses.map(t=>option(t.id,t.title))}</select></label>
     {supplementary&&<fieldset><legend>Sinh viên được Khoa cho bảo vệ bổ sung</legend>{supplementary.roster.filter(r=>supplementary.absence_decisions?.[r.id]?.outcome==="SUPPLEMENTARY"&&!data.slots.some(s=>s.prior_slot_id===supplementary.id&&s.roster.some(m=>m.id===r.id))).map(r=><label className="defense-check" key={r.id}><input type="checkbox" name="member" value={r.id}/>{r.name} · {r.code}</label>)}<p>Chỉ xếp lịch cho các SV được chọn. Điểm của thành viên đã bảo vệ được giữ nguyên.</p></fieldset>}
     {council && options.some(hasConflict) && <p>Đã loại đề tài có GVHD trong hội đồng. Chọn hội đồng khác cho đề tài đó.</p>}
     {council&&!theses.length&&<p>Chưa có đề tài phù hợp trong phạm vi hội đồng.</p>}
+    {council&&pending.length>0&&<details className="defense-operation"><summary>Hồ sơ cần xử lý trước khi xếp lịch ({pending.length})</summary><ul>{pending.map(t=><li key={t.id}><strong>{t.title}</strong> · {t.schedule_reason} {t.can_review_eligibility&&<Link to={`/evaluation/${t.id}`}>Mở xét điều kiện</Link>}</li>)}</ul></details>}
     {selected?.extension_until_at&&<p className="alert alert-info">Hồ sơ đã gia hạn: {when(selected.extension_starts_at)} → <strong>{when(selected.extension_until_at)}</strong>. Chọn kỳ bảo vệ thực tế của Khoa trong khoảng này; không kéo dài hạn khi đổi lịch.</p>}
     <label>Bắt đầu (giờ Việt Nam)<input name="start" className="input" type="datetime-local" min={selected?.extension_starts_at?dateLocal(selected.extension_starts_at):undefined} max={selected?.extension_until_at?dateLocal(selected.extension_until_at):undefined} defaultValue={slot?dateLocal(slot.starts_at):""} required/></label>
     <label>Kết thúc (giờ Việt Nam)<input name="end" onInput={e=>e.currentTarget.setCustomValidity("")} className="input" type="datetime-local" min={selected?.extension_starts_at?dateLocal(selected.extension_starts_at):undefined} max={selected?.extension_until_at?dateLocal(selected.extension_until_at):undefined} defaultValue={slot?dateLocal(slot.ends_at):""} required/></label>

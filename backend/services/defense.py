@@ -572,15 +572,27 @@ def workspace(session,user):
                 continue
             row = {"id":t.id,"title":t.current_title,"round_id":t.round_id,"department_id":t.department_id,
                 "advisor_ids":sorted(supervising_ids(session,t.id))}
-            planning_theses.append(row)
-            if t.state not in {"READY_FOR_DEFENSE", "EXTENDED"}:
-                continue
             extension = session.scalar(select(m.ThesisExtension).where(m.ThesisExtension.thesis_id == t.id))
             report = evaluation.report(session, t)
             members = evaluation.members(session, t)
-            if not report or not members or any(evaluation.eligibility_out(session, t, member, report)["state"] != "ELIGIBLE" for member in members):
-                continue
-            if extension and extension.until_at < now():
+            member_states = [evaluation.eligibility_out(session, t, member, report)["state"] for member in members]
+            if not report:
+                reason = "Chưa có cuốn báo cáo."
+            elif not members:
+                reason = "Chưa có thành viên đang thực hiện."
+            elif any(state == "STALE" for state in member_states):
+                reason = "Kết quả xét đã cũ. TBM cần xét và lưu lại điều kiện của sinh viên."
+            elif any(state != "ELIGIBLE" for state in member_states):
+                reason = "Còn sinh viên chưa được chốt đủ điều kiện bảo vệ."
+            elif extension and extension.until_at < now():
+                reason = "Thời hạn gia hạn đã hết."
+            elif t.state not in {"READY_FOR_DEFENSE", "EXTENDED"}:
+                reason = "Hồ sơ chưa ở trạng thái sẵn sàng bảo vệ."
+            else:
+                reason = None
+            planning_theses.append({**row, "schedule_reason": reason,
+                "can_review_eligibility": "evaluation:eligibility" in evaluation.permissions(session,user,t)})
+            if reason:
                 continue
             request = session.scalar(select(m.ThesisExtensionRequest).where(m.ThesisExtensionRequest.extension_id == extension.id)) if extension else None
             eligible.append({**row,
