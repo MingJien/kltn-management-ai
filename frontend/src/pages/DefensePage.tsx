@@ -205,11 +205,9 @@ function StudentMarks({slot,student,data,act,download,busy,mode}:{slot:Slot;stud
       <button className="btn btn-secondary" disabled={busy}>Lưu điểm danh</button>
     </DraftForm>}
     {slot.role&&slot.bonus_evidence?.length>0&&<details className="defense-operation"><summary>Xem tài liệu minh chứng đã nộp</summary>{slot.bonus_evidence.map(f=><button key={f.id} className="btn btn-secondary" onClick={()=>download(endpoint+"/evidence/"+f.id,f.filename??f.name)}>{f.name}</button>)}</details>}
-    {!slot.finalized_at&&slot.role==="CHAIR"&&<DraftForm className="stack" onSubmit={e=>submit("/bonus/"+student.id,e,f=>({points:text(f,"bonus"),reference:text(f,"reference"),evidence_version_id:text(f,"evidence")||null}))}>
-      <label>Điểm thưởng chung cho sinh viên<input name="bonus" className="input" type="number" min={0} max={1} step=".01" defaultValue={recorded?.bonus??"0"} required/></label>
-      <label>Minh chứng trong hồ sơ<select className="input" name="evidence" defaultValue={recorded?.bonus_evidence_version_id??""}><option value="">Chọn minh chứng đã nộp</option>{slot.bonus_evidence?.map(f=>option(f.id,f.name))}</select></label><label>Căn cứ công bố khoa học<input name="reference" className="input" maxLength={500} defaultValue={recorded?.bonus_reference}/></label>
-      <button className="btn btn-secondary" disabled={busy}>Xác nhận điểm thưởng</button>
-    </DraftForm>}
+    <p className="alert alert-info">Điểm thưởng đã được TBM duyệt: <strong>{recorded?.bonus??"0"} / 1</strong>{recorded?.bonus_reference&&` · Căn cứ: ${recorded.bonus_reference}`}. Mức này tự áp dụng vào phiếu chấm từng thành viên Hội đồng.</p>
+    {!slot.finalized_at&&slot.role==="CHAIR"&&<button className="btn btn-secondary" disabled={busy} onClick={()=>act(endpoint+"/bonus/"+student.id,{points:recorded?.bonus??"0",reference:recorded?.bonus_reference??"",evidence_version_id:recorded?.bonus_evidence_version_id??null},slot.version,"PUT")}>Đã đối chiếu mức thưởng của TBM</button>}
+
     </div><div hidden={mode!=="marks"}>
     {!slot.finalized_at&&slot.role&&recorded?.status==="PRESENT"&&<details><summary>Phiếu chấm Mẫu 6 · Điểm thưởng {recorded.bonus??"0"}</summary>
       {slot.role==="SECRETARY"&&<label>Người đánh giá<select className="input" value={grader} onChange={e=>{if(!mayDiscard())return;setGrader(e.target.value);setPreview(slot.marks[student.id]?.[e.target.value]?.scores??Array(12).fill(""));}}>

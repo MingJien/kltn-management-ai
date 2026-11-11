@@ -1,3 +1,4 @@
+import PublicationClaims from "./PublicationClaims";
 import EmptyState from "../ui/EmptyState";
 import { useState } from "react";
 import { X } from "lucide-react";
@@ -10,7 +11,6 @@ import VersionTimeline from "./VersionTimeline";
 
 const documentPresets: Record<string, string> = {
   PLAN: "Kế hoạch thực hiện (Mẫu 2)",
-  SUPPORTING_PUBLICATION: "Minh chứng công bố khoa học để xét điểm thưởng",
   SUPPORTING_REFERENCES: "Tài liệu tham khảo",
   SUPPORTING_SURVEY: "Phiếu khảo sát / kết quả khảo sát",
   SUPPORTING_DESIGN: "Đặc tả yêu cầu / tài liệu thiết kế",
@@ -164,10 +164,11 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
   const deadline = deadlines.find(item => item.document_type === kind);
   const canFirstSubmit = deadline?.state === "OPEN";
   return <div className="stack">
+    {kind === "SUPPORTING" && !legacyOnly && <PublicationClaims thesis={thesis} docs={docs} userId={userId} busy={busy} run={run} canUpload={!!canFirstSubmit}/>}
     <div className="submission-heading"><div><span className="section-eyebrow">{kind === "PLAN" ? "KẾ HOẠCH CỦA NHÓM" : kind === "REPORT" ? "BẢN BÁO CÁO HOÀN CHỈNH" : "TỆP HỖ TRỢ HỒ SƠ"}</span><h2>{heading}</h2><p>{kind === "PLAN"
       ? "Một kế hoạch chung cho đề tài. Nộp bản đã điền; GVHD nhận xét, yêu cầu sửa hoặc tiếp nhận."
       : kind === "REPORT" ? "Nộp cuốn báo cáo trước bảo vệ. Đây là bản báo cáo hoàn chỉnh, khác với báo cáo tiến độ định kỳ."
-      : legacyOnly ? "Các tệp đã nộp trước đây vẫn được giữ để xem lại và đối chiếu." : "Tệp hỗ trợ cho hồ sơ khóa luận."}</p></div>
+      : legacyOnly ? "Các tệp đã nộp trước đây vẫn được giữ để xem lại và đối chiếu." : "Tệp hỗ trợ cho hồ sơ khóa luận. Tiếp nhận tệp ở đây không thay thế xét duyệt điểm thưởng tại mục minh chứng công bố phía trên."}</p></div>
       {kind === "PLAN" && <button type="button" className="btn btn-secondary" disabled={busy} onClick={async () => {
         setTemplateError(""); try {await downloadPlanTemplate(thesis.round_id);} catch (cause) {setTemplateError(String(cause));}
       }}>Tải mẫu áp dụng · Mẫu 2</button>}

@@ -19,6 +19,7 @@ from backend.api.core import router as thesis_workspace_router
 from backend.api.activity import router as activity_router
 from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
+from backend.api.publications import router as publications_router
 from backend.api.defense import router as defense_router
 from backend.api.thesis_changes import router as thesis_changes_router
 from backend.api.lecturer_profiles import router as lecturer_profiles_router
@@ -80,6 +81,7 @@ app.include_router(thesis_workspace_router)
 app.include_router(activity_router)
 app.include_router(school_forms_router)
 app.include_router(evaluation_router)
+app.include_router(publications_router)
 app.include_router(defense_router)
 app.include_router(thesis_changes_router)
 app.include_router(lecturer_profiles_router)

@@ -86,6 +86,16 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     evidence=session.get(m.DocumentVersion,UUID(evidence_version))
     session.get(m.StoredFile,evidence.stored_file_id).scan_state='CLEAN'
     session.commit()
+    claim_endpoint = path+'/publication-claims'
+    claim = client.post(claim_endpoint, headers=hdr(users[0]), json={
+        'title':'Synthetic publication title','venue':'Synthetic journal','reference':'DOI synthetic publication',
+        'contribution':'Synthetic individual contribution to the thesis research',
+        'student_ids':[str(students[0].id)],'evidence_version_id':evidence_version})
+    assert claim.status_code==201,claim.text
+    claim_endpoint += '/'+claim.json()['id']+'/decision'
+    confirmed=client.post(claim_endpoint,headers={**hdr(users[3]),'If-Match':'1'},json={
+        'outcome':'CONFIRM','reason':'GVHD confirmed contribution'})
+    assert confirmed.status_code==200,confirmed.text
     account = m.UserAccount(id=uuid4(),external_subject="defense-"+uuid4().hex,base_role="LECTURER",status="ACTIVE")
     extra = m.LecturerProfile(id=uuid4(),user_id=account.id,department_id=lecturers[1].department_id,
         lecturer_code="D-"+uuid4().hex[:10],display_name="Synthetic council reviewer")
@@ -135,6 +145,13 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     response = client.post(base+"/slots",headers=hdr(users[4]),json=body)
     assert response.status_code==201,response.text
     slot = response.json()["id"]
+    assert client.get(base,headers=hdr(users[0])).json()['slots'][0]['results'][
+        client.get(base,headers=hdr(users[0])).json()['slots'][0]['roster'][0]['id']]['attendance'].get('bonus','0')=='0'
+    approved=client.post(claim_endpoint,headers={**hdr(users[4]),'If-Match':'2'},json={
+        'outcome':'APPROVE','reason':'TBM confirmed research publication','points':{str(students[0].id):'1'}})
+    assert approved.status_code==200,approved.text
+    assert client.get(base,headers=hdr(users[0])).json()['slots'][0]['results'][
+        client.get(base,headers=hdr(users[0])).json()['slots'][0]['roster'][0]['id']]['attendance']['bonus']=='1'
     assert client.post(base+"/slots",headers=hdr(users[4]),json=body).status_code==409
     assert client.get(base,headers=hdr(users[2])).json()["slots"]==[]
     student_slots = client.get(base,headers=hdr(users[0])).json()["slots"]
@@ -176,6 +193,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert blank.status_code==200,blank.text
     blank_sheet=load_workbook(BytesIO(blank.content)).active
     assert str(blank_sheet["A14"].value)=="1.1" and blank_sheet["F14"].value is None
+    assert blank_sheet["F28"].value==1
     assert client.get(endpoint+"/forms/6",headers=hdr(users[5])).status_code==404
     assert client.get(endpoint+"/report",headers=hdr(users[2])).status_code==404
     assert client.get(endpoint+"/report",headers=hdr(account)).status_code==200
@@ -185,6 +203,10 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
         res=client.put(endpoint+"/marks",headers={**hdr(account),"If-Match":str(shared["version"])},json={
             "thesis_member_id":first,"lecturer_id":str(person.id),"scores":scores,"ballot_revision":0,"context_token":shared["context_token"]})
         assert res.status_code==204,res.text
+    claims_workspace=client.get(path+'/publication-claims',headers=hdr(users[4])).json()
+    assert not claims_workspace['can_approve'] and not claims_workspace['can_review']
+    assert client.post(claim_endpoint,headers={**hdr(users[4]),'If-Match':'3'},json={
+        'outcome':'APPROVE','reason':'Attempt to change bonus after marking','points':{str(students[0].id):'0'}}).status_code==409
     pending_form=client.get(endpoint+"/forms/6",headers=hdr(users[4]),params={"student_id":first,"lecturer_id":str(lecturers[1].id)})
     assert pending_form.status_code==200,pending_form.text
     pending_sheet=load_workbook(BytesIO(pending_form.content)).active

@@ -140,7 +140,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
             sheet[address].alignment = Alignment(horizontal="left",vertical="center",wrap_text=True)
         for row,score in zip([14,15,16,18,19,20,21,22,23,25,26,27],mark["scores"]):
             sheet[f"F{row}"] = None if blank else float(score)
-        sheet["F28"] = None if blank else float(attendance.get("bonus","0"))
+        sheet["F28"] = float(attendance.get("bonus","0"))
         for address in ("F13","F17","F24","F29"):
             sheet[address] = None
         if not blank:

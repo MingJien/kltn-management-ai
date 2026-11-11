@@ -26,6 +26,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.db.base import Base, TimestampMixin, UuidPrimaryKeyMixin, VersionedMixin
 
 
+class PublicationClaim(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "publication_claim"
+    __table_args__ = (CheckConstraint("state IN ('SUBMITTED','ADVISOR_CONFIRMED','APPROVED','REJECTED','REVISION_REQUIRED')", name="state"),
+        Index("ix_publication_claim_thesis", "thesis_id"))
+    thesis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("thesis.id"))
+    evidence_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("document_version.id"))
+    submitted_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user_account.id"))
+    state: Mapped[str] = mapped_column(String(30), default="SUBMITTED")
+    details: Mapped[dict] = mapped_column(JSONB)
+    history: Mapped[list] = mapped_column(JSONB, default=list)
+
+
 def fk(target: str, *, nullable: bool = False):
     return mapped_column(
         UUID(as_uuid=True),

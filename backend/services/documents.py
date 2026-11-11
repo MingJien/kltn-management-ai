@@ -195,6 +195,10 @@ def withdraw_document(session, user, thesis_id, document_id, data, expected):
     row_version(expected, item.row_version)
     if item.document_type == "PROPOSAL":
         raise HTTPException(409, "Đề cương phải xử lý ở luồng đề cương")
+    if session.scalar(select(m.PublicationClaim.id).join(m.DocumentVersion,
+            m.DocumentVersion.id == m.PublicationClaim.evidence_version_id).where(
+            m.DocumentVersion.document_id == item.id).limit(1)):
+        raise HTTPException(409, "Tài liệu đã gắn hồ sơ điểm thưởng, cần giữ để đối chiếu")
     versions = session.scalars(select(m.DocumentVersion).where(
         m.DocumentVersion.document_id == item.id).with_for_update()).all()
     if any(version.state not in {"SUBMITTED", "SUPERSEDED"} for version in versions):

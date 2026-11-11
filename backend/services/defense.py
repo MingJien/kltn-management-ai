@@ -108,7 +108,7 @@ def manage_council(session, user, data, identifier=None, signature=None):
         if signature!=council_signature(existing):
             raise HTTPException(409,"Hội đồng đã được cập nhật. Làm mới để đối chiếu trước khi sửa")
         slots=session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.council_id==identifier).order_by(m.DefenseSlot.id).with_for_update()).all()
-        if existing.closed_at or any(s.finalized_at or s.marks or s.attendance or s.minutes for s in slots):
+        if existing.closed_at or any(s.finalized_at or s.marks or meeting_started(s) or s.minutes for s in slots):
             raise HTTPException(409,"Chỉ sửa thành phần trước khi nhập dữ liệu buổi bảo vệ")
     if data.thesis_ids and not data.confirmed_no_conflict:
         raise HTTPException(422, "Cần xác nhận đã đối chiếu quan hệ thân nhân trước khi lập hội đồng")
@@ -154,6 +154,11 @@ def manage_council(session, user, data, identifier=None, signature=None):
     audit(session, user, "DEFENSE_COUNCIL_REVISED" if existing else "DEFENSE_COUNCIL_CREATED", "defense_council", council.id, detail, source_reference=data.reference)
     session.commit()
     return {"id":council.id}
+
+
+def meeting_started(slot):
+    return bool(slot.attendance.get("_council") or any(
+        isinstance(value, dict) and value.get("status") for value in slot.attendance.values()))
 
 
 def load_slot(session, user, identifier, *, write=False):
@@ -210,7 +215,7 @@ def schedule(session, user, data, identifier=None, expected=None):
         if not old_manager:
             raise HTTPException(403, "Bạn không quản lý lịch này")
         row_version(expected, slot.row_version)
-        if slot.finalized_at or slot.marks or slot.attendance or slot.minutes or slot.thesis_id != data.thesis_id:
+        if slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes or slot.thesis_id != data.thesis_id:
             raise HTTPException(409, "Chỉ đổi lịch của cùng đề tài trước khi nhập nội dung buổi bảo vệ")
     council = session.get(m.DefenseCouncil, data.council_id)
     thesis = session.scalar(select(m.Thesis).where(m.Thesis.id == data.thesis_id).with_for_update())
@@ -270,6 +275,8 @@ def schedule(session, user, data, identifier=None, expected=None):
     slot.council_id, slot.report_version_id = council.id, report.id
     slot.starts_at, slot.ends_at, slot.room, slot.roster = data.starts_at, data.ends_at, data.room, roster
     session.flush()
+    from backend.services.publications import sync_slot
+    sync_slot(session, slot)
     audit(session,user,"DEFENSE_SCHEDULED","defense_slot",slot.id,data.room)
     notify(session,user,slot,council,"DEFENSE_SCHEDULED","Đã cập nhật lịch bảo vệ")
     session.commit()
@@ -293,7 +300,7 @@ def cancel_schedule(session,user,identifier,expected,reason):
     row_version(expected,slot.row_version)
     if not manager:
         raise HTTPException(403,"Bạn không quản lý lịch này")
-    if slot.finalized_at or slot.marks or slot.attendance or slot.minutes:
+    if slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes:
         raise HTTPException(409,"Lịch đã có dữ liệu bảo vệ")
     audit(session,user,"DEFENSE_CANCELLED","defense_slot",slot.id,reason)
     notify(session,user,slot,council,"DEFENSE_CANCELLED","Đã hủy lịch bảo vệ")
@@ -325,6 +332,11 @@ def save_marks(session,user,identifier,expected,data):
     check_supervision_conflict(session, session.get(m.Thesis, slot.thesis_id),
         {UUID(row["id"]) for row in council.members})
     ensure_quorum(slot,council)
+    from backend.services.publications import rows
+    if any(r.state in {"SUBMITTED", "ADVISOR_CONFIRMED"} for r in rows(session, slot.thesis_id)):
+        raise HTTPException(409,"Cần GVHD và TBM xử lý xong hồ sơ điểm thưởng trước khi chấm")
+    if invalid_bonus(session, slot):
+        raise HTTPException(409,"Cần đối chiếu mức thưởng đã được TBM duyệt trước khi chấm")
     student = student_id(slot,data.thesis_member_id)
     lecturer = str(data.lecturer_id)
     old=slot.marks.get(student,{}).get(lecturer,{})
@@ -433,28 +445,33 @@ def blockers(slot,council):
 
 
 def invalid_bonus(session,slot):
-    available={str(row["id"]) for row in evidence_options(session,slot.thesis_id)}
-    return any(Decimal(slot.attendance.get(r["id"],{}).get("bonus","0"))>0 and
-        slot.attendance.get(r["id"],{}).get("bonus_evidence_version_id") not in available for r in slot.roster)
+    from backend.services.publications import approved_for
+    for row in slot.roster:
+        current = slot.attendance.get(row["id"], {})
+        try:
+            approved = approved_for(session, slot.thesis_id, row["student_id"])
+        except HTTPException:
+            return True
+        if Decimal(current.get("bonus", "0")) != Decimal(approved["bonus"]):
+            return True
+        if Decimal(approved["bonus"]) > 0 and current.get("bonus_claim_id") != approved.get("bonus_claim_id"):
+            return True
+    return False
 
 
 def save_bonus(session,user,identifier,expected,member_id,data):
+    from backend.services.publications import approved_for
     slot,council,member = edit(session,user,identifier,expected)
     if member["role"] != "CHAIR":
-        raise HTTPException(403,"Chủ tịch hội đồng xác nhận mức thưởng")
+        raise HTTPException(403,"Chủ tịch hội đồng đối chiếu mức thưởng đã được TBM duyệt")
     student = student_id(slot,member_id)
-    if data.points and len(data.reference) < 5:
-        raise HTTPException(422,"Cần căn cứ minh chứng công bố")
-    if data.points:
-        version=session.get(m.DocumentVersion,data.evidence_version_id) if data.evidence_version_id else None
-        document=session.get(m.Document,version.document_id) if version else None
-        file=session.get(m.StoredFile,version.stored_file_id) if version else None
-        if not document or document.thesis_id!=slot.thesis_id or document.document_type not in {"SUPPORTING"} or not file or file.scan_state!="CLEAN":
-            raise HTTPException(422,"Chọn phiên bản tài liệu minh chứng đã được quét an toàn trong hồ sơ khóa luận")
-    old = slot.attendance.get(student,{})
-    slot.attendance = {**slot.attendance,student:{**old,"bonus":str(data.points),"bonus_reference":data.reference,
-        "bonus_evidence_version_id":str(data.evidence_version_id) if data.points else None,"bonus_confirmed_by":str(user.id),"bonus_confirmed_at":now().isoformat()}}
-    finish_edit(session,user,slot,"DEFENSE_BONUS_CONFIRMED",f"{student} · {data.points} · {data.reference}")
+    row = next(r for r in slot.roster if r["id"] == student)
+    approved = approved_for(session, slot.thesis_id, row["student_id"])
+    if data.points != Decimal(approved["bonus"]) or (data.points and str(data.evidence_version_id) != approved.get("bonus_evidence_version_id")):
+        raise HTTPException(422,"Chỉ được sử dụng đúng mức thưởng và minh chứng đã được TBM duyệt cho sinh viên này")
+    slot.attendance = {**slot.attendance, student: {**slot.attendance.get(student,{}), **approved,
+        "bonus_confirmed_by":str(user.id), "bonus_confirmed_at":now().isoformat()}}
+    finish_edit(session,user,slot,"DEFENSE_BONUS_CONFIRMED",approved.get("bonus_reference"))
 
 
 def save_minutes(session,user,identifier,expected,data):
@@ -555,7 +572,7 @@ def workspace(session,user):
             "council_attendance":slot.attendance.get("_council",{}) if not own else {},
             "blockers":(blockers(slot,council)+(["Chủ tịch cần đối chiếu lại minh chứng điểm thưởng"] if invalid_bonus(session,slot) else [])) if privileged and not slot.finalized_at else [],
             "role":member["role"] if member else None,"lecturer_id":member["id"] if member else None,
-            "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or slot.attendance or slot.minutes)})
+            "can_manage":slot.council_id in managed,"schedule_editable":not (slot.finalized_at or slot.marks or meeting_started(slot) or slot.minutes)})
     scopes = []
     eligible = []
     planning_theses = []
@@ -647,7 +664,8 @@ def evidence_options(session,thesis_id):
     rows=session.execute(select(m.DocumentVersion,m.Document,m.StoredFile)
         .join(m.Document,m.Document.id==m.DocumentVersion.document_id)
         .join(m.StoredFile,m.StoredFile.id==m.DocumentVersion.stored_file_id)
-        .where(m.Document.thesis_id==thesis_id,m.Document.document_type.in_(["SUPPORTING"]),m.StoredFile.scan_state=="CLEAN")
+        .where(m.Document.thesis_id==thesis_id,m.Document.document_type.in_(["SUPPORTING"]),m.StoredFile.scan_state=="CLEAN",
+            m.DocumentVersion.id.in_(select(m.PublicationClaim.evidence_version_id).where(m.PublicationClaim.thesis_id==thesis_id,m.PublicationClaim.state=="APPROVED")))
         .order_by(m.DocumentVersion.created_at.desc())).all()
     return [{"id":v.id,"name":f"{d.title} · {f.original_name} · v{v.version_no}","filename":f.original_name} for v,d,f in rows]
 

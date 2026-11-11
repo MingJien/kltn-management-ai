@@ -16,11 +16,12 @@ SELECTED_TABLES = frozenset(
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
-        "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "defense_absence_decision", "thesis_change_request", "thesis_extension", "thesis_extension_request", "thesis_extension_consent",
+        "publication_claim", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "defense_absence_decision", "thesis_change_request", "thesis_extension", "thesis_extension_request", "thesis_extension_consent",
     }
 )
 
 TABLE_INFO = {
+    "publication_claim": ("Hồ sơ xét điểm thưởng công bố khoa học", "Phiên bản minh chứng, đóng góp, GVHD xác nhận và TBM duyệt mức thưởng theo từng sinh viên"),
     "thesis_extension_request": ("Yêu cầu gia hạn KLTN", "Nguyện vọng SV, đồng thuận nhóm, ý kiến GVHD và quyết định có căn cứ"),
     "thesis_extension_consent": ("Xác nhận thành viên xin gia hạn", "Mỗi thành viên tự xác nhận; không làm mất quyền tham gia khi yêu cầu hết hạn"),
     "thesis_change_request": ("Đổi đề tài", "Đồng ý của nhóm, GVHD và quyết định TBM, dữ liệu trước thay đổi"),

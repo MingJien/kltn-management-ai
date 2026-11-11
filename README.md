@@ -4,7 +4,7 @@
 
 ## Hiện trạng
 
-- Runtime dùng PostgreSQL kltn_management; schema hiện có 50 bảng nghiệp vụ, Alembic head 20261110_0024. Bảng `defense_absence_decision` lưu quyết định xử lý SV vắng; lịch bổ sung liên kết với phiên gốc. Cập nhật CSDL qua migration; không chạy file SQL tổng hợp lên database đang dùng.
+- Runtime dùng PostgreSQL kltn_management; schema hiện có 51 bảng nghiệp vụ, Alembic head 20261111_0026. Bảng `defense_absence_decision` lưu quyết định xử lý SV vắng; lịch bổ sung liên kết với phiên gốc. Cập nhật CSDL qua migration; không chạy file SQL tổng hợp lên database đang dùng.
 - NV5 có giao diện và API cho tài khoản/phân quyền, danh sách SV/GV, đề tài, xét duyệt, đăng ký cá nhân/nhóm, tiếp nhận và tạo hồ sơ khóa luận/GVHD.
 - Hồ sơ khóa luận hỗ trợ đề cương, mốc và báo cáo tiến độ, hạn theo loại tài liệu, phiên bản, phản hồi đúng bản nộp, đánh dấu trễ, gia hạn theo đợt, thông báo và nhật ký.
 - GVHD đặt, gia hạn và đóng mốc nội bộ từng khóa luận; SV nộp và GVHD phản hồi đúng hồ sơ. Mốc riêng tách quyền với lịch chung của đợt. Giới hạn 3 khóa luận đang hướng dẫn tính cả đề tài gia hạn từ đợt cũ.
@@ -15,6 +15,7 @@
 - Trang bảo vệ giữ nháp khi đổi tab/lưu biểu mẫu khác, kiểm soát phiên bản từng phiếu, in phiếu trống trước họp, xem báo cáo đúng phiên bản và xử lý SV vắng theo quyết định Khoa. [Kiểm chứng ngày 10/11](docs/evidence/defense-delivery-validation-2026-11-10.md).
 - NV6 tuần 2 có hội đồng, lịch bảo vệ, Mẫu 6, tổng hợp điểm, Mẫu 9–11 và đối chiếu báo cáo Word/PDF theo cặp, gồm OCR khi cấu hình Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md).
 - Mẫu nhận xét Mẫu 7/8 gắn với đúng sinh viên và bản báo cáo; GV gửi nhận xét trên hệ thống, xuất phiếu có footer để ký ngoài. Người được phân công tiếp nhận hồ sơ hoặc TBM ghi nhận bản giấy theo mã bản xuất và căn cứ; không yêu cầu tải bản ký lên lại.
+- Điểm thưởng công bố khoa học có luồng SV nộp → GVHD xác nhận → TBM duyệt từng SV; tự đưa mức đã duyệt vào phiếu Mẫu 6 và khóa căn cứ khi đã chấm. [Kiểm chứng](docs/evidence/publication-bonus-approval.md).
 - Có hồ sơ chuyên môn GV, phân công theo đợt và kiểm tra điều kiện bảo vệ ở mức hiện tại.
 
 Chấp thuận gia hạn KLTN chính thức đang tạm khóa, chờ Khoa/GVHD chốt mốc tính tối đa 5 tháng và cách xếp hội đồng; gửi yêu cầu, đồng thuận nhóm và ý kiến GVHD vẫn hoạt động.
