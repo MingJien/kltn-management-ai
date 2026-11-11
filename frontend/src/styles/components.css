@@ -1619,6 +1619,7 @@ textarea.input {
   .registration-summary dd { margin-bottom: .5rem; }
 }
 .late-badge { color: #b42318; font-weight: 700; white-space: nowrap; }
+.late-badge::before { content: "! "; }
 
 /* ── Workspace Overview Grid & Back Link ── */
 .workspace-back-link {

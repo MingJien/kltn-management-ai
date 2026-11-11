@@ -43,6 +43,8 @@
 .evaluation-field input:disabled,.evaluation-field select:disabled,.evaluation-field textarea:disabled {background:#f1f5f9;color:#53657c;cursor:not-allowed;}
 .evaluation-field input[type="file"] {padding:9px;font-size:13px;}.evaluation-field input[type="file"]::file-selector-button {border:1px solid #bac9d7;background:#f5f8fc;border-radius:5px;padding:6px 10px;margin-right:10px;cursor:pointer;}
 .evaluation-two-fields {display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.evaluation-review-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+@media(max-width:700px) {.evaluation-review-fields {grid-template-columns:1fr;gap:0;}}
 .evaluation-fieldset {border:0;border-top:1px solid var(--evaluation-border);padding:20px 0;margin-top:20px;min-width:0;}.evaluation-fieldset legend {font-size:16px;font-weight:700;padding-right:12px;}.evaluation-fieldset p {line-height:1.65;color:#52647b;}
 .evaluation-review {border:1px solid var(--evaluation-border);border-radius:10px;padding:18px;}.evaluation-review>p {color:#52647b;font-size:13px;margin:10px 0;}.evaluation-review details {margin-top:14px;}.evaluation-review-content dt {font-weight:600;font-size:14px;margin:16px 0 5px;}.evaluation-review-content dd {white-space:pre-wrap;overflow-wrap:anywhere;margin:0;line-height:1.75;font-size:14px;}
 .evaluation-page summary {cursor:pointer;color:#285789;font-weight:600;padding:8px 0;}.evaluation-page summary:focus-visible {outline:2px solid #2456a6;outline-offset:3px;}

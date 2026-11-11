@@ -31,7 +31,7 @@ export default function ThesisReviewEditor({initial,data,context,onClose,onUpdat
     onClose={()=>dirty?setDiscard(true):onClose()} footer={<>
       <span className="evaluation-save-state" role="status">{busy?"Đang lưu…":dirty?"Có thay đổi chưa lưu":"Đã lưu nháp trên hệ thống"}</span>
       <button className="btn btn-secondary" disabled={busy} onClick={()=>dirty?setDiscard(true):onClose()}>Đóng</button>
-      <button className="btn btn-primary" disabled={busy||!dirty} onClick={()=>void run(()=>mutate<Review>(path,context.user_id,value,review.row_version,"PUT"),"Đã lưu nháp riêng. Nếu thay đổi nội dung, cần đính kèm lại bản ký tương ứng.")}><Save size={16} aria-hidden="true"/>Lưu nháp</button>
+      <button className="btn btn-primary" disabled={busy||!dirty} onClick={()=>void run(()=>mutate<Review>(path,context.user_id,value,review.row_version,"PUT"),"Đã lưu nháp riêng. Nếu nội dung thay đổi, hãy xuất lại phiếu trước khi ký.")}><Save size={16} aria-hidden="true"/>Lưu nháp</button>
     </>}>
     <div className="evaluation-editor">
       <div className="evaluation-note"><strong>{student?.name} · {student?.student_code}</strong><p>Phiếu v{review.version_no} · Bản báo cáo v{data.report?.version_no}. Nháp riêng, sinh viên chưa thấy.</p></div>
@@ -39,26 +39,27 @@ export default function ThesisReviewEditor({initial,data,context,onClose,onUpdat
       {discard&&<div className="alert alert-warning" role="alert"><p>Nội dung đang viết chưa được lưu.</p><button className="btn btn-secondary" onClick={()=>setDiscard(false)}>Tiếp tục viết</button><button className="btn btn-danger" onClick={onClose}>Bỏ thay đổi và đóng</button></div>}
       <fieldset disabled={busy||confirm} className="evaluation-fieldset"><legend>1. Nội dung nhận xét theo biểu mẫu</legend>
         {data.form_fields[review.kind].map(field=><label className="evaluation-field" key={field.key}>{field.label}<textarea aria-label={field.label} rows={4} maxLength={6000} value={sections[field.key]||""} onChange={e=>setSections(old=>({...old,[field.key]:e.target.value}))}/><small>{(sections[field.key]||"").length}/6.000 ký tự</small></label>)}
-        {review.kind==="ADVISOR"&&<div className="evaluation-two-fields">
+        {review.kind==="ADVISOR"&&<div className="evaluation-review-fields">
           <label className="evaluation-field">Xác nhận hoàn thành khóa luận<select aria-label="Xác nhận hoàn thành khóa luận" value={completed} onChange={e=>setCompleted(e.target.value)}><option value="">Chọn kết quả</option><option value="true">Đã hoàn thành</option><option value="false">Chưa hoàn thành</option></select></label>
           <label className="evaluation-field">Đề nghị của GVHD<select aria-label="Đề nghị của GVHD" value={allow} onChange={e=>setAllow(e.target.value)}><option value="">Chọn đề nghị</option><option value="true">Đồng ý cho bảo vệ</option><option value="false">Không đồng ý cho bảo vệ</option></select></label>
+          <label className="evaluation-field">Số hoặc căn cứ phiếu (nếu có)<input maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>
         </div>}
-        <label className="evaluation-field">Số hoặc căn cứ phiếu (nếu có)<input maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>
+        {review.kind!=="ADVISOR"&&<label className="evaluation-field">Số hoặc căn cứ phiếu (nếu có)<input maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>}
       </fieldset>
       <fieldset className="evaluation-fieldset" disabled={busy||confirm}><legend>2. Xuất phiếu và bản ký (bổ sung sau)</legend>
-        <p>Xuất phiếu đã điền từ mẫu chính thức của Khoa, kiểm tra rồi ký theo quy trình. Bạn có thể gửi nhận xét ngay trên hệ thống. Bản giấy được cán bộ phụ trách hoặc TBM ghi nhận sau; đính kèm bản quét là tùy chọn.</p>
+        <p>Xuất phiếu từ mẫu của Khoa, kiểm tra và ký. Sau khi gửi nhận xét, người viết, TBM hoặc cán bộ tiếp nhận xác nhận văn bản đã ký trên hệ thống.</p>
         <button className="btn btn-primary" disabled={busy||dirty||!allFields||(review.kind==="ADVISOR"&&(!completed||!allow))} onClick={()=>{
           setBusy(true);setError("");void exportThesisReview(data.thesis_id,review.id,review.row_version)
-            .then(()=>setNotice("Đã xuất phiếu đã điền để ký. Kiểm tra bản in trước khi ký và đính kèm lại."))
+            .then(()=>setNotice("Đã xuất phiếu đã điền. Kiểm tra nội dung trước khi ký."))
             .catch(e=>setError(errorMessage(e))).finally(()=>setBusy(false));
         }}><Download size={16} aria-hidden="true"/>Xuất phiếu đã điền để ký</button>{" "}
         <button className="btn btn-secondary" onClick={()=>void downloadOfficialTemplate(review.kind==="ADVISOR"?"mau-07":"mau-08",`mau-${review.kind==="ADVISOR"?"7":"8"}.docx`,data.round_id).catch(e=>setError(errorMessage(e)))}><Download size={16} aria-hidden="true"/>Tải Mẫu {review.kind==="ADVISOR"?"7":"8"} chính thức</button>
-        <label className="evaluation-field">Đính kèm bản đã ký (PDF/DOCX, tối đa 10 MB)<input type="file" accept=".pdf,.docx" disabled={busy||dirty} onChange={e=>{
+        <details><summary>Đính kèm bản quét (tùy chọn)</summary><label className="evaluation-field">Đính kèm bản đã ký (PDF/DOCX, tối đa 10 MB)<input type="file" accept=".pdf,.docx" disabled={busy||dirty} onChange={e=>{
           const file=e.target.files?.[0];e.target.value="";if(!file)return;
           if(file.size>10*1024*1024||!file.size){setError("Chọn tệp có nội dung, tối đa 10 MB.");return;}
           void run(()=>request<Review>(path+"/signed-copy",context.user_id,{method:"POST",body:file,headers:{"Content-Type":"application/octet-stream","X-File-Name":encodeURIComponent(file.name),"If-Match":String(review.row_version)}}),"Đã lưu bản ký; kiểm tra trạng thái quét trước khi gửi.");
         }}/>{dirty&&<small>Lưu nội dung nháp để bật đính kèm.</small>}</label>
-        {review.signed_file&&<div className="evaluation-note"><strong>{review.signed_file.name}</strong><p>{labels[review.signed_file.scan_state]}</p>{review.signed_file.scan_state!=="CLEAN"&&<button className="btn btn-secondary" onClick={()=>void run(()=>mutate<Review>(path+"/scan",context.user_id,{},review.row_version),"Đã kiểm tra lại trạng thái quét.")}>Quét lại bản ký</button>}</div>}
+        {review.signed_file&&<div className="evaluation-note"><strong>{review.signed_file.name}</strong><p>{labels[review.signed_file.scan_state]}</p>{review.signed_file.scan_state!=="CLEAN"&&<button className="btn btn-secondary" onClick={()=>void run(()=>mutate<Review>(path+"/scan",context.user_id,{},review.row_version),"Đã kiểm tra lại trạng thái quét.")}>Quét lại bản ký</button>}</div>}</details>
       </fieldset>
       <fieldset className="evaluation-fieldset" disabled={busy}><legend>3. Gửi nhận xét</legend><p>Sau khi gửi, nội dung và bản ký được giữ nguyên. Bản sửa cần một phiên bản phiếu mới kèm lý do.</p>
         {!confirm?<button className="btn btn-primary" disabled={dirty||!allFields||(!!review.signed_file&&review.signed_file.scan_state!=="CLEAN")||(review.kind==="ADVISOR"&&(!completed||!allow))} onClick={()=>setConfirm(true)}><Send size={16} aria-hidden="true"/>Kiểm tra và gửi nhận xét</button>:<div className="evaluation-confirm">

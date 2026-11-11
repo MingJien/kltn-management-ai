@@ -85,6 +85,7 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     expect((await read(tbm,base)).reviews).toHaveLength(0);
     const export8=reviewer.waitForEvent("download");await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
     await (await export8).saveAs(path.join(output,"nv6-mau8-filled.docx"));
+    await dialog.getByText("Đính kèm bản quét (tùy chọn)",{exact:true}).click();
     await expect(dialog.getByLabel(/Đính kèm bản đã ký/)).toBeEnabled();
     await dialog.getByLabel(/Đính kèm bản đã ký/).setInputFiles(fixture);
     await expect(dialog.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
@@ -111,6 +112,7 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
       await expect(dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true})).toBeEnabled();
       const export7=advisor.waitForEvent("download");await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
       await (await export7).saveAs(path.join(output,`nv6-mau7-${memberId}-filled.docx`));
+      await dialog.getByText("Đính kèm bản quét (tùy chọn)",{exact:true}).click();
       await expect(dialog.getByLabel(/Đính kèm bản đã ký/)).toBeEnabled();
       await dialog.getByLabel(/Đính kèm bản đã ký/).setInputFiles(fixture);
       await expect(dialog.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
@@ -205,13 +207,13 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     await reviewer.getByRole("link",{name:"NV6 · Phản biện và bảo vệ theo từng sinh viên",exact:true}).click();
     await reviewer.getByLabel("Sinh viên trong hồ sơ").selectOption(studentMemberIds[0]);
     const card=reviewer.locator(".evaluation-review").filter({hasText:"Mẫu 7 · GVHD · Phiếu v"+submitted.version_no});
-    await card.getByRole("button",{name:"Ghi nhận bản giấy",exact:true}).click();
+    await card.getByRole("button",{name:"Xác nhận văn bản đã ký",exact:true}).click();
     dialog=reviewer.getByRole("dialog");
     await dialog.getByLabel("Số / căn cứ tiếp nhận bản giấy",{exact:true}).fill("SO-TIEP-NHAN-DEMO-2026/01");
-    await dialog.getByRole("checkbox",{name:/Tôi đã đối chiếu bản giấy/}).check();
-    await dialog.getByRole("button",{name:"Xác nhận đã nhận bản giấy",exact:true}).click();
+    await dialog.getByRole("checkbox",{name:/Tôi xác nhận văn bản đã có chữ ký/}).check();
+    await dialog.getByRole("button",{name:"Lưu xác nhận văn bản đã ký",exact:true}).click();
     await expect(dialog).toHaveCount(0);
-    await expect(card.getByText("Đã đối chiếu bản giấy",{exact:true})).toBeVisible();
+    await expect(card.getByText("Đã xác nhận văn bản có chữ ký",{exact:true})).toBeVisible();
     view=await read(tbm,base);memberState=view.members.find((m:any)=>m.id===studentMemberIds[0]);
     expect(memberState.eligibility.conditions.find((c:any)=>c.key==="consent").met).toBe(true);
     const grant=(await read(admin,"/admin/round-assignments")).find((g:any)=>g.round_id===round&&g.user_id===receiver&&g.assignment_type==="REVIEW_RECORDS_MANAGER");

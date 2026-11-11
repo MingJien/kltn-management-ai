@@ -327,6 +327,11 @@ def test_export_fills_official_form_preserves_reference_and_requires_saved_compl
     result=client.post(base+"/print-copy",headers=version_headers(users[user],saved))
     assert result.status_code==200,result.text
     assert result.headers["X-Print-SHA256"]==hashlib.sha256(result.content).hexdigest()
+    if kind == "ADVISOR":
+        document = __import__("docx").Document(io.BytesIO(result.content))
+        heading = next(p for p in document.paragraphs if p.text.strip().startswith("1. Về tinh thần"))
+        assert any(run.italic and "Về tinh thần" in run.text for run in heading.runs)
+        assert any("SYNTHETIC EXPORT TEXT attitude" in p.text for p in document.paragraphs)
     with zipfile.ZipFile(io.BytesIO(original)) as before,zipfile.ZipFile(io.BytesIO(result.content)) as after:
         editable={"word/document.xml","word/_rels/document.xml.rels","[Content_Types].xml"}
         assert all(before.read(name)==after.read(name) for name in before.namelist() if name not in editable)
@@ -381,6 +386,22 @@ def test_changed_review_cannot_receive_paper_for_old_export(evaluation):
     result=client.post(base+"/paper-receipt",headers=version_headers(users[4],r),json={
         "reference":"PAPER-OLD-CONTENT","export_code":export.headers["X-Document-Code"],"confirm_paper":True})
     assert result.status_code==422
+
+
+def test_review_author_can_confirm_signed_export_without_upload(evaluation):
+    ctx,_=evaluation;client,users,_,_,_,path=ctx
+    review=create(ctx).json();base=path+f"/evaluation/reviews/{review['id']}"
+    payload={"sections":{field["key"]:"Synthetic signed review "+field["key"] for field in FORM_FIELDS["ADVISOR"]},
+        "thesis_completed":True,"allow_defense":True}
+    review=client.put(base,headers=version_headers(users[3],review),json=payload).json()
+    review=client.post(base+"/submit",headers=version_headers(users[3],review),json={"confirm_content":True}).json()
+    exported=client.post(base+"/print-copy",headers=version_headers(users[3],review))
+    assert exported.status_code==200
+    receipt={"reference":"SYNTHETIC SIGNED PAPER","export_code":exported.headers["X-Document-Code"],"confirm_paper":True}
+    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],review),json=receipt).status_code in (403,404)
+    response=client.post(base+"/paper-receipt",headers=version_headers(users[3],review),json=receipt)
+    assert response.status_code==200,response.text
+    assert next(c for c in get(ctx)["members"][0]["eligibility"]["conditions"] if c["key"]=="consent")["met"]
 
 @pytest.mark.parametrize("source_code,target_code", [("BM-CNTT","BM-KHMT"), ("BM-KHMT","BM-CNTT")])
 def test_computing_departments_can_assign_cross_reviewer(evaluation, source_code, target_code):

@@ -587,10 +587,15 @@ def review_fingerprint(session,item):
     return hashlib.sha256(json.dumps(values,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
 def record_paper(session,user,thesis_id,review_id,data,expected):
-    thesis=access(session,user,thesis_id,"evaluation:record",write=True)
+    thesis=access(session,user,thesis_id,write=True)
     item=session.scalar(select(m.ThesisReview).where(m.ThesisReview.id==review_id,m.ThesisReview.thesis_id==thesis.id).with_for_update())
     if not item or item.state!="SUBMITTED":
         raise HTTPException(409,"Chỉ ghi nhận bản giấy của phiếu đã gửi")
+    if "evaluation:record" not in permissions(session,user,thesis):
+        lecturer, assignment = writing_assignment(session, user, thesis, item.kind)
+        column = "advisor_assignment_id" if item.kind == "ADVISOR" else "reviewer_assignment_id"
+        if item.lecturer_id != lecturer.id or getattr(item, column) != assignment.id:
+            raise HTTPException(403, "Chỉ người viết phiếu hiện hành hoặc người được giao tiếp nhận được xác nhận")
     row_version(expected,item.row_version)
     if item.paper_confirmed_at:
         raise HTTPException(409,"Bản giấy đã được ghi nhận; lịch sử được giữ nguyên")
@@ -604,6 +609,6 @@ def record_paper(session,user,thesis_id,review_id,data,expected):
     audit(session,user,"THESIS_REVIEW_PAPER_RECEIVED","thesis_review",item.id,data.reference,source_reference=data.export_code)
     author=session.get(m.LecturerProfile,item.lecturer_id).user_id
     student=session.get(m.StudentProfile,session.get(m.ThesisMember,item.thesis_member_id).student_id).user_id
-    notify(session,user,thesis,people(session,thesis)|{author,student},"THESIS_REVIEW_PAPER_RECEIVED","Đã ghi nhận bản giấy nhận xét; bộ môn có thể xét lại điều kiện")
+    notify(session,user,thesis,people(session,thesis)|{author,student},"THESIS_REVIEW_PAPER_RECEIVED","Đã xác nhận văn bản nhận xét có chữ ký; bộ môn có thể xét lại điều kiện")
     session.commit()
     return workspace(session,user,thesis.id)

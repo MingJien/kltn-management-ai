@@ -49,7 +49,7 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
                 node.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
                 node.text = line
 
-        def slot(prefix, value):
+        def slot(prefix, value, preserve_heading=False):
             p = find(prefix)
             original_font = p.find(f"{{{W}}}r/{{{W}}}rPr")
             original_font = deepcopy(original_font) if original_font is not None else E.Element(f"{{{W}}}rPr")
@@ -66,7 +66,14 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
             for tag in ("b","i"):
                 E.SubElement(original_font,f"{{{W}}}{tag}").set(f"{{{W}}}val","0")
             lines = value.split("\n")
-            replace(p, lines[0])
+            if preserve_heading:
+                remaining = len(lines[0])
+                for node in p.xpath('.//w:t', namespaces=NS):
+                    content = node.text or ''
+                    node.text = content[:remaining]
+                    remaining = max(0, remaining - len(content))
+            else:
+                replace(p, lines[0])
             following = p.getnext()
             while following is not None and following.tag == f"{{{W}}}p" and re.fullmatch(r"[.\s…]+", text(following)):
                 next_node = following.getnext()
@@ -101,6 +108,16 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
             if re.fullmatch(r"KHOA\s*[.\s…]+", text(p)):
                 faculty_name = values["faculty"]
                 replace(p, faculty_name.upper() if faculty_name.lower().startswith("khoa") else "KHOA " + faculty_name.upper())
+                run = p.find(f"{{{W}}}r")
+                props = run.find(f"{{{W}}}rPr")
+                if props is None:
+                    props = E.Element(f"{{{W}}}rPr")
+                    run.insert(0, props)
+                for tag in ("sz", "szCs"):
+                    size = props.find(f"{{{W}}}{tag}")
+                    if size is None:
+                        size = E.SubElement(props, f"{{{W}}}{tag}")
+                    size.set(f"{{{W}}}val", "21")
 
         slot("Họ và tên sinh viên:", "Họ và tên sinh viên: " + values["student"])
         slot("Lớp:", f"Lớp: {values['class_name']}    Mã sinh viên: {values['student_code']}")
@@ -110,8 +127,8 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
             slot("Đơn vị:", "Đơn vị: " + values["unit"])
             fields = [("1. Về tinh thần", "attitude"), ("2. Sự đáp ứng", "content"), ("3. Hình thức", "presentation")]
             for prefix, key in fields:
-                label = text(find(prefix)).split(":")[0] + ":"
-                slot(prefix, label + "\n" + sections[key])
+                heading = text(find(prefix)).split(":")[0] + ":"
+                slot(prefix, heading + "\n" + sections[key], preserve_heading=True)
             slot("Đề nghị của giảng viên hướng dẫn:", "Đề nghị của giảng viên hướng dẫn: " +
                 ("Đồng ý cho bảo vệ." if allow else "Không đồng ý cho bảo vệ.") + "\n" +
                 ("Xác nhận KLTN đã hoàn thành." if completed else "KLTN chưa hoàn thành."))
