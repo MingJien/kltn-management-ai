@@ -91,7 +91,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await tbm.getByRole("button",{name:"Mở mốc cho đợt",exact:true}).click();
     await expect(tbm.getByRole("heading",{name:"Mốc báo cáo NV5 · v1",exact:true})).toBeVisible();
 
-    await sv.getByRole("button",{name:"Tiến độ",exact:true}).or(sv.getByRole("tab",{name:"Tiến độ",exact:true})).click();
+    await sv.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click();
     await sv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await sv.getByLabel("Mốc báo cáo",{exact:true}).selectOption({label:"Mốc báo cáo NV5 · v1"});
     await sv.getByLabel("Kết quả, khó khăn và kế hoạch",{exact:true}).fill("Báo cáo nộp trễ có minh chứng");
@@ -140,7 +140,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await review(gv,reportCard,"CONFIRM","GVHD xác nhận báo cáo bản 2");
 
     // Real Mẫu 2, immutable versions, close, request revision, accept, download and print.
-    await sv.getByRole("button",{name:"Tài liệu",exact:true}).or(sv.getByRole("tab",{name:"Tài liệu",exact:true})).click();
+    await sv.goto(`${web}${base}?section=submissions&kind=PLAN`);
     const originalPlan=await fs.readFile(process.env.KLTN_E2E_PLAN_FILE!);
     const zip=await JSZip.loadAsync(originalPlan);
     const styles=await zip.file("word/styles.xml")!.async("string");
@@ -149,27 +149,27 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     const cut=xml.lastIndexOf("<w:sectPr"); expect(cut).toBeGreaterThan(0);
     zip.file("word/document.xml",xml.slice(0,cut)+'<w:p><w:pPr><w:pStyle w:val="KLTNReviewProof"/></w:pPr><w:r><w:t>KIỂM THỬ ĐỊNH DẠNG</w:t></w:r></w:p>'+xml.slice(cut));
     const source=await zip.generateAsync({type:"nodebuffer"});
-    await savedDownload(sv,sv.getByRole("button",{name:"Tải nhanh Mẫu 2 (Kế hoạch)",exact:true}),"official-plan.docx");
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("REGISTRATION");
-    await expect(sv.getByRole("link",{name:"Mở đơn Mẫu 1a/1b trong hồ sơ đăng ký",exact:true})).toHaveAttribute("href",`/registrations?focus=${reg.id}`);
-    await expect(sv.getByRole("button",{name:"Tạo hồ sơ tài liệu",exact:true})).toHaveCount(0);
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("PROPOSAL");
-    await expect(sv.getByRole("link",{name:"Mở nơi nộp Đề cương Mẫu 3",exact:true})).toHaveAttribute("href",`${base}?section=proposal`);
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("PLAN");
-    await sv.getByLabel("Tên tài liệu",{exact:true}).fill("Kế hoạch NV5 theo Mẫu 2");
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("PLAN");
-    await sv.getByRole("button",{name:"Tạo hồ sơ tài liệu",exact:true}).click();
-    await expect(sv.getByLabel(/Nộp phiên bản mới/)).toHaveAttribute("accept",".pdf,.docx");
-    await sv.getByLabel(/Nộp phiên bản mới/).setInputFiles({name:"wrong-plan.txt",mimeType:"text/plain",buffer:Buffer.from("Wrong layout")});
-    await expect(sv.getByRole("button",{name:"Nộp tài liệu",exact:true})).toBeDisabled();
-    await expect(sv.getByRole("alert")).toContainText("chỉ nhận PDF hoặc DOCX");
+    await savedDownload(sv,sv.getByRole("button",{name:"Tải mẫu áp dụng · Mẫu 2",exact:true}),"official-plan.docx");
+    await expect(sv.getByRole("link",{name:/Mẫu 3 Đề cương/})).toHaveAttribute("href",`${base}?section=submissions&kind=PROPOSAL`);
+    await expect(sv.getByLabel(/Tệp cần nộp/)).toHaveAttribute("accept",".pdf,.docx");
+    await sv.getByLabel(/Tệp cần nộp/).setInputFiles({name:"wrong-plan.txt",mimeType:"text/plain",buffer:Buffer.from("Wrong layout")});
+    await expect(sv.getByRole("button",{name:"Nộp kế hoạch Mẫu 2",exact:true})).toBeDisabled();
+    await expect(sv.getByRole("alert")).toContainText("Tệp phải đúng định dạng");
     const upload=async(name:string)=>{
-      await sv.getByLabel(/Nộp phiên bản mới/).setInputFiles({name,mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",buffer:source});
-      await sv.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
+      const payload={name,mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",buffer:source};
+      if(await sv.getByLabel(/Tệp cần nộp/).count()){
+        await sv.getByLabel(/Tệp cần nộp/).setInputFiles(payload);
+        await sv.getByRole("button",{name:"Nộp kế hoạch Mẫu 2",exact:true}).click();
+      }else{
+        const update=sv.locator("details.submission-update");
+        if((await update.getAttribute("open"))===null)await update.locator("summary").click();
+        await sv.getByLabel(/Nộp phiên bản mới/).setInputFiles(payload);
+        await sv.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
+      }
       await expect(sv.getByText(new RegExp(`Phiên bản \\d+ · ${name}`))).toBeVisible();
     };
     await upload("ke-hoach-v1.docx");
-    await gv.getByRole("button",{name:"Tài liệu",exact:true}).or(gv.getByRole("tab",{name:"Tài liệu",exact:true})).click();
+    await gv.goto(`${web}${base}?section=submissions&kind=PLAN`);
     await gv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     const oldCard=gv.locator(".core-version").filter({has:gv.getByText("Phiên bản 1 · ke-hoach-v1.docx",{exact:true})});
     await oldCard.getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click();
@@ -180,7 +180,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await upload("ke-hoach-v2.docx");
     await docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click();
     await expect(docModal.getByRole("alert")).toBeVisible();
-    const unchanged=(await read(gv,base+"/documents")).find((d:any)=>d.title==="Kế hoạch NV5 theo Mẫu 2");
+    const unchanged=(await read(gv,base+"/documents")).find((d:any)=>d.title==="Kế hoạch thực hiện (Mẫu 2)");
     expect(unchanged.versions.map((v:any)=>v.state)).toEqual(["SUBMITTED","SUPERSEDED"]);
     expect(unchanged.versions[0].reviews).toHaveLength(0);
     await docModal.getByRole("button",{name:"Quay lại",exact:true}).click();
@@ -203,7 +203,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await deadline.getByText("Đóng nhận Kế hoạch thực hiện (Mẫu 2) cho cả đợt",{exact:true}).click();
     await deadline.getByLabel("Lý do đóng",{exact:true}).fill("Khoa kết thúc nhận kế hoạch");
     await deadline.getByRole("button",{name:"Đóng nhận cho cả đợt",exact:true}).click();
-    await gv.getByRole("button",{name:"Tài liệu",exact:true}).or(gv.getByRole("tab",{name:"Tài liệu",exact:true})).click();
+    await gv.goto(`${web}${base}?section=submissions&kind=PLAN`);
     await gv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await gv.locator(".core-version").filter({has:gv.getByText("Phiên bản 2 · ke-hoach-v2.docx",{exact:true})}).getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click();
     docModal = gv.getByRole("dialog");
@@ -255,8 +255,8 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await expect(sv.getByRole("dialog").getByRole("button",{name:"Đặt ghim",exact:true})).toHaveCount(0);
     await sv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
     await sv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
-    await expect(sv.getByRole("heading",{name:"Nộp bản sửa v3 theo yêu cầu GVHD",exact:true})).toBeVisible();
-    await expect(sv.getByRole("link",{name:"Đến hồ sơ Kế hoạch Mẫu 2 đã có",exact:true})).toBeVisible();
+    await expect(sv.getByRole("heading",{name:"Nộp bản sửa v3 theo yêu cầu cập nhật",exact:true})).toBeVisible();
+    expect((await read(sv,base+"/documents")).filter((d:any)=>d.document_type==="PLAN")).toHaveLength(1);
     await upload("ke-hoach-v3.docx");
     await gv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await review(gv,gv.locator(".core-version").filter({has:gv.getByText("Phiên bản 3 · ke-hoach-v3.docx",{exact:true})}),"ACCEPT","GVHD tiếp nhận kế hoạch phiên bản 3");
@@ -275,7 +275,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"nv5-documents-student.png"),fullPage:true});
 
     // Real Mẫu 3 → GVHD confirmation → TBM finalization → traced print copy.
-    await sv.getByRole("button",{name:"Đề cương",exact:true}).or(sv.getByRole("tab",{name:"Đề cương",exact:true})).click();
+    await sv.goto(`${web}${base}?section=submissions&kind=PROPOSAL`);
     await sv.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
     await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
     await expect(sv.getByText(/Phiên bản 1 · synthetic-proposal.docx/)).toBeVisible();
@@ -289,7 +289,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await expect(sv.getByRole("dialog").locator(".review-text-sheet [data-review-block]").first()).toBeVisible();
     await expect(sv.getByRole("dialog").getByRole("button",{name:"Đặt ghim",exact:true})).toHaveCount(0);
     await sv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
-    await gv.getByRole("button",{name:"Đề cương",exact:true}).or(gv.getByRole("tab",{name:"Đề cương",exact:true})).click();
+    await gv.goto(`${web}${base}?section=submissions&kind=PROPOSAL`);
     await gv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await gv.locator(".core-version").filter({has:gv.getByText("Phiên bản 2 · synthetic-proposal.docx",{exact:true})}).getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click();
     await expect(gv.getByRole("dialog").locator(".review-text-sheet [data-review-block]").first()).toBeVisible();
@@ -306,7 +306,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await expect(sv.getByRole("dialog").locator(".review-block--selected")).toBeVisible();
     await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"proposal-docx-published-review.png")});
     await sv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
-    await tbm.getByRole("button",{name:"Đề cương",exact:true}).or(tbm.getByRole("tab",{name:"Đề cương",exact:true})).click();
+    await tbm.goto(`${web}${base}?section=submissions&kind=PROPOSAL`);
     await tbm.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await review(tbm,tbm.locator(".card").filter({has:tbm.getByRole("heading",{name:/Trưởng bộ môn/})}),"FINALIZE","TBM chốt bản đề cương hiện hành");
     await sv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
@@ -314,16 +314,23 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await sv.getByText("Lịch sử xuất bản in v2",{exact:true}).click();
     await expect(sv.getByText("Xuất từ phiên bản đã duyệt",{exact:true})).toBeVisible();
     expect((await read(sv,base+"/proposal")).state).toBe("DEPARTMENT_FINALIZED");
-    await sv.getByRole("button",{name:"Tài liệu",exact:true}).or(sv.getByRole("tab",{name:"Tài liệu",exact:true})).click();
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("SUPPORTING_DESIGN");
+    await sv.goto(`${web}${base}?section=submissions&kind=PLAN`);
+    await tbm.goto(`${web}${base}?section=submissions&kind=SUPPORTING`);
+    const supportingDeadline=tbm.locator("section.card").filter({has:tbm.getByRole("heading",{name:"Lịch nhận tài liệu của đợt",exact:true})});
+    await supportingDeadline.getByLabel("Hạn mới (giờ Việt Nam)",{exact:true}).fill(local(new Date(Date.now()+80*86400000)));
+    await supportingDeadline.getByLabel("Căn cứ / lý do",{exact:true}).fill("Khoa mở nhận tài liệu hỗ trợ theo đợt");
+    await supportingDeadline.getByRole("button",{name:/Thiết lập cho cả đợt|Gia hạn cho cả đợt/}).click();
+    await sv.goto(`${web}${base}?section=submissions&kind=SUPPORTING`);
+    await sv.getByLabel("Nội dung tài liệu",{exact:true}).selectOption("SUPPORTING_DESIGN");
     await expect(sv.getByLabel("Tên tài liệu",{exact:true})).toHaveValue("Đặc tả yêu cầu / tài liệu thiết kế");
     await sv.getByLabel("Tên tài liệu",{exact:true}).fill("Thiết kế NV5 hỗ trợ");
-    await sv.getByRole("button",{name:"Tạo hồ sơ tài liệu",exact:true}).click();
-    await expect(sv.getByRole("heading",{name:"Thiết kế NV5 hỗ trợ",exact:true})).toBeVisible();
+    await sv.getByLabel(/Tệp cần nộp/).setInputFiles({name:"thiet-ke.txt",mimeType:"text/plain",buffer:Buffer.from("Synthetic design documentation")});
+    await sv.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
+    await expect(sv.locator("details.submission-attachment > summary").filter({hasText:"Thiết kế NV5 hỗ trợ"})).toBeVisible();
     expect((await read(sv,base+"/documents")).find((item:any)=>item.title==="Thiết kế NV5 hỗ trợ").document_type).toBe("SUPPORTING");
     expect((await outsider.request.get(api+base+"/document-deadline-history")).status()).toBe(404);
     // The faculty can reopen a closed intake with a later round-wide deadline.
-    await tbm.getByRole("button",{name:"Tiến độ",exact:true}).or(tbm.getByRole("tab",{name:"Tiến độ",exact:true})).click();
+    await tbm.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click();
     await tbm.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     await milestone.getByText("Gia hạn và mở lại toàn đợt",{exact:true}).click();
     await milestone.getByLabel("Hạn mới (giờ Việt Nam)",{exact:true}).fill(local(new Date(Date.now()+3*86400000)));
@@ -337,7 +344,7 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await deadline.getByRole("button",{name:"Gia hạn và mở nhận lại cả đợt",exact:true}).click();
     await deadline.getByText("Lịch sử hạn nộp tài liệu của đợt",{exact:true}).click();
     await expect(deadline.getByText(/PLAN:.*Khoa mở lại hạn kế hoạch cả đợt/)).toBeVisible();
-    await sv.getByRole("button",{name:"Tiến độ",exact:true}).or(sv.getByRole("tab",{name:"Tiến độ",exact:true})).click();
+    await sv.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click();
     await sv.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
     const historyCard = sv.locator("article.card").filter({has:sv.getByText("Báo cáo nộp trễ có minh chứng",{exact:true})});
     await historyCard.getByText("Lịch sử cập nhật (1 bản trước)",{exact:true}).click();

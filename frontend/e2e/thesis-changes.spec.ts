@@ -17,7 +17,7 @@ async function mutate(page:Page,path:string,body:unknown,version?:number,method=
   const r=await page.request.fetch(api+path,{method,data:body,headers:{"X-CSRF-Token":context.csrf_token,...(version?{"If-Match":String(version)}:{})}});
   expect(r.ok(),await r.text()).toBeTruthy();return r.status()===204?undefined:r.json();
 }
-test("Đổi đề tài và gia hạn với chính sách giả lập riêng cho test, bố cục 320–1920px",async({browser})=>{
+test("Đổi đề tài và gia hạn theo quyết định, bố cục 320–1920px",async({browser})=>{
   test.setTimeout(180000);
   const contexts=await Promise.all(["admin","tbm","gv","nv6Student","nv6Member"].map(async key=>{
     const context=await browser.newContext();const page=await context.newPage();page.setDefaultTimeout(15000);await login(page,key);return {context,page};
@@ -89,7 +89,6 @@ test("Đổi đề tài và gia hạn với chính sách giả lập riêng cho 
     await sv.getByRole("button",{name:"Xin gia hạn KLTN",exact:true}).last().click();
     dialog=sv.getByRole("dialog");
     const extended=new Date(Date.now()+30*86400000+7*3600000).toISOString().slice(0,16);
-    await dialog.getByLabel("Hạn hoàn thành đề nghị (giờ Việt Nam)",{exact:true}).fill(extended);
     await dialog.getByLabel("Lý do xin gia hạn",{exact:true}).fill("Synthetic request to complete the academic work.");
     await dialog.getByLabel("Tôi đồng ý xin gia hạn và hiểu rằng các thành viên khác phải tự xác nhận nguyện vọng.").check();
     await dialog.getByRole("button",{name:"Gửi yêu cầu gia hạn",exact:true}).click();
@@ -112,13 +111,22 @@ test("Đổi đề tài và gia hạn với chính sách giả lập riêng cho 
     await dialog.getByLabel("Kết quả",{exact:true}).selectOption("APPROVE");
     await dialog.getByLabel("Ngày quyết định",{exact:true}).fill(new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Ho_Chi_Minh"}));
     await dialog.getByLabel("Bắt đầu gia hạn theo quyết định (giờ Việt Nam)",{exact:true}).fill(new Date(Date.now()+7*86400000+7*3600000).toISOString().slice(0,16));
-    await dialog.getByLabel("Hạn mới được duyệt (giờ Việt Nam)",{exact:true}).fill(extended);
+    const untilInput=dialog.getByLabel("Hạn mới được duyệt (giờ Việt Nam)",{exact:true});
+    await untilInput.fill(new Date(Date.now()+220*86400000+7*3600000).toISOString().slice(0,16));
+    expect(await untilInput.evaluate((element:HTMLInputElement)=>element.validity.rangeOverflow)).toBe(true);
+    await untilInput.fill(extended);
     await dialog.getByLabel("Số hoặc căn cứ quyết định",{exact:true}).fill("QD-SYN-EXTENSION-01");
     await dialog.getByLabel("Ý kiến và căn cứ",{exact:true}).fill("Synthetic external decision grants additional time.");
     await dialog.getByLabel("Tôi đã đối chiếu quyết định và mốc thời gian ghi nhận.").check();
     await dialog.getByRole("button",{name:"Xác nhận",exact:true}).click();
     await expect(dialog).toHaveCount(0);
     await expect(tbm.getByText("Đã ghi nhận một lần",{exact:true})).toBeVisible();
+    await expect(tbm.getByText("Chờ Khoa xếp kỳ bảo vệ tiếp theo trong thời hạn gia hạn được duyệt.",{exact:true})).toBeVisible();
+    await expect(tbm.getByText("QD-SYN-EXTENSION-01",{exact:true}).last()).toBeVisible();
+    await sv.reload();
+    await sv.getByRole("button",{name:"Xin gia hạn KLTN",exact:true}).click();
+    await expect(sv.getByText("Chờ Khoa xếp kỳ bảo vệ tiếp theo trong thời hạn gia hạn được duyệt.",{exact:true})).toBeVisible();
+
 
     await sv.reload();
     await sv.getByRole("combobox",{name:"Trạng thái yêu cầu",exact:true}).selectOption("ALL");
@@ -192,9 +200,7 @@ test("Tách cá nhân giữ nhóm cũ và GVHD đặt mốc riêng cho từng kh
     await dialog.getByRole("button",{name:"Gửi yêu cầu",exact:true}).click();
     await expect(dialog).toHaveCount(0);
     await peer.goto(`/changes?thesis=${source}`);
-    await peer.getByRole("button",{name:"Xác nhận nguyện vọng",exact:true}).click();
-    await peer.getByRole("dialog").getByRole("button",{name:"Xác nhận",exact:true}).click();
-    await expect(peer.getByRole("dialog")).toHaveCount(0);
+    await expect(peer.getByRole("button",{name:"Xác nhận nguyện vọng",exact:true})).toHaveCount(0);
     await gv.goto(`/changes?thesis=${source}`);
     await gv.getByRole("button",{name:"GVHD hiện tại xem xét",exact:true}).click();
     await gv.getByLabel("Ý kiến và căn cứ",{exact:true}).fill("Both theses have a feasible independent academic scope.");

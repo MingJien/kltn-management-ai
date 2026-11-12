@@ -79,6 +79,16 @@ def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
 def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     ctx,_ = evaluation
     client,users,students,lecturers,session,path = ctx
+    major_code="EXPORT-MAJOR"
+    for dept in {student.department_id for student in students}:
+        session.add(m.DepartmentMajor(id=uuid4(),department_id=dept,code=major_code,name="Công nghệ thông tin"))
+    session.flush()
+    for student in students:
+        student.class_name="ĐHCNTT22A"
+        student.major_code=major_code
+        student.birth_date=datetime(2004,3,15).date()
+        student.training_cohort="2022–2026"
+    session.commit()
     thesis = get(ctx)
     proof=client.post(path+'/documents',headers=hdr(users[0]),json={'document_type':'SUPPORTING','title':'Synthetic research publication evidence'})
     assert proof.status_code==201,proof.text
@@ -139,7 +149,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert created.status_code==201,created.text
     council = created.json()["id"]
     assert session.get(m.DefenseCouncil,UUID(council)).members[-1]["invitation_reference"]==council_input["reference"]
-    body = {"council_id":council,"thesis_id":thesis["thesis_id"],"room":"Synthetic room",
+    body = {"confirmed_no_conflict":True,"council_id":council,"thesis_id":thesis["thesis_id"],"room":"Synthetic room",
         "starts_at":(now()-timedelta(hours=2)).isoformat(),"ends_at":(now()-timedelta(hours=1)).isoformat()}
     assert client.post(base+"/slots",headers=hdr(users[4]),json=body).status_code == 409
     for index in range(len(thesis["members"])):
@@ -245,7 +255,8 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("PUT","/attendance/"+second,users[5],{"status":"ABSENT","reason":"Có báo vắng"})
     mutate("PUT","/bonus/"+first,users[4],{"points":"1","reference":"Synthetic research publication"},422)
     mutate("PUT","/bonus/"+first,users[4],{"points":"1","reference":"Synthetic research publication","evidence_version_id":evidence_version})
-    mutate("PUT","/minutes",users[5],{"discussion":"Synthetic discussion","conclusion":"Synthetic conclusion"})
+    meeting={"discussion":"Synthetic discussion","conclusion":"Synthetic conclusion","objectives":"Mục tiêu kiểm thử","functions":"Chức năng kiểm thử","achievements":"Kết quả kiểm thử","recommendations":"Kiến nghị kiểm thử","classifications":{first:"Xuất sắc"}}
+    mutate("PUT","/minutes",users[5],meeting)
     mutate("POST","/finalize",users[4],{},409)
     blank = client.get(endpoint+"/forms/6",headers=hdr(users[5]),params={"student_id":first,"lecturer_id":str(lecturers[1].id),"blank":True})
     assert blank.status_code==200,blank.text
@@ -265,11 +276,14 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert not claims_workspace['can_approve'] and not claims_workspace['can_review']
     assert client.post(claim_endpoint,headers={**hdr(users[4]),'If-Match':'3'},json={
         'outcome':'APPROVE','reason':'Attempt to change bonus after marking','points':{str(students[0].id):'0'}}).status_code==409
+    students[0].class_name="ĐHCNTT22C"
+    session.commit()
     pending_form=client.get(endpoint+"/forms/6",headers=hdr(users[4]),params={"student_id":first,"lecturer_id":str(lecturers[1].id)})
     assert pending_form.status_code==200,pending_form.text
     pending_sheet=load_workbook(BytesIO(pending_form.content)).active
     assert pending_sheet["F28"].value==1 and pending_sheet["F29"].value==10
-    assert "CHUA CHOT" in pending_sheet.oddFooter.left.text
+    assert "ĐHCNTT22C" in pending_sheet["A7"].value
+    assert "CHƯA CHỐT" in pending_sheet.oddFooter.left.text
     stale=client.put(endpoint+"/marks",headers={**hdr(users[4]),"If-Match":str(shared["version"])},json={
         "thesis_member_id":first,"lecturer_id":str(lecturers[1].id),"scores":scores,"ballot_revision":0,"context_token":shared["context_token"]})
     assert stale.status_code==409
@@ -280,7 +294,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("POST","/finalize",users[4],{})
     mutate("PUT","/bonus/"+first,users[4],{"points":"0"},409)
     mutate("POST","/reopen-unsigned",users[4],{"reason":"Correct unsigned meeting conclusion","confirm_unsigned":True})
-    mutate("PUT","/minutes",users[5],{"discussion":"Synthetic discussion","conclusion":"Synthetic conclusion corrected"})
+    mutate("PUT","/minutes",users[5],{**meeting,"conclusion":"Synthetic conclusion corrected"})
     mutate("POST","/finalize",users[4],{})
     result = client.get(base,headers=hdr(users[0])).json()["slots"][0]["results"]
     assert result[first]["average"]=="10.0"
@@ -291,6 +305,15 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert minutes.status_code==200,minutes.text
     doc = Document(BytesIO(minutes.content))
     assert "Synthetic conclusion corrected" in "\n".join(p.text for p in doc.paragraphs)
+    assert "Mục tiêu kiểm thử" in "\n".join(p.text for p in doc.paragraphs)
+    layout_fields=client.get(endpoint+"/forms/9?layout_fields=true",headers=hdr(users[5]))
+    assert {r["key"] for r in layout_fields.json()["fields"]}=={"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}
+    styled=client.get(endpoint+"/forms/9",headers=hdr(users[5]),params={"line_breaks":'{"conclusion":[9]}',"narrative_italic":"true"})
+    assert styled.status_code==200,styled.text
+    assert any(p.text=="Synthetic\n conclusion corrected" for p in Document(BytesIO(styled.content)).paragraphs)
+    for broken in ['{"average":[0]}','{"conclusion":"changed"}','{"conclusion":[99999]}','{"conclusion":[true]}']:
+        assert client.get(endpoint+"/forms/9",headers=hdr(users[5]),params={"line_breaks":broken}).status_code==422
+
     form6 = client.get(endpoint+"/forms/6",headers=hdr(users[4]),params={
         "student_id":first,"lecturer_id":str(lecturers[1].id)})
     assert form6.status_code==200,form6.text
@@ -306,6 +329,28 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     rows = list(load_workbook(BytesIO(official.content),read_only=True).active.values)
     assert any(r[1]==students[0].student_code and r[5]==10 for r in rows)
     assert any(r[1]==students[1].student_code and r[5] is None and r[6]=="Vắng" for r in rows)
+    # An authorized metadata correction remains possible after locking, with an
+    # auditable new export revision and the exact same frozen academic result.
+    import copy
+    record=session.get(m.DefenseSlot,UUID(slot))
+    snapshot=copy.deepcopy(record.minutes["results_snapshot"])
+    old_marks=copy.deepcopy(record.marks)
+    academic={"class_name":"ĐHCNTT22B","major_code":major_code,"birth_date":"2004-03-15",
+        "training_cohort":"2022–2026","source_reference":"DS-TEST-2026","reason":"Correct class from verified student record"}
+    mutate("PUT","/academic-profile/"+first,users[5],academic,403)
+    mutate("PUT","/academic-profile/"+first,users[4],{**academic,"major_code":"UNRELATED"},422)
+    mutate("PUT","/academic-profile/"+first,users[4],{**academic,"birth_date":"2099-01-01"},422)
+    mutate("PUT","/academic-profile/"+first,users[4],{**academic,"scores":[0]*12},422)
+    mutate("PUT","/academic-profile/"+first,users[4],academic)
+    session.refresh(record)
+    assert record.minutes["results_snapshot"]==snapshot and record.marks==old_marks
+    corrected=client.get(base+"/councils/"+council+"/forms/10",headers=hdr(users[4]))
+    assert "ĐHCNTT22B" in "\n".join(c.text for r in Document(BytesIO(corrected.content)).tables[1].rows for c in r.cells)
+    assert client.get(endpoint+"/forms/9?font_size=5",headers=hdr(users[5])).status_code==422
+    sheet_preview=client.get(base+"/councils/"+council+"/forms/11?preview_sheet=true",headers=hdr(users[4]))
+    assert sheet_preview.status_code==200 and sheet_preview.json()["sheets"]
+    member_view=client.get(base,headers=hdr(extras[1][0])).json()["slots"][0]
+    assert all("birth_date" not in r for r in member_view["roster"])
     original=slot
     decision_path=endpoint+"/absence/"+second
     decision={"outcome":"NOT_PASSED","reference":"QD-ABSENCE-01","reason":"Faculty confirmed absence after reviewing the case","revision":0}

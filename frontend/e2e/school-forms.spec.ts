@@ -58,8 +58,10 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await expect(admin.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
   await manager.bringToFront();await manager.evaluate(()=>window.dispatchEvent(new Event("focus")));
   await expect(manager.getByRole("link",{name:"Quản lý kho biểu mẫu Khoa",exact:true})).toBeVisible();
-  await manager.reload();await manager.getByText("Bổ sung các mẫu có sẵn còn thiếu",{exact:true}).click();
-  await manager.getByRole("button",{name:"Bổ sung mẫu còn thiếu",exact:true}).click();
+  await manager.reload();
+  await manager.getByText("Bổ sung bộ mẫu gốc Khoa cung cấp",{exact:true}).click();
+  await manager.getByLabel("Tôi đã đối chiếu bộ mẫu nguồn được Khoa chấp thuận.",{exact:true}).check();
+  await manager.getByRole("button",{name:"Bổ sung các mẫu còn thiếu",exact:true}).click();
   await expect(manager.locator(".table-container table tbody tr")).toHaveCount(12,{timeout:300000});
   await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
   await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(managerId);

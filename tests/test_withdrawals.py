@@ -204,7 +204,9 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     assert client.get(path+"/evaluation", headers=hdr(users[0])).status_code == 404
     for kind, user in [("ADVISOR", 3), ("REVIEWER", 5)]:
         assert create_review(ctx, user=user, kind=kind).status_code == 409
-    assert check(ctx).status_code == 409
+    checked = check(ctx)
+    assert checked.status_code == 200
+    assert checked.json()["members"][0]["eligibility"]["state"] == "BLOCKED"
     # The report's automatic revision request permits one correction after close.
     current_doc = client.get(path+"/documents", headers=hdr(users[1])).json()[0]
     assert current_doc["versions"][0]["state"] == "REVISION_REQUESTED"
@@ -228,7 +230,9 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
     session.add(m.DocumentVersion(id=uuid4(),document_id=plan.id,version_no=1,stored_file_id=version.stored_file_id,
         submitted_by=students[1].id,submitted_at=now(),content_sha256=version.content_sha256,state="ACCEPTED"))
     session.commit()
-    assert check(ctx).status_code == 409
+    checked = check(ctx)
+    assert checked.status_code == 200
+    assert all(member["eligibility"]["state"]!="ELIGIBLE" for member in checked.json()["members"])
     # An approved proposal for the remaining member releases the workflow.
     response = client.post(path+"/proposal/versions", headers={**version_headers(users[1], {"row_version":0}),
         "X-File-Name":"de-cuong-nhom-moi.pdf"}, content=synthetic_pdf())
@@ -244,11 +248,11 @@ def test_membership_change_blocks_old_report_reviews_and_checks_until_reapproval
         json={"reason":"Bộ môn chốt đề cương theo nhóm mới"})
     assert response.status_code == 200, response.text
     assert evaluation_get(ctx)["workflow_blockers"] == []
-    assert evaluation_get(ctx)["members"][0]["eligibility"]["state"] == "STALE"
+    assert evaluation_get(ctx)["members"][0]["eligibility"]["state"] == "BLOCKED"
     complete_review(ctx)
     final = check(ctx)
     assert final.status_code == 200 and final.json()["state"] == "READY_FOR_DEFENSE"
-    assert len(final.json()["eligibility_history"]) == 2
+    assert len(final.json()["eligibility_history"]) == 4
     assert any(r["id"] == old_review["id"] for r in final.json()["reviews"])
 
 

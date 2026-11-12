@@ -1,5 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 import hashlib
 import json
@@ -246,6 +246,8 @@ def schedule(session, user, data, identifier=None, expected=None):
         raise HTTPException(404, "Không tìm thấy hội đồng hoặc đề tài trong phạm vi quản lý")
     if council.closed_at:
         raise HTTPException(409, "Hội đồng đã khóa bảng điểm")
+    if (not slot or slot.thesis_id!=thesis.id or slot.council_id!=council.id) and not data.confirmed_no_conflict:
+        raise HTTPException(422,"Cần đối chiếu quan hệ thân nhân giữa thành viên hội đồng và SV trong đề tài trước khi xếp lịch")
     if data.ends_at <= data.starts_at:
         raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
     if not (slot.prior_slot_id if slot else data.prior_slot_id) and session.scalar(select(m.DefenseSlot.id).where(
@@ -429,7 +431,10 @@ def save_marks(session,user,identifier,expected,data):
 
 
 def save_attendance(session,user,identifier,expected,member_id,data):
-    slot,_,_ = edit(session,user,identifier,expected,secretary=True)
+    slot,council,_ = edit(session,user,identifier,expected,secretary=True)
+    if now() < slot.starts_at:
+        raise HTTPException(409,"Chưa đến giờ bảo vệ. Có thể đổi lịch trước khi mở phiên")
+    ensure_quorum(slot,council)
     student = student_id(slot,member_id)
     if data.status == "ABSENT" and (len(data.reason) < 5 or slot.marks.get(student)):
         raise HTTPException(409,"Cần lý do vắng và sinh viên chưa được nhập điểm")
@@ -542,8 +547,42 @@ def save_bonus(session,user,identifier,expected,member_id,data):
 
 def save_minutes(session,user,identifier,expected,data):
     slot,_,_ = edit(session,user,identifier,expected,secretary=True)
-    slot.minutes = data.model_dump()
+    if not set(map(str,data.classifications)) <= {r["id"] for r in slot.roster}:
+        raise HTTPException(422,"Xếp loại chỉ dành cho sinh viên trong phiên bảo vệ")
+    slot.minutes = data.model_dump(mode="json")
     finish_edit(session,user,slot,"DEFENSE_MINUTES_SAVED")
+
+
+def correct_academic_profile(session,user,identifier,expected,member_id,data):
+    """Correct identity metadata with a basis; never reopen or alter grading."""
+    from datetime import date
+    slot,council,_,_,manager=load_slot(session,user,identifier,write=True)
+    if not manager:raise HTTPException(403,"Chỉ TBM hoặc điều phối được đính chính thông tin học vụ")
+    row_version(expected,slot.row_version)
+    key=student_id(slot,member_id)
+    original=next(r for r in slot.roster if r["id"]==key)
+    student=session.scalar(select(m.StudentProfile).where(m.StudentProfile.id==UUID(original["student_id"])).with_for_update())
+    major=session.scalar(select(m.DepartmentMajor).where(m.DepartmentMajor.department_id==student.department_id,
+        m.DepartmentMajor.code==data.major_code))
+    if not major or (not major.active and data.major_code!=student.major_code):
+        raise HTTPException(422,"Chọn ngành thuộc đúng bộ môn của sinh viên trong danh mục")
+    if major.name.startswith("Chưa xác minh"):
+        raise HTTPException(422,"Mã ngành cũ chưa được xác minh. Cần đối chiếu danh mục Khoa trước khi đính chính")
+    if data.birth_date and (data.birth_date>date.today() or data.birth_date.year<1900):
+        raise HTTPException(422,"Ngày sinh phải từ năm 1900 đến hiện tại")
+    updated={**original,"name":student.display_name,"code":student.student_code,"class_name":data.class_name,"major_code":major.code,"major":major.name,
+        "birth_date":data.birth_date.isoformat() if data.birth_date else "","training_cohort":data.training_cohort,
+        "department_id":str(student.department_id)}
+    if updated==original:raise HTTPException(422,"Thông tin học vụ chưa thay đổi")
+    digest=lambda value:hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+    session.add(m.AuditEvent(id=uuid4(),actor_id=user.id,action="DEFENSE_ACADEMIC_PROFILE_CORRECTED",
+        resource_type="defense_slot",resource_id=slot.id,reason=f"{student.student_code} · {data.reason}",
+        source_reference=data.source_reference,before_hash=digest(original),after_hash=digest(updated),occurred_at=now(),correlation_id=uuid4()))
+    student.class_name,student.major_code,student.birth_date,student.training_cohort=data.class_name,data.major_code,data.birth_date,data.training_cohort or None
+    slot.roster=[updated if r["id"]==key else r for r in slot.roster]
+    slot.row_version+=1
+    notify(session,user,slot,council,"DEFENSE_ACADEMIC_PROFILE_CORRECTED","Đã đính chính thông tin học vụ. Điểm giữ nguyên; tải lại bản xuất mới để in ký")
+    session.commit()
 
 
 def finish_edit(session,user,slot,event,reason=None):
@@ -594,6 +633,8 @@ def finalize(session,user,identifier,expected):
         for row in results(slot,council).values()):
         raise HTTPException(409,"Cần có biên bản, điểm đầy đủ của sinh viên có mặt và lý do của sinh viên vắng")
     frozen_results=results(slot,council)
+    from backend.services.defense_templates import academic_roster
+    slot.roster = academic_roster(session,slot)
     slot.finalized_at,slot.finalized_by = now(),user.id
     advisor = primary_advisor(session,thesis.id)
     slot.minutes = {**slot.minutes,"title":thesis.current_title,"results_snapshot":frozen_results,
@@ -632,7 +673,7 @@ def workspace(session,user):
         slots.append({"id":slot.id,"prior_slot_id":slot.prior_slot_id,"absence_decisions":absence_out(session,slot,own),"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
             "report_filename":session.get(m.StoredFile,session.get(m.DocumentVersion,slot.report_version_id).stored_file_id).original_name,
             "starts_at":slot.starts_at,"ends_at":slot.ends_at,"room":slot.room,"version":slot.row_version,
-            "roster":[own] if own else slot.roster,"results":totals,"marks":marks,
+            "roster":visible_academic_roster(session,slot,own,privileged),"results":totals,"marks":marks,
             "context_token":context_token(slot,council),"bonus_evidence":evidence_options(session,slot.thesis_id),
             "minutes":slot.minutes if privileged else {}, "finalized_at":slot.finalized_at,
             "council_attendance":slot.attendance.get("_council",{}) if not own else {},
@@ -704,7 +745,15 @@ def workspace(session,user):
         .where(m.UserAccount.status=="ACTIVE",m.UserAccount.base_role=="LECTURER")
         .order_by(m.LecturerProfile.display_name)) if can_plan_demo or not demo_department(d.code if d else None)] if scopes else []
     return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,"scope_catalog":catalog,
-        "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES}
+        "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES,
+        "academic_majors":[{"department_id":str(r.department_id),"code":r.code,"name":r.name} for r in session.scalars(select(m.DepartmentMajor).where(m.DepartmentMajor.active.is_(True)))]}
+
+
+def visible_academic_roster(session,slot,own,privileged):
+    from backend.services.defense_templates import academic_roster
+    rows=academic_roster(session,slot)
+    if own:return [r for r in rows if r["id"]==own["id"]]
+    return rows if privileged else [{k:v for k,v in r.items() if k!="birth_date"} for r in rows]
 
 
 def council_out(council, can_manage=False):

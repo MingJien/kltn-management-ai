@@ -13272,6 +13272,96 @@
         }
       }
     },
+    "/api/v1/defense/slots/{identifier}/academic-profile/{member_id}": {
+      "put": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Academic Profile",
+        "operationId": "academic_profile_api_v1_defense_slots__identifier__academic_profile__member_id__put",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcademicProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/defense/slots/{identifier}/finalize": {
       "post": {
         "tags": [
@@ -13423,6 +13513,139 @@
               "type": "boolean",
               "default": false,
               "title": "Blank"
+            }
+          },
+          {
+            "name": "font_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 11
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Font Size"
+            }
+          },
+          {
+            "name": "line_spacing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Spacing"
+            }
+          },
+          {
+            "name": "paragraph_space",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 8,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paragraph Space"
+            }
+          },
+          {
+            "name": "break_recommendations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Break Recommendations"
+            }
+          },
+          {
+            "name": "preview_sheet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview Sheet"
+            }
+          },
+          {
+            "name": "narrative_bold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Narrative Bold"
+            }
+          },
+          {
+            "name": "narrative_italic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Narrative Italic"
+            }
+          },
+          {
+            "name": "line_breaks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Breaks"
+            }
+          },
+          {
+            "name": "layout_fields",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Layout Fields"
             }
           },
           {
@@ -13981,6 +14204,80 @@
               ],
               "type": "string",
               "title": "Form"
+            }
+          },
+          {
+            "name": "font_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 11
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Font Size"
+            }
+          },
+          {
+            "name": "line_spacing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Spacing"
+            }
+          },
+          {
+            "name": "paragraph_space",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 8,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paragraph Space"
+            }
+          },
+          {
+            "name": "break_recommendations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Break Recommendations"
+            }
+          },
+          {
+            "name": "preview_sheet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview Sheet"
             }
           },
           {
@@ -19232,6 +19529,61 @@
         ],
         "title": "AbsenceDecision"
       },
+      "AcademicProfileInput": {
+        "properties": {
+          "class_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Class Name"
+          },
+          "major_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Major Code"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
+          "training_cohort": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Training Cohort",
+            "default": ""
+          },
+          "source_reference": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Source Reference"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "class_name",
+          "major_code",
+          "source_reference",
+          "reason"
+        ],
+        "title": "AcademicProfileInput"
+      },
       "AccessOut": {
         "properties": {
           "id": {
@@ -20224,6 +20576,18 @@
             "minLength": 1,
             "title": "Class Name"
           },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          },
           "major_code": {
             "type": "string",
             "maxLength": 32,
@@ -20816,8 +21180,15 @@
       "ExtensionCreate": {
         "properties": {
           "until_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Until At"
           },
           "reason": {
@@ -20835,7 +21206,6 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "until_at",
           "reason",
           "confirm_consequences"
         ],
@@ -21845,6 +22215,49 @@
             "maxLength": 5000,
             "minLength": 5,
             "title": "Conclusion"
+          },
+          "objectives": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Objectives",
+            "default": ""
+          },
+          "functions": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Functions",
+            "default": ""
+          },
+          "achievements": {
+            "type": "string",
+            "maxLength": 3000,
+            "title": "Achievements",
+            "default": ""
+          },
+          "recommendations": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Recommendations",
+            "default": ""
+          },
+          "classifications": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "Xuất sắc",
+                "Giỏi",
+                "Khá",
+                "Trung bình",
+                "Không đạt",
+                "Chờ xác nhận"
+              ]
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "maxProperties": 3,
+            "title": "Classifications"
           }
         },
         "additionalProperties": false,
@@ -24222,6 +24635,11 @@
             "type": "array",
             "maxItems": 3,
             "title": "Thesis Member Ids"
+          },
+          "confirmed_no_conflict": {
+            "type": "boolean",
+            "title": "Confirmed No Conflict",
+            "default": false
           }
         },
         "additionalProperties": false,

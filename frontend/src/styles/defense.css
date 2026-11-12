@@ -36,6 +36,13 @@
 @media(max-width:600px){.defense-tabs .btn{flex:1 1 120px}.defense-page .defense-criterion label{grid-template-columns:1fr;gap:10px}.defense-page .defense-criterion input{grid-column:1;width:120px}.defense-results th,.defense-results td{padding:8px;font-size:.82rem}.defense-session{padding:10px}}
 .defense-page .defense-score-preview{position:static}
 .defense-planning { grid-column: 1 / -1; min-width: 0; border: 1px solid #dbe3eb; border-radius: 8px; padding: 12px; }
+.defense-print { min-width:0; grid-column:1/-1; }
+.defense-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:16px; margin:16px 0; }
+.defense-print .button-row { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
+.defense-print .review-document { min-height:480px; max-height:75vh; overflow:auto; }
+.defense-sheet-preview { overflow:auto; max-width:100%; max-height:75vh; background:white; padding:16px; }
+.defense-sheet-preview table { border-collapse:collapse; min-width:720px; font-family:"Times New Roman",serif; color:#000; }
+.defense-sheet-preview td { white-space:pre-wrap; border:1px solid #ccc; padding:6px; min-width:45px; overflow-wrap:anywhere; }
 .defense-plan-search { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .defense-selected-plans { margin-top:12px; }
 .defense-selected-plans summary { cursor:pointer; }

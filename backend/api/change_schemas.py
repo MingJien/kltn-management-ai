@@ -44,7 +44,7 @@ class ExtensionRecord(Input):
 
 
 class ExtensionCreate(Input):
-    until_at: AwareDatetime
+    until_at: AwareDatetime | None = None
     reason: str = Field(min_length=10,max_length=3000)
     confirm_consequences: Literal[True]
 

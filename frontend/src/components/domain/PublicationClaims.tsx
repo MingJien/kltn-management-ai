@@ -16,7 +16,7 @@ export default function PublicationClaims({thesis,docs,userId,busy,run,canUpload
   const endpoint = `/theses/${thesis.id}/publication-claims`;
   const load = async () => {try {setData(await request<Workspace>(endpoint,userId));setError("");} catch(e){setError(String(e));}};
   useEffect(()=>{void load();},[endpoint,userId,docs]);
-  const options=docs.filter(d=>d.document_type==="SUPPORTING").flatMap(d=>d.versions.filter(v=>v.scan_state==="CLEAN").map(v=>({id:v.id,label:`${d.title} · v${v.version_no} · ${v.file_name}`})));
+  const options=docs.filter(d=>d.document_type==="SUPPORTING").flatMap(d=>d.versions.slice(0,1).filter(v=>v.scan_state==="CLEAN").map(v=>({id:v.id,label:`${d.title} · bản hiện hành v${v.version_no} · ${v.file_name}`})));
   const taken=new Set(data?.items.filter(i=>["SUBMITTED","ADVISOR_CONFIRMED","APPROVED"].includes(i.state)).flatMap(i=>i.details.student_ids));
   return <section className="card" style={{overflowWrap:"anywhere",minWidth:0}}><div className="card-body stack">
     <h2>Minh chứng công bố khoa học · Xét điểm thưởng</h2>

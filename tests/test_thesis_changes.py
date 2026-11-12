@@ -56,7 +56,7 @@ def test_change_requires_group_advisor_and_head_and_invalidates_old_evidence(wor
     ctx=workspace
     client,users,students,lecturers,session,path=ctx
     item=submit(ctx)
-    assert listing(ctx,2)=={"theses":[],"requests":[],"extension_requests":[],"extension_policy_confirmed":False}
+    assert listing(ctx,2)=={"theses":[],"requests":[],"extension_requests":[]}
     act(ctx,item,"advisor-review",3,{"role":"CURRENT_ADVISOR","decision":"AGREE","reason":"Premature decision"},409)
     act(ctx,item,"decision",4,{"decision":"APPROVE","reason":"Missing agreements"},409)
     act(ctx,item,"decision",0,{"decision":"APPROVE","reason":"Student is not head"},403)

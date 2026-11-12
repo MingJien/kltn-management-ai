@@ -28,7 +28,7 @@ test("Mẫu 1a/1b: nộp trước tiếp nhận, phiên bản bất biến, đ�
     expect((await admin.request.get(api+base+"/forms")).status()).toBe(404);
     expect((await member.request.get(api+base+"/forms")).status()).toBe(404);
     await sv.goto(`${web}/registrations?focus=${reg.id}`);
-    await sv.getByText("Đơn đăng ký Mẫu 1a/1b · tệp nộp và bản in",{exact:true}).click();
+    await sv.getByRole("link",{name:"Mở đơn Mẫu 1a/1b · nộp, tải & lịch sử",exact:true}).click();
     const forms=sv.locator(".registration-forms");
     await expect(forms.getByText("Mẫu áp dụng: 1a — cá nhân",{exact:true})).toBeVisible();
     const sourceA=process.env.KLTN_E2E_FORM_1A_FILE!;
@@ -56,11 +56,13 @@ test("Mẫu 1a/1b: nộp trước tiếp nhận, phiên bản bất biến, đ�
     await submit(/Nộp đơn Mẫu 1b/,process.env.KLTN_E2E_FORM_1B_FILE!,3);
     waiting=sv.waitForEvent("download");await forms.getByRole("button",{name:"Xuất bản nộp có footer v3",exact:true}).click();output=await waiting;
     await output.saveAs(path.join(process.env.KLTN_E2E_RUN_DIR!,"application-1b-print.docx"));
+    await sv.getByRole("link",{name:"Xem hồ sơ & quyết định đăng ký",exact:true}).click();
     await sv.getByRole("button",{name:"Gửi đăng ký cho GV",exact:true}).click();
     await gv.goto(`${web}/registrations?focus=${reg.id}`);
     await gv.getByRole("button",{name:"Chấp nhận chính thức và tạo khóa luận",exact:true}).click();
     await expect(gv.getByRole("link",{name:/Mở hồ sơ khóa luận/})).toBeVisible();
-    await forms.getByRole("button",{name:"Làm mới đơn đăng ký",exact:true}).click();
+    const accepted=await read(gv,base);
+    await sv.goto(`${web}/theses/${accepted.thesis_id}?section=submissions&kind=REGISTRATION`);
     await expect(forms.getByRole("button",{name:"Nộp phiên bản đơn",exact:true})).toHaveCount(0);
     await expect(forms.getByRole("button",{name:"Xuất bản nộp có footer v3",exact:true})).toBeEnabled();
   } finally {for(const actor of actors)await actor.context.close();}

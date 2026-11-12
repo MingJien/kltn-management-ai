@@ -37,12 +37,15 @@ def open_for_edit(session, thesis, *, lock=False):
     return not any(slot.finalized_at or slot.marks for slot in slots)
 
 
-def evidence(session, thesis_id, version_id):
+def evidence(session, thesis_id, version_id, *, latest=False):
     version = session.get(m.DocumentVersion, version_id)
     doc = session.get(m.Document, version.document_id) if version else None
     file = session.get(m.StoredFile, version.stored_file_id) if version else None
     if not doc or doc.thesis_id != thesis_id or doc.document_type != "SUPPORTING" or doc.state != "ACTIVE" or not file or file.scan_state != "CLEAN":
         raise HTTPException(422, "Chọn minh chứng thuộc hồ sơ này, đã quét an toàn và chưa rút")
+    if latest and session.scalar(select(m.DocumentVersion.id).where(m.DocumentVersion.document_id==doc.id,
+            m.DocumentVersion.version_no>version.version_no).limit(1)):
+        raise HTTPException(409,"Tệp minh chứng đã có bản mới. Chọn phiên bản hiện hành để gửi hồ sơ")
     return version
 
 
@@ -73,7 +76,7 @@ def submit(session, user, thesis_id, data):
     for old in rows(session, thesis.id):
         if old.state in {"SUBMITTED", "ADVISOR_CONFIRMED", "APPROVED"} and selected.intersection(old.details["student_ids"]):
             raise HTTPException(409, "SV đã có hồ sơ đang chờ xử lý hoặc đã được duyệt; không nộp trùng")
-    evidence(session, thesis.id, data.evidence_version_id)
+    evidence(session, thesis.id, data.evidence_version_id, latest=True)
     item = m.PublicationClaim(id=uuid4(), thesis_id=thesis.id, submitted_by=user.id,
         evidence_version_id=data.evidence_version_id, state="SUBMITTED", details=data.model_dump(mode="json", exclude={"evidence_version_id"}), history=[])
     session.add(item)

@@ -23,7 +23,7 @@ type Thesis={can_request_extension:boolean;extension_request_blocker:string;id:s
   extension_blocker:string;can_set_start:boolean;baseline_due:string|null;extension_max:string|null;extension:Extension|null;
   member_count:number;candidates:{group_available:boolean;individual_available:boolean;id:string;code:string;title:string;description:string;advisor:string;capacity:number}[];
   evidence:{id:string;name:string;scan_state:string}[]};
-type Workspace={extension_policy_confirmed:boolean;theses:Thesis[];requests:Change[];extension_requests:ExtensionRequest[]};
+type Workspace={theses:Thesis[];requests:Change[];extension_requests:ExtensionRequest[]};
 type Operation={kind:"create"|"start";thesis:Thesis}|{kind:"consent"|"review"|"decision"|"cancel";item:Change;role?:string};
 const labels:Record<string,string>={SUBMITTED:"Đang lấy ý kiến",ADVISOR_REVIEWED:"Chờ bộ môn duyệt",APPROVED:"Đã chấp thuận",
   REJECTED:"Không chấp thuận",CANCELLED:"Đã hủy",CURRENT_ADVISOR:"GVHD hiện tại",NEW_ADVISOR:"GVHD tiếp nhận đề tài mới"};
@@ -32,14 +32,14 @@ const shortDate=(value:string)=>new Date(value).toLocaleDateString("vi-VN",{time
 const formText=(form:FormData,key:string)=>String(form.get(key)??"");
 
 function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Operation)=>void}) {
-  const groupReady=item.snapshot.members.every(m=>item.consents[m.user_id]?.decision==="AGREE");
+  const groupReady=item.scope==="INDIVIDUAL" ? item.consents[item.requested_by]?.decision==="AGREE" : item.snapshot.members.every(m=>item.consents[m.user_id]?.decision==="AGREE");
   const current=pending(item)?item.ready?2:groupReady?1:0:3;
   const completed=[groupReady,item.ready,item.state==="APPROVED",!pending(item)];
   return <article className="change-card card" id={"change-"+item.id}><div className="card-body stack">
     <div className="change-card__heading"><div><p className="change-eyebrow">{item.code} · {item.scope==="INDIVIDUAL"?"Tách cá nhân · ":""}{item.kind==="REPLACEMENT"?"Chuyển sang đề tài khác":"Điều chỉnh tên và phạm vi"}</p>
       <h3>{item.proposed_title}</h3></div><span className={"change-status change-status--"+item.state.toLowerCase()}>{labels[item.state]}</span></div>
     <ol className="change-steps" aria-label="Tiến trình xét duyệt">
-      {["Thành viên đồng ý","GVHD xem xét","Bộ môn quyết định","Kết quả"].map((text,index)=><li key={text} aria-current={pending(item)&&index===current?"step":undefined}
+      {[item.scope==="INDIVIDUAL"?"Người đề nghị xác nhận":"Thành viên đồng ý","GVHD xem xét","Bộ môn quyết định","Kết quả"].map((text,index)=><li key={text} aria-current={pending(item)&&index===current?"step":undefined}
         className={completed[index]?"is-done":pending(item)&&index===current?"is-current":""}><span>{completed[index]?<Check size={14} aria-hidden="true"/>:index+1}</span>{text}</li>)}
     </ol>
     <div className="change-compare"><div><span>Đề tài khi gửi</span><p>{item.snapshot.title}</p></div>
@@ -49,7 +49,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
       <p className="change-prose">{item.proposed_description||"Theo mô tả đề tài đã công bố."}</p>
       {item.snapshot.target_advisor_name&&<p>GVHD tiếp nhận · <strong>{item.snapshot.target_advisor_name}</strong></p>}
       <ul className="change-people">{item.snapshot.members.map(m=><li key={m.user_id}><Users size={16} aria-hidden="true"/>
-        <span>{m.name}{m.user_id===userId?" (bạn)":""}</span><span>{item.consents[m.user_id]?.decision==="AGREE"?"Đã đồng ý":
+        <span>{m.name}{m.user_id===userId?" (bạn)":""}</span><span>{item.scope==="INDIVIDUAL" && m.user_id!==item.requested_by?"Được thông báo":item.consents[m.user_id]?.decision==="AGREE"?"Đã đồng ý":
           item.consents[m.user_id]?.decision==="DECLINE"?"Không đồng ý":"Chờ xác nhận"}</span></li>)}</ul>
       {Object.entries(item.reviews).map(([role,r])=><div key={role} className="change-review">
         <strong>{labels[role]} · {r.decision==="AGREE"?"Đồng ý":"Từ chối"}</strong><p className="change-prose">{r.reason}</p><small>{when(r.at)}</small></div>)}
@@ -121,7 +121,7 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
           {candidate&&<div className="change-target"><strong>{candidate.title}</strong><p>GVHD · {candidate.advisor} · Tối đa {candidate.capacity} sinh viên</p><p className="change-prose">{candidate.description}</p></div>}
         </>}
         <label>Lý do thay đổi<textarea name="reason" className="input" required minLength={10} maxLength={3000} rows={3}/></label>
-        <p className="change-note">Sau khi được duyệt, nhóm cập nhật Mẫu 1–3 và báo cáo theo đề tài mới. Mọi thành viên và GVHD liên quan cần đồng ý trước khi bộ môn xét duyệt.</p>
+        <p className="change-note">Sau khi được duyệt, nhóm cập nhật Mẫu 1–3 và báo cáo theo đề tài mới. GVHD liên quan cần đồng ý trước khi bộ môn xét duyệt; nếu thay đổi cả nhóm, từng thành viên cần đồng ý.</p>
         <label className="change-checkbox"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>Tôi đồng ý nội dung đề nghị và việc cập nhật hồ sơ sau khi được duyệt.</span></label>
       </>}
       {op.kind==="start"&&<>
@@ -226,7 +226,7 @@ export default function ThesisChangesPage({context}:{context:Context}) {
         </aside>
         <section className="changes-main">
           <nav className="assignment-tabs" aria-label="Nghiệp vụ thay đổi"><button type="button" className={"assignment-tabs__link "+(view==="CHANGE"?"is-active":"")} onClick={()=>setView("CHANGE")}>Đổi / tách đề tài</button><button type="button" className={"assignment-tabs__link "+(view==="EXTENSION"?"is-active":"")} onClick={()=>setView("EXTENSION")}>Xin gia hạn KLTN</button></nav>
-          {view==="EXTENSION"?<ThesisExtensionRequests policyConfirmed={data.extension_policy_confirmed} userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
+          {view==="EXTENSION"?<ThesisExtensionRequests userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
           <div className="changes-toolbar"><h2><History size={19} aria-hidden="true"/>Yêu cầu đổi đề tài</h2><div className="changes-tools">
             <label className="changes-search"><span className="sr-only">Tìm yêu cầu</span><Search size={16} aria-hidden="true"/><input className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm đề tài hoặc mã…"/></label>
             <label><span className="sr-only">Trạng thái yêu cầu</span><select className="input" value={filter} onChange={e=>setFilter(e.target.value)}><option value="OPEN">Đang xử lý</option><option value="ALL">Tất cả và lịch sử</option></select></label>

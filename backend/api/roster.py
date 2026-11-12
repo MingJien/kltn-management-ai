@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -87,6 +87,7 @@ class CorrectStudent(BaseModel):
     student_code: str = Field(min_length=1, max_length=32)
     display_name: str = Field(min_length=1, max_length=255)
     class_name: str = Field(min_length=1, max_length=100)
+    birth_date: date | None = None
     major_code: str = Field(min_length=1, max_length=32)
     basis_ref: str = Field(min_length=3, max_length=500)
     reason: str = Field(min_length=5, max_length=1000)
@@ -195,6 +196,7 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
         rows.append({"snapshot_id": str(snapshot.id), "student_id": str(student.id),
             "student_code": student.student_code, "display_name": student.display_name,
             "class_name": student.class_name, "major_code": student.major_code,
+            "birth_date": student.birth_date.isoformat() if student.birth_date else None,
             "department_code": session.get(m.Department, student.department_id).code,
             "email": account.email, "account_status": account.status,
             "mail_status": status if user.base_role == "ADMIN" else None,
@@ -373,6 +375,8 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
                     user: m.UserAccount = Depends(current_user),
                     session: Session = Depends(get_session)) -> dict:
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
+    if payload.birth_date and (payload.birth_date > date.today() or payload.birth_date.year < 1900):
+        raise HTTPException(422,"Ngày sinh phải từ năm 1900 đến hiện tại")
     code = payload.student_code.strip()
     name = payload.display_name.strip()
     class_name = payload.class_name.strip()
@@ -390,7 +394,8 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
         m.StudentProfile.id == student_id).with_for_update())
     department = session.get(m.Department, student.department_id)
     if (code == student.student_code and name == student.display_name
-            and class_name == student.class_name and major_code == student.major_code):
+            and class_name == student.class_name and major_code == student.major_code
+            and ("birth_date" not in payload.model_fields_set or payload.birth_date == student.birth_date)):
         raise HTTPException(422, "No student information has changed")
     allowed = session.scalar(select(m.DepartmentMajor.id).where(
         m.DepartmentMajor.department_id == department.id,
@@ -404,12 +409,15 @@ def correct_student(round_id: UUID, student_id: UUID, payload: CorrectStudent,
         raise HTTPException(409, "Student code is already assigned")
     def fingerprint() -> str:
         fields = {"code": student.student_code, "name": student.display_name,
-                  "class": student.class_name, "major": student.major_code}
+                  "class": student.class_name, "major": student.major_code,
+                  "birth_date": str(student.birth_date or "")}
         return hashlib.sha256(json.dumps(fields, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     before = fingerprint()
     student.student_code = code
     student.display_name = name
     student.class_name = class_name
+    if "birth_date" in payload.model_fields_set:
+        student.birth_date = payload.birth_date
     student.major_code = major_code
     session.add(m.AuditEvent(id=uuid4(), actor_id=user.id, action="ROSTER_IDENTITY_CORRECTED",
         resource_type="student_profile", resource_id=student.id,

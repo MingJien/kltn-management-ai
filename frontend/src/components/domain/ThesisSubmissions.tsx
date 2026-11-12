@@ -1,5 +1,6 @@
 import WorkflowSteps from "./WorkflowSteps";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { request } from "../../api";
 import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Lecturer, ProgressReport, Proposal, Thesis, ThesisDocument } from "../../api";
 import { Status, formatDate } from "./CoreForms";
@@ -15,7 +16,15 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
   busy: boolean; run: CoreRun; kind: string;
 }) {
   const [pendingOnly, setPendingOnly] = useState(false);
-  const canProcess = thesis.actions.some(action => ["document:review","proposal:review","proposal:finalize","proposal:dean_confirm"].includes(action));
+  const [publicationPending, setPublicationPending] = useState(0);
+  useEffect(()=>{
+    const abort=new AbortController();
+    void request<{items:{state:string}[];can_review:boolean;can_approve:boolean}>(`/theses/${thesis.id}/publication-claims`,userId,{signal:abort.signal}).then(data=>{
+      if(!abort.signal.aborted)setPublicationPending(data.items.filter(item=>(data.can_review&&item.state==="SUBMITTED")||(data.can_approve&&item.state==="ADVISOR_CONFIRMED")).length);
+    }).catch(()=>{if(!abort.signal.aborted)setPublicationPending(0);});
+    return()=>abort.abort();
+  },[thesis.id,thesis.row_version,userId,docs]);
+  const canProcess = thesis.actions.some(action => ["document:review","proposal:review","proposal:finalize","proposal:dean_confirm","evaluation:advisor","evaluation:manage"].includes(action));
   const managesDeadlines = thesis.actions.includes("milestone:manage");
   const canReadDocuments = thesis.actions.includes("document:view");
   const choices = [
@@ -24,7 +33,7 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
     ...((proposal || managesDeadlines) ? [{kind:"PROPOSAL", label:"Đề cương", code:"Mẫu 3", description:"GVHD xác nhận · TBM chốt", state:proposal?.state, pending:!!proposal && ((thesis.actions.includes("proposal:review") && ["SUBMITTED","UNDER_REVIEW"].includes(proposal.state)) || (thesis.actions.includes("proposal:finalize") && proposal.state === "ADVISOR_CONFIRMED") || (thesis.actions.includes("proposal:dean_confirm") && proposal.state === "DEPARTMENT_FINALIZED"))}] : []),
     ...((canReadDocuments || managesDeadlines) ? [
       {kind:"REPORT", label:"Cuốn báo cáo KLTN", code:"Báo cáo trước bảo vệ", description:"Bản báo cáo hoàn chỉnh của đề tài", state:docs.find(doc => doc.document_type === "REPORT")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "REPORT" && doc.versions[0]?.state === "SUBMITTED")},
-      {kind:"SUPPORTING", label:"Tài liệu hỗ trợ", code:"Minh chứng", description:"Minh chứng công bố khoa học và tệp bổ sung", state:null, pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "SUPPORTING" && doc.versions[0]?.state === "SUBMITTED")},
+      {kind:"SUPPORTING", label:"Tài liệu hỗ trợ", code:"Minh chứng", description:publicationPending?`${publicationPending} hồ sơ điểm thưởng chờ bạn xử lý`:"Minh chứng công bố khoa học và tệp bổ sung", state:null, pending:publicationPending>0||(thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "SUPPORTING" && doc.versions[0]?.state === "SUBMITTED"))},
     ] : []),
   ];
   const effectiveDeadlines = deadlines.map(item => item.document_type === "REPORT" && thesis.extension_until_at && Date.parse(thesis.extension_until_at) > Date.parse(item.due_at)
@@ -45,7 +54,8 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
       </Link>)}
     </div>
     <div className="submission-panel stack" key={selected}>{["PLAN","PROPOSAL","REPORT"].includes(selected) && <WorkflowSteps steps={selected==="PROPOSAL"?["SV nộp đề cương","GVHD xác nhận","TBM chốt","Hoàn tất hồ sơ"]:["SV nộp tệp","GVHD xem / phản hồi","Tiếp nhận phiên bản"]}
- current={selected==="PROPOSAL"?(["DEPARTMENT_FINALIZED","DEAN_CONFIRMED"].includes(proposal?.state||"")?3:proposal?.state==="ADVISOR_CONFIRMED"?2:["SUBMITTED","UNDER_REVIEW"].includes(proposal?.state||"")?1:0):docs.some(d=>d.document_type===selected && ["ACCEPTED","FINAL"].includes(d.versions[0]?.state||""))?2:docs.some(d=>d.document_type===selected && d.versions.length)?1:0}/> }
+ current={selected==="PROPOSAL"?(["DEPARTMENT_FINALIZED","DEAN_CONFIRMED"].includes(proposal?.state||"")?3:proposal?.state==="ADVISOR_CONFIRMED"?2:["SUBMITTED","UNDER_REVIEW"].includes(proposal?.state||"")?1:0):docs.some(d=>d.document_type===selected && ["ACCEPTED","FINAL"].includes(d.versions[0]?.state||""))?2:docs.some(d=>d.document_type===selected && d.versions.length&&!['REVISION_REQUESTED','REVISION_REQUIRED','REJECTED'].includes(d.versions[0]?.state||''))?1:0}/> }
+      {docs.some(d=>d.document_type===selected&&['REVISION_REQUESTED','REVISION_REQUIRED','REJECTED'].includes(d.versions[0]?.state||''))&&<p className="alert alert-info">SV cần xem nhận xét, sửa nội dung và nộp phiên bản mới. Bản cũ vẫn được giữ để đối chiếu.</p>}
       {selected === "REGISTRATION" && (thesis.registration_id
         ? <RegistrationSubmission registrationId={thesis.registration_id} userId={userId} />
         : <p className="alert alert-info">Hồ sơ này chưa có liên kết đơn đăng ký. <Link to="/registrations">Xem hồ sơ đăng ký</Link></p>)}

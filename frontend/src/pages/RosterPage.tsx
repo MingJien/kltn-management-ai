@@ -10,7 +10,7 @@ type Assignment = {round_id:string; round_code:string; assignment_type:string};
 type PreviewRow = {line:number; student_code:string; display_name:string; email:string; department_code:string; class_name:string; major_code:string};
 type Preview = {sha256:string; count:number; rows:PreviewRow[]};
 type CatalogEntry = {department_code:string; department_name:string; major_code:string; major_name:string};
-type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null; registration_submitted:boolean; registration_submitted_at:string|null; mail_status?:string|null; delivery_mode?:string|null; current_delivery_mode?:string|null; mail_ready?:boolean; mail_retry_at?:string|null; can_send_activation?:boolean};
+type RosterEntry = {snapshot_id:string; student_id:string; student_code:string; display_name:string; email:string; department_code:string; class_name:string|null; birth_date?:string|null; major_code:string|null; account_status:string; account_activated?:boolean; state:string; version:number; evidence_ref:string; confirmed_at:string|null; registration_submitted:boolean; registration_submitted_at:string|null; mail_status?:string|null; delivery_mode?:string|null; current_delivery_mode?:string|null; mail_ready?:boolean; mail_retry_at?:string|null; can_send_activation?:boolean};
 type ImportResult = {new_accounts:number; confirmed:number; unchanged:number; snapshot_ids:string[]};
 
 function normalized(value:string) {
@@ -72,6 +72,7 @@ export default function RosterPage({context}: {context:Context}) {
   const [correctionCode, setCorrectionCode] = useState("");
   const [correctionName, setCorrectionName] = useState("");
   const [correctionClass, setCorrectionClass] = useState("");
+  const [correctionBirth, setCorrectionBirth] = useState("");
   const [correctionMajor, setCorrectionMajor] = useState("");
   const [correctionRef, setCorrectionRef] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
@@ -421,11 +422,12 @@ export default function RosterPage({context}: {context:Context}) {
               <StudentPicker label="Sinh viên cần đính chính" rows={roster} value={correctionStudent} onChange={id=>{
                 const row=roster.find(r=>r.student_id===id);setCorrectionStudent(id);
                 setCorrectionCode(row?.student_code||"");setCorrectionName(row?.display_name||"");
-                setCorrectionClass(row?.class_name||"");setCorrectionMajor(row?.major_code||"");
+                setCorrectionClass(row?.class_name||"");setCorrectionBirth(row?.birth_date||"");setCorrectionMajor(row?.major_code||"");
               }} placeholder="Chọn sinh viên" disabled={busy} />
               {correctionStudent?<div className="roster-form-grid">
                 <label className="input-group">MSSV<input className="input" value={correctionCode} onChange={e=>setCorrectionCode(e.target.value)} /></label>
                 <label className="input-group">Họ tên<input className="input" value={correctionName} onChange={e=>setCorrectionName(e.target.value)} /></label>
+                <label className="input-group">Ngày sinh (Mẫu 11)<input className="input" type="date" min="1900-01-01" max={new Date().toISOString().slice(0,10)} value={correctionBirth} onChange={e=>setCorrectionBirth(e.target.value)} /></label>
                 <label className="input-group">Lớp<input className="input" value={correctionClass} onChange={e=>setCorrectionClass(e.target.value)} /></label>
                 <label className="input-group">Ngành ({roster.find(row=>row.student_id===correctionStudent)?.department_code})
                   <select className="input" value={correctionMajor} onChange={e=>setCorrectionMajor(e.target.value)}>
@@ -445,7 +447,7 @@ export default function RosterPage({context}: {context:Context}) {
                 onClick={()=>void run(async()=>{
                   await request(`/rounds/${roundId}/roster/${correctionStudent}`,context.user_id,
                     {method:"PATCH",body:JSON.stringify({student_code:correctionCode,display_name:correctionName,
-                      class_name:correctionClass,major_code:correctionMajor,
+                      class_name:correctionClass,major_code:correctionMajor,birth_date:correctionBirth||null,
                       basis_ref:correctionRef.trim(),reason:correctionReason.trim()})});
                   return "Đã đính chính hồ sơ và lưu dấu vết.";
                 }, "Đã đính chính thông tin.")}>Lưu đính chính</button></div>

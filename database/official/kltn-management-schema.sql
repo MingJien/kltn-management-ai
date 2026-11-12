@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261110_0024.
--- 50 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261112_0028.
+-- 51 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -343,6 +343,8 @@ CREATE TABLE student_profile (
 	department_id UUID NOT NULL,
 	display_name VARCHAR(255) NOT NULL,
 	class_name VARCHAR(100),
+	birth_date DATE,
+	training_cohort VARCHAR(50),
 	major_code VARCHAR(32),
 	id UUID NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
@@ -907,7 +909,7 @@ CREATE TABLE thesis_extension_request (
 	thesis_id UUID NOT NULL,
 	requested_by UUID NOT NULL,
 	original_due_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	requested_until_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	requested_until_at TIMESTAMP WITH TIME ZONE,
 	reason TEXT NOT NULL,
 	snapshot JSONB NOT NULL,
 	state VARCHAR(25) NOT NULL,
@@ -1052,6 +1054,26 @@ CREATE TABLE proposal_review (
 	CONSTRAINT fk_proposal_review_reviewer_assignment_id_reviewer_assignment FOREIGN KEY(reviewer_assignment_id) REFERENCES reviewer_assignment (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_proposal_review_reviewer_user_id_user_account FOREIGN KEY(reviewer_user_id) REFERENCES user_account (id) ON DELETE RESTRICT
 );
+
+CREATE TABLE publication_claim (
+	thesis_id UUID NOT NULL,
+	evidence_version_id UUID NOT NULL,
+	submitted_by UUID NOT NULL,
+	state VARCHAR(30) NOT NULL,
+	details JSONB NOT NULL,
+	history JSONB NOT NULL,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_publication_claim PRIMARY KEY (id),
+	CONSTRAINT ck_publication_claim_state CHECK (state IN ('SUBMITTED','ADVISOR_CONFIRMED','APPROVED','REJECTED','REVISION_REQUIRED')),
+	CONSTRAINT fk_publication_claim_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id),
+	CONSTRAINT fk_publication_claim_evidence_version_id_document_version FOREIGN KEY(evidence_version_id) REFERENCES document_version (id),
+	CONSTRAINT fk_publication_claim_submitted_by_user_account FOREIGN KEY(submitted_by) REFERENCES user_account (id)
+);
+
+CREATE INDEX ix_publication_claim_thesis ON publication_claim (thesis_id);
 
 CREATE TABLE signature_confirmation (
 	proposal_id UUID NOT NULL,

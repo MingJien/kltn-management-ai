@@ -68,6 +68,20 @@ def ensure(session: Session, cls, identity_key: str, **values):
     return item
 
 
+def ensure_demo_major(session: Session, department):
+    """Repair only the explicitly synthetic catalog, never real departments."""
+    if department.code!="SYN-DEMO-DEP":
+        raise ValueError("Only the synthetic demo department may be repaired")
+    major=session.scalar(select(m.DepartmentMajor).where(m.DepartmentMajor.department_id==department.id,
+        m.DepartmentMajor.code=="7480201"))
+    if major is None:
+        major=ensure(session,m.DepartmentMajor,"department-major-cntt",department_id=department.id,
+            code="7480201",name="Công nghệ thông tin",active=True)
+    major.name="Công nghệ thông tin"
+    major.active=True
+    return major
+
+
 def add_gv2_only(engine, now: datetime) -> None:
     """Add a second ordinary lecturer without resetting existing demo passwords."""
     GV2_CREDENTIALS_PATH.parent.mkdir(exist_ok=True)
@@ -155,8 +169,7 @@ def main() -> None:
         faculty = ensure(session, m.Faculty, "faculty", code="SYN-DEMO-FAC", name="Khoa giả lập")
         department = ensure(session, m.Department, "department", faculty_id=faculty.id,
                             code="SYN-DEMO-DEP", name="Bộ môn giả lập")
-        ensure(session, m.DepartmentMajor, "department-major-cntt", department_id=department.id,
-               code="7480201", name="Công nghệ thông tin", active=True)
+        ensure_demo_major(session,department)
         year = ensure(session, m.AcademicYear, "year", code="SYN-DEMO-2026",
                       starts_on=date(2026, 9, 1), ends_on=date(2027, 8, 31), state="ACTIVE")
         round_ = ensure(session, m.ThesisRound, "round", academic_year_id=year.id,

@@ -1,17 +1,25 @@
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Query
+from backend.services.defense_templates import LineBreaks, PrintLayout
+from pydantic import TypeAdapter, ValidationError
 
 from backend.api.dependencies import current_user
 from backend.api.defense_schemas import AttendanceInput, BonusInput, CouncilInput, MarkInput, MinutesInput, SlotInput
 from backend.api.evaluation import transaction
 from backend.api.evaluation_schemas import Reason
 from backend.services import defense, defense_export
-from backend.api.defense_schemas import CouncilAttendance, ReopenInput
+from backend.api.defense_schemas import AcademicProfileInput, CouncilAttendance, ReopenInput
 from backend.api.defense_schemas import AbsenceDecision
 
 router = APIRouter(prefix="/api/v1/defense", tags=["Hội đồng và bảo vệ"])
+
+
+def parse_line_breaks(value):
+    try:return TypeAdapter(LineBreaks).validate_json(value) if value else {}
+    except ValidationError as exc:
+        raise HTTPException(422,"Dữ liệu ngắt dòng không hợp lệ. Chỉ nhận vị trí ngắt dòng, không nhận nội dung thay thế") from exc
 
 
 @router.get("")
@@ -75,6 +83,12 @@ def minutes(identifier:UUID,data:MinutesInput,version:int=Header(alias="If-Match
     defense.save_minutes(session,user,identifier,version,data)
 
 
+@router.put("/slots/{identifier}/academic-profile/{member_id}",status_code=204)
+def academic_profile(identifier:UUID,member_id:UUID,data:AcademicProfileInput,version:int=Header(alias="If-Match",ge=1),
+                     user=Depends(current_user),session=Depends(transaction)):
+    defense.correct_academic_profile(session,user,identifier,version,member_id,data)
+
+
 @router.post("/slots/{identifier}/finalize",status_code=204)
 def finalize(identifier:UUID,version:int=Header(alias="If-Match",ge=1),
              user=Depends(current_user),session=Depends(transaction)):
@@ -83,8 +97,16 @@ def finalize(identifier:UUID,version:int=Header(alias="If-Match",ge=1),
 
 @router.get("/slots/{identifier}/forms/{form}")
 def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:UUID|None=None,lecturer_id:UUID|None=None,blank:bool=False,
+              font_size: Annotated[int|None,Query(ge=11,le=14)]=None,
+              line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
+              paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
+              narrative_bold:bool|None=None,narrative_italic:bool|None=None,
+              line_breaks:Annotated[str|None,Query(max_length=6000)]=None,layout_fields:bool=False,
               user=Depends(current_user),session=Depends(transaction)):
-    return defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank)
+    result = defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank,layout_fields=layout_fields,
+        layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations,
+            narrative_bold=narrative_bold,narrative_italic=narrative_italic,line_breaks=parse_line_breaks(line_breaks)))
+    return defense_export.preview_sheet(result) if preview_sheet and form=="6" and not layout_fields else result
 
 
 @router.get("/slots/{identifier}/report")
@@ -127,5 +149,11 @@ def reopen_unsigned(identifier:UUID,data:ReopenInput,version:int=Header(alias="I
 
 
 @router.get("/councils/{identifier}/forms/{form}")
-def council_form(identifier:UUID,form:Literal["10","11"],request:Request,user=Depends(current_user),session=Depends(transaction)):
-    return defense_export.export_council(session,user,identifier,int(form),str(request.base_url))
+def council_form(identifier:UUID,form:Literal["10","11"],request:Request,
+                 font_size: Annotated[int|None,Query(ge=11,le=14)]=None,
+                 line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
+                 paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
+                 user=Depends(current_user),session=Depends(transaction)):
+    result = defense_export.export_council(session,user,identifier,int(form),str(request.base_url),
+        layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations))
+    return defense_export.preview_sheet(result) if preview_sheet and form=="11" else result

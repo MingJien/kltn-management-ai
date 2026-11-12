@@ -68,7 +68,7 @@ def rights(session, user, thesis):
         student = profile(session, user, "STUDENT")
         if session.scalar(select(m.ThesisMember.id).where(m.ThesisMember.thesis_id == thesis.id,
                 m.ThesisMember.student_id == student.id, m.ThesisMember.active.is_(True))):
-            result.update({"view", "document:view", "progress:view", "work:view", "progress:submit", "document:submit", "work:submit", "proposal:view", "proposal:submit"})
+            result.update({"view", "document:view", "progress:view", "work:view", "progress:submit", "document:submit", "work:submit", "proposal:view", "proposal:submit", "extension:request"})
     elif user.base_role == "LECTURER":
         lecturer = profile(session, user, "LECTURER")
         advisor = primary_advisor(session, thesis.id)
@@ -93,7 +93,7 @@ def rights(session, user, thesis):
             m.EligibilitySnapshot.round_id == thesis.round_id,
         ).order_by(m.EligibilitySnapshot.version.desc()).limit(1))
         if latest is not None and latest.state == "REJECTED":
-            result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit"})
+            result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit", "extension:request"})
     from backend.services.evaluation import permissions
     evaluation_actions = permissions(session, user, thesis)
     if evaluation_actions:
@@ -112,7 +112,7 @@ def thesis_access(session, user, thesis_id, *, action="view", lock=False, write=
         raise HTTPException(403, "Bạn không có quyền thực hiện thao tác này trên khóa luận")
     if write and user.base_role == "STUDENT" and "document:submit" not in rights(session, user, thesis):
         raise HTTPException(403, "Quyền tham gia đợt đã bị thu hồi. Bạn vẫn được xem hồ sơ nhưng không thể nộp hoặc sửa nội dung.")
-    if write and thesis.state not in EDITABLE:
+    if write and thesis.state not in EDITABLE and not (action == "extension:request" and thesis.state == "READY_FOR_DEFENSE"):
         raise HTTPException(409, "Khóa luận đã khóa các thao tác thực hiện")
     return thesis
 

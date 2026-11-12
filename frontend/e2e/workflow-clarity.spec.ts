@@ -12,7 +12,9 @@ test("Admin sees real aggregate dashboard and dedicated complete lecturer direct
  const response=await page.request.get(api+"/admin/dashboard");expect(response.status()).toBe(200);const summary=await response.json();await expect(page.locator(".metric-card").filter({hasText:"Giảng viên"}).locator("strong")).toHaveText(String(summary.accounts.LECTURER || 0));
  await page.getByRole("link",{name:"Danh sách giảng viên",exact:true}).click();
  await expect(page.getByRole("heading",{name:"Danh sách giảng viên",exact:true})).toBeVisible();
+ await page.getByRole("tab",{name:/Nhập Excel/}).click();
  await expect(page.getByText("Chỉ hiển thị GV chưa kích hoạt")).toBeVisible();
+ await page.getByRole("checkbox",{name:"Chỉ hiển thị GV chưa kích hoạt"}).uncheck();
  await expect(page.getByRole("checkbox",{name:"Chỉ hiển thị GV chưa kích hoạt"})).not.toBeChecked();
  await expect(page.locator("table").last()).toBeVisible();
  await expect(page.locator("table").last().locator("tbody tr").first()).toBeVisible();

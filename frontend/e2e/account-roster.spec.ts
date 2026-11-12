@@ -40,7 +40,7 @@ test("Khoa phân quyền, nhập danh sách chính thức, thu hồi và SV tự
     await page.getByRole("dialog").getByLabel("Lý do / căn cứ").fill("SYNTHETIC E2E CLOSE");
     await page.getByRole("dialog").getByRole("button",{name:"Đóng đợt"}).click();
     await expect(newRound).toContainText("Đã đóng");
-    await page.getByRole("link",{name:"Phân công theo đợt"}).click();
+    await page.getByRole("link",{name:"Phân công và chức vụ",exact:true}).click();
     await page.getByRole("combobox",{name:"Đợt",exact:true}).selectOption({label:"SYN-DEMO · OPEN"});
     await page.getByLabel("Nhiệm vụ").selectOption("ELIGIBILITY_IMPORTER");
     await page.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption({label:accounts.admin.email});

@@ -301,7 +301,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
             <h3>Sinh viên đã đăng ký ({selected.registered_member_count}/{selected.max_students} SV)</h3>
           </div>
           {selected.registered_students && selected.registered_students.length > 0 ? (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Sinh viên đã đăng ký đề tài">
               <table className="topic-registered-table">
                 <thead>
                   <tr>

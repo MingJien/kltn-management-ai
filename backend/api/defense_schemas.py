@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 from typing import Literal
 from uuid import UUID
 
@@ -33,6 +34,16 @@ class SlotInput(Input):
     room: str = Field(min_length=2, max_length=200)
     prior_slot_id: UUID | None = None
     thesis_member_ids: list[UUID] = Field(default_factory=list, max_length=3)
+    confirmed_no_conflict: bool = False
+
+
+class AcademicProfileInput(Input):
+    class_name: str = Field(min_length=1, max_length=100)
+    major_code: str = Field(min_length=1, max_length=32)
+    birth_date: date | None = None
+    training_cohort: str = Field(default="", max_length=50)
+    source_reference: str = Field(min_length=3, max_length=500)
+    reason: str = Field(min_length=5, max_length=1000)
 
 
 class AbsenceDecision(Input):
@@ -66,6 +77,11 @@ class BonusInput(Input):
 class MinutesInput(Input):
     discussion: str = Field(min_length=5, max_length=10000)
     conclusion: str = Field(min_length=5, max_length=5000)
+    objectives: str = Field(default="", max_length=3000)
+    functions: str = Field(default="", max_length=3000)
+    achievements: str = Field(default="", max_length=3000)
+    recommendations: str = Field(default="", max_length=5000)
+    classifications: dict[UUID, Literal["Xuất sắc", "Giỏi", "Khá", "Trung bình", "Không đạt", "Chờ xác nhận"]] = Field(default_factory=dict, max_length=3)
 
 
 class CouncilAttendance(Input):

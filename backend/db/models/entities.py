@@ -108,6 +108,8 @@ class StudentProfile(UuidPrimaryKeyMixin, TimestampMixin, Base):
     department_id: Mapped[uuid.UUID] = fk("department.id")
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     class_name: Mapped[Optional[str]] = mapped_column(String(100))
+    birth_date: Mapped[Optional[date]] = mapped_column(Date)
+    training_cohort: Mapped[Optional[str]] = mapped_column(String(50))
     major_code: Mapped[Optional[str]] = mapped_column(String(32))
 
 

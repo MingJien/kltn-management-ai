@@ -19,7 +19,7 @@ test("Excel GV: xem trước → tạo riêng, chưa gửi → chọn/bỏ chọ
     await page.getByLabel("Mật khẩu", {exact: true}).fill(accounts.admin.password);
     await page.getByRole("button", {name: "Đăng nhập", exact: true}).click();
     await expect(page.getByRole("heading", {name: "Tổng quan", exact: true})).toBeVisible();
-    await page.goto("/lecturers");
+    await page.goto("/lecturers?tab=activation");
     const region = page.getByRole("region", {name: "Nhập và mời danh sách giảng viên"});
     await expect(region.getByRole("heading", {name: "Nhập danh sách giảng viên bằng Excel"})).toBeVisible();
     const downloadPromise = page.waitForEvent("download");

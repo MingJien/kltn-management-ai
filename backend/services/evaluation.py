@@ -122,9 +122,9 @@ def eligibility_out(session, thesis, member, current_report):
     review = review_current(session, thesis, member, current_report) if not blocked else None
     check = last_check(session, member)
     conditions = requirements(session, current_report, review, check.discipline_status if check else "UNKNOWN")
-    fresh = bool(not blocked and check and check.report_version_id == (current_report.id if current_report else None)
+    fresh = bool(check and check.report_version_id == (current_report.id if current_report else None)
         and check.advisor_review_id == (review.id if review else None))
-    state = "ELIGIBLE" if fresh and check.state == "ELIGIBLE" and all(x["met"] for x in conditions) else (
+    state = "ELIGIBLE" if not blocked and fresh and check.state == "ELIGIBLE" and all(x["met"] for x in conditions) else (
         "STALE" if check and not fresh else "BLOCKED" if check else "NOT_CHECKED")
     return {"state": state, "conditions": conditions, "advisor_review_id": review.id if review else None,
         "discipline_status": check.discipline_status if check else "UNKNOWN",

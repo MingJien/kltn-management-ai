@@ -177,7 +177,7 @@
 .requirement-preview__empty {
   margin: 0;
   padding-top: 4px;
-  color: var(--neutral-400);
+  color: var(--neutral-600);
   font-style: italic;
   font-size: 12px;
 }

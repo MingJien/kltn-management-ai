@@ -55,9 +55,9 @@ def snapshot(session,thesis):
             "name":session.get(m.StudentProfile,member.student_id).display_name} for member in members]}
 
 
-def mutable(session,thesis):
+def mutable(session,thesis,*,allow_ready=False):
     round_ = session.get(m.ThesisRound,thesis.round_id)
-    if thesis.state not in EDITABLE or round_.state == "ARCHIVED":
+    if thesis.state not in (EDITABLE | ({"READY_FOR_DEFENSE"} if allow_ready else set())) or round_.state == "ARCHIVED":
         raise HTTPException(409,"Hồ sơ đã khóa giai đoạn thực hiện")
     if session.scalar(select(m.DefenseSlot.id).where(m.DefenseSlot.thesis_id == thesis.id)):
         raise HTTPException(409,"Cần xử lý lịch bảo vệ trước khi đổi đề tài hoặc gia hạn")
@@ -139,8 +139,14 @@ def required_roles(item):
     return roles
 
 
+def group_consent_ready(item):
+    if item.scope == "INDIVIDUAL":
+        return item.consents.get(str(item.requested_by), {}).get("decision") == "AGREE"
+    return all(item.consents.get(member["user_id"], {}).get("decision") == "AGREE" for member in item.snapshot["members"])
+
+
 def ready(item):
-    return all(item.consents.get(member["user_id"],{}).get("decision")=="AGREE" for member in item.snapshot["members"]) and all(
+    return group_consent_ready(item) and all(
         item.reviews.get(role,{}).get("decision")=="AGREE" for role in required_roles(item))
 
 
@@ -200,7 +206,7 @@ def create(session,user,thesis_id,data,expected):
     session.add(item)
     session.flush()
     audit(session,user,"THESIS_CHANGE_SUBMITTED","thesis_change_request",item.id,data.reason)
-    announce(session,user,item,"THESIS_CHANGE_SUBMITTED","Nhóm đã gửi yêu cầu đổi đề tài. Các thành viên và GVHD cần xác nhận.")
+    announce(session,user,item,"THESIS_CHANGE_SUBMITTED", "Một thành viên đề nghị chuyển đề tài; các thành viên còn lại được thông báo, GVHD xem xét." if item.scope == "INDIVIDUAL" else "Nhóm đã gửi yêu cầu đổi đề tài. Các thành viên và GVHD cần xác nhận.")
     session.commit()
     return {"id":item.id}
 
@@ -209,6 +215,8 @@ def consent(session,user,identifier,data,expected):
     item,thesis=get_request(session,user,identifier,expected)
     mutable(session,thesis)
     fresh(session,item,thesis)
+    if item.scope == "INDIVIDUAL":
+        raise HTTPException(409,"Tách cá nhân không cần thành viên còn lại xác nhận")
     if str(user.id) not in {row["user_id"] for row in item.snapshot["members"]}:
         raise HTTPException(403,"Chỉ thành viên nhóm xác nhận nguyện vọng của mình")
     if str(user.id) in item.consents:
@@ -225,8 +233,8 @@ def review(session,user,identifier,data,expected):
     fresh(session,item,thesis)
     if required_roles(item).get(data.role)!=str(user.id):
         raise HTTPException(403,"Cần đúng GVHD được ghi nhận trong yêu cầu")
-    if not all(item.consents.get(member["user_id"],{}).get("decision")=="AGREE" for member in item.snapshot["members"]):
-        raise HTTPException(409,"Chờ mọi thành viên nhóm đồng ý trước khi GVHD xem xét")
+    if not group_consent_ready(item):
+        raise HTTPException(409,"Chờ xác nhận cần thiết trước khi GVHD xem xét")
     if data.role in item.reviews:
         raise HTTPException(409,"Bạn đã ghi ý kiến cho vai trò này")
     item.reviews={**item.reviews,data.role:{"decision":data.decision,"reason":data.reason,"by":str(user.id),"at":now().isoformat()}}
@@ -429,7 +437,7 @@ def request_out(session,user,item):
         "reviews":item.reviews,"submitted_at":item.submitted_at,"decided_at":item.decided_at,
         "decision_reason":item.decision_reason,"decided_by":notices.actor_name(session,item.decided_by) if item.decided_by else None,
         "row_version":item.row_version,
-        "can_consent":pending and str(user.id) not in item.consents and any(row["user_id"]==str(user.id) for row in item.snapshot["members"]),
+        "can_consent":pending and item.scope == "GROUP" and str(user.id) not in item.consents and any(row["user_id"]==str(user.id) for row in item.snapshot["members"]),
         "can_cancel":pending and item.requested_by==user.id,
         "review_roles":[role for role,identifier in roles.items() if identifier==str(user.id) and role not in item.reviews] if pending else [],
         "can_decide":pending and head(session,user,thesis),"ready":ready(item)}
@@ -490,6 +498,11 @@ def workspace(session,user):
             mutable(session,thesis)
         except HTTPException as error:
             block=error.detail
+        extension_block=""
+        try:
+            mutable(session,thesis,allow_ready=True)
+        except HTTPException as error:
+            extension_block=error.detail
         in_window=bool(cutoff and datetime.combine(round_.execution_starts_on,time.min,VN)<=now()<cutoff)
         candidates=[]
         if own and not block and in_window and not pending:
@@ -523,8 +536,8 @@ def workspace(session,user):
                 "Quyền tham gia đợt đã bị thu hồi. Liên hệ Khoa để đối chiếu." if own and not eligible else
                 "Chưa có ngày bắt đầu thực hiện" if not cutoff else "Ngoài thời hạn đổi đề tài" if not in_window else ""),
             "can_extend":False,
-            "can_request_extension":bool(eligible and not block and not pending and not extension_request and not extension and baseline),
-            "extension_request_blocker":block or ("Có yêu cầu đang chờ xử lý" if pending or extension_request else "Đã gia hạn một lần" if extension else "Khoa chưa thiết lập hạn báo cáo" if not baseline else ""),
+            "can_request_extension":bool(eligible and not extension_block and not pending and not extension_request and not extension and baseline),
+            "extension_request_blocker":extension_block or ("Có yêu cầu đang chờ xử lý" if pending or extension_request else "Đã gia hạn một lần" if extension else "Khoa chưa thiết lập hạn báo cáo" if not baseline else ""),
             "extension_blocker":block or ("Đã gia hạn một lần" if extension else "Nhóm đang có yêu cầu đổi đề tài" if pending else
                 "Chưa thiết lập hạn báo cáo của đợt" if not baseline else ""),
             "can_set_start":manager(session,user,thesis) and bool(resource_role(session,user.id,"KLTN_COORDINATOR",round_id=thesis.round_id)),
@@ -539,5 +552,4 @@ def workspace(session,user):
         m.ThesisChangeRequest.snapshot["members"].contains([{"user_id":user_key}])))
     items=[request_out(session,user,item) for item in session.scalars(query.order_by(m.ThesisChangeRequest.submitted_at.desc()))
         if accessible(session,user,item)]
-    from backend.services.thesis_extensions import policy_confirmed
-    return {"theses":theses,"requests":items,"extension_requests":extension_items,"extension_policy_confirmed":policy_confirmed()}
+    return {"theses":theses,"requests":items,"extension_requests":extension_items}

@@ -80,6 +80,7 @@ test("Khoa quyết định SV vắng rồi xếp lịch bổ sung đúng ngườ
   await form.getByLabel("Bắt đầu (giờ Việt Nam)",{exact:true}).fill("2026-11-11T08:00");
   await form.getByLabel("Kết thúc (giờ Việt Nam)",{exact:true}).fill("2026-11-11T09:00");
   await form.getByLabel("Phòng bảo vệ",{exact:true}).fill("A.301");
+  await form.getByLabel(/Đã đối chiếu thành viên hội đồng không có quan hệ thân nhân/).check();
   await form.getByRole("button",{name:"Lưu lịch",exact:true}).click();
   await expect.poll(()=>scheduled).toMatchObject({prior_slot_id:"slot-demo",thesis_member_ids:["student-2"]});
 });

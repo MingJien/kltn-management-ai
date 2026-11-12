@@ -103,7 +103,7 @@ test("Admin: Toggle ẩn/hiện mật khẩu, quản lý đợt KLTN, phân côn
 
     // 3. Phân công theo đợt (/administration/assignments)
     await page.goto(web + "/administration/assignments");
-    await expect(page.getByRole("heading", { name: "Phân công theo đợt" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Phân công theo đợt", level: 1 })).toBeVisible();
 
     // Phân công KLTN_COORDINATOR và ELIGIBILITY_VERIFIER cho giảng viên
     const assignmentCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Phân công theo đợt", exact: true }) });
@@ -123,6 +123,7 @@ test("Admin: Toggle ẩn/hiện mật khẩu, quản lý đợt KLTN, phân côn
     await expect(page.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
 
     // Tạo giảng viên mới & sửa email
+    await page.goto(web+"/administration");
     const suffix = Date.now().toString().slice(-5);
     const initialEmail = `audit-gv-${suffix}@e2e.test`;
     const updatedEmail = `audit-gv-new-${suffix}@e2e.test`;
@@ -277,8 +278,8 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
       await expect(assignment.locator("select").nth(0).locator(`option[value="${round.id}"]`)).toHaveCount(1);
       await expect(assignment.locator("select").nth(1).locator(`option[value="${lecturer.id}"]`)).toHaveCount(1);
       await assignment.locator("select").nth(0).selectOption(round.id);
-      await assignment.locator("select").nth(2).selectOption("KLTN_COORDINATOR");
-      await assignment.locator("select").nth(1).selectOption(lecturer.id);
+      await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
+      await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(lecturer.id);
       await assignment.getByLabel("Căn cứ phân công").fill("Giao nhiệm vụ điều phối tiến độ đợt");
       await assignment.getByRole("button", { name: "Lưu phân công", exact: true }).click();
       await expect(admin.page.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
@@ -358,8 +359,8 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
 
     // 4. Mở mốc tiến độ (GV với tư cách điều phối đợt)
     await gv.page.goto(sv1.page.url());
-    await gv.page.getByRole("button", { name: "Tiến độ", exact: true }).click();
-    await expect(gv.page.getByRole("heading", { name: "Mở mốc theo kế hoạch đợt", exact: true })).toBeVisible();
+    await gv.page.getByRole("tab", { name: "Báo cáo tiến độ", exact: true }).click();
+    await expect(gv.page.getByRole("heading", { name: "Tạo mốc nội bộ của khóa luận", exact: true })).toBeVisible();
 
     // Thiết lập mốc
     const milestoneCode = "MOC_AUDIT_1";
@@ -369,12 +370,12 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
     await gv.page.getByLabel("Tên mốc").fill("Mốc thẩm định tiến độ tháng 10");
     await gv.page.getByLabel("Hạn nộp (giờ Việt Nam)").fill(dueAt);
     await gv.page.getByLabel("Tiến độ dự kiến (%)").fill("35");
-    await gv.page.getByRole("button", { name: "Mở mốc cho đợt", exact: true }).click();
+    await gv.page.getByRole("button", { name: "Tạo mốc nội bộ", exact: true }).click();
     await expect(gv.page.getByRole("heading", { name: "Mốc thẩm định tiến độ tháng 10 · v1", exact: true })).toBeVisible();
 
     // 5. SV nộp báo cáo tiến độ và tự sửa trước hạn
     await sv1.page.reload();
-    await sv1.page.getByRole("button", { name: "Tiến độ", exact: true }).click();
+    await sv1.page.getByRole("tab", { name: "Báo cáo tiến độ", exact: true }).click();
     await sv1.page.getByLabel("Mốc báo cáo").selectOption({ index: 1 });
     await sv1.page.getByLabel("Kết quả, khó khăn và kế hoạch").fill("Hoàn thành nghiên cứu tài liệu và thiết kế kiến trúc.");
     await sv1.page.getByLabel("Tiến độ tự báo cáo (%)").fill("35");
@@ -396,54 +397,31 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
     await progressCard.getByRole("button", { name: "Gửi kết quả", exact: true }).click();
     await expect(gv.page.getByRole("status")).toContainText("Đã lưu nhận xét tiến độ");
 
-    // 6. Tài liệu: Tải biểu mẫu chính thức từ Khoa & nộp Kế hoạch thực hiện Mẫu 2
-    await sv1.page.getByRole("button", { name: "Tài liệu", exact: true }).click();
-    await expect(sv1.page.getByRole("button", { name: "Tải nhanh Mẫu 2 (Kế hoạch)", exact: true })).toBeVisible();
-    await expect(sv1.page.getByText(/Xem toàn bộ biểu mẫu chính thức/)).toBeVisible();
-
-    // Tạo hồ sơ tài liệu Kế hoạch Mẫu 2
-    await sv1.page.getByLabel("Tên tài liệu").fill("Kế hoạch thực hiện khóa luận tốt nghiệp");
-    await sv1.page.getByLabel("Loại tài liệu").selectOption("PLAN");
-    await sv1.page.getByRole("button", { name: "Tạo hồ sơ tài liệu", exact: true }).click();
-
-    // Gia hạn hạn nộp PLAN để cho phép nộp tệp
-    await gv.page.getByRole("button", { name: "Tiến độ", exact: true }).click();
-    const deadlineCard = gv.page.locator("section.card").filter({ has: gv.page.getByRole("heading", { name: "Hạn nộp tài liệu theo đợt" }) });
-    await expect(deadlineCard).toBeVisible();
-    await deadlineCard.getByLabel("Loại tài liệu").selectOption("PLAN");
-    const planDue = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
-    const planDueStr = `${planDue.getFullYear()}-${String(planDue.getMonth() + 1).padStart(2, "0")}-${String(planDue.getDate()).padStart(2, "0")}T17:00`;
+    // Current unified submission UI: open PLAN intake, submit once, review the
+    // exact version, and export the accepted source without creating empty files.
+    const thesisPath=new URL(sv1.page.url()).pathname;
+    await gv.page.goto(web+thesisPath+"?section=submissions&kind=PLAN");
+    const deadlineCard=gv.page.locator("section.card").filter({has:gv.page.getByRole("heading",{name:"Lịch nhận tài liệu của đợt",exact:true})});
+    const planDue=new Date(Date.now()+60*86400000);
+    const planDueStr=`${planDue.getFullYear()}-${String(planDue.getMonth()+1).padStart(2,"0")}-${String(planDue.getDate()).padStart(2,"0")}T17:00`;
     await deadlineCard.getByLabel("Hạn mới (giờ Việt Nam)").fill(planDueStr);
-    await deadlineCard.getByLabel("Căn cứ / lý do").fill("Kế hoạch nộp tài liệu toàn đợt");
-    await deadlineCard.getByRole("button", { name: /Thiết lập cho cả đợt|Gia hạn cho cả đợt/ }).click();
-
-    // Nộp tệp Kế hoạch (PDF)
-    await sv1.page.getByRole("button", { name: "Tài liệu", exact: true }).click();
-    const docCard = sv1.page.locator("article.card").filter({ has: sv1.page.getByRole("heading", { name: "Kế hoạch thực hiện khóa luận tốt nghiệp" }) });
-    await docCard.getByLabel(/Nộp phiên bản mới/).setInputFiles({
-      name: "ke-hoach-thuc-hien-v1.pdf",
-      mimeType: "application/pdf",
-      buffer: VALID_PDF,
-    });
-    await docCard.getByRole("button", { name: "Nộp tài liệu", exact: true }).click();
-    await expect(docCard.getByText("Phiên bản 1 · ke-hoach-thuc-hien-v1.pdf", { exact: true })).toBeVisible();
-    await expect(docCard.getByText(/Đã quét an toàn/)).toBeVisible();
-
-    // GV tiếp nhận bản kế hoạch
+    await deadlineCard.getByLabel("Căn cứ / lý do").fill("Kế hoạch nộp Mẫu 2 toàn đợt");
+    await deadlineCard.getByRole("button",{name:/Thiết lập cho cả đợt|Gia hạn cho cả đợt/}).click();
+    await sv1.page.goto(web+thesisPath+"?section=submissions&kind=PLAN");
+    await expect(sv1.page.getByRole("button",{name:"Tải mẫu áp dụng · Mẫu 2",exact:true})).toBeVisible();
+    await sv1.page.getByLabel(/Tệp cần nộp/).setInputFiles({name:"ke-hoach-thuc-hien-v1.pdf",mimeType:"application/pdf",buffer:VALID_PDF});
+    await sv1.page.getByRole("button",{name:"Nộp kế hoạch Mẫu 2",exact:true}).click();
+    await expect(sv1.page.getByText("Phiên bản 1 · ke-hoach-thuc-hien-v1.pdf",{exact:true})).toBeVisible();
+    await expect(sv1.page.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
     await gv.page.reload();
-    await gv.page.getByRole("button", { name: "Tài liệu", exact: true }).click();
-    const gvDocCard = gv.page.locator("article.card").filter({ has: gv.page.getByRole("heading", { name: "Kế hoạch thực hiện khóa luận tốt nghiệp" }) });
-    await gvDocCard.getByLabel("Kết quả").selectOption("ACCEPT");
-    await gvDocCard.getByLabel("Nhận xét / lý do").fill("Kế hoạch chi tiết, khả thi.");
-    await gvDocCard.getByRole("button", { name: "Gửi kết quả", exact: true }).click();
-    await expect(gv.page.getByRole("status")).toContainText("Đã lưu nhận xét tài liệu");
-
-    // 7. Kiểm tra nút xuất bản in 3 dòng footer
+    await gv.page.getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click();
+    const fileReview=gv.page.getByRole("dialog");
+    await fileReview.getByLabel("Kết quả",{exact:true}).selectOption("ACCEPT");
+    await fileReview.getByLabel("Nhận xét tổng quát",{exact:true}).fill("Kế hoạch chi tiết, khả thi.");
+    await fileReview.getByRole("button",{name:/^Hoàn thành và gửi góp ý/}).click();
+    await expect(fileReview).toHaveCount(0);
     await sv1.page.reload();
-    await sv1.page.getByRole("button", { name: "Tài liệu", exact: true }).click();
-    const printBtn = sv1.page.getByRole("button", { name: /Xuất bản đã duyệt để ký ngoài/ });
-    await expect(printBtn).toBeVisible();
-    await expect(printBtn).toBeEnabled();
+    await expect(sv1.page.getByRole("button",{name:/Xuất bản đã duyệt để ký ngoài/})).toBeEnabled();
 
   } finally {
     await close(actors);

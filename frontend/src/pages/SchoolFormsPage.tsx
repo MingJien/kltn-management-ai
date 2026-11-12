@@ -149,6 +149,19 @@ export default function SchoolFormsPage({context}:{context:Context}) {
   const showCategory=items.some(item=>item.document_kind==="FORM") && items.some(item=>item.document_kind==="PUBLICATION");
   const displayed=items.filter(item=>(!showCategory || category==="ALL" || item.document_kind===category) && `${item.code} ${item.title}`.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim()));
   const selected=rounds.find(row=>row.id===roundId),manage=!!selected?.can_manage;
+  async function importOriginals(){
+    await run(async()=>{
+      try{
+        let imported=0;
+        for(let batch=0;batch<50;batch++){
+          const result=await request<{created:number;remaining:number}>(`/school-forms/bootstrap/${roundId}`,context.user_id,{method:"POST"});
+          imported+=result.created;
+          setNotice(`Đã nhập ${imported} mẫu gốc; còn ${result.remaining} mẫu sẵn có chưa nhập.`);
+          if(!result.remaining||!result.created)break;
+        }
+      }finally{await load();}
+    },"Đã bổ sung các mẫu gốc sẵn có. Mẫu đã có được giữ nguyên; kiểm tra bản nháp nếu tệp chưa quét an toàn.");
+  }
   const downloadPublished=(item:SchoolForm,version:SchoolFormVersion)=>run(async()=>{
     await downloadFile(`/school-forms/${item.id}/versions/${version.id}/download`,version.file_name);
   },"Đã tải bản đang áp dụng.");
@@ -171,6 +184,11 @@ export default function SchoolFormsPage({context}:{context:Context}) {
       </div>
     </div></div>
     {error && <p role="alert" className="alert alert-danger">{error}</p>}{notice && <p role="status" className="alert alert-success">{notice}</p>}
+    {manage&&<details className="card"><summary className="school-form-create__summary">Bổ sung bộ mẫu gốc Khoa cung cấp</summary><form className="card-body stack" onSubmit={e=>{e.preventDefault();void importOriginals();}}>
+      <p>Nhập những mẫu còn thiếu từ bộ tệp nguồn của Khoa trên máy chủ. Giữ nguyên các mẫu và phiên bản đã có. Mỗi tệp được quét an toàn trước khi phát hành.</p>
+      <label className="checkbox-label"><input type="checkbox" required disabled={busy}/>Tôi đã đối chiếu bộ mẫu nguồn được Khoa chấp thuận.</label>
+      <button className="btn btn-secondary" disabled={busy}>{busy?"Đang nhập và quét mẫu…":"Bổ sung các mẫu còn thiếu"}</button>
+    </form></details>}
     {manage && <details className="card school-form-create"><summary className="school-form-create__summary"><FilePlus2 size={19} aria-hidden="true"/><span><strong>Thêm biểu mẫu hoặc tài liệu công bố</strong><small>Tạo danh mục và tải tệp trong một bước</small></span><ChevronDown className="school-form-create__chevron" size={18} aria-hidden="true"/></summary><div className="card-body school-form-create__body"><form className="school-form-create__form" onSubmit={async event=>{
       event.preventDefault();
       if(busy || !newFile || !validNewFile || newSource.trim().length<3 || reason.trim().length<5)return;
@@ -195,9 +213,9 @@ export default function SchoolFormsPage({context}:{context:Context}) {
         setBusy(false);
       }
     }}><div className="school-form-create__grid">
-      <label>Mã tài liệu<input className="input" required pattern="[a-z0-9][a-z0-9_-]{1,49}" value={code} placeholder="Ví dụ: don-xin-thoi" onChange={event=>{setCode(event.target.value);if(/^mau-(06|07|08|09|10|11)$/.test(event.target.value))setAudience("LECTURER");}}/></label>
-      <label>Tên tài liệu<input className="input" required minLength={3} maxLength={255} value={title} placeholder="Ví dụ: Đơn xin thôi thực hiện KLTN" onChange={event=>setTitle(event.target.value)}/></label>
-      <label htmlFor="catalog-kind">Phân loại<select id="catalog-kind" className="input" value={kind} onChange={event=>setKind(event.target.value)}><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label>
+      <label>Mã tài liệu<input className="input" required pattern="[a-z0-9][a-z0-9_-]{1,49}" value={code} placeholder="Ví dụ: huong-dan-bao-ve" onChange={event=>{setCode(event.target.value);if(/^mau-(06|07|08|09|10|11)$/.test(event.target.value))setAudience("LECTURER");}}/></label>
+      <label>Tên tài liệu<input className="input" required minLength={3} maxLength={255} value={title} placeholder="Ví dụ: Hướng dẫn bảo vệ khóa luận" onChange={event=>setTitle(event.target.value)}/></label>
+      <label htmlFor="catalog-kind">Phân loại<select id="catalog-kind" aria-label="Phân loại" className="input" value={kind} onChange={event=>setKind(event.target.value)}><option value="FORM">Biểu mẫu trắng / hướng dẫn</option><option value="PUBLICATION">Tài liệu công bố theo đợt</option></select></label>
       <label>Cho ai xem<select className="input" value={audience} onChange={event=>setAudience(event.target.value)}><option value="STUDENT_AND_LECTURER">Sinh viên và giảng viên</option><option value="LECTURER">Chỉ giảng viên</option></select></label>
       <label>Nguồn / văn bản áp dụng<input className="input" required minLength={3} maxLength={500} value={newSource} onChange={event=>setNewSource(event.target.value)} placeholder="Ví dụ: Mẫu Khoa cung cấp"/></label>
       <div className="school-form-create__file"><label htmlFor="new-school-form-file">Tệp biểu mẫu hoặc tài liệu (PDF, DOCX, XLSX)</label>
