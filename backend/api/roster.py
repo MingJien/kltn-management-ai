@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -177,7 +177,9 @@ def list_roster(round_id: UUID, user: m.UserAccount = Depends(current_user),
         for event in session.scalars(select(m.AuditEvent).where(
                 m.AuditEvent.resource_type == "user_account", m.AuditEvent.resource_id.in_(user_ids),
                 m.AuditEvent.action.in_((*STUDENT_MAIL_ACTIONS, "ACCOUNT_EMAIL_CORRECTED")))
-                .order_by(m.AuditEvent.occurred_at.desc(), m.AuditEvent.id.desc())):
+                .order_by(m.AuditEvent.occurred_at.desc(), case(
+                    (m.AuditEvent.action.in_(("STUDENT_ACTIVATION_SENT", "STUDENT_ACTIVATION_FAILED")), 1),
+                    else_=0).desc(), m.AuditEvent.id.desc())):
             mail_events.setdefault(event.resource_id, event)
     now = datetime.now(timezone.utc)
     rows = []

@@ -82,8 +82,10 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await assignment.getByRole("button",{name:"Lưu phân công",exact:true}).click();
     await expect(admin.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
     await tbm.goto(web + "/progress");
-    // A single thesis now opens directly from the sidebar in the current UI.
-    await expect(tbm).toHaveURL(new RegExp(`${id}.*section=progress`));
+    const thesisLink = tbm.getByRole("link", {name: "NV5 kiểm thử sau tiếp nhận", exact: true});
+    const milestoneCode = tbm.getByLabel("Mã mốc", {exact: true});
+    await expect(thesisLink.or(milestoneCode)).toBeVisible();
+    if (await thesisLink.isVisible()) await thesisLink.click();
     await expect(tbm).toHaveURL(new RegExp(`${id}.*section=progress`));
     await tbm.getByLabel("Mã mốc",{exact:true}).fill("NV5_LATE");
     await tbm.getByLabel("Tên mốc",{exact:true}).fill("Mốc báo cáo NV5");
@@ -101,6 +103,8 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     const report1=sv.locator("article.card").filter({has:sv.getByText("Báo cáo nộp trễ có minh chứng",{exact:true})});
     await expect(report1.getByLabel("Nộp trễ",{exact:true})).toBeVisible();
     await expect(report1.getByRole("button",{name:"Tải minh chứng của báo cáo",exact:true})).toBeEnabled();
+    await expect(sv.getByRole("heading",{name:"Chưa có mốc bạn có thể nộp lúc này",exact:true})).toBeVisible();
+    await expect(sv.getByRole("button",{name:"Gửi báo cáo",exact:true})).toHaveCount(0);
     await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"nv5-progress-student.png"),fullPage:true});
 
     // Extending the round does not rewrite the first report's original lateness.
@@ -179,7 +183,9 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await docModal.getByLabel("Nhận xét tổng quát",{exact:true}).fill("GV đang xem phiên bản 1");
     await upload("ke-hoach-v2.docx");
     await docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click();
-    await expect(docModal.getByRole("alert")).toBeVisible();
+    await expect(docModal.getByRole("alert")).toContainText("Bản nháp vẫn được giữ");
+    await expect(docModal.getByLabel("Nhận xét tổng quát",{exact:true})).toHaveValue("GV đang xem phiên bản 1");
+    await expect(docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true})).toBeDisabled();
     const unchanged=(await read(gv,base+"/documents")).find((d:any)=>d.title==="Kế hoạch thực hiện (Mẫu 2)");
     expect(unchanged.versions.map((v:any)=>v.state)).toEqual(["SUBMITTED","SUPERSEDED"]);
     expect(unchanged.versions[0].reviews).toHaveLength(0);
@@ -321,13 +327,9 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await supportingDeadline.getByLabel("Căn cứ / lý do",{exact:true}).fill("Khoa mở nhận tài liệu hỗ trợ theo đợt");
     await supportingDeadline.getByRole("button",{name:/Thiết lập cho cả đợt|Gia hạn cho cả đợt/}).click();
     await sv.goto(`${web}${base}?section=submissions&kind=SUPPORTING`);
-    await sv.getByLabel("Nội dung tài liệu",{exact:true}).selectOption("SUPPORTING_DESIGN");
-    await expect(sv.getByLabel("Tên tài liệu",{exact:true})).toHaveValue("Đặc tả yêu cầu / tài liệu thiết kế");
-    await sv.getByLabel("Tên tài liệu",{exact:true}).fill("Thiết kế NV5 hỗ trợ");
-    await sv.getByLabel(/Tệp cần nộp/).setInputFiles({name:"thiet-ke.txt",mimeType:"text/plain",buffer:Buffer.from("Synthetic design documentation")});
-    await sv.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
-    await expect(sv.locator("details.submission-attachment > summary").filter({hasText:"Thiết kế NV5 hỗ trợ"})).toBeVisible();
-    expect((await read(sv,base+"/documents")).find((item:any)=>item.title==="Thiết kế NV5 hỗ trợ").document_type).toBe("SUPPORTING");
+    await expect(sv.getByRole("heading",{name:/Minh chứng công bố khoa học/})).toBeVisible();
+    await expect(sv.getByRole("button",{name:"Nộp tài liệu",exact:true})).toHaveCount(0);
+    await expect(sv.getByText("Nộp hồ sơ xét điểm thưởng",{exact:true})).toBeVisible();
     expect((await outsider.request.get(api+base+"/document-deadline-history")).status()).toBe(404);
     // The faculty can reopen a closed intake with a later round-wide deadline.
     await tbm.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click();

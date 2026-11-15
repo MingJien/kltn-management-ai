@@ -14,7 +14,8 @@
 - Xin thôi KLTN trong 14 ngày đầu: sinh viên gửi yêu cầu, điều phối đợt quyết định trực tiếp và hệ thống giữ lịch sử riêng từng thành viên.
 - Trang bảo vệ giữ nháp khi đổi tab/lưu biểu mẫu khác, kiểm soát phiên bản từng phiếu, in phiếu trống trước họp, xem báo cáo đúng phiên bản và xử lý SV vắng theo quyết định Khoa. [Kiểm chứng ngày 10/11](docs/evidence/defense-delivery-validation-2026-11-10.md).
 - NV6 tuần 2 có hội đồng, lịch bảo vệ, Mẫu 6, tổng hợp điểm, Mẫu 9–11 và đối chiếu báo cáo Word/PDF theo cặp, gồm OCR khi cấu hình Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md).
-- Mẫu 6, 9, 10 và 11 điền từ tệp gốc của Khoa. TBM hoặc điều phối bổ sung thông tin học vụ có căn cứ. Hội đồng xem trước và điều chỉnh cách trình bày trên bản xuất chỉ đọc. [Hướng dẫn biểu mẫu](docs/design/defense-forms.md).
+- Mẫu 6, 9, 10 và 11 điền từ tệp gốc của Khoa. Mẫu 10/11 tổng hợp toàn đợt, kể cả bảo vệ bổ sung; Mẫu 11 chọn mã học phần trước khi xuất. TBM hoặc điều phối bổ sung thông tin học vụ có căn cứ. Bản xem trước chỉ cho chỉnh trình bày; bản dùng để ký được lưu nguyên tệp để tải lại. [Hướng dẫn biểu mẫu](docs/design/defense-forms.md).
+- Kho nội bộ có SV nộp bản sau bảo vệ → TBM duyệt lưu hoặc yêu cầu nộp lại, lịch sử phiên bản và quyền tải theo hồ sơ. Báo cáo theo đợt/bộ môn tổng hợp điều kiện, kết quả, điểm, xếp loại, điểm danh, tiến độ nộp lưu và danh sách thiếu dữ liệu học vụ. [Hướng dẫn](docs/design/nv6-archive-reporting.md).
 - Mẫu nhận xét Mẫu 7/8 gắn với đúng sinh viên và bản báo cáo; GV gửi nhận xét trên hệ thống, xuất phiếu có footer để ký ngoài. Người được phân công tiếp nhận hồ sơ hoặc TBM ghi nhận bản giấy theo mã bản xuất và căn cứ; không yêu cầu tải bản ký lên lại.
 - Điểm thưởng công bố khoa học có luồng SV nộp → GVHD xác nhận → TBM duyệt từng SV; tự đưa mức đã duyệt vào phiếu Mẫu 6 và khóa căn cứ khi đã chấm. [Kiểm chứng](docs/evidence/publication-bonus-approval.md).
 - Có hồ sơ chuyên môn GV, phân công theo đợt và kiểm tra điều kiện bảo vệ ở mức hiện tại.
@@ -38,4 +39,4 @@ Mở http://127.0.0.1:1573. Cấu hình máy và mật khẩu nằm trong .env c
     .\.venv\Scripts\python.exe -m tools.validate_official_database
     npm run build --prefix 'D:\KLTN\frontend'
 
-Các kiểm thử tích hợp dùng dữ liệu giả trong schema riêng. [Kết quả tổng duyệt NV6 và kiểm bản in](docs/evidence/nv6-export-workflow-validation.md).
+Các kiểm thử tích hợp dùng dữ liệu giả trong schema riêng. [Kiểm chứng hiện tại: bảng điểm toàn đợt, kho nội bộ, dashboard và bản in](docs/evidence/nv6-archive-register-validation.md). [Kết quả đối chiếu biểu mẫu trước đó](docs/evidence/nv6-export-workflow-validation.md).

@@ -154,9 +154,8 @@ def create_progress(session, user, thesis_id, data, *, commit=True):
     if latest and not revision_requested:
         reviewed = session.scalar(select(m.ProgressReview.id).where(
             m.ProgressReview.progress_report_id == latest.id).limit(1)) is not None
-        student = profile(session, user, "STUDENT")
         if (latest.state != "SUBMITTED" or reviewed or not milestone.due_at or
-                current_time > milestone.due_at or latest.submitted_by != student.id):
+                current_time > milestone.due_at):
             raise HTTPException(409, "Chỉ tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; sau đó cần yêu cầu sửa")
         latest.row_version += 1
     file_id = None

@@ -21,6 +21,7 @@ from backend.api.school_forms import router as school_forms_router
 from backend.api.evaluation import router as evaluation_router
 from backend.api.publications import router as publications_router
 from backend.api.defense import router as defense_router
+from backend.api.nv6_reporting import router as nv6_reporting_router
 from backend.api.thesis_changes import router as thesis_changes_router
 from backend.api.lecturer_profiles import router as lecturer_profiles_router
 from backend.api.withdrawals import router as withdrawals_router
@@ -83,6 +84,7 @@ app.include_router(school_forms_router)
 app.include_router(evaluation_router)
 app.include_router(publications_router)
 app.include_router(defense_router)
+app.include_router(nv6_reporting_router)
 app.include_router(thesis_changes_router)
 app.include_router(lecturer_profiles_router)
 app.include_router(withdrawals_router)

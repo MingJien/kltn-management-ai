@@ -1,6 +1,7 @@
 """Run real UI -> API -> PostgreSQL tests in a dedicated test database.
 
 Command: python -m tools.run_e2e [playwright spec filter...]
+With no filters, use a fresh schema per spec file. Use --isolate-specs [filename patterns...] to select files in the same mode.
 Requires frontend npm dependencies and `npx playwright install chromium`.
 Never reuses or stops a user's running API/Vite server.
 
@@ -21,6 +22,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from pathlib import Path
 from urllib.request import urlopen
 from uuid import uuid4
@@ -59,7 +61,9 @@ def main() -> int:
     print("Checking real ClamAV scanner...", flush=True)
     if not start_local_daemon():
         raise RuntimeError("E2E BLOCKED: real ClamAV daemon is not ready; uploads must not be falsely marked CLEAN")
-    api_port, web_port = available_port(DEFAULT_API_PORT), available_port(DEFAULT_WEB_PORT)
+    ephemeral = os.getenv('KLTN_E2E_EPHEMERAL_PORTS') == 'true'
+    api_port = available_port(0 if ephemeral else DEFAULT_API_PORT)
+    web_port = available_port(0 if ephemeral else DEFAULT_WEB_PORT)
     if api_port == web_port:
         web_port = available_port(0)
     for port in (api_port, web_port):
@@ -211,5 +215,27 @@ def main() -> int:
         engine.dispose()
 
 
+def run_isolated_specs(patterns: list[str]) -> int:
+    specs = sorted((ROOT / 'frontend' / 'e2e').rglob('*.spec.ts'))
+    selected = [spec for spec in specs if not patterns or any(fnmatch(spec.name, pattern) for pattern in patterns)]
+    if not selected:
+        print('No E2E specs match the supplied filename patterns.', file=sys.stderr)
+        return 2
+    failed = []
+    env = dict(os.environ, KLTN_E2E_EPHEMERAL_PORTS='true')
+    for index, spec in enumerate(selected, 1):
+        print(f'[{index}/{len(selected)}] {spec.name} with a fresh test schema', flush=True)
+        result = subprocess.run([sys.executable, '-m', 'tools.run_e2e', spec.name], cwd=ROOT, env=env)
+        if result.returncode:
+            failed.append(spec.name)
+    print(f'Passed spec files: {len(selected) - len(failed)}/{len(selected)}', flush=True)
+    if failed:
+        print('Failed spec files: ' + ', '.join(failed), file=sys.stderr, flush=True)
+    return int(bool(failed))
+
+
 if __name__ == '__main__':
+    args = sys.argv[1:]
+    if not args or args[0] == '--isolate-specs':
+        raise SystemExit(run_isolated_specs(args[1:]))
     raise SystemExit(main())

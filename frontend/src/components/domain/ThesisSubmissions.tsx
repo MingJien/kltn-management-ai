@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { request } from "../../api";
 import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Lecturer, ProgressReport, Proposal, Thesis, ThesisDocument } from "../../api";
-import { Status, formatDate } from "./CoreForms";
+import { Status } from "./CoreForms";
 import DocumentDeadlines from "./DocumentDeadlines";
 import RegistrationSubmission from "./RegistrationSubmission";
 import ThesisDocuments, { type CoreRun } from "./ThesisDocuments";
@@ -33,7 +33,7 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
     ...((proposal || managesDeadlines) ? [{kind:"PROPOSAL", label:"Đề cương", code:"Mẫu 3", description:"GVHD xác nhận · TBM chốt", state:proposal?.state, pending:!!proposal && ((thesis.actions.includes("proposal:review") && ["SUBMITTED","UNDER_REVIEW"].includes(proposal.state)) || (thesis.actions.includes("proposal:finalize") && proposal.state === "ADVISOR_CONFIRMED") || (thesis.actions.includes("proposal:dean_confirm") && proposal.state === "DEPARTMENT_FINALIZED"))}] : []),
     ...((canReadDocuments || managesDeadlines) ? [
       {kind:"REPORT", label:"Cuốn báo cáo KLTN", code:"Báo cáo trước bảo vệ", description:"Bản báo cáo hoàn chỉnh của đề tài", state:docs.find(doc => doc.document_type === "REPORT")?.versions[0]?.state || "Chưa nộp", pending:thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "REPORT" && doc.versions[0]?.state === "SUBMITTED")},
-      {kind:"SUPPORTING", label:"Tài liệu hỗ trợ", code:"Minh chứng", description:publicationPending?`${publicationPending} hồ sơ điểm thưởng chờ bạn xử lý`:"Minh chứng công bố khoa học và tệp bổ sung", state:null, pending:publicationPending>0||(thesis.actions.includes("document:review") && docs.some(doc => doc.document_type === "SUPPORTING" && doc.versions[0]?.state === "SUBMITTED"))},
+      {kind:"SUPPORTING", label:"Minh chứng điểm thưởng", code:"Công bố khoa học", description:publicationPending?`${publicationPending} hồ sơ chờ bạn xử lý`:"Nộp tệp cùng hồ sơ xét điểm thưởng", state:null, pending:publicationPending>0},
     ] : []),
   ];
   const effectiveDeadlines = deadlines.map(item => item.document_type === "REPORT" && thesis.extension_until_at && Date.parse(thesis.extension_until_at) > Date.parse(item.due_at)
@@ -65,8 +65,7 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
       </>}
       {["PLAN","REPORT","SUPPORTING"].includes(selected) && <>
         <DocumentDeadlines thesis={thesis} deadlines={deadlines} history={history} userId={userId} busy={busy} run={run} kinds={[selected as "PLAN" | "REPORT" | "SUPPORTING"]} />
-        {selected === "REPORT" && thesis.extension_until_at && <p className="alert alert-info">Hạn hoàn thành riêng đã được gia hạn đến <strong>{formatDate(thesis.extension_until_at)}</strong>. Hạn chung của đợt vẫn giữ nguyên; bản đã được tiếp nhận chỉ nộp lại khi GVHD yêu cầu sửa.</p>}
-        {canReadDocuments && <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT" | "SUPPORTING"} pendingOnly={pendingOnly} />}
+          {canReadDocuments && <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT" | "SUPPORTING"} pendingOnly={pendingOnly} />}
       </>}
     </div>
     <p className="submission-help text-body-sm text-muted">Cần mẫu trắng hoặc tài liệu Khoa công bố? <Link to={"/forms?round_id=" + thesis.round_id}>Mở kho biểu mẫu & tài liệu Khoa</Link>. Báo cáo định kỳ nộp tại <Link to={"/theses/" + thesis.id + "?section=progress"}>Báo cáo tiến độ</Link>.</p>

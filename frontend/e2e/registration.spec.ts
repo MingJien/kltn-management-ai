@@ -176,7 +176,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await sv1.page.reload();
     await card(sv1.page,approved).getByRole("link",{name:/Mở hồ sơ khóa luận/}).click();
     await sv1.page.getByRole("tab",{name:"Báo cáo tiến độ",exact:true}).click({timeout:10000});
-    await expect(sv1.page.getByRole("heading",{name:"Nộp báo cáo tiến độ",exact:true})).toBeVisible();
+    await expect(sv1.page.getByRole("heading",{name:"Chưa có mốc tiến độ trong hồ sơ này",exact:true})).toBeVisible();
     const rounds = await read(admin.page,"/admin/rounds");
     const round = rounds.find((item:{state:string}) => item.state === "OPEN");
     expect(round).toBeTruthy();
@@ -208,26 +208,28 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true}).click();
     console.log("E2E progress v1 submitted");
     await expect(sv1.page.getByText("Đã hoàn thành thiết kế; tiếp tục tích hợp và kiểm thử.",{exact:true})).toBeVisible();
-    await expect(sv1.page.getByLabel("Mốc báo cáo").locator("option",{hasText:"Mốc kiểm tra giao diện · v1"})).toHaveCount(1);
-    await sv1.page.getByLabel("Mốc báo cáo").selectOption({label:"Mốc kiểm tra giao diện · v1 · nộp phiên bản mới"});
-    await sv1.page.getByLabel("Kết quả, khó khăn và kế hoạch").fill("Bản tự sửa trước hạn, GVHD chưa phản hồi.");
-    await expect(sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true})).toBeEnabled();
-    await sv1.page.getByRole("button",{name:"Gửi báo cáo",exact:true}).click({timeout:10000});
-    await expect(sv1.page.getByRole("status")).toContainText("Đã gửi báo cáo tiến độ");
-    console.log("E2E progress v2 submitted");
-    await expect(sv1.page.getByText("Bản tự sửa trước hạn, GVHD chưa phản hồi.",{exact:true})).toBeVisible();
+    await sv2.page.goto(`${web}/theses/${thesisId}?section=progress`);
+    await sv2.page.getByLabel("Mốc báo cáo").selectOption({label:"Mốc kiểm tra giao diện · v1 · nộp phiên bản mới"});
+    await sv2.page.getByLabel("Kết quả, khó khăn và kế hoạch").fill("Thành viên cập nhật tiến độ trước khi GVHD phản hồi.");
+    await sv2.page.getByLabel("Tiến độ tự báo cáo (%)").fill("45");
+    await sv2.page.getByRole("button",{name:"Gửi báo cáo",exact:true}).click();
+    await expect(sv2.page.getByRole("status")).toContainText("Đã gửi báo cáo tiến độ");
+    const progress = await read(sv2.page,`/theses/${thesisId}/progress-reports`);
+    expect(progress.find(row => row.version_no === 2)?.submitted_by_student_id).toBe((await read(sv2.page,"/me/context")).student_id);
+    await sv1.page.reload();
+    await expect(sv1.page.getByText("Thành viên cập nhật tiến độ trước khi GVHD phản hồi.",{exact:true})).toBeVisible();
     await sv1.page.locator(".progress-report-history > summary").click();
     await sv1.page.locator(".progress-report-history__version > summary").click();
     await expect(sv1.page.getByText("Đã hoàn thành thiết kế; tiếp tục tích hợp và kiểm thử.",{exact:true})).toBeVisible();
     await gv.page.reload();
-    const reportCard = gv.page.locator("article.card").filter({has:gv.page.getByText("Bản tự sửa trước hạn, GVHD chưa phản hồi.",{exact:true})});
+    const reportCard = gv.page.locator("article.card").filter({has:gv.page.getByText("Thành viên cập nhật tiến độ trước khi GVHD phản hồi.",{exact:true})});
     await reportCard.getByLabel("Kết quả").selectOption("CONFIRM");
     await reportCard.getByLabel("Nhận xét / lý do").fill("Báo cáo tiến độ đã được xác nhận.");
     await reportCard.getByRole("button",{name:"Gửi kết quả",exact:true}).click();
     await expect(gv.page.getByRole("status")).toContainText("Đã lưu nhận xét tiến độ");
 
-    const supportingUrl=`${web}/theses/${thesisId}?section=submissions&kind=SUPPORTING`;
-    await gv.page.goto(supportingUrl);
+    const planUrl=`${web}/theses/${thesisId}?section=submissions&kind=PLAN`;
+    await gv.page.goto(planUrl);
     const deadlineCard = gv.page.locator("section.card").filter({has:gv.page.getByRole("heading",{name:"Lịch nhận tài liệu của đợt",exact:true})});
     const later = new Date(Date.now()+70*24*60*60*1000);
     const laterDueAt = `${later.getFullYear()}-${String(later.getMonth()+1).padStart(2,"0")}-${String(later.getDate()).padStart(2,"0")}T17:00`;
@@ -235,39 +237,29 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await deadlineCard.getByLabel("Căn cứ / lý do").fill("Kế hoạch nộp tài liệu đợt kiểm thử");
     await deadlineCard.getByRole("button",{name:/Thiết lập cho cả đợt|Gia hạn cho cả đợt/}).click({timeout:10000});
 
-    await sv1.page.goto(supportingUrl);
-    await sv1.page.getByLabel("Nội dung tài liệu",{exact:true}).selectOption("SUPPORTING_DESIGN",{timeout:10000});
-    await sv1.page.getByLabel("Tên tài liệu").fill("Báo cáo UI E2E");
-    const openAttachment=async(page:Page)=>{
-      const attachment=page.locator("details.submission-attachment").filter({has:page.locator("summary").filter({hasText:"Báo cáo UI E2E"})});
-      const summary=attachment.locator(":scope > summary");
-      await expect(summary).toBeVisible();
-      if((await attachment.getAttribute("open"))===null)await summary.click();
-    };
+    await expect(gv.page.getByRole("status")).toContainText(/Đã (thiết lập hạn|gia hạn loại) tài liệu/);
+    await sv1.page.goto(planUrl);
     const fileInput = sv1.page.getByLabel(/Tệp cần nộp/);
     await fileInput.setInputFiles({name:"bao-cao-v1.pdf",mimeType:"application/pdf",
       buffer:VALID_PDF});
-    await sv1.page.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
-    await openAttachment(sv1.page);
+    await sv1.page.getByRole("button",{name:"Nộp kế hoạch Mẫu 2",exact:true}).click();
     await expect(sv1.page.getByText("Phiên bản 1 · bao-cao-v1.pdf",{exact:true})).toBeVisible();
     const update=sv1.page.locator("details.submission-update");
     if((await update.getAttribute("open"))===null)await update.locator("summary").click();
     await sv1.page.getByLabel(/Nộp phiên bản mới/).setInputFiles({name:"bao-cao-v2.pdf",mimeType:"application/pdf",
       buffer:VALID_PDF});
     await update.getByRole("button",{name:"Nộp tài liệu",exact:true}).click();
-    await openAttachment(sv1.page);
     await expect(sv1.page.getByText("Phiên bản 2 · bao-cao-v2.pdf",{exact:true})).toBeVisible();
     await sv1.page.getByText("Lịch sử cập nhật (1 bản trước)",{exact:true}).click();
     await sv1.page.locator(".version-history-item > summary").first().click();
     await expect(sv1.page.getByText("Phiên bản 1 · bao-cao-v1.pdf",{exact:true})).toBeVisible();
-    const uploaded = (await read(sv1.page,`/theses/${thesisId}/documents`)).find((item:{title:string})=>item.title === "Báo cáo UI E2E");
+    const uploaded = (await read(sv1.page,`/theses/${thesisId}/documents`)).find((item:{document_type:string})=>item.document_type === "PLAN");
     expect(uploaded.versions).toHaveLength(2);
     expect(uploaded.versions[0].state).toBe("SUBMITTED");
     expect(uploaded.versions[1].state).toBe("SUPERSEDED");
     expect(uploaded.versions[0].scan_state).toBe("CLEAN");
     await expect(sv1.page.getByRole("button",{name:"Tải bản nộp gốc v2",exact:true})).toBeEnabled();
-    await gv.page.goto(supportingUrl);
-    await openAttachment(gv.page);
+    await gv.page.goto(planUrl);
     await gv.page.locator(".core-version").filter({hasText:"Phiên bản 2 · bao-cao-v2.pdf"}).getByRole("button",{name:"Xem tệp & nhận xét",exact:true}).click({timeout:10000});
     const documentReview=gv.page.getByRole("dialog");
     await documentReview.getByLabel("Kết quả",{exact:true}).selectOption("ACCEPT");
@@ -276,7 +268,6 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await expect(documentReview).toHaveCount(0);
     expect(topic.title_versions.map((v:{title:string}) => v.title)).toEqual([title,approved]);
     await sv1.page.reload();
-    await openAttachment(sv1.page);
     await expect(sv1.page.getByText("Phiên bản 2 · bao-cao-v2.pdf",{exact:true})).toBeVisible();
     expect((await write(sv1.page,"/topics",{data:{round_id:topic.round_id,title:"SV không được tạo đề tài GV"}})).status()).toBe(403);
     await gv.page.goto(web+"/registrations");
@@ -454,7 +445,7 @@ test("SV nộp đề cương; tệp chưa quét được giữ cách ly và ch�
     expect(registration.state).toBe("FINALIZED");
     const thesisId = registration.thesis_id;
     expect(thesisId).toBeTruthy();
-    await sv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
+    await sv.page.goto(`${web}/theses/${thesisId}?section=proposal`);
     await expect(sv.page.getByRole("heading",{name:"Đề cương khóa luận"})).toBeVisible();
     await sv.page.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles({
       name:"de-cuong-v1.pdf",mimeType:"application/pdf",buffer:VALID_PDF});
@@ -464,12 +455,12 @@ test("SV nộp đề cương; tệp chưa quét được giữ cách ly và ch�
     const isQuarantined = await sv.page.getByText(/Đang cách ly – chưa quét/i).isVisible().catch(() => false);
     if (isQuarantined) {
       await expect(sv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeDisabled();
-      await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
+      await gv.page.goto(`${web}/theses/${thesisId}?section=proposal`);
       await expect(gv.page.getByText(/Chưa thể nhận xét: tệp đang cách ly/)).toBeVisible();
       await expect(gv.page.getByLabel("Kết quả")).toHaveCount(0);
     } else {
       await expect(sv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled();
-      await gv.page.goto(`http://127.0.0.1:5174/theses/${thesisId}?section=proposal`);
+      await gv.page.goto(`${web}/theses/${thesisId}?section=proposal`);
       await expect(gv.page.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled();
     }
     expect((await read(sv.page,`/theses/${thesisId}/proposal`)).state).toBe("SUBMITTED");

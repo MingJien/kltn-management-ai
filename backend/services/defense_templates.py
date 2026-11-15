@@ -394,7 +394,8 @@ def minutes_document(path, slot, council, roster, totals, notes, footer, layout,
     p[24].paragraph_format.keep_with_next=True
     p[24].paragraph_format.keep_together=True
     for index in [13,14,18,19,20,21]:p[index].paragraph_format.keep_with_next=True
-    anchor = after(p[25], narrative_text(slot.minutes.get("recommendations") or "","recommendations",layout) or "Không có kiến nghị bổ sung.",layout)
+    recommendation_status = "Hội đồng xác nhận không có kiến nghị." if slot.minutes.get("no_recommendations") else "Chưa ghi nhận kiến nghị."
+    anchor = after(p[25], narrative_text(slot.minutes.get("recommendations") or "","recommendations",layout) or recommendation_status,layout)
     p[25].paragraph_format.keep_with_next = True
     p[22].paragraph_format.keep_with_next = True
     p[23].paragraph_format.keep_with_next = True
@@ -420,6 +421,14 @@ def summary_document(path, council, rows, footer, layout, date):
         tab._tbl.append(deepcopy(template))
         for c, value in zip(tab.rows[-1].cells, [index,student["name"],student["code"],student["class_name"] or "Chưa cập nhật",score if score is not None else student.get("outcome_label","Vắng")]):
             cell(c, str(value))
+            margins=OxmlElement("w:tcMar")
+            for edge, amount in (("top",50),("bottom",50),("left",80),("right",80)):
+                side=OxmlElement(f"w:{edge}")
+                side.set(qn("w:w"),str(amount));side.set(qn("w:type"),"dxa")
+                margins.append(side)
+            properties=c._tc.get_or_add_tcPr()
+            for old in list(properties.findall(qn("w:tcMar"))):properties.remove(old)
+            properties.append(margins)
     for row in list(tab.rows)[-min(2,len(rows)):]:
         for c in row.cells:
             for p in c.paragraphs:p.paragraph_format.keep_with_next=True
@@ -428,20 +437,22 @@ def summary_document(path, council, rows, footer, layout, date):
     separator = doc.paragraphs[4]
     separator.paragraph_format.keep_with_next = True
     separator.paragraph_format.line_spacing = Pt(1)
-    put(anchor, f"Danh sách có {len(rows)} sinh viên · Hội đồng: {council.name} · {council.reference}")
+    scope = getattr(council, "summary_label", f"Hội đồng: {council.name} · {council.reference}")
+    put(anchor, f"Danh sách có {len(rows)} sinh viên · {scope}")
     people={r["role"]:r["name"] for r in council.members}
     signature_names(doc.tables[2], "", people["SECRETARY"], date, dean=True)
     layout_word(doc, layout, footer, doc.tables[2], anchor)
     return doc
 
 
-def official_sheet(path, council, round_, rows, footer, layout):
+def official_sheet(path, council, round_, rows, footer, layout, *, course_code=None):
     book=load_workbook(path)
     s=book.active
-    # Keep the original course heading and ASC import markers; replace the
-    # template's example lecturer with the actual council chair.
+    if course_code:
+        s["B5"] = f"Học phần: [{course_code}] - Khóa luận tốt nghiệp"
+    # Preserve the import markers from the original.
     s["B6"]=f"Đợt: {round_.code} · {council.name}"
-    s["B7"]="Giảng viên: "+next(r["name"] for r in council.members if r["role"]=="CHAIR")
+    s["B7"]="Giảng viên: "+next((r["name"] for r in council.members if r["role"]=="CHAIR"), "")
     if len(rows)>7:
         extra=len(rows)-7
         # openpyxl does not translate merged ranges when inserting rows.
@@ -468,17 +479,38 @@ def official_sheet(path, council, round_, rows, footer, layout):
             c.alignment=Alignment(horizontal="left" if col in {3,4,7} else "center",vertical="center",wrap_text=True)
         s.cell(r,5).number_format="dd/mm/yyyy"
         s.cell(r,6).number_format="0.0"
-        s.row_dimensions[r].height=max(25,ceil(len(student["name"])/25)*17)
+        # Names and absence decisions wrap in their actual columns, not across
+        # the combined full-name width. Excel does not auto-fit exported rows.
+        height=25
+        for col in (2,3,4,7):
+            c=s.cell(r,col)
+            size=layout.font_size or c.font.sz or 14
+            width=s.column_dimensions[c.column_letter].width or 13
+            capacity=max(3,int(width*11/(size*.9)))
+            lines=sum(max(1,len(wrap(part,width=capacity))) for part in str(c.value or "").split("\n"))
+            height=max(height,lines*size*1.35+6)
+        s.row_dimensions[r].height=height
     s.cell(11+count,1,f"Danh sách có {sum(score is not None for _,score in rows)} sinh viên có điểm / {len(rows)} sinh viên")
     secretary=next(r["name"] for r in council.members if r["role"]=="SECRETARY")
     s.cell(17+count,6,secretary)
     s.print_title_rows="4:10"
     layout_sheet(s,layout,footer,f"A1:G{17+count}")
     # Preserve readable print size on a large council rather than one tiny page.
-    if count>20:
+    heights=[s.row_dimensions[11+i].height or 25 for i in range(count)]
+    if sum(heights)>500:
         from openpyxl.worksheet.pagebreak import Break
         s.page_setup.fitToHeight=0
-        stops=list(range(20,count,20))
-        if stops and count-stops[-1]<3:stops[-1]=count-3
+        stops=[]
+        first=0
+        while sum(heights[first:])+110>500:
+            stop=first
+            used=0
+            while stop<count and used+heights[stop]<=500:
+                used+=heights[stop]
+                stop+=1
+            stop=min(stop,count-3)
+            if stop<=first:break
+            stops.append(stop)
+            first=stop
         for stop in stops:s.row_breaks.append(Break(id=10+stop))
     return book

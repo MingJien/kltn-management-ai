@@ -45,6 +45,8 @@ const messages: Record<string, string> = {
 };
 
 export function apiMessage(status: number, detail: unknown, path = ""): string {
+  if ((path.startsWith("/nv6-reports/") || path.startsWith("/thesis-archive/")) && typeof detail === "string" &&
+      [403,409,422,503].includes(status) && /[^\x00-\x7F]/.test(detail)) return detail;
   if (path.startsWith("/defense/") && typeof detail === "string" && [403, 409, 422].includes(status) && /[^\x00-\x7F]/.test(detail)) return detail;
   // These workflows return actionable Vietnamese explanations for their business rules.
   if (typeof detail === "string" && [403, 409, 422].includes(status) &&

@@ -270,8 +270,9 @@ export async function fetchReviewFile(path: string, signal?: AbortSignal): Promi
   return response.arrayBuffer();
 }
 
-export async function downloadFile(path: string, fallback: string): Promise<void> {
-  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include"});
+export async function downloadFile(path: string, fallback: string, method: "GET" | "POST" = "GET"): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include", method,
+    headers: method === "POST" && sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}});
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));

@@ -145,6 +145,10 @@ def can_view(session, user, notice):
         from backend.services.evaluation import permissions
         thesis = session.get(m.Thesis, identifier)
         return bool(thesis and "evaluation:view" in permissions(session, user, thesis))
+    if kind == "thesis_archive":
+        from backend.services.thesis_archive import access
+        thesis = session.get(m.Thesis, identifier)
+        return bool(thesis and any(access(session, user, thesis)[:3]))
     if kind == "thesis":
         thesis = session.get(m.Thesis, identifier)
         if thesis is None:

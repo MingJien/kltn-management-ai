@@ -27,6 +27,8 @@ import LoginPage from "./pages/LoginPage";
 const EvaluationsPage = lazy(() => import("./pages/EvaluationsPage"));
 const EvaluationPage = lazy(() => import("./pages/EvaluationPage"));
 const DefensePage = lazy(() => import("./pages/DefensePage"));
+const Nv6ReportsPage = lazy(() => import("./pages/Nv6ReportsPage"));
+const ThesisArchivePage = lazy(() => import("./pages/ThesisArchivePage"));
 const ThesisChangesPage = lazy(() => import("./pages/ThesisChangesPage"));
 import { plannedPages, type PlannedPageId } from "./plannedPages";
 const AIPage = lazy(() => import("./pages/AIPage"));
@@ -45,6 +47,8 @@ function App() {
     const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
     labels["/changes"] = "Đổi đề tài & gia hạn";
     labels["/defense"] = "Hội đồng và bảo vệ";
+    labels["/reports"] = "Báo cáo và thống kê KLTN";
+    labels["/repository"] = "Kho khóa luận nội bộ";
     labels["/withdrawals"] = "Xin thôi KLTN";
     labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
     labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
@@ -217,6 +221,10 @@ function App() {
         <Route path="/evaluation" element={workflowAccess ? <EvaluationsPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/evaluation/:thesisId" element={workflowAccess ? <EvaluationPage context={context}/> : <Navigate to="/" replace/>}/>
         <Route path="/defense" element={workflowAccess ? <DefensePage context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/reports" element={context.base_role!=="STUDENT" ? <Nv6ReportsPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/repository" element={workflowAccess ? <ThesisArchivePage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>
+        <Route path="/planned/reports" element={<Navigate to="/reports" replace/>}/>
+        <Route path="/planned/repository" element={<Navigate to="/repository" replace/>}/>
         {["council","defense","results"].map(id=><Route key={id} path={`/planned/${id}`} element={<Navigate to="/defense" replace/>}/>)}
         <Route path="/planned/evaluation" element={<Navigate to="/evaluation" replace/>}/>
         <Route path="/changes" element={workflowAccess ? <ThesisChangesPage key={context.user_id} context={context}/> : <Navigate to="/" replace/>}/>

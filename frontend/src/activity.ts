@@ -5,6 +5,8 @@ export type ActivityItem = {
 export type ActivityResult = {items: ActivityItem[]; total: number; actions: string[]; scope: string};
 
 const actions: Record<string, string> = {
+  DEFENSE_PRINT_SAVED:"Lưu bản xuất hội đồng để ký", THESIS_ARCHIVE_SUBMITTED:"Nộp bản khóa luận sau bảo vệ",
+  THESIS_ARCHIVE_ACCEPTED:"Duyệt lưu khóa luận nội bộ", THESIS_ARCHIVE_RETURNED:"Yêu cầu nộp lại bản khóa luận lưu",
   DEFENSE_COUNCIL_CREATED:"Lập hội đồng bảo vệ", DEFENSE_COUNCIL_REVISED:"Điều chỉnh hội đồng", DEFENSE_COUNCIL_BEFORE_REVISION:"Lưu thành phần hội đồng trước sửa",
   DEFENSE_SCHEDULED:"Xếp / đổi lịch bảo vệ", DEFENSE_CANCELLED:"Hủy lịch bảo vệ", DEFENSE_COUNCIL_ATTENDANCE:"Điểm danh hội đồng",
   DEFENSE_ATTENDANCE_RECORDED:"Điểm danh sinh viên", DEFENSE_MARK_SUBMITTED:"Lưu phiếu chấm", DEFENSE_MARK_REVISED:"Lưu phiên bản phiếu trước sửa",

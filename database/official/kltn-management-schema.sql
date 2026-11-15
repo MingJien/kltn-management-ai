@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261112_0028.
--- 51 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261115_0030.
+-- 53 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -648,6 +648,32 @@ CREATE UNIQUE INDEX uq_resource_assignment_round_scope ON resource_assignment (a
 
 CREATE UNIQUE INDEX uq_resource_assignment_thesis_scope ON resource_assignment (assignment_type, user_id, thesis_id) WHERE thesis_id IS NOT NULL AND state = 'ACTIVE';
 
+CREATE TABLE thesis_archive_version (
+	thesis_id UUID NOT NULL,
+	file_id UUID NOT NULL,
+	submitted_by UUID NOT NULL,
+	version_no INTEGER NOT NULL,
+	state VARCHAR(20) NOT NULL,
+	snapshot JSONB NOT NULL,
+	decided_by UUID,
+	decided_at TIMESTAMP WITH TIME ZONE,
+	decision_note TEXT,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_thesis_archive_version PRIMARY KEY (id),
+	CONSTRAINT uq_thesis_archive_version_thesis_id_version_no UNIQUE (thesis_id, version_no),
+	CONSTRAINT ck_thesis_archive_version_state CHECK (state IN ('SUBMITTED','RETURNED','ACCEPTED')),
+	CONSTRAINT ck_thesis_archive_version_decision CHECK ((state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)),
+	CONSTRAINT fk_thesis_archive_version_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_archive_version_file_id_stored_file FOREIGN KEY(file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_archive_version_submitted_by_user_account FOREIGN KEY(submitted_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_thesis_archive_version_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_thesis_archive_pending ON thesis_archive_version (thesis_id) WHERE state = 'SUBMITTED';
+
 CREATE TABLE thesis_change_request (
 	scope VARCHAR(20) DEFAULT 'GROUP' NOT NULL,
 	thesis_id UUID NOT NULL,
@@ -1203,6 +1229,26 @@ CREATE TABLE defense_eligibility_check (
 );
 
 CREATE INDEX ix_defense_eligibility_check_thesis_member ON defense_eligibility_check (thesis_id, thesis_member_id);
+
+CREATE TABLE defense_print_record (
+	round_id UUID NOT NULL,
+	slot_id UUID,
+	created_by UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	form INTEGER NOT NULL,
+	filename VARCHAR(255) NOT NULL,
+	sha256 VARCHAR(64) NOT NULL,
+	content BYTEA NOT NULL,
+	source JSONB NOT NULL,
+	id UUID NOT NULL,
+	CONSTRAINT pk_defense_print_record PRIMARY KEY (id),
+	CONSTRAINT ck_defense_print_record_scope CHECK ((form IN (6,9) AND slot_id IS NOT NULL) OR (form IN (10,11) AND slot_id IS NULL)),
+	CONSTRAINT fk_defense_print_record_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_print_record_slot_id_defense_slot FOREIGN KEY(slot_id) REFERENCES defense_slot (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_print_record_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_defense_print_record_round ON defense_print_record (round_id, created_at);
 
 CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num));
 

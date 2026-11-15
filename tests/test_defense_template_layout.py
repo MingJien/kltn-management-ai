@@ -87,6 +87,17 @@ def test_official_sheet_expands_and_preserves_date_and_signature():
     assert s.page_setup.fitToHeight==0
 
 
+def test_official_sheet_long_names_and_absence_reason_have_room_to_wrap():
+    council,roster,_,_=data()
+    student={**roster[0],"name":"Nguyễn Văn Kiểm Thử Khóa Luận", "outcome_label":"Không đạt do vắng · QĐ-KHOA-2026-2919"}
+    s=t.official_sheet(source(11),council,NS(code="TEST"),[(student,None)]*36,"v1",t.PrintLayout(),course_code="CT2026").active
+    assert s["B5"].value=="Học phần: [CT2026] - Khóa luận tốt nghiệp"
+    assert s.row_dimensions[11].height>=50
+    assert s["G11"].value==student["outcome_label"] and s["F11"].value is None
+    assert s.page_setup.fitToHeight==0 and len(s.row_breaks.brk)>1
+    assert all(item.id<=43 for item in s.row_breaks.brk)  # final page keeps at least three data rows
+
+
 def test_layout_accepts_presentation_only_and_rejects_tiny_type_or_text_edits():
     for value in [{"font_size":4},{"line_spacing":.5},{"paragraph_space":50},{"scores":[10]},{"conclusion":"altered"}]:
         with pytest.raises(ValidationError):t.PrintLayout(**value)

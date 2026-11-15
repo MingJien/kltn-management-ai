@@ -10,6 +10,8 @@ import ProfilePopup from "./ProfilePopup";
  * Only includes paths that are statically known.
  */
 const BREADCRUMB_MAP: Record<string, string> = {
+  "/reports": "Báo cáo và thống kê",
+  "/repository": "Kho khóa luận nội bộ",
   "/": "Tổng quan",
   "/topics": "Đề tài",
   "/registrations": "Đăng ký",

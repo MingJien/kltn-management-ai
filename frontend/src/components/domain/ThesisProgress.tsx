@@ -82,7 +82,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     if (previous?.state === "REVISION_REQUIRED") return true;
     if (item.state !== "OPEN") return false;
     if (!previous) return true; // An initial report may still be accepted late while the round milestone is open.
-    return previous.submitted_by_student_id === studentId && previous.state === "SUBMITTED" && previous.reviews.length === 0 && !!item.due_at
+    return previous.state === "SUBMITTED" && previous.reviews.length === 0 && !!item.due_at
       && Date.now() <= new Date(item.due_at).getTime();
   });
   const selected = available.some(item => item.id === milestoneId) ? milestoneId : "";
@@ -162,9 +162,9 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     </div></div>
     {thesis.actions.includes("progress:submit") && active && available.length === 0 && milestones.length > 0 && (
       <div className="card"><div className="card-body">
-        <h3>Không có mốc nào đang mở nhận báo cáo</h3>
+        <h3>Chưa có mốc bạn có thể nộp lúc này</h3>
         <p className="text-muted">
-          Các mốc đã đóng, báo cáo đã được phản hồi hoặc đã hết hạn tự sửa. Nếu GVHD yêu cầu sửa, bạn sẽ nộp được phiên bản mới kể cả sau khi mốc đóng. GVHD quản lý hạn mốc nội bộ; người điều phối quản lý hạn mốc chung của đợt.
+          Mốc có thể đã đóng, đã có phản hồi hoặc hết hạn tự cập nhật. Nếu GVHD yêu cầu sửa, mốc sẽ xuất hiện lại trong form nộp báo cáo.
         </p>
       </div></div>
     )}
@@ -180,7 +180,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
         </p>
       </div></div>
     )}
-    {thesis.actions.includes("progress:submit") && active && <form className="card" onSubmit={async event => {
+    {thesis.actions.includes("progress:submit") && active && available.length > 0 && <form className="card" onSubmit={async event => {
       event.preventDefault();
       const form = event.currentTarget;
       const sent = await run(() => submitProgress(thesis.id, userId, {
@@ -191,7 +191,7 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       }
     }}><div className="card-body core-form">
       <h3>Nộp báo cáo tiến độ</h3>
-      <p className="text-body-sm text-muted">Có thể nộp trễ lần đầu khi mốc còn mở. Trước hạn, bạn có thể tự nộp bản sửa nếu GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi mốc đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
+      <p className="text-body-sm text-muted">Có thể nộp trễ lần đầu khi mốc còn mở. Trước hạn, thành viên trong nhóm có thể nộp bản cập nhật khi GVHD chưa phản hồi. Hệ thống lưu bản cũ và người nộp từng phiên bản. Sau hạn hoặc khi mốc đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
       <div className="input-group"><label htmlFor="report-milestone">Mốc báo cáo</label><select className="input" id="report-milestone" value={selected} onChange={event => setMilestoneId(event.target.value)} required disabled={busy}>
         <option value="">Chọn mốc có thể nộp</option>{available.map(item => <option key={item.id} value={item.id}>{item.title} · v{item.version_no}{latest.has(item.id) ? " · nộp phiên bản mới" : ""}</option>)}
       </select></div>

@@ -2,7 +2,7 @@ import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
-import { errorMessage } from "../errors";
+import { ApiError, errorMessage } from "../errors";
 import type { AuditEvent, Context, DocumentDeadline, Lecturer, Milestone, ProgressReport, Proposal, Thesis, ThesisDocument, WorkAssignment } from "../api";
 import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
@@ -32,7 +32,13 @@ function ThesisWorkspace({context}: {context: Context}) {
   const [reason, setReason] = useState("");
   const load = useCallback(async (signal?: AbortSignal) => {
     const path = `/theses/${thesisId}`;
-    const thesis = await request<Thesis>(path, context.user_id, {signal});
+    const thesis = await request<Thesis>(path, context.user_id, {signal}).catch(cause => {
+      if (!signal?.aborted && cause instanceof ApiError && [403, 404].includes(cause.status)) {
+        setData(null);
+        setUpdatedAt(null);
+      }
+      throw cause;
+    });
     const get = <T,>(suffix: string, action?: string): Promise<T[]> => !action || thesis.actions.includes(action)
       ? request<T[]>(path+suffix, context.user_id, {signal}) : Promise.resolve([]);
     const [milestones, deadlines, reports, docs, work, lecturers, audit, milestoneHistory, proposal, deadlineHistory] = await Promise.all([
@@ -71,11 +77,19 @@ function ThesisWorkspace({context}: {context: Context}) {
     }
   }, [data, location.hash]);
 
-  async function run(action: () => Promise<unknown>, success: string) {
+  async function run(action: () => Promise<unknown>, success: string, onConflict?: () => void) {
     if (busy) return false;
     setBusy(true); setError(""); setMessage("");
     try {await action(); await load(); setMessage(success); return true;}
-    catch (cause) {setError(errorMessage(cause)); await load().catch(() => undefined); return false;}
+    catch (cause) {
+      if (onConflict && cause instanceof ApiError && cause.status === 409) {
+        onConflict();
+      } else {
+        setError(errorMessage(cause));
+        await load().catch(() => undefined);
+      }
+      return false;
+    }
     finally {setBusy(false);}
   }
   async function refresh() {
@@ -101,9 +115,11 @@ function ThesisWorkspace({context}: {context: Context}) {
     <PageHeader title={{overview:"Khóa luận & GVHD",submissions:"Hồ sơ nộp & xét duyệt",progress:"Báo cáo tiến độ"}[section] || "Hồ sơ khóa luận"} description={`${thesis.title} · ${thesis.round_label}`}>
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
-    {active && <Link className="btn btn-secondary" to={`/withdrawals?thesis=${thesis.id}`}>Đơn xin thôi thực hiện KLTN</Link>}
-    {active && <Link className="btn btn-secondary" to={`/changes?thesis=${thesis.id}`}>Đổi đề tài &amp; gia hạn</Link>}
-    {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}
+    {(active || thesis.actions.includes("evaluation:view")) && <nav className="flex gap-2" aria-label="Quy trình liên quan" style={{flexWrap:"wrap"}}>
+      {active && <Link className="btn btn-secondary btn-sm" to={`/withdrawals?thesis=${thesis.id}`}>Đơn xin thôi thực hiện KLTN</Link>}
+      {active && <Link className="btn btn-secondary btn-sm" to={`/changes?thesis=${thesis.id}`}>Đổi đề tài &amp; gia hạn</Link>}
+      {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary btn-sm" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}
+    </nav>}
     {context.base_role === "STUDENT" && active && !thesis.actions.includes("document:submit") && <p className="alert alert-warning" role="status">Quyền tham gia đợt của bạn đã bị thu hồi. Bạn vẫn xem được hồ sơ; các thao tác nộp/sửa được tạm dừng. Liên hệ Khoa nếu cần khôi phục.</p>}
     {updatedAt && <p className="text-caption" style={{margin: "0 0 var(--space-2)"}}>Dữ liệu cập nhật lúc {formatDate(updatedAt.toISOString())}.</p>}
     <div className="core-toolbar">
@@ -136,7 +152,7 @@ function ThesisWorkspace({context}: {context: Context}) {
           <GraduationCap className="workspace-tab-banner__icon" size={20} aria-hidden="true" />
           <div>
             <strong>Tổng quan khóa luận & Giảng viên hướng dẫn</strong>
-            <p>Theo dõi thông tin đề tài, danh sách thành viên nhóm, phân công GVHD chính thức và giảng viên góp ý chéo.</p>
+            <p>Xem thông tin đề tài, thành viên nhóm và lịch sử phân công giảng viên hướng dẫn.</p>
           </div>
         </div>
       )}

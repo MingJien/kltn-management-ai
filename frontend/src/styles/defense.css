@@ -49,3 +49,9 @@
 .defense-selected-plans ul { max-height:12rem; overflow:auto; padding:0; }
 .defense-selected-plans li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; }
 @media(max-width:600px) { .defense-plan-search { grid-template-columns:1fr; } }
+.defense-operation[open] > .stack { margin-top: 14px; }
+.defense-print-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.defense-print-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+.defense-print-list > li > div { min-width: 0; flex: 1 1 240px; overflow-wrap: anywhere; }
+.defense-blockers .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.defense-page [id^="slot-"], .defense-page [id^="archive-"], #nv6-report-students { scroll-margin-top: 96px; }

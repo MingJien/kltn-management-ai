@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { AuditEvent, DocumentDeadline, Thesis } from "../../api";
 import { request } from "../../api";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate } from "./CoreForms";
 
-const names = {PROPOSAL:"Đề cương (Mẫu 3)", PLAN:"Kế hoạch thực hiện (Mẫu 2)", REPORT:"Cuốn báo cáo KLTN", SUPPORTING:"Tài liệu hỗ trợ"};
+const names = {PROPOSAL:"Đề cương (Mẫu 3)", PLAN:"Kế hoạch thực hiện (Mẫu 2)", REPORT:"Cuốn báo cáo KLTN", SUPPORTING:"Minh chứng điểm thưởng"};
 type Kind = keyof typeof names;
 
 export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,run,kinds=["PROPOSAL","PLAN","REPORT"]}: {
@@ -27,7 +28,7 @@ export default function DocumentDeadlines({thesis,deadlines,history,userId,busy,
     })}
     {thesis.extension_until_at && kinds.includes("REPORT") && <p className="alert alert-info">
       Khóa luận này được gia hạn nộp báo cáo đến <strong>{formatDate(thesis.extension_until_at)}</strong>.
-      <a href={`/changes?thesis=${thesis.id}`}> Xem quyết định gia hạn</a>
+      <Link to={`/changes?thesis=${thesis.id}&extension=1`}> Xem quyết định gia hạn</Link>
     </p>}
     <p className="text-caption">Chỉ người được giao điều phối đợt được đặt/gia hạn lịch. GVHD có thể yêu cầu sửa từng bản nộp; các báo cáo định kỳ được quản lý ở mục Báo cáo tiến độ.</p>
     {canManage && <form className="core-form" onSubmit={async event=>{

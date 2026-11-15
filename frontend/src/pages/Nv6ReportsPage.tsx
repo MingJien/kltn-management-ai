@@ -1,0 +1,157 @@
+import {useEffect, useState} from "react";
+import {Link} from "react-router-dom";
+import {request,type Context} from "../api";
+import {errorMessage} from "../errors";
+import {labels,when} from "../evaluation";
+import PageHeader from "../components/layout/PageHeader";
+import Dialog from "../components/ui/Dialog";
+import "../styles/defense.css";
+
+type Scope = {round_id:string;round_code:string;department_id:string;department:string};
+type Row = {id:string;thesis_id:string;title:string;name:string;code:string;class_name:string|null;eligibility:string;result:string;grade:string|null;issues:string[];slot_id:string|null;classification:string|null;attendance:string|null};
+type Summary = {generated_at:string;theses:number;students:number;sessions:number;councils:number;eligibility:Record<string,number>;results:Record<string,number>;score_counts:Record<string,number>;archives:Record<string,number>;attendance:Record<string,number>;classifications:Record<string,number>;incomplete_profiles:number;rows:Row[]};
+const resultLabels: Record<string,string> = {GRADED:"Đã chốt điểm",ABSENT_FINAL:"Không đạt do vắng",PENDING:"Chờ kết quả hoặc quyết định",NOT_SCHEDULED:"Chưa xếp lịch"};
+const archiveLabels: Record<string,string> = {ACCEPTED:"Đã duyệt lưu",SUBMITTED:"Chờ bộ môn duyệt",RETURNED:"Cần nộp lại",NOT_SUBMITTED:"Chưa nộp lưu"};
+const attendanceLabels: Record<string,string> = {PRESENT:"Có mặt",ABSENT:"Vắng",NOT_RECORDED:"Chưa điểm danh"};
+
+type Profile = {class_name:string;major_code:string;birth_date:string;training_cohort:string;revision:string;majors:{code:string;name:string}[]};
+
+function ProfileCorrection({row,round,close,saved}:{row:Row;round:string;close:()=>void;saved:()=>void}) {
+  const [profile,setProfile] = useState<Profile|null>(null);
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState("");
+  const endpoint = `/nv6-reports/${round}/students/${row.id}`;
+  useEffect(()=>{
+    const controller = new AbortController();
+    void request<Profile>(endpoint,"",{signal:controller.signal}).then(data=>{if(!controller.signal.aborted)setProfile(data);})
+      .catch(cause=>{if(!controller.signal.aborted)setError(errorMessage(cause));});
+    return ()=>controller.abort();
+  },[endpoint]);
+  return <Dialog open title={`Thông tin học vụ · ${row.name}`} onClose={close} busy={busy}>
+    <p>{row.code} · {row.title}</p>
+    {error&&<p role="alert" className="alert alert-danger">{error}</p>}
+    {!profile&&!error&&<p role="status">Đang tải thông tin học vụ…</p>}
+    {profile&&<form className="stack" onSubmit={async event=>{
+      event.preventDefault();
+      if(busy)return;
+      const fields = Object.fromEntries(new FormData(event.currentTarget));
+      setBusy(true);setError("");
+      try {await request(endpoint,"",{method:"PUT",headers:{"If-Match":profile.revision},body:JSON.stringify({...fields,birth_date:fields.birth_date||null})});saved();}
+      catch(cause){setError(errorMessage(cause));}finally{setBusy(false);}
+    }}>
+      <div className="defense-form-grid">
+        <label>Lớp<input className="input" name="class_name" defaultValue={profile.class_name} required maxLength={100}/></label>
+        <label>Ngành<select className="input" name="major_code" defaultValue={profile.majors.some(m=>m.code===profile.major_code)?profile.major_code:""} required>
+          <option value="">Chọn ngành từ danh mục</option>{profile.majors.map(major=><option key={major.code} value={major.code}>{major.code} · {major.name}</option>)}
+        </select></label>
+        <label>Khóa học<input className="input" name="training_cohort" defaultValue={profile.training_cohort} maxLength={50} placeholder="Ví dụ: 2022–2026"/></label>
+        <label>Ngày sinh<input className="input" type="date" min="1900-01-01" name="birth_date" defaultValue={profile.birth_date}/></label>
+      </div>
+      {!profile.majors.length&&<p>Chưa có ngành đã xác minh trong danh mục bộ môn. Cập nhật danh mục trước khi lưu.</p>}
+      <label>Căn cứ đối chiếu<input className="input" name="source_reference" required minLength={3} maxLength={500}/></label>
+      <label>Lý do cập nhật<textarea className="input" name="reason" required minLength={5} maxLength={1000} rows={2}/></label>
+      <button className="btn btn-primary" disabled={busy||!profile.majors.length}>Lưu thông tin học vụ</button>
+    </form>}
+  </Dialog>;
+}
+
+export default function Nv6ReportsPage({context}: {context:Context}) {
+  const [scopes,setScopes] = useState<Scope[]|null>(null);
+  const [round,setRound] = useState("");
+  const [department,setDepartment] = useState("");
+  const [data,setData] = useState<Summary|null>(null);
+  const [error,setError] = useState("");
+  const [revision,setRevision] = useState(0);
+  const [filter,setFilter] = useState("");
+  const [search,setSearch] = useState("");
+  const [limit,setLimit] = useState(25);
+  const [editing,setEditing] = useState<Row|null>(null);
+  const [notice,setNotice] = useState("");
+  const rounds = new Map(scopes?.map(scope=>[scope.round_id,scope.round_code]));
+
+  useEffect(()=>{
+    const controller = new AbortController();
+    void request<Scope[]>("/nv6-reports/scopes",context.user_id,{signal:controller.signal}).then(result=>{
+      if(controller.signal.aborted)return;
+      setScopes(result);
+      setRound(current=>current || (result.find(scope=>scope.round_code!=="SYN-DEMO")??result[0])?.round_id || "");
+    }).catch(cause=>{if(!controller.signal.aborted)setError(errorMessage(cause));});
+    return ()=>controller.abort();
+  },[context.user_id,revision]);
+
+  useEffect(()=>{
+    setData(null);
+    if(!round)return;
+    const controller = new AbortController();
+    const path = `/nv6-reports/${round}${department?`?department_id=${encodeURIComponent(department)}`:""}`;
+    void request<Summary>(path,context.user_id,{signal:controller.signal}).then(result=>{
+      if(!controller.signal.aborted)setData(result);
+    }).catch(cause=>{if(!controller.signal.aborted)setError(errorMessage(cause));});
+    return ()=>controller.abort();
+  },[round,department,context.user_id,revision]);
+
+  const visible = data?.rows.filter(row=>(!filter||row.eligibility===filter||row.result===filter||(filter==="issues"&&row.issues.length))&&
+    `${row.name} ${row.code} ${row.title}`.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")))??[];
+  function selectFilter(value:string) {
+    setFilter(value);
+    setLimit(25);
+    document.getElementById("nv6-report-students")?.scrollIntoView({block:"start"});
+  }
+  function breakdown(title:string, values:Record<string,number>, names:Record<string,string>, links=false) {
+    return <section className="card"><div className="card-body"><h3>{title}</h3>
+      {Object.keys(values).length?<ul className="dashboard-status-list">{Object.entries(values).map(([key,value])=><li key={key}>
+        <span>{names[key]??key}</span>{links&&!!data?.rows.length?<button className="btn btn-secondary btn-sm" aria-label={`Xem ${value} · ${names[key]??key}`} onClick={()=>selectFilter(key)}>{value}</button>:<strong>{value}</strong>}
+      </li>)}</ul>:<p className="text-muted">Chưa có dữ liệu trong phạm vi đang xem.</p>}
+    </div></section>;
+  }
+
+  return <div className="stack defense-page">
+    <PageHeader title="Báo cáo và thống kê KLTN" description="Theo dõi điều kiện bảo vệ, kết quả và tiến độ nộp lưu theo đợt và bộ môn.">
+      <button className="btn btn-secondary" onClick={()=>{setError("");setRevision(value=>value+1);}}>Làm mới thống kê</button>
+    </PageHeader>
+    {error&&<p className="alert alert-danger" role="alert">{error}</p>}
+    {notice&&<p className="alert alert-success" role="status">{notice}</p>}
+    {!scopes&&!error&&<p role="status">Đang tải phạm vi báo cáo…</p>}
+    {scopes?.length===0&&<p>Bạn chưa được giao xem báo cáo theo đợt hoặc bộ môn.</p>}
+    {!!scopes?.length&&<div className="defense-form-grid">
+      <label>Đợt KLTN<select className="input" value={round} onChange={event=>{setRound(event.target.value);setDepartment("");setFilter("");setError("");}}>
+        {Array.from(rounds,([id,code])=><option key={id} value={id}>{code}</option>)}
+      </select></label>
+      <label>Bộ môn<select className="input" value={department} onChange={event=>{setDepartment(event.target.value);setFilter("");setError("");}}>
+        <option value="">Tất cả bộ môn trong phạm vi</option>{scopes.filter(scope=>scope.round_id===round).map(scope=><option key={scope.department_id} value={scope.department_id}>{scope.department}</option>)}
+      </select></label>
+    </div>}
+    {round&&!data&&!error&&<p role="status">Đang tổng hợp số liệu…</p>}
+    {data&&<>
+      <div className="dashboard-metrics">{[["Sinh viên",data.students],["Khóa luận",data.theses],["Hội đồng có lịch",data.councils],["Phiên bảo vệ",data.sessions]].map(([name,value])=><div className="card metric-card" key={name}><span>{name}</span><strong>{value}</strong></div>)}</div>
+      <div className="dashboard-breakdown">
+        {breakdown("Điều kiện dự bảo vệ · theo SV",data.eligibility,labels,true)}
+        {breakdown("Kết quả bảo vệ · theo SV",data.results,resultLabels,true)}
+        {breakdown("Nộp lưu · theo khóa luận",data.archives,archiveLabels)}
+        {breakdown("Điểm danh · phiên sau cùng",data.attendance,attendanceLabels)}
+        {breakdown("Xếp loại đã ghi trong biên bản",data.classifications,{})}
+      </div>
+      {Object.keys(data.score_counts).length>0&&breakdown("Phân bố điểm đã chốt",Object.fromEntries(Object.entries(data.score_counts).sort(([a],[b])=>Number(b)-Number(a)).map(([key,value])=>[`${key.replace(".",",")} điểm`,value])),{})}
+      <p className="text-muted">Cập nhật {when(data.generated_at)} · {data.incomplete_profiles} sinh viên cần bổ sung dữ liệu học vụ.{rounds.get(round)==="SYN-DEMO"?" Đợt đang xem là dữ liệu giả lập.":""}</p>
+      {context.base_role==="LECTURER"&&<section id="nv6-report-students" className="stack">
+        <h2>Đối chiếu từng sinh viên</h2>
+        <div className="defense-form-grid">
+          <label>Tìm tên, MSSV hoặc đề tài<input className="input" value={search} onChange={event=>{setSearch(event.target.value);setLimit(25);}}/></label>
+          <label>Nhóm cần xem<select className="input" value={filter} onChange={event=>selectFilter(event.target.value)}><option value="">Tất cả</option><option value="issues">Thiếu thông tin học vụ</option>
+            {[...Object.keys(data.eligibility),...Object.keys(data.results)].map(key=><option key={key} value={key}>{labels[key]??resultLabels[key]}</option>)}</select></label>
+        </div>
+        <div className="defense-results" role="region" tabIndex={0} aria-label="Danh sách đối chiếu sinh viên"><table><thead><tr><th>Sinh viên và đề tài</th><th>Điều kiện</th><th>Kết quả</th><th>Dữ liệu học vụ</th></tr></thead><tbody>{visible.slice(0,limit).map(row=><tr key={row.id}>
+          <td><strong>{row.name}</strong><br/><small>{row.code} · {row.class_name||"Chưa có lớp"}</small><br/>{row.title}</td>
+          <td><Link to={`/evaluation/${row.thesis_id}`}>{labels[row.eligibility]??row.eligibility}</Link></td><td>{row.grade?.replace(".",",")??resultLabels[row.result]}{row.classification&&<><br/><small>{row.classification}</small></>}</td>
+          <td>{row.issues.length ? <>{row.issues.join(", ")}<br/>{row.slot_id?<Link to={`/defense?slot=${row.slot_id}&tab=results`}>Mở hồ sơ đối chiếu</Link>:
+            <button className="btn btn-secondary btn-sm" onClick={()=>{setNotice("");setEditing(row);}}>Bổ sung thông tin</button>}</>:"Đủ"}</td>
+        </tr>)}</tbody></table></div>
+        {!visible.length&&<p>Không có sinh viên phù hợp bộ lọc.</p>}
+        {visible.length>limit&&<button className="btn btn-secondary" onClick={()=>setLimit(v=>v+25)}>Xem thêm sinh viên</button>}
+      </section>}
+    </>}
+    {editing&&<ProfileCorrection row={editing} round={round} close={()=>setEditing(null)} saved={()=>{
+      setEditing(null);setNotice(`Đã lưu thông tin học vụ của ${editing.name}.`);setRevision(value=>value+1);
+    }}/>}
+  </div>;
+}

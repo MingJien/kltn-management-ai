@@ -13433,6 +13433,259 @@
       }
     },
     "/api/v1/defense/slots/{identifier}/forms/{form}": {
+      "post": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Slot Form",
+        "operationId": "slot_form_api_v1_defense_slots__identifier__forms__form__post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "6",
+                "9"
+              ],
+              "type": "string",
+              "title": "Form"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "lecturer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lecturer Id"
+            }
+          },
+          {
+            "name": "blank",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Blank"
+            }
+          },
+          {
+            "name": "font_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 11
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Font Size"
+            }
+          },
+          {
+            "name": "line_spacing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Spacing"
+            }
+          },
+          {
+            "name": "paragraph_space",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 8,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paragraph Space"
+            }
+          },
+          {
+            "name": "break_recommendations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Break Recommendations"
+            }
+          },
+          {
+            "name": "preview_sheet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview Sheet"
+            }
+          },
+          {
+            "name": "narrative_bold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Narrative Bold"
+            }
+          },
+          {
+            "name": "narrative_italic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Narrative Italic"
+            }
+          },
+          {
+            "name": "line_breaks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Breaks"
+            }
+          },
+          {
+            "name": "layout_fields",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Layout Fields"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "Hội đồng và bảo vệ"
@@ -14167,13 +14420,133 @@
         }
       }
     },
-    "/api/v1/defense/councils/{identifier}/forms/{form}": {
+    "/api/v1/defense/round-register": {
       "get": {
         "tags": [
           "Hội đồng và bảo vệ"
         ],
-        "summary": "Council Form",
-        "operationId": "council_form_api_v1_defense_councils__identifier__forms__form__get",
+        "summary": "Register Rounds",
+        "operationId": "register_rounds_api_v1_defense_round_register_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/round-register/{identifier}": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Register Workspace",
+        "operationId": "register_workspace_api_v1_defense_round_register__identifier__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/round-register/{identifier}/forms/{form}": {
+      "post": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Round Form",
+        "operationId": "round_form_api_v1_defense_round_register__identifier__forms__form__post",
         "security": [
           {
             "APIKeyCookie": []
@@ -14278,6 +14651,966 @@
               "type": "boolean",
               "default": false,
               "title": "Preview Sheet"
+            }
+          },
+          {
+            "name": "course_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Course Code"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Round Form",
+        "operationId": "round_form_api_v1_defense_round_register__identifier__forms__form__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "form",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "10",
+                "11"
+              ],
+              "type": "string",
+              "title": "Form"
+            }
+          },
+          {
+            "name": "font_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 11
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Font Size"
+            }
+          },
+          {
+            "name": "line_spacing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.5,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line Spacing"
+            }
+          },
+          {
+            "name": "paragraph_space",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 8,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paragraph Space"
+            }
+          },
+          {
+            "name": "break_recommendations",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Break Recommendations"
+            }
+          },
+          {
+            "name": "preview_sheet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Preview Sheet"
+            }
+          },
+          {
+            "name": "course_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Course Code"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/round-register/{identifier}/prints": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Round Prints",
+        "operationId": "round_prints_api_v1_defense_round_register__identifier__prints_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/slots/{identifier}/prints": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Slot Prints",
+        "operationId": "slot_prints_api_v1_defense_slots__identifier__prints_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/prints/{identifier}": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Recorded Print",
+        "operationId": "recorded_print_api_v1_defense_prints__identifier__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nv6-reports/scopes": {
+      "get": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Scopes",
+        "operationId": "scopes_api_v1_nv6_reports_scopes_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nv6-reports/{round_id}": {
+      "get": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Report",
+        "operationId": "report_api_v1_nv6_reports__round_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/nv6-reports/{round_id}/students/{member_id}": {
+      "get": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Academic Profile",
+        "operationId": "academic_profile_api_v1_nv6_reports__round_id__students__member_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Correct Profile",
+        "operationId": "correct_profile_api_v1_nv6_reports__round_id__students__member_id__put",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcademicProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/thesis-archive": {
+      "get": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Archive",
+        "operationId": "archive_api_v1_thesis_archive_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/thesis-archive/theses/{identifier}": {
+      "post": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Submit Archive",
+        "operationId": "submit_archive_api_v1_thesis_archive_theses__identifier__post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/thesis-archive/versions/{identifier}/decision": {
+      "post": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Archive Decision",
+        "operationId": "archive_decision_api_v1_thesis_archive_versions__identifier__decision_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "If-Match"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/thesis-archive/versions/{identifier}/file": {
+      "get": {
+        "tags": [
+          "Báo cáo và lưu trữ KLTN"
+        ],
+        "summary": "Archive File",
+        "operationId": "archive_file_api_v1_thesis_archive_versions__identifier__file_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
             }
           },
           {
@@ -19920,6 +21253,31 @@
         ],
         "title": "Appointment"
       },
+      "ArchiveDecision": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "RETURNED"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "title": "ArchiveDecision"
+      },
       "AssignmentRevoke": {
         "properties": {
           "reason": {
@@ -22240,6 +23598,11 @@
             "title": "Recommendations",
             "default": ""
           },
+          "no_recommendations": {
+            "type": "boolean",
+            "title": "No Recommendations",
+            "default": false
+          },
           "classifications": {
             "additionalProperties": {
               "type": "string",
@@ -22258,6 +23621,25 @@
             "type": "object",
             "maxProperties": 3,
             "title": "Classifications"
+          },
+          "oral_comments": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "propertyNames": {
+                "format": "uuid"
+              },
+              "type": "object",
+              "maxProperties": 5
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "maxProperties": 3,
+            "title": "Oral Comments"
           }
         },
         "additionalProperties": false,

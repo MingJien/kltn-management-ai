@@ -18,6 +18,31 @@ from test_nv6_evaluation import check, complete_review, evaluation, get
 from test_registration import hdr, scenario
 
 
+def test_academic_profile_before_schedule_uses_scope_and_revision(evaluation):
+    ctx, _ = evaluation
+    client, users, students, lecturers, session, _ = ctx
+    thesis = get(ctx)
+    member = thesis["members"][0]["id"]
+    endpoint = f"/api/v1/nv6-reports/{thesis['round_id']}/students/{member}"
+    student = students[0]
+    major = m.DepartmentMajor(department_id=student.department_id, code="SYN-CNTT", name="Công nghệ thông tin", active=True)
+    session.add(major)
+    session.commit()
+    assert client.get(endpoint, headers=hdr(users[0])).status_code == 404
+    profile = client.get(endpoint, headers=hdr(users[4]))
+    assert profile.status_code == 200, profile.text
+    data = {"class_name":"ĐHCNTT22A", "major_code":"SYN-CNTT", "training_cohort":"2022–2026",
+            "birth_date":"2004-03-15", "source_reference":"Danh sách học vụ kiểm thử", "reason":"Đối chiếu thông tin học vụ"}
+    headers = {**hdr(users[4]), "If-Match":profile.json()["revision"]}
+    assert client.put(endpoint, headers=headers, json={**data,"major_code":"UNKNOWN"}).status_code == 422
+    updated = client.put(endpoint, headers=headers, json=data)
+    assert updated.status_code == 204, updated.text
+    assert client.put(endpoint, headers=headers, json=data).status_code == 409
+    report = client.get(f"/api/v1/nv6-reports/{thesis['round_id']}",headers=hdr(users[4])).json()
+    row = next(row for row in report["rows"] if row["id"] == member)
+    assert row["class_name"] == "ĐHCNTT22A" and row["issues"] == []
+
+
 def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
     from backend.services.account_tokens import make_token
     from backend.services.passwords import unusable_password
@@ -76,7 +101,7 @@ def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
     assert all("invitation_reference" not in member for member in saved.members)
 
 
-def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
+def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monkeypatch):
     ctx,_ = evaluation
     client,users,students,lecturers,session,path = ctx
     major_code="EXPORT-MAJOR"
@@ -91,6 +116,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     session.commit()
     thesis = get(ctx)
     proof=client.post(path+'/documents',headers=hdr(users[0]),json={'document_type':'SUPPORTING','title':'Synthetic research publication evidence'})
+    register = f"/api/v1/defense/round-register/{thesis['round_id']}"
     assert proof.status_code==201,proof.text
     proof=proof.json()
     uploaded=client.post(path+'/documents/'+proof['id']+'/versions',headers={**version_headers(users[0],proof),
@@ -291,6 +317,10 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("PUT","/marks",users[4],{"thesis_member_id":first,"lecturer_id":str(lecturers[1].id),"scores":scores})
     mutate("PUT","/marks",extras[1][0],{"thesis_member_id":first,"lecturer_id":str(extras[1][1].id),
         "scores":scores},409)
+    mutate("PUT","/minutes",users[5],{**meeting,"recommendations":"","classifications":{first:"Chờ xác nhận"}})
+    mutate("POST","/finalize",users[4],{},409)
+    meeting["oral_comments"] = {first:{str(extra.id):"Ý kiến từ phản biện tại cuộc họp"}}
+    mutate("PUT","/minutes",users[5],meeting)
     mutate("POST","/finalize",users[4],{})
     mutate("PUT","/bonus/"+first,users[4],{"points":"0"},409)
     mutate("POST","/reopen-unsigned",users[4],{"reason":"Correct unsigned meeting conclusion","confirm_unsigned":True})
@@ -306,6 +336,11 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     doc = Document(BytesIO(minutes.content))
     assert "Synthetic conclusion corrected" in "\n".join(p.text for p in doc.paragraphs)
     assert "Mục tiêu kiểm thử" in "\n".join(p.text for p in doc.paragraphs)
+    assert "Ý kiến từ phản biện tại cuộc họp" in "\n".join(p.text for p in doc.paragraphs)
+    issued_minutes=client.post(endpoint+"/forms/9",headers=hdr(users[5]))
+    assert issued_minutes.status_code==200,issued_minutes.text
+    minutes_record=client.get(endpoint+"/prints",headers=hdr(users[5])).json()[0]
+    assert client.get(base+"/prints/"+minutes_record["id"],headers=hdr(users[0])).status_code==404
     layout_fields=client.get(endpoint+"/forms/9?layout_fields=true",headers=hdr(users[5]))
     assert {r["key"] for r in layout_fields.json()["fields"]}=={"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}
     styled=client.get(endpoint+"/forms/9",headers=hdr(users[5]),params={"line_breaks":'{"conclusion":[9]}',"narrative_italic":"true"})
@@ -319,16 +354,25 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert form6.status_code==200,form6.text
     sheet = load_workbook(BytesIO(form6.content)).active
     assert sheet["F29"].value==10 and sheet["F28"].value==1
-    assert client.get(base+"/councils/"+council+"/forms/11",headers=hdr(users[4])).status_code==409
+    assert client.get(register+"/forms/11",headers=hdr(users[4])).status_code==409
     assert client.post(base+"/councils/"+council+"/close",headers=hdr(users[4])).status_code==204
-    form10 = client.get(base+"/councils/"+council+"/forms/10",headers=hdr(users[4]))
+    assert client.get(register+"/forms/10",headers=hdr(users[4])).status_code==409
+    assert client.get(register,headers=hdr(users[5])).status_code==404
+    decision_path=endpoint+"/absence/"+second
+    decision={"outcome":"NOT_PASSED","reference":"QD-ABSENCE-01","reason":"Faculty confirmed absence after reviewing the case","revision":0}
+    assert client.post(decision_path,headers=hdr(users[0]),json=decision).status_code==403
+    assert client.post(decision_path,headers=hdr(users[4]),json=decision).status_code==204
+    form10 = client.post(register+"/forms/10",headers=hdr(users[4]))
     assert form10.status_code==200,form10.text
     assert any(row.cells[-1].text=="10.0" for row in Document(BytesIO(form10.content)).tables[1].rows)
-    official = client.get(base+"/councils/"+council+"/forms/11",headers=hdr(users[4]))
+    assert client.get(register+"/forms/11",headers=hdr(users[4])).status_code==422
+    official = client.get(register+"/forms/11?course_code=IT2026",headers=hdr(users[4]))
     assert official.status_code==200,official.text
     rows = list(load_workbook(BytesIO(official.content),read_only=True).active.values)
     assert any(r[1]==students[0].student_code and r[5]==10 for r in rows)
-    assert any(r[1]==students[1].student_code and r[5] is None and r[6]=="Vắng" for r in rows)
+    assert rows[4][1] == "Học phần: [IT2026] - Khóa luận tốt nghiệp"
+    assert any(r[1]==students[1].student_code and r[5] is None and r[6].startswith("Không đạt do vắng") for r in rows)
+    print_record=client.get(register+"/prints",headers=hdr(users[4])).json()[0]
     # An authorized metadata correction remains possible after locking, with an
     # auditable new export revision and the exact same frozen academic result.
     import copy
@@ -344,18 +388,16 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     mutate("PUT","/academic-profile/"+first,users[4],academic)
     session.refresh(record)
     assert record.minutes["results_snapshot"]==snapshot and record.marks==old_marks
-    corrected=client.get(base+"/councils/"+council+"/forms/10",headers=hdr(users[4]))
+    corrected=client.get(register+"/forms/10",headers=hdr(users[4]))
     assert "ĐHCNTT22B" in "\n".join(c.text for r in Document(BytesIO(corrected.content)).tables[1].rows for c in r.cells)
     assert client.get(endpoint+"/forms/9?font_size=5",headers=hdr(users[5])).status_code==422
-    sheet_preview=client.get(base+"/councils/"+council+"/forms/11?preview_sheet=true",headers=hdr(users[4]))
+    assert client.get(base+"/prints/"+print_record["id"],headers=hdr(users[4])).content==form10.content
+    assert client.get(base+"/prints/"+minutes_record["id"],headers=hdr(users[5])).content==issued_minutes.content
+    sheet_preview=client.get(register+"/forms/11?preview_sheet=true&course_code=IN4299N",headers=hdr(users[4]))
     assert sheet_preview.status_code==200 and sheet_preview.json()["sheets"]
     member_view=client.get(base,headers=hdr(extras[1][0])).json()["slots"][0]
     assert all("birth_date" not in r for r in member_view["roster"])
     original=slot
-    decision_path=endpoint+"/absence/"+second
-    decision={"outcome":"NOT_PASSED","reference":"QD-ABSENCE-01","reason":"Faculty confirmed absence after reviewing the case","revision":0}
-    assert client.post(decision_path,headers=hdr(users[0]),json=decision).status_code==403
-    assert client.post(decision_path,headers=hdr(users[4]),json=decision).status_code==204
     decision.update(outcome="SUPPLEMENTARY",revision=1)
     assert client.post(decision_path,headers=hdr(users[4]),json=decision).status_code==204
     assert client.post(decision_path,headers=hdr(users[4]),json=decision).status_code==409
@@ -374,7 +416,8 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     assert client.post(decision_path,headers=hdr(users[4]),json={**decision,"revision":2}).status_code==409
     mutate("PUT","/council-attendance",users[5],{"present_ids":present,"reason":"Four members present for supplementary defense"})
     mutate("PUT","/attendance/"+second,users[5],{"status":"PRESENT"})
-    mutate("PUT","/minutes",users[5],{"discussion":"Supplementary defense discussion","conclusion":"Student assessed separately"})
+    mutate("PUT","/minutes",users[5],{**meeting,"discussion":"Supplementary defense discussion","conclusion":"Student assessed separately",
+        "recommendations":"","no_recommendations":True,"classifications":{second:"Xuất sắc"},"oral_comments":{}})
     for user,person in [(users[4],lecturers[1]),(users[5],lecturers[2]),extras[0]]:
         mutate("PUT","/marks",user,{"thesis_member_id":second,"lecturer_id":str(person.id),"scores":scores})
     mutate("PUT","/marks",users[5],{"thesis_member_id":second,"lecturer_id":str(extra.id),"scores":scores,"paper_entry_reason":"Entered from paper ballot"})
@@ -384,6 +427,48 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation):
     new=next(s for s in slots_after if s["id"]==slot)
     assert old["results"][first]["average"]=="10.0" and old["results"][second]["average"] is None
     assert new["results"][second]["average"]=="10.0" and first not in new["results"]
+    assert client.post(base+"/councils/"+fresh_council.json()["id"]+"/close",headers=hdr(users[4])).status_code==204
+    final_form=client.post(register+"/forms/11?course_code=ALT_11",headers=hdr(users[4]))
+    assert final_form.status_code==200,final_form.text
+    workbook=load_workbook(BytesIO(final_form.content)).active
+    assert workbook["B5"].value=="Học phần: [ALT_11] - Khóa luận tốt nghiệp"
+    assert workbook["A7"].value=="[ASCIMP]"
+    populated=[(workbook.cell(index,2).value,workbook.cell(index,6).value) for index in range(11,18) if workbook.cell(index,2).value]
+    assert sorted(populated)==sorted([(students[0].student_code,10),(students[1].student_code,10)])
+    report_path="/api/v1/nv6-reports/"+thesis["round_id"]
+    report=client.get(report_path,headers=hdr(users[4]))
+    assert report.status_code==200,report.text
+    assert report.json()["results"]["GRADED"]==2 and report.json()["councils"]==2
+    assert client.get(report_path,headers=hdr(users[0])).status_code==404
+
+    from backend.services import file_scanner
+    monkeypatch.setattr(file_scanner,"require_available",lambda: None)
+
+    def scan_demo(file,path):
+        file.scan_state="CLEAN"
+        return "CLEAN"
+
+    monkeypatch.setattr(file_scanner,"scan",scan_demo)
+    archive="/api/v1/thesis-archive"
+    upload_headers={**hdr(users[0]),"X-File-Name":"synthetic-final.pdf","Content-Type":"application/octet-stream"}
+    assert client.get(archive,headers=hdr(users[0])).json()[0]["can_submit"]
+    submission_path=archive+"/theses/"+thesis["thesis_id"]
+    sent=client.post(submission_path,headers=upload_headers,content=synthetic_pdf())
+    assert sent.status_code==201,sent.text
+    assert client.post(submission_path,headers=upload_headers,content=synthetic_pdf()).status_code==409
+    first_archive=archive+"/versions/"+sent.json()["id"]
+    assert client.get(first_archive+"/file",headers=hdr(users[2])).status_code==404
+    returned=client.post(first_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"RETURNED","reason":"Bổ sung kết luận theo biên bản"})
+    assert returned.status_code==204,returned.text
+    resubmitted=client.post(submission_path,headers=upload_headers,content=synthetic_pdf())
+    assert resubmitted.status_code==201,resubmitted.text
+    latest_archive=archive+"/versions/"+resubmitted.json()["id"]
+    accepted=client.post(latest_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"ACCEPTED","reason":"Đã đối chiếu bản hoàn thiện"})
+    assert accepted.status_code==204,accepted.text
+    assert client.get(latest_archive+"/file",headers=hdr(users[1])).status_code==200
+    assert client.get(archive,headers=hdr(users[2])).json()==[]
+    inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
+    assert any("Đã đưa khóa luận vào kho nội bộ" in notice["message"] for notice in inbox)
 
 
 

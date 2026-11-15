@@ -98,8 +98,8 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await sv.getByLabel("Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)").setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
     await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
     await expect(sv.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled({timeout:60000});
-    await sv.locator(".submission-kinds").getByRole("link",{name:/Tài liệu hỗ trợ/}).click();
-    await expect(sv.getByRole("heading",{name:"Tài liệu hỗ trợ",exact:true})).toBeVisible();
+    await sv.locator(".submission-kinds").getByRole("link",{name:/Minh chứng điểm thưởng/}).click();
+    await expect(sv.getByRole("button",{name:"Nộp tài liệu",exact:true})).toHaveCount(0);
     await expect(sv.getByText(/Phiên bản 1 ·/)).toHaveCount(0);
     const claims=(page:Page)=>page.locator("section.card").filter({has:page.getByRole("heading",{name:"Minh chứng công bố khoa học · Xét điểm thưởng",exact:true})});
     await claims(sv).getByText("Nộp hồ sơ xét điểm thưởng",{exact:true}).click();

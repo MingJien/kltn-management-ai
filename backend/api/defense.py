@@ -9,7 +9,7 @@ from backend.api.dependencies import current_user
 from backend.api.defense_schemas import AttendanceInput, BonusInput, CouncilInput, MarkInput, MinutesInput, SlotInput
 from backend.api.evaluation import transaction
 from backend.api.evaluation_schemas import Reason
-from backend.services import defense, defense_export
+from backend.services import defense, defense_export, defense_register
 from backend.api.defense_schemas import AcademicProfileInput, CouncilAttendance, ReopenInput
 from backend.api.defense_schemas import AbsenceDecision
 
@@ -96,6 +96,7 @@ def finalize(identifier:UUID,version:int=Header(alias="If-Match",ge=1),
 
 
 @router.get("/slots/{identifier}/forms/{form}")
+@router.post("/slots/{identifier}/forms/{form}")
 def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:UUID|None=None,lecturer_id:UUID|None=None,blank:bool=False,
               font_size: Annotated[int|None,Query(ge=11,le=14)]=None,
               line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
@@ -103,7 +104,10 @@ def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:U
               narrative_bold:bool|None=None,narrative_italic:bool|None=None,
               line_breaks:Annotated[str|None,Query(max_length=6000)]=None,layout_fields:bool=False,
               user=Depends(current_user),session=Depends(transaction)):
+    if request.method == "POST" and preview_sheet:
+        raise HTTPException(422, "Dùng bản xem trước để kiểm tra cách trình bày")
     result = defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank,layout_fields=layout_fields,
+        record=request.method == "POST",
         layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations,
             narrative_bold=narrative_bold,narrative_italic=narrative_italic,line_breaks=parse_line_breaks(line_breaks)))
     return defense_export.preview_sheet(result) if preview_sheet and form=="6" and not layout_fields else result
@@ -148,12 +152,42 @@ def reopen_unsigned(identifier:UUID,data:ReopenInput,version:int=Header(alias="I
     defense.reopen_unsigned(session,user,identifier,version,data)
 
 
-@router.get("/councils/{identifier}/forms/{form}")
-def council_form(identifier:UUID,form:Literal["10","11"],request:Request,
+@router.get("/round-register")
+def register_rounds(user=Depends(current_user),session=Depends(transaction)):
+    return [{"id": round_.id, "code": round_.code} for round_ in defense_register.rounds_for_export(session,user)]
+
+
+@router.get("/round-register/{identifier}")
+def register_workspace(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_register.workspace(session,user,identifier)
+
+
+@router.get("/round-register/{identifier}/forms/{form}")
+@router.post("/round-register/{identifier}/forms/{form}")
+def round_form(identifier:UUID,form:Literal["10","11"],request:Request,
                  font_size: Annotated[int|None,Query(ge=11,le=14)]=None,
                  line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
                  paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
+                 course_code: Annotated[str|None,Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")]=None,
                  user=Depends(current_user),session=Depends(transaction)):
-    result = defense_export.export_council(session,user,identifier,int(form),str(request.base_url),
+    if request.method == "POST" and preview_sheet:
+        raise HTTPException(422, "Dùng bản xem trước để kiểm tra cách trình bày")
+    result = defense_export.export_round(session,user,identifier,int(form),str(request.base_url),
+        course_code=course_code.upper() if course_code else None,record=request.method == "POST",
         layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations))
     return defense_export.preview_sheet(result) if preview_sheet and form=="11" else result
+
+
+@router.get("/round-register/{identifier}/prints")
+def round_prints(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_export.print_history(session,user,round_id=identifier)
+
+
+@router.get("/slots/{identifier}/prints")
+def slot_prints(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_export.print_history(session,user,slot_id=identifier)
+
+
+@router.get("/prints/{identifier}")
+def recorded_print(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_export.download_print(session,user,identifier)

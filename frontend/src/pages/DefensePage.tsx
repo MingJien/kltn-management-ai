@@ -6,6 +6,8 @@ import {errorMessage} from "../errors";
 import "../styles/defense.css";
 import PageHeader from "../components/layout/PageHeader";
 import DefensePrintPreview from "../components/domain/DefensePrintPreview";
+import DefensePrintHistory from "../components/domain/DefensePrintHistory";
+import DefenseRegister from "../components/domain/DefenseRegister";
 
 type Person={id:string;name:string;role:string};
 type Student={id:string;name:string;code:string;class_name?:string;major?:string;major_code?:string;department_id?:string;birth_date?:string;training_cohort?:string};
@@ -16,9 +18,9 @@ type Mark={scores:string[];note:string;revision?:number};
 type Result={average?:string|null;attendance:{status?:string;reason?:string;bonus?:string;bonus_reference?:string;bonus_evidence_version_id?:string};scores?:Array<string|null>};
 type Slot={report_filename?:string;prior_slot_id?:string|null;absence_decisions?:Record<string,{outcome:string;reference:string;reason:string;recorded_by:string;recorded_at:string;revision:number}>;context_token:string;bonus_evidence:{id:string;name:string;filename?:string}[];id:string;thesis_id:string;title:string;council:Council;starts_at:string;ends_at:string;room:string;version:number;
   roster:Student[];results:Record<string,Result>;marks:Record<string,Record<string,Mark>>;
-  role:string|null;lecturer_id:string|null;minutes:{discussion?:string;conclusion?:string;objectives?:string;functions?:string;achievements?:string;recommendations?:string;classifications?:Record<string,string>};finalized_at:string|null;
+  role:string|null;lecturer_id:string|null;minutes:{discussion?:string;conclusion?:string;objectives?:string;functions?:string;achievements?:string;recommendations?:string;no_recommendations?:boolean;classifications?:Record<string,string>;oral_comments?:Record<string,Record<string,string>>};finalized_at:string|null;
   can_manage:boolean;schedule_editable:boolean;blockers:string[];council_attendance:{present_ids?:string[];reason?:string}};
-type Workspace={academic_majors?:{department_id:string;code:string;name:string}[];scopes:Scope[];scope_catalog?:Scope[];councils:Council[];eligible:{id:string;title:string;round_id:string;department_id:string;extension_starts_at:string|null;extension_until_at:string|null;advisor_ids?:string[]}[];
+type Workspace={export_rounds?:{id:string;code:string}[];academic_majors?:{department_id:string;code:string;name:string}[];scopes:Scope[];scope_catalog?:Scope[];councils:Council[];eligible:{id:string;title:string;round_id:string;department_id:string;extension_starts_at:string|null;extension_until_at:string|null;advisor_ids?:string[]}[];
   planning_theses?:PlanningThesis[];candidates:{id:string;name:string;code:string;department_code?:string;faculty_id?:string|null;specializations?:string[]}[];slots:Slot[];criteria:[string,string,string][];roles:Record<string,string>};
 type Act=(path:string,body:unknown,version?:number|string,method?:string)=>Promise<boolean>;
 type Download=(path:string,name:string)=>void;
@@ -207,7 +209,7 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
   </DraftForm>;
 }
 
-function StudentMarks({slot,student,data,act,download,busy,mode}:{slot:Slot;student:Student;data:Workspace;act:Act;download:Download;busy:boolean;mode:string}) {
+function StudentMarks({slot,student,data,act,download,busy,mode,onRecord}:{slot:Slot;student:Student;data:Workspace;act:Act;download:Download;busy:boolean;mode:string;onRecord:()=>void}) {
   const [grader,setGrader]=useState(slot.lecturer_id??"");
   const result=slot.results[student.id];
   const recorded=result?.attendance;
@@ -258,19 +260,20 @@ function StudentMarks({slot,student,data,act,download,busy,mode}:{slot:Slot;stud
       </DraftForm>
     </details>}
     {slot.role&&<details className="defense-operation"><summary>In phiếu chấm trước buổi họp</summary><p>Phiếu trống có sẵn thông tin để chấm giấy; chưa phải bản kết quả đã chốt.</p>{slot.council.members.filter(m=>canExport||m.id===slot.lecturer_id).map(m=><button className="btn btn-secondary" key={m.id} onClick={()=>download(endpoint+"/forms/6?blank=true&student_id="+student.id+"&lecturer_id="+m.id,`Phieu-trong-${student.code}-${m.id}.xlsx`)}>In phiếu trống · {m.name}</button>)}</details>}
-    {!slot.role&&<p>Minh chứng công bố khoa học nộp cùng tài liệu khóa luận ở mục Hồ sơ nộp & xét duyệt. Chủ tịch đối chiếu và xác nhận mức thưởng trước khi chốt.</p>}
+    {!slot.role&&<p>Nộp minh chứng công bố khoa học trong Hồ sơ nộp & xét duyệt. GVHD xác nhận đóng góp, TBM duyệt mức thưởng theo từng sinh viên; phiếu chấm tự nhận mức đã duyệt. Chủ tịch đối chiếu trước khi chốt.</p>}
     {!slot.finalized_at&&["CHAIR","SECRETARY"].includes(slot.role??"")&&Object.keys(slot.marks[student.id]??{}).length>0&&<details className="defense-operation"><summary>Hủy phiếu nhập nhầm</summary><DraftForm className="stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);if(window.confirm("Hủy hiệu lực phiếu này? Bản cũ vẫn được lưu trong lịch sử."))act(endpoint+"/marks/"+student.id+"/"+text(f,"lecturer")+"/void",{reason:text(f,"reason")},slot.version);}}><label>Phiếu cần hủy<select name="lecturer" className="input">{slot.council.members.filter(m=>slot.marks[student.id]?.[m.id]).map(m=>option(m.id,m.name))}</select></label><label>Lý do<input className="input" name="reason" required minLength={5} maxLength={500}/></label><button className="btn btn-secondary" disabled={busy}>Hủy hiệu lực phiếu</button></DraftForm></details>}
-    {recorded?.status==="PRESENT"&&slot.council.members.filter(m=>(canExport||m.id===slot.lecturer_id)&&!!slot.marks[student.id]?.[m.id]).map(m=>
-      <button key={m.id} className="btn btn-secondary" onClick={()=>download(endpoint+"/forms/6?student_id="+student.id+"&lecturer_id="+m.id,
-        `Mau-06-${student.code}-${m.id.slice(0,8)}-v${slot.version}.xlsx`)}>Mẫu 6 {slot.finalized_at?"đã chốt":"đã lưu · chưa chốt"} · {m.name}</button>)}
-    {recorded?.status==="PRESENT"&&slot.council.members.filter(m=>(canExport||m.id===slot.lecturer_id)&&!!slot.marks[student.id]?.[m.id]).map(m=><DefensePrintPreview key={"preview-"+m.id} endpoint={endpoint+"/forms/6?student_id="+student.id+"&lecturer_id="+m.id} name="Mau-06-Phieu-cham.xlsx" label={"Mẫu 6 · "+m.name+" · "+student.name}/>)}
+    {recorded?.status==="PRESENT"&&slot.council.members.filter(m=>(canExport||m.id===slot.lecturer_id)&&!!slot.marks[student.id]?.[m.id]).map(m=><DefensePrintPreview key={"preview-"+m.id} endpoint={endpoint+"/forms/6?student_id="+student.id+"&lecturer_id="+m.id} name="Mau-06-Phieu-cham.xlsx" label={"Mẫu 6 · "+m.name+" · "+student.name} record={!!slot.finalized_at} onRecord={onRecord}/>)}
     </div>
   </Card>;
 }
 
-function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Act;download:Download;busy:boolean}) {
+function SlotCard({slot,data,act,download,busy,initialTab}:{slot:Slot;data:Workspace;act:Act;download:Download;busy:boolean;initialTab?:string}) {
   const endpoint=slotPath(slot);
-  const [tab,setTab]=useState("overview");
+  const [tab,setTab]=useState(initialTab||"overview");
+  const [history,setHistory]=useState(0);
+  const [noRecommendations,setNoRecommendations]=useState(!!slot.minutes.no_recommendations);
+  const onRecord=()=>setHistory(value=>value+1);
+  useEffect(()=>{if(initialTab)setTab(initialTab);},[initialTab]);
   return <Card title={slot.title}>
     <div className="defense-session-head"><strong>{slot.council.name} · {slot.room}</strong><span>{when(slot.starts_at)} → {when(slot.ends_at)}</span>
     <button className="btn btn-secondary" onClick={()=>download(endpoint+"/report",slot.report_filename??"Bao-cao-bao-ve")}>Tải báo cáo dùng để bảo vệ</button></div>
@@ -288,7 +291,6 @@ function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Ac
       <p className="text-muted">Chỉ mở phiên từ giờ bảo vệ đã xếp. Trước đó, người quản lý vẫn có thể đổi lịch.</p><button className="btn btn-secondary" disabled={busy||Date.now()<Date.parse(slot.starts_at)}>Lưu thành phần dự họp</button>
     </DraftForm>}
     </div><div hidden={tab!=="overview"}>
-    <p>{slot.council.name} · {when(slot.starts_at)} → {when(slot.ends_at)} · {slot.room}</p>
     {slot.role&&<a className="btn btn-secondary" href={"/activity?resource_type=defense_slot&resource_id="+slot.id}>Xem lịch sử phiên bảo vệ</a>}
     <p>{slot.finalized_at?`Đã chốt v${slot.version} · ${when(slot.finalized_at)}`:"Đã xếp lịch"}{slot.role&&" · "+data.roles[slot.role]}</p>
     {slot.can_manage&&slot.schedule_editable&&<details><summary>Đổi đề tài, giờ, phòng hoặc hủy lịch</summary>
@@ -300,17 +302,29 @@ function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Ac
       </DraftForm>
     </details>}
     </div><div hidden={tab!=="marks"&&tab!=="attendance"}>
-    {slot.roster.map(s=><StudentMarks key={s.id} slot={slot} student={s} mode={tab} data={data} act={act} download={download} busy={busy}/>)}
+    {slot.roster.map(s=><StudentMarks key={s.id} slot={slot} student={s} mode={tab} data={data} act={act} download={download} busy={busy} onRecord={onRecord}/>)}
     </div><div hidden={tab!=="minutes"}>
     {!slot.finalized_at&&slot.role==="SECRETARY"&&<DraftForm className="stack" onSubmit={e=>{
       e.preventDefault();const f=new FormData(e.currentTarget);
-      act(endpoint+"/minutes",{discussion:text(f,"discussion"),conclusion:text(f,"conclusion"),objectives:text(f,"objectives"),functions:text(f,"functions"),achievements:text(f,"achievements"),recommendations:text(f,"recommendations"),classifications:Object.fromEntries(slot.roster.map(s=>[s.id,text(f,"classification-"+s.id)]).filter(([,value])=>!!value))},slot.version,"PUT");}}>
+      const oralComments = Object.fromEntries(slot.roster.map(student=>[student.id,Object.fromEntries(
+        slot.council.members.map(person=>[person.id,text(f,`oral-${student.id}-${person.id}`).trim()]).filter(([,value])=>value))])
+        .filter(([,comments])=>Object.keys(comments).length));
+      act(endpoint+"/minutes",{discussion:text(f,"discussion"),conclusion:text(f,"conclusion"),objectives:text(f,"objectives"),functions:text(f,"functions"),achievements:text(f,"achievements"),recommendations:text(f,"recommendations"),no_recommendations:noRecommendations,oral_comments:oralComments,classifications:Object.fromEntries(slot.roster.map(s=>[s.id,text(f,"classification-"+s.id)]).filter(([,value])=>!!value))},slot.version,"PUT");}}>
       <h4>Biên bản Mẫu 9</h4>
       <p>Các nhận xét đã lưu trên phiếu chấm được tổng hợp riêng theo phản biện, thành viên và sinh viên. Số phiếu và điểm lấy tự động từ kết quả.</p>
       {[["objectives","Mục tiêu"],["functions","Chức năng"],["achievements","Kết quả đạt được"]].map(([key,label])=><label key={key}>{label}<textarea name={key} className="input" defaultValue={slot.minutes[key as "objectives"]} maxLength={3000}/></label>)}
-      <label>Nội dung họp, câu hỏi và nhận xét<textarea name="discussion" className="input" defaultValue={slot.minutes.discussion} minLength={5} maxLength={10000} required/></label>
+      <label>Nội dung trao đổi và trả lời câu hỏi<textarea name="discussion" className="input" defaultValue={slot.minutes.discussion} minLength={5} maxLength={10000} required/></label>
+      {slot.roster.filter(student=>slot.results[student.id]?.attendance.status==="PRESENT").map(student=><details className="defense-operation" key={student.id}>
+        <summary>Đối chiếu nhận xét · {student.name}</summary>
+        <p>Phiếu đã lưu tự điền vào Mẫu 9. Ghi thêm ý kiến phát biểu tại buổi họp nếu cần.</p>
+        {slot.council.members.filter(person=>slot.council_attendance.present_ids?.includes(person.id)).map(person=><label key={person.id}>
+          {data.roles[person.role]} · {person.name} <small>({slot.marks[student.id]?.[person.id]?.note?.trim()?"Đã có nhận xét trên phiếu":"Chưa có nhận xét trên phiếu"})</small>
+          <textarea className="input" rows={2} maxLength={1500} name={`oral-${student.id}-${person.id}`} defaultValue={slot.minutes.oral_comments?.[student.id]?.[person.id]}/>
+        </label>)}
+      </details>)}
       <label>Kết luận của Chủ tịch hội đồng<textarea name="conclusion" className="input" defaultValue={slot.minutes.conclusion} minLength={5} maxLength={5000} required/></label>
-      <label>Kiến nghị của hội đồng<textarea name="recommendations" className="input" defaultValue={slot.minutes.recommendations} maxLength={5000}/></label>
+      <label className="defense-check"><input type="checkbox" checked={noRecommendations} onChange={event=>setNoRecommendations(event.target.checked)}/>Hội đồng xác nhận không có kiến nghị</label>
+      <label>Kiến nghị của hội đồng<textarea name="recommendations" className="input" defaultValue={slot.minutes.recommendations} maxLength={5000} disabled={noRecommendations}/></label>
       {slot.roster.filter(s=>slot.results[s.id]?.attendance.status!=="ABSENT").map(s=><label key={s.id}>Xếp loại được hội đồng xác nhận · {s.name}<select name={"classification-"+s.id} className="input" defaultValue={slot.minutes.classifications?.[s.id]??""}><option value="">Chưa ghi nhận</option>{["Xuất sắc","Giỏi","Khá","Trung bình","Không đạt","Chờ xác nhận"].map(v=>option(v,v))}</select></label>)}
       <button className="btn btn-secondary" disabled={busy}>Lưu biên bản</button>
     </DraftForm>}
@@ -330,7 +344,8 @@ function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Ac
       </section>;
     })}
     {slot.can_manage&&slot.finalized_at&&slot.roster.some(r=>slot.absence_decisions?.[r.id]?.outcome==="SUPPLEMENTARY"&&!data.slots.some(s=>s.prior_slot_id===slot.id&&s.roster.some(m=>m.id===r.id)))&&<details className="defense-operation"><summary>Xếp lịch bảo vệ bổ sung theo quyết định</summary><ScheduleForm data={data} act={act} busy={busy} supplementary={slot}/></details>}
-    {!slot.finalized_at&&slot.blockers.length>0&&<aside className="defense-blockers"><h4>Việc cần hoàn tất trước khi chốt</h4><ul>{slot.blockers.map((text,i)=><li key={i}>{text}</li>)}</ul></aside>}
+    {!slot.finalized_at&&slot.blockers.length>0&&<aside className="defense-blockers"><h4>Việc cần hoàn tất trước khi chốt</h4><ul>{slot.blockers.map((text,i)=><li key={i}>{text}</li>)}</ul>
+      {slot.role&&<div className="button-row"><button className="btn btn-secondary" onClick={()=>setTab("attendance")}>Mở điểm danh</button><button className="btn btn-secondary" onClick={()=>setTab("marks")}>Mở phiếu chấm</button><button className="btn btn-secondary" onClick={()=>setTab("minutes")}>Mở biên bản</button></div>}</aside>}
     {!slot.finalized_at&&["CHAIR","SECRETARY"].includes(slot.role??"")&&<button className="btn btn-primary" disabled={busy||slot.blockers.length>0} onClick={()=>{if(slot.blockers.length)return;if(hasDrafts()){window.alert("Cần lưu hoặc bỏ các nội dung đang nhập trước khi chốt.");return;}if(window.confirm("Chốt điểm và biên bản để xuất bản ký?"))act(endpoint+"/finalize",{},slot.version);}}>Chốt kết quả bảo vệ</button>}
     {slot.finalized_at&&!slot.council.closed_at&&["CHAIR","SECRETARY"].includes(slot.role??"")&&<details className="defense-operation">
       <summary>Sửa bản chưa ký và xuất lại</summary><DraftForm className="stack" onSubmit={e=>{
@@ -341,9 +356,10 @@ function SlotCard({slot,data,act,download,busy}:{slot:Slot;data:Workspace;act:Ac
         <label className="defense-check"><input type="checkbox" name="unsigned" required/>Tôi xác nhận hồ sơ này chưa được ký.</label>
         <button className="btn btn-secondary" disabled={busy}>Mở chỉnh sửa bản chưa ký</button>
       </DraftForm></details>}
-    {slot.finalized_at&&(slot.can_manage||slot.role)&&<button className="btn btn-secondary" onClick={()=>download(endpoint+"/forms/9",
-      `Mau-09-${slot.id}-v${slot.version}.docx`)}>Tải biên bản Mẫu 9</button>}
-    {slot.finalized_at&&(slot.can_manage||slot.role)&&<DefensePrintPreview endpoint={endpoint+"/forms/9"} name="Mau-09-Bien-ban.docx" label="Biên bản Mẫu 9"/>}
+    {slot.finalized_at&&(slot.can_manage||slot.role)&&<>
+      <DefensePrintPreview endpoint={endpoint+"/forms/9"} name="Mau-09-Bien-ban.docx" label="Biên bản Mẫu 9" record onRecord={onRecord}/>
+      <DefensePrintHistory endpoint={endpoint+"/prints"} revision={history}/>
+    </>}
     </div>
   </Card>;
 }
@@ -356,7 +372,8 @@ export default function DefensePage({context}:{context:Context}) {
   const [message,setMessage]=useState("");
   const [filter,setFilter]=useState("");
   const [search,setSearch]=useState("");
-  const load=useCallback(async()=>setData(await request<Workspace>(root,context.user_id)),[context.user_id]);
+  const [refresh,setRefresh]=useState(0);
+  const load=useCallback(async()=>{setData(await request<Workspace>(root,context.user_id));setRefresh(value=>value+1);},[context.user_id]);
   useEffect(()=>{void load().catch(e=>setError(errorMessage(e)));},[load]);
   useEffect(()=>{
     const warn=(e:BeforeUnloadEvent)=>{if(hasDrafts()){e.preventDefault();e.returnValue="";}};
@@ -378,8 +395,10 @@ export default function DefensePage({context}:{context:Context}) {
     finally{form?.removeAttribute("data-submitting");setBusy(false);}
   };
   const download:Download=(path,name)=>{setError("");void downloadEvaluationFile(path,name).catch(e=>setError(errorMessage(e)));};
-  const focused=params.get("slot");
-  const slots=data?.slots.filter(s=>(s.id===focused||!filter||s.council.id===filter)&&(s.title+" "+s.room+" "+s.council.name+" "+s.roster.map(r=>r.name+" "+r.code).join(" ")).toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi")))??[];
+  const focused=params.get("slot")??params.get("focus");
+  const initialTab=params.get("tab")==="results"?"results":undefined;
+  const slots=data?.slots.filter(s=>s.id===focused||((!filter||s.council.id===filter)&&searchText(s.title+" "+s.room+" "+s.council.name+" "+s.roster.map(r=>r.name+" "+r.code).join(" ")).includes(searchText(search))))??[];
+  useEffect(()=>{if(data&&focused)document.getElementById(`slot-${focused}`)?.scrollIntoView({block:"start"});},[focused,Boolean(data)]);
   return <div className="stack defense-page">
     <PageHeader title="Hội đồng và bảo vệ" description="Hội đồng → lịch bảo vệ → điểm danh → chấm Mẫu 6 → biên bản → chốt và xuất bảng điểm.">
       <button className="btn btn-secondary" disabled={busy} onClick={()=>{void load().catch(e=>setError(errorMessage(e)));}}>Làm mới dữ liệu</button>
@@ -390,6 +409,7 @@ export default function DefensePage({context}:{context:Context}) {
     {data&&<>
       {!!data.scopes.length&&<details className="defense-operation"><summary>Lập hội đồng mới</summary><CouncilForm data={data} act={act} busy={busy}/></details>}
       {data.councils.some(c=>c.can_manage&&!c.closed_at)&&<details className="defense-operation"><summary>Xếp lịch bảo vệ</summary><Card title="Xếp lịch bảo vệ"><ScheduleForm data={data} act={act} busy={busy}/></Card></details>}
+      {!!data.export_rounds?.length&&<DefenseRegister rounds={data.export_rounds} refresh={refresh}/>}
       {!!data.councils.length&&<section className="stack"><h2>Hội đồng</h2>
         {data.councils.map(c=>{
           const ownRole=data.slots.find(s=>s.council.id===c.id)?.role;
@@ -401,13 +421,7 @@ export default function DefensePage({context}:{context:Context}) {
             {c.can_manage&&!c.closed_at&&data.scopes.some(s=>s.round_id===c.round_id&&s.department_id===c.department_id)&&!data.slots.some(s=>s.council.id===c.id&&!s.schedule_editable)&&<details className="defense-operation"><summary>Điều chỉnh hội đồng trước buổi họp</summary><CouncilForm council={c} data={data} act={act} busy={busy}/></details>}
             {(c.can_manage||["CHAIR","SECRETARY"].includes(ownRole??""))&&<details className="defense-operation"><summary>Đối chiếu bảng điểm trước khi khóa</summary><div className="defense-results"><table><thead><tr><th>Sinh viên</th><th>Điểm</th><th>Trạng thái</th></tr></thead><tbody>{data.slots.filter(s=>s.council.id===c.id).flatMap(s=>s.roster.map(r=><tr key={s.id+r.id}><td>{r.name} · {r.code}</td><td>{s.results[r.id]?.average??"—"}</td><td>{s.finalized_at?"Đã chốt":"Chưa chốt"}{s.results[r.id]?.attendance.status==="ABSENT"&&" · Vắng, chưa có kết quả học vụ"}</td></tr>))}</tbody></table></div></details>}
             {c.can_manage&&!c.closed_at&&<button className="btn btn-primary" disabled={busy||!data.slots.some(s=>s.council.id===c.id)||data.slots.some(s=>s.council.id===c.id&&!s.finalized_at)}
-              onClick={()=>{if(window.confirm("Khóa danh sách và điểm của hội đồng để xuất Mẫu 10 và 11?"))act(path+"/close",{});}}>Khóa bảng điểm hội đồng</button>}
-            {c.closed_at&&(c.can_manage||["CHAIR","SECRETARY"].includes(ownRole??""))&&<div className="flex gap-3">
-              <button className="btn btn-secondary" onClick={()=>download(path+"/forms/10",`Mau-10-${c.id}.docx`)}>Tải Mẫu 10</button>
-              <button className="btn btn-secondary" onClick={()=>download(path+"/forms/11",`Mau-11-${c.id}.xlsx`)}>Tải Mẫu 11</button>
-              <DefensePrintPreview endpoint={path+"/forms/10"} name="Mau-10-Bang-diem.docx" label="Mẫu 10"/>
-              <DefensePrintPreview endpoint={path+"/forms/11"} name="Mau-11-Bang-diem.xlsx" label="Mẫu 11"/>
-            </div>}
+              onClick={()=>{if(window.confirm("Khóa điểm của các phiên đã chốt trong hội đồng này?"))act(path+"/close",{});}}>Khóa bảng điểm hội đồng</button>}
           </Card>;
         })}
       </section>}
@@ -415,7 +429,7 @@ export default function DefensePage({context}:{context:Context}) {
       <label>Tìm lịch theo đề tài, hội đồng, phòng, tên SV hoặc MSSV<input className="input" value={search} onChange={e=>{if(!hasDrafts())setSearch(e.target.value);else setError("Hãy lưu nội dung đang nhập trước khi lọc danh sách.");}}/></label>
       {filter&&<button className="btn btn-secondary" onClick={()=>{if(mayDiscard())setFilter("");}}>Hiện tất cả lịch</button>}
       {!slots.length&&<p>{search||filter?"Không có kết quả phù hợp. Hãy đổi từ khóa hoặc xóa bộ lọc.":"Chưa có lịch trong phạm vi của bạn."}</p>}
-      {[...slots].sort((a,b)=>Number(b.id===focused)-Number(a.id===focused)).map(slot=><details key={slot.id} className="defense-operation defense-session" open={slot.id===focused||slots.length===1}><summary>{when(slot.starts_at)} · {slot.room} · {slot.title}</summary><SlotCard slot={slot} data={data} act={act} download={download} busy={busy}/></details>)}
+      {[...slots].sort((a,b)=>Number(b.id===focused)-Number(a.id===focused)).map(slot=><details id={`slot-${slot.id}`} key={slot.id} className="defense-operation defense-session" open={slot.id===focused||slots.length===1}><summary>{when(slot.starts_at)} · {slot.room} · {slot.title}</summary><SlotCard slot={slot} data={data} act={act} download={download} busy={busy} initialTab={slot.id===focused?initialTab:undefined}/></details>)}
     </>}
   </div>;
 }

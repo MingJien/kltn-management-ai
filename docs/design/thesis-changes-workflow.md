@@ -5,7 +5,7 @@
 Mục **Đề tài và đăng ký → Đổi đề tài & gia hạn** cho sinh viên, GVHD và người phụ trách theo phạm vi. Trong hồ sơ khóa luận cũng có liên kết đến đúng hồ sơ tại mục này.
 
 - Sinh viên đang tham gia đợt chọn điều chỉnh tên/phạm vi của đề tài hiện tại hoặc chuyển sang đề tài trống đã công bố trong cùng đợt và bộ môn. Gửi trong 14 ngày đầu tính từ mốc bắt đầu thực hiện của đợt, gồm ngày bắt đầu.
-- Người gửi xác nhận nguyện vọng của mình. Các thành viên còn lại tự xác nhận bằng tài khoản riêng. Một thành viên từ chối sẽ kết thúc yêu cầu để nhóm thống nhất lại.
+- Với yêu cầu đổi cả nhóm, các thành viên tự xác nhận bằng tài khoản riêng. Nếu có người từ chối, yêu cầu kết thúc. Một SV trong nhóm từ hai người có thể xin chuyển riêng sang đề tài khác. Thành viên còn lại được thông báo và tiếp tục hồ sơ cũ khi yêu cầu được chấp thuận.
 - GVHD hiện tại xem xét khi nhóm đã đồng ý đủ. Nếu chuyển sang đề tài có GVHD khác, GVHD tiếp nhận cũng phải đồng ý. Ý kiến có nội dung, người ghi và thời điểm.
 - Trưởng bộ môn quyết định. Chấp thuận cần đủ ý kiến và dữ liệu nhóm, đề tài, GVHD vẫn khớp khi gửi. Từ chối phải có lý do. Người gửi được hủy yêu cầu còn chờ, kể cả khi đã hết hạn gửi mới.
 - Mỗi khóa luận chỉ có một yêu cầu chờ. Nhóm tiếp tục thực hiện hồ sơ hiện tại trong lúc chờ. Việc xét đủ điều kiện bảo vệ và gửi xin thôi bị chặn trong lúc còn yêu cầu đổi chưa xử lý.
@@ -16,13 +16,11 @@ Căn cứ đã đối chiếu trên máy gồm Điều 4 khoản 4 và 7 của b
 
 ## Gia hạn thực hiện của một khóa luận
 
-SV và GVHD xem quyết định tại thẻ **Gia hạn thực hiện**. TBM hoặc điều phối đúng đợt ghi nhận quyết định đã được giải quyết, ngày quyết định, số/căn cứ, lý do và hạn mới. Minh chứng được chọn từ tệp đã quét an toàn trong chính hồ sơ này; có nút tải để đối chiếu.
+SV gửi yêu cầu tại thẻ **Gia hạn thực hiện**. Mỗi thành viên nhóm tự xác nhận. Khi đủ đồng thuận, GVHD cho ý kiến và Trưởng bộ môn đúng phạm vi ghi nhận quyết định với ngày quyết định, số/căn cứ, lý do, thời điểm bắt đầu và hạn mới. Yêu cầu hết hạn lấy ý kiến giữ nguyên quyền tham gia KLTN.
 
-Chỉ ghi nhận một lần. Hạn mới phải sau hạn báo cáo hiện hành của đợt và sau hiện tại, không quá 5 tháng tính từ hạn cũ. Mốc tháng tính theo lịch Việt Nam, chặn vượt giới hạn kể cả trường hợp cuối tháng. Không cho ghi nhận khi hồ sơ có lịch bảo vệ, đã khóa, có yêu cầu xin thôi hoặc đổi đề tài chờ xử lý.
+Mỗi khóa luận được gia hạn một lần. Hạn mới phải sau hiện tại, sau hạn cuốn báo cáo cũ và trong tối đa 5 tháng lịch Việt Nam tính từ thời điểm bắt đầu gia hạn ghi trong quyết định. Nếu chưa có hạn cuốn báo cáo của đợt, người điều phối cần thiết lập trước khi SV gửi yêu cầu. Nếu đã có lịch bảo vệ, cần xử lý lịch cũ trước khi ghi nhận gia hạn.
 
-Quyết định áp dụng cho khóa luận và các thành viên hiện hành. Hạn báo cáo riêng được áp dụng ngay cho lần nộp tiếp theo. Hạn chung của cả đợt và hạn đã ghi trên bản nộp cũ được giữ để đối chiếu đúng hạn/trễ. Thông tin I được trình bày như trạng thái tạm theo quy định khi gia hạn; điểm Hội đồng được chốt theo phân hệ bảo vệ.
-
-Việc lấy hạn REPORT hiện hành của đợt làm hạn cũ và cơ sở giới hạn 5 tháng là quy ước triển khai, vì hệ thống hiện quản lý hạn nộp theo loại tài liệu. Nếu chưa có hạn REPORT, người điều phối cần thiết lập trước.
+Hạn mới chỉ áp dụng cho cuốn báo cáo của khóa luận được gia hạn. Hệ thống giữ hạn chung của đợt và hạn đã ghi trên bản nộp cũ. Khoa xếp kỳ bảo vệ theo lịch thực tế, với giờ bắt đầu và kết thúc nằm trong thời gian gia hạn. Hết hạn mà thiếu lịch hợp lệ thì hệ thống ghi nhận không đạt. Nếu có lịch hợp lệ chưa chốt điểm, hồ sơ chờ đối chiếu kết quả.
 
 ## Gia hạn mở đợt đăng ký
 
@@ -34,4 +32,4 @@ Các thẻ đợt có mục **Lịch sử đợt** để xem người thực hi�
 
 ## Cấu trúc dữ liệu
 
-Migration Alembic `20261104_0022` bổ sung `thesis_change_request` và `thesis_extension`, với ràng buộc một yêu cầu đổi đang chờ và một lần gia hạn cho mỗi khóa luận. Chỉ dùng Alembic để nâng database đang hoạt động.
+Migration Alembic `20261104_0022` bổ sung `thesis_change_request` và `thesis_extension`, với ràng buộc một yêu cầu đổi đang chờ và một lần gia hạn cho mỗi khóa luận. Migration `20261108_0023` bổ sung phạm vi đổi đề tài, yêu cầu gia hạn và xác nhận từng thành viên. Chỉ dùng Alembic để nâng database đang hoạt động.

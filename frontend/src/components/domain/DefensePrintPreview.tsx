@@ -1,6 +1,5 @@
 import {useRef,useState} from "react";
-import {request} from "../../api";
-import {downloadEvaluationFile} from "../../evaluation";
+import {downloadFile,request} from "../../api";
 import {errorMessage} from "../../errors";
 import {ReadOnlyFilePreview} from "./ReviewAttachmentPreview";
 import "../../styles/review-workspace.css";
@@ -42,7 +41,7 @@ function BreakEditor({field,positions,onChange}:{field:Narrative;positions:numbe
   </div>;
 }
 /** Format-only controls: the server supplies all document content and results. */
-export default function DefensePrintPreview({endpoint,name,label}:{endpoint:string;name:string;label:string}) {
+export default function DefensePrintPreview({endpoint,name,label,record=false,onRecord}:{endpoint:string;name:string;label:string;record?:boolean;onRecord?:()=>void}) {
   const [font,setFont]=useState(""),[spacing,setSpacing]=useState(""),[space,setSpace]=useState("");
   const [breakPage,setBreakPage]=useState(false),[active,setActive]=useState<string|null>(null);
   const [sheets,setSheets]=useState<Sheet[]>([]),[error,setError]=useState(""),[busy,setBusy]=useState(false);
@@ -67,7 +66,7 @@ export default function DefensePrintPreview({endpoint,name,label}:{endpoint:stri
     }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
   }
   return <details className="defense-operation defense-print"><summary>Xem trước & định dạng · {label}</summary>
-    <p>Nội dung, điểm và kết quả chỉ đọc. Định dạng áp dụng riêng cho lần xuất này; mẫu gốc được giữ nguyên khi chọn “Theo mẫu”.</p>
+    <p>Chỉnh cách trình bày cho lần xuất này. Nội dung và điểm lấy từ hồ sơ đã lưu.</p>
     <div className="defense-form-grid">
       <label>Cỡ chữ<select className="input" value={font} onChange={e=>setFont(e.target.value)}><option value="">Theo mẫu</option>{[11,12,13,14].map(n=><option key={n}>{n}</option>)}</select></label>
       {isWord&&<><label>Giãn dòng<select className="input" value={spacing} onChange={e=>setSpacing(e.target.value)}><option value="">Theo mẫu</option>{[1,1.15,1.3,1.5].map(n=><option key={n}>{n}</option>)}</select></label>
@@ -81,11 +80,11 @@ export default function DefensePrintPreview({endpoint,name,label}:{endpoint:stri
     </details>}
     {isWord&&hasNarrative&&<label className="defense-check"><input type="checkbox" checked={breakPage} onChange={e=>setBreakPage(e.target.checked)}/>Chuyển phần kết quả, kiến nghị và ký tên sang trang mới</label>}
     <div className="button-row"><button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void preview()}>Áp dụng & xem trước</button>
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={async()=>{setError("");setBusy(true);try{await downloadEvaluationFile(path,name);}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>Tải bản theo định dạng đã chọn</button>
+      <button type="button" className="btn btn-primary" disabled={busy} onClick={async()=>{setError("");setBusy(true);try{await downloadFile(path,name,record?"POST":"GET");if(record)onRecord?.();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>{record?"Lưu và tải bản dùng để ký":"Tải bản theo định dạng đã chọn"}</button>
       <button type="button" className="btn btn-secondary" onClick={()=>{setFont("");setSpacing("");setSpace("");setBreakPage(false);setBold("");setItalic("");setBreaks({});setFields([]);setActive(null);setSheets([]);}}>Khôi phục định dạng mẫu</button></div>
     {error&&<p role="alert" className="alert alert-danger">{error}</p>}
-    {active&&active!==path&&<p role="status">Định dạng đã đổi. Bấm “Áp dụng & xem trước” để cập nhật bản xem.</p>}
-    {active&&<><p className="text-body-sm text-muted">Bản xem trên trình duyệt có thể ngắt trang khác Word/Excel. Kiểm tra Print Preview trong ứng dụng trước khi in ký. Mã bố trí được ghi ở chân trang.</p>
+    {active&&active!==path&&<p role="status">Tùy chọn đã đổi. Bấm “Áp dụng & xem trước” để cập nhật bản xem.</p>}
+    {active&&<><p className="text-body-sm text-muted">Kiểm tra số trang và vùng ký trong Word hoặc Excel trước khi in. Cách ngắt trang trên trình duyệt có thể khác.</p>
       {isWord?<ReadOnlyFilePreview name={name} endpoint={active} onBack={()=>setActive(null)} label={label} backLabel="Đóng bản xem" caption="Dữ liệu lấy từ hồ sơ đã lưu, không sửa nội dung tại đây."/>
         :sheets.map(s=><section key={s.name}><h5>{s.name}</h5>{s.truncated&&<p>Bản xem giới hạn 1.000 dòng và 30 cột. Tải tệp để xem toàn bộ dữ liệu.</p>}<div className="defense-sheet-preview" tabIndex={0} role="region" aria-label={`Bản xem ${label} · ${s.name}`}><table aria-label={label}><colgroup>{s.widths?.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{s.rows.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j} rowSpan={c.rowspan} colSpan={c.colspan} style={{fontWeight:c.bold?700:400,fontStyle:c.italic?"italic":"normal",fontSize:Math.min(c.size,18)+"pt",textAlign:c.align,color:c.color}}>{c.text}</td>)}</tr>)}</tbody></table></div></section>)}</>}
   </details>;

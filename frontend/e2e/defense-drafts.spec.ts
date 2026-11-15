@@ -25,7 +25,7 @@ test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có d�
   });
   await page.goto("/defense");
   await page.getByRole("button",{name:"Biên bản",exact:true}).click();
-  const discussion=page.getByLabel("Nội dung họp, câu hỏi và nhận xét",{exact:true});
+  const discussion=page.getByLabel("Nội dung trao đổi và trả lời câu hỏi",{exact:true});
   await discussion.fill("Biên bản đang soạn chưa lưu");
   await page.getByRole("button",{name:"Phiếu chấm",exact:true}).click();
   await page.getByText("Phiếu chấm Mẫu 6 · Điểm thưởng 0",{exact:true}).first().click();
@@ -48,6 +48,52 @@ test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có d�
   page.once("dialog",d=>d.accept());await page.reload();
   await page.getByLabel("Tìm lịch theo đề tài, hội đồng, phòng, tên SV hoặc MSSV").fill("0023412345");
   await expect(page.getByRole("heading",{name:slot.title,exact:true})).toBeVisible();
+});
+
+test("Mẫu 11 toàn đợt yêu cầu chọn mã và dùng cùng mã khi xem hoặc lưu",async({page})=>{
+  const register="/defense/round-register/round-demo";
+  let savedCode="";
+  await page.route("**/api/v1/**",async route=>{
+    const url=new URL(route.request().url());
+    const endpoint=url.pathname.replace("/api/v1","");
+    if(endpoint==="/me/context")return route.fulfill({json:context});
+    if(endpoint==="/defense")return route.fulfill({json:{...workspace,slots:[],export_rounds:[{id:"round-demo",code:"KLTN-DEMO"}]}});
+    if(endpoint===register)return route.fulfill({json:{code:"KLTN-DEMO",issues:[],rows:[
+      {name:"Sinh viên A",code:"0023000001",class_name:"CNTT22",grade:"8.5",status:"Đã chốt điểm",slot_id:"slot-main",council:"Hội đồng chính",has_birth_date:true},
+      {name:"Sinh viên B",code:"0023000002",class_name:"CNTT22",grade:"8.0",status:"Đã chốt điểm",slot_id:"slot-extra",council:"Hội đồng bổ sung",has_birth_date:true},
+    ]}});
+    if(endpoint===register+"/forms/11"){
+      const code=url.searchParams.get("course_code")??"";
+      if(route.request().method()==="POST"){
+        savedCode=code;
+        return route.fulfill({body:"Synthetic browser download",contentType:"application/octet-stream",
+          headers:{"content-disposition":'attachment; filename="Mau-11-KLTN-DEMO.xlsx"',"access-control-expose-headers":"Content-Disposition"}});
+      }
+      return route.fulfill({json:{sheets:[{name:"Bảng điểm",rows:[[{text:`Mã học phần ${code}`,rowspan:1,colspan:1,bold:true,italic:false,size:11,align:"left"}]]}]}});
+    }
+    if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+    return route.fulfill({json:[]});
+  });
+  await page.goto("/defense");
+  await page.getByText("Bảng điểm toàn đợt · Mẫu 10 và 11",{exact:true}).click();
+  await page.getByRole("combobox",{name:/Đợt bảo vệ/}).selectOption("round-demo");
+  await expect(page.getByRole("cell",{name:"Hội đồng bổ sung",exact:true})).toBeVisible();
+  await expect(page.getByText(/Xem trước & định dạng · Mẫu 11/)).toHaveCount(0);
+  await page.getByRole("combobox",{name:/Mã học phần của bảng/}).selectOption("IN4299N");
+  await expect(page.getByText("Xem trước & định dạng · Mẫu 11 · IN4299N",{exact:true})).toBeVisible();
+  await page.getByRole("combobox",{name:/Mã học phần của bảng/}).selectOption("other");
+  await page.getByRole("textbox",{name:/Mã học phần khác/}).fill("CT2026");
+  await page.getByText("Xem trước & định dạng · Mẫu 11 · CT2026",{exact:true}).click();
+  await page.getByRole("button",{name:"Áp dụng & xem trước",exact:true}).click();
+  await expect(page.getByRole("cell",{name:"Mã học phần CT2026",exact:true})).toBeVisible();
+  for(const width of [320,390,768,1440]){
+    await page.setViewportSize({width,height:900});
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+  }
+  const download = page.waitForEvent("download");
+  await page.getByRole("button",{name:"Lưu và tải bản dùng để ký",exact:true}).click();
+  expect((await download).suggestedFilename()).toBe("Mau-11-KLTN-DEMO.xlsx");
+  expect(savedCode).toBe("CT2026");
 });
 
 test("Khoa quyết định SV vắng rồi xếp lịch bổ sung đúng người",async({page})=>{

@@ -501,6 +501,8 @@ def blockers(slot,council):
         pending.append(error.detail)
     if not slot.minutes:
         pending.append("Thư ký cần lưu nội dung họp và kết luận")
+    else:
+        pending.extend(minutes_blockers(slot))
     present=slot.attendance.get("_council",{}).get("present_ids",[])
     for row in slot.roster:
         status=slot.attendance.get(row["id"],{}).get("status")
@@ -513,6 +515,22 @@ def blockers(slot,council):
     if now()<slot.starts_at:
         pending.append("Chưa đến giờ bảo vệ")
     return pending
+
+
+def minutes_blockers(slot):
+    if not slot.minutes:
+        return ["Thư ký cần lưu nội dung họp và kết luận"]
+    missing = []
+    for key, label in (("objectives", "Mục tiêu"), ("functions", "Chức năng"), ("achievements", "Kết quả đạt được")):
+        if not slot.minutes.get(key):
+            missing.append(f"Bổ sung mục {label} trong biên bản")
+    if not (slot.minutes.get("recommendations") or slot.minutes.get("no_recommendations")):
+        missing.append("Nhập kiến nghị hoặc xác nhận hội đồng không có kiến nghị")
+    classifications = slot.minutes.get("classifications", {})
+    for student in slot.roster:
+        if slot.attendance.get(student["id"], {}).get("status") == "PRESENT" and classifications.get(student["id"]) in {None, "Chờ xác nhận"}:
+            missing.append(f"Ghi xếp loại được hội đồng xác nhận cho {student['name']}")
+    return missing
 
 
 def invalid_bonus(session,slot):
@@ -546,30 +564,30 @@ def save_bonus(session,user,identifier,expected,member_id,data):
 
 
 def save_minutes(session,user,identifier,expected,data):
-    slot,_,_ = edit(session,user,identifier,expected,secretary=True)
-    if not set(map(str,data.classifications)) <= {r["id"] for r in slot.roster}:
+    slot,council,_ = edit(session,user,identifier,expected,secretary=True)
+    student_ids = {r["id"] for r in slot.roster}
+    if not set(map(str,data.classifications)) <= student_ids:
         raise HTTPException(422,"Xếp loại chỉ dành cho sinh viên trong phiên bảo vệ")
-    slot.minutes = data.model_dump(mode="json")
+    if data.no_recommendations and data.recommendations:
+        raise HTTPException(422,"Chọn một cách ghi: nhập kiến nghị hoặc xác nhận không có kiến nghị")
+    present = set(slot.attendance.get("_council", {}).get("present_ids", []))
+    members = {person["id"] for person in council.members} & present
+    if any(str(student) not in student_ids or not set(map(str, comments)) <= members
+            for student, comments in data.oral_comments.items()):
+        raise HTTPException(422,"Ý kiến chỉ được ghi cho sinh viên trong phiên và thành viên hội đồng có mặt")
+    slot.minutes = {**data.model_dump(mode="json"), "revision_epoch": slot.minutes.get("revision_epoch", 0)}
     finish_edit(session,user,slot,"DEFENSE_MINUTES_SAVED")
 
 
 def correct_academic_profile(session,user,identifier,expected,member_id,data):
     """Correct identity metadata with a basis; never reopen or alter grading."""
-    from datetime import date
     slot,council,_,_,manager=load_slot(session,user,identifier,write=True)
     if not manager:raise HTTPException(403,"Chỉ TBM hoặc điều phối được đính chính thông tin học vụ")
     row_version(expected,slot.row_version)
     key=student_id(slot,member_id)
     original=next(r for r in slot.roster if r["id"]==key)
     student=session.scalar(select(m.StudentProfile).where(m.StudentProfile.id==UUID(original["student_id"])).with_for_update())
-    major=session.scalar(select(m.DepartmentMajor).where(m.DepartmentMajor.department_id==student.department_id,
-        m.DepartmentMajor.code==data.major_code))
-    if not major or (not major.active and data.major_code!=student.major_code):
-        raise HTTPException(422,"Chọn ngành thuộc đúng bộ môn của sinh viên trong danh mục")
-    if major.name.startswith("Chưa xác minh"):
-        raise HTTPException(422,"Mã ngành cũ chưa được xác minh. Cần đối chiếu danh mục Khoa trước khi đính chính")
-    if data.birth_date and (data.birth_date>date.today() or data.birth_date.year<1900):
-        raise HTTPException(422,"Ngày sinh phải từ năm 1900 đến hiện tại")
+    major = validate_academic_profile(session,student,data)
     updated={**original,"name":student.display_name,"code":student.student_code,"class_name":data.class_name,"major_code":major.code,"major":major.name,
         "birth_date":data.birth_date.isoformat() if data.birth_date else "","training_cohort":data.training_cohort,
         "department_id":str(student.department_id)}
@@ -581,8 +599,20 @@ def correct_academic_profile(session,user,identifier,expected,member_id,data):
     student.class_name,student.major_code,student.birth_date,student.training_cohort=data.class_name,data.major_code,data.birth_date,data.training_cohort or None
     slot.roster=[updated if r["id"]==key else r for r in slot.roster]
     slot.row_version+=1
-    notify(session,user,slot,council,"DEFENSE_ACADEMIC_PROFILE_CORRECTED","Đã đính chính thông tin học vụ. Điểm giữ nguyên; tải lại bản xuất mới để in ký")
+    notify(session,user,slot,council,"DEFENSE_ACADEMIC_PROFILE_CORRECTED","Đã đính chính thông tin học vụ. Hãy xuất bản mới nếu cần ký lại")
     session.commit()
+
+
+def validate_academic_profile(session, student, data):
+    major=session.scalar(select(m.DepartmentMajor).where(m.DepartmentMajor.department_id==student.department_id,
+        m.DepartmentMajor.code==data.major_code))
+    if not major or (not major.active and data.major_code!=student.major_code):
+        raise HTTPException(422,"Chọn ngành thuộc đúng bộ môn của sinh viên trong danh mục")
+    if major.name.startswith("Chưa xác minh"):
+        raise HTTPException(422,"Mã ngành cũ chưa được xác minh. Cần đối chiếu danh mục Khoa trước khi đính chính")
+    if data.birth_date and (data.birth_date>now().astimezone(VN).date() or data.birth_date.year<1900):
+        raise HTTPException(422,"Ngày sinh phải từ năm 1900 đến hiện tại")
+    return major
 
 
 def finish_edit(session,user,slot,event,reason=None):
@@ -632,6 +662,9 @@ def finalize(session,user,identifier,expected):
     if not slot.minutes or any(row["attendance"].get("status") != "ABSENT" and row["average"] is None
         for row in results(slot,council).values()):
         raise HTTPException(409,"Cần có biên bản, điểm đầy đủ của sinh viên có mặt và lý do của sinh viên vắng")
+    pending = minutes_blockers(slot)
+    if pending:
+        raise HTTPException(409, ". ".join(pending))
     frozen_results=results(slot,council)
     from backend.services.defense_templates import academic_roster
     slot.roster = academic_roster(session,slot)
@@ -744,7 +777,9 @@ def workspace(session,user):
         .outerjoin(m.Department,m.Department.id==m.LecturerProfile.department_id)
         .where(m.UserAccount.status=="ACTIVE",m.UserAccount.base_role=="LECTURER")
         .order_by(m.LecturerProfile.display_name)) if can_plan_demo or not demo_department(d.code if d else None)] if scopes else []
+    from backend.services.defense_register import rounds_for_export
     return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,"scope_catalog":catalog,
+        "export_rounds": [{"id": round_.id, "code": round_.code} for round_ in rounds_for_export(session,user)],
         "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES,
         "academic_majors":[{"department_id":str(r.department_id),"code":r.code,"name":r.name} for r in session.scalars(select(m.DepartmentMajor).where(m.DepartmentMajor.active.is_(True)))]}
 

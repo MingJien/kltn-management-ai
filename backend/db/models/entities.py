@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -995,6 +996,42 @@ class DefenseAbsenceDecision(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin
     reason: Mapped[str] = mapped_column(Text)
     recorded_by: Mapped[uuid.UUID] = fk("user_account.id")
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DefensePrintRecord(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "defense_print_record"
+    __table_args__ = (
+        CheckConstraint("(form IN (6,9) AND slot_id IS NOT NULL) OR (form IN (10,11) AND slot_id IS NULL)", name="scope"),
+        Index("ix_defense_print_record_round", "round_id", "created_at"),
+    )
+    round_id: Mapped[uuid.UUID] = fk("thesis_round.id")
+    slot_id: Mapped[Optional[uuid.UUID]] = fk("defense_slot.id", nullable=True)
+    created_by: Mapped[uuid.UUID] = fk("user_account.id")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    form: Mapped[int] = mapped_column(Integer)
+    filename: Mapped[str] = mapped_column(String(255))
+    sha256: Mapped[str] = mapped_column(String(64))
+    content: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    source: Mapped[dict] = mapped_column(JSONB)
+
+
+class ThesisArchiveVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "thesis_archive_version"
+    __table_args__ = (
+        UniqueConstraint("thesis_id", "version_no"),
+        CheckConstraint("state IN ('SUBMITTED','RETURNED','ACCEPTED')", name="state"),
+        CheckConstraint("(state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)", name="decision"),
+        Index("uq_thesis_archive_pending", "thesis_id", unique=True, postgresql_where=text("state = 'SUBMITTED'")),
+    )
+    thesis_id: Mapped[uuid.UUID] = fk("thesis.id")
+    file_id: Mapped[uuid.UUID] = fk("stored_file.id")
+    submitted_by: Mapped[uuid.UUID] = fk("user_account.id")
+    version_no: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(20))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_note: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class ThesisExtensionRequest(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
