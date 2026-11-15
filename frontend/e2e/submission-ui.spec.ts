@@ -96,8 +96,8 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await sv.getByLabel("Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)").setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
     await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
     await expect(sv.getByRole("button",{name:"Tải bản nộp gốc v1",exact:true})).toBeEnabled({timeout:60000});
-    await sv.getByRole("link",{name:/Tài liệu bổ sung/}).filter({hasText:"Khảo sát"}).click();
-    await expect(sv.getByRole("heading",{name:"Tài liệu bổ sung",exact:true})).toBeVisible();
+    await expect(sv.locator("#supporting-preset")).toHaveCount(0);
+    await expect(sv.locator("#supporting-title")).toHaveCount(0);
     await expect(sv.getByText(/Phiên bản 1 ·/)).toHaveCount(0);
     await sv.setViewportSize({width:600,height:900});
     expect(await sv.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();

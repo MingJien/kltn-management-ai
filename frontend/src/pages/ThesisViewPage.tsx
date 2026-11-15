@@ -2,7 +2,7 @@ import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardList, FolderOpen, GraduationCap, RefreshCw } from "lucide-react";
-import { errorMessage } from "../errors";
+import { ApiError, errorMessage } from "../errors";
 import type { AuditEvent, Context, DocumentDeadline, Lecturer, Milestone, ProgressReport, Proposal, Thesis, ThesisDocument, WorkAssignment } from "../api";
 import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
@@ -32,7 +32,13 @@ function ThesisWorkspace({context}: {context: Context}) {
   const [reason, setReason] = useState("");
   const load = useCallback(async (signal?: AbortSignal) => {
     const path = `/theses/${thesisId}`;
-    const thesis = await request<Thesis>(path, context.user_id, {signal});
+    const thesis = await request<Thesis>(path, context.user_id, {signal}).catch(cause => {
+      if (!signal?.aborted && cause instanceof ApiError && [403, 404].includes(cause.status)) {
+        setData(null);
+        setUpdatedAt(null);
+      }
+      throw cause;
+    });
     const get = <T,>(suffix: string, action?: string): Promise<T[]> => !action || thesis.actions.includes(action)
       ? request<T[]>(path+suffix, context.user_id, {signal}) : Promise.resolve([]);
     const [milestones, deadlines, reports, docs, work, lecturers, audit, milestoneHistory, proposal, deadlineHistory] = await Promise.all([
@@ -65,11 +71,19 @@ function ThesisWorkspace({context}: {context: Context}) {
     return () => controller.abort();
   }, [load]);
 
-  async function run(action: () => Promise<unknown>, success: string) {
+  async function run(action: () => Promise<unknown>, success: string, onConflict?: () => void) {
     if (busy) return false;
     setBusy(true); setError(""); setMessage("");
     try {await action(); await load(); setMessage(success); return true;}
-    catch (cause) {setError(errorMessage(cause)); await load().catch(() => undefined); return false;}
+    catch (cause) {
+      if (onConflict && cause instanceof ApiError && cause.status === 409) {
+        onConflict();
+      } else {
+        setError(errorMessage(cause));
+        await load().catch(() => undefined);
+      }
+      return false;
+    }
     finally {setBusy(false);}
   }
   async function refresh() {

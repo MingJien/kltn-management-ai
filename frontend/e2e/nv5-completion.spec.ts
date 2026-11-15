@@ -180,6 +180,9 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await upload("ke-hoach-v2.docx");
     await docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click();
     await expect(docModal.getByRole("alert")).toBeVisible();
+    await expect(docModal.getByRole("alert")).toContainText("Bản nháp vẫn được giữ");
+    await expect(docModal.getByLabel("Nhận xét tổng quát",{exact:true})).toHaveValue("GV đang xem phiên bản 1");
+    await expect(docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true})).toBeDisabled();
     const unchanged=(await read(gv,base+"/documents")).find((d:any)=>d.title==="Kế hoạch NV5 theo Mẫu 2");
     expect(unchanged.versions.map((v:any)=>v.state)).toEqual(["SUBMITTED","SUPERSEDED"]);
     expect(unchanged.versions[0].reviews).toHaveLength(0);
@@ -314,13 +317,9 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await sv.getByText("Lịch sử xuất bản in v2",{exact:true}).click();
     await expect(sv.getByText("Xuất từ phiên bản đã duyệt",{exact:true})).toBeVisible();
     expect((await read(sv,base+"/proposal")).state).toBe("DEPARTMENT_FINALIZED");
-    await sv.getByRole("button",{name:"Tài liệu",exact:true}).or(sv.getByRole("tab",{name:"Tài liệu",exact:true})).click();
-    await sv.getByLabel("Loại tài liệu",{exact:true}).selectOption("SUPPORTING_DESIGN");
-    await expect(sv.getByLabel("Tên tài liệu",{exact:true})).toHaveValue("Đặc tả yêu cầu / tài liệu thiết kế");
-    await sv.getByLabel("Tên tài liệu",{exact:true}).fill("Thiết kế NV5 hỗ trợ");
-    await sv.getByRole("button",{name:"Tạo hồ sơ tài liệu",exact:true}).click();
-    await expect(sv.getByRole("heading",{name:"Thiết kế NV5 hỗ trợ",exact:true})).toBeVisible();
-    expect((await read(sv,base+"/documents")).find((item:any)=>item.title==="Thiết kế NV5 hỗ trợ").document_type).toBe("SUPPORTING");
+    await sv.goto(`${web}${base}?section=documents`);
+    await expect(sv.locator("#supporting-preset")).toHaveCount(0);
+    await expect(sv.locator("#supporting-title")).toHaveCount(0);
     expect((await outsider.request.get(api+base+"/document-deadline-history")).status()).toBe(404);
     // The faculty can reopen a closed intake with a later round-wide deadline.
     await tbm.getByRole("button",{name:"Tiến độ",exact:true}).or(tbm.getByRole("tab",{name:"Tiến độ",exact:true})).click();

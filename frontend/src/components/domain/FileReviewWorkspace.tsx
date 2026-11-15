@@ -44,6 +44,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
   const [storageError, setStorageError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submissionConflict, setSubmissionConflict] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ProgressAnnotation | null>(null);
   const [closing, setClosing] = useState(false);
@@ -279,7 +280,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
             {canEdit && <div className="review-add-actions">{<button type="button" className={`btn ${pinMode ? "btn-primary" : "btn-secondary"} btn-sm`} aria-pressed={pinMode} disabled={!data || submitting} onClick={() => setPinMode(value => !value)}><MapPin size={16} />{pinMode ? "Đang đặt ghim" : "Đặt ghim"}</button>}
               <button type="button" className="btn btn-secondary btn-sm" disabled={submitting || !loaded} onClick={() => addNote()}><Plus size={16} />Theo mục</button></div>}
           </div>
-          {(error || storageError) && <div className="review-error" role="alert"><p>{error || "Trình duyệt không lưu được bản nháp cục bộ; hãy chờ ghim đồng bộ lên máy chủ trước khi thoát."}</p>{canEdit && <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={() => {setError(""); void flush();}}>Thử lưu lại</button>}</div>}
+          {(error || storageError) && <div className="review-error" role="alert"><p>{error || "Trình duyệt không lưu được bản nháp cục bộ; hãy chờ ghim đồng bộ lên máy chủ trước khi thoát."}</p>{canEdit && !submissionConflict && <button type="button" className="btn btn-secondary btn-sm" disabled={saving} onClick={() => {setError(""); void flush();}}>Thử lưu lại</button>}</div>}
           <div className="review-notes">
             {(canEdit || attachments.length > 0) && <section className="review-feedback-files" aria-label="Tệp GV phản hồi">
               <h4><Paperclip size={16} /> Tệp GV phản hồi <small>{attachments.length}</small></h4>
@@ -316,15 +317,17 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
             {!canEdit && target.reviews.length > 0 && <div className="review-conclusion"><h4>Kết quả phản hồi</h4><Reviews items={target.reviews} /></div>}
           </div>
           {canEdit && <form className="review-submit" onSubmit={async event => {
-            event.preventDefault(); setSubmitting(true); setError("");
+            event.preventDefault();
+            if (submissionConflict) return;
+            setSubmitting(true); setError("");
             try {
               if (!(await flush())) return;
               if (notesRef.current.some(note => note.state === "DRAFT" && note.annotation_kind !== "SUMMARY" && !note.comment.trim())) {setError("Có ghim chưa ghi góp ý. Hãy điền nội dung hoặc bỏ ghim đó trước khi gửi."); return;}
               const conclusion = comment.trim() || `Xem ${drafts.length} ghim và ${draftAttachments.length} tệp phản hồi của lần nộp ${target.versionNo}.`;
-              const sent = await run(() => request(target.reviewPath, userId, {method: "POST", headers: {"If-Match": String(target.rowVersion)}, body: JSON.stringify({decision, comment: conclusion})}), "Đã gửi phản hồi cùng các ghim nhận xét đúng phiên bản.");
+              const sent = await run(() => request(target.reviewPath, userId, {method: "POST", headers: {"If-Match": String(target.rowVersion)}, body: JSON.stringify({decision, comment: conclusion})}), "Đã gửi phản hồi cùng các ghim nhận xét đúng phiên bản.", () => setSubmissionConflict(true));
               if (sent) {
                 notesRef.current = []; currentCache.current = {page, zoom, scroll: scroll.current}; persist(); onClose();
-              } else setError("Chưa gửi được kết quả. Bản nháp vẫn được giữ; hãy quay lại tải mới hồ sơ để kiểm tra trạng thái phiên bản.");
+              } else setError("Chưa gửi được kết quả. Bản nháp vẫn được giữ; hãy quay lại và làm mới hồ sơ để kiểm tra phiên bản đang chờ xử lý.");
             } finally {setSubmitting(false);}
           }}><h4>Gửi kết quả cho nhóm</h4><label htmlFor="review-final-decision">Kết quả<select aria-label="Kết quả" className="input" id="review-final-decision" required value={decision} disabled={submitting} onChange={event => setDecision(event.target.value)}>
               <option value="">Chọn kết quả trước khi gửi</option>
@@ -333,7 +336,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
             {summary?.conflict && <p role="alert">Nhận xét chung đã đổi ở phiên khác. Bản đang viết vẫn được giữ. <button type="button" className="btn btn-secondary btn-sm" onClick={()=>changeNotes(items=>items.map(item=>item.id === summary.id ? {...item,conflict:false,dirty:true} : item))}>Dùng bản đang viết</button></p>}
             <small>Nội dung nháp được lưu trên máy chủ; chọn kết quả khi hoàn thành. SV chỉ thấy sau khi bạn gửi. {drafts.length} ghim · {draftAttachments.length} tệp.</small>
             {feedbackAwaitingScan && <small role="status">Cần quét sạch hoặc bỏ tệp phản hồi chưa an toàn trước khi hoàn thành.</small>}
-            <button className="btn btn-primary" disabled={submitting || uploading || feedbackAwaitingScan || !loaded || !decision || (!comment.trim() && drafts.length === 0 && draftAttachments.length === 0)}><Send size={16} />{submitting ? "Đang gửi…" : "Hoàn thành và gửi góp ý"}</button>
+            <button className="btn btn-primary" disabled={submitting || submissionConflict || uploading || feedbackAwaitingScan || !loaded || !decision || (!comment.trim() && drafts.length === 0 && draftAttachments.length === 0)}><Send size={16} />{submitting ? "Đang gửi…" : "Hoàn thành và gửi góp ý"}</button>
           </form>}
         </aside>
       </div>

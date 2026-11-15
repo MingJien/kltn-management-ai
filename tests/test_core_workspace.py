@@ -105,19 +105,25 @@ def test_progress_revision_cross_comment_and_closed_milestone(workspace):
     report = client.post(path+"/progress-reports", headers=hdr(users[0]), json=payload)
     assert report.status_code == 201, report.text
     first = report.json()
-    assert client.post(path+"/progress-reports", headers=hdr(users[1]), json=payload).status_code == 409
+    updated = client.post(path+"/progress-reports", headers=hdr(users[1]),
+        json={**payload, "summary": "Teammate updated before advisor feedback"})
+    assert updated.status_code == 201, updated.text
+    teammate = updated.json()
+    assert teammate["version_no"] == 2
+    assert teammate["submitted_by_student_id"] != first["submitted_by_student_id"]
+    assert client.post(path+"/progress-reports", headers=hdr(users[2]), json=payload).status_code == 404
     # Progress is private to the group and formal advisor, including when a former peer role exists.
     thesis = client.get(path, headers=hdr(users[4])).json()
     assert client.post(path+"/progress-reviewers", headers=version_headers(users[4],thesis), json={
         "lecturer_id":str(lecturers[2].id),"reason":"Retired peer workflow"}).status_code==403
     assert client.get(path+"/progress-reports",headers=hdr(users[4])).status_code==403
     assert client.get(path+"/progress-reports",headers=hdr(users[5])).status_code==404
-    returned = client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[3], first), json={
+    returned = client.post(path+f"/progress-reports/{teammate['id']}/review", headers=version_headers(users[3], teammate), json={
         "decision": "REVISION_REQUIRED", "comment": "Add measurements"})
     assert returned.status_code == 200, returned.text
     second = client.post(path+"/progress-reports", headers=hdr(users[1]), json={**payload, "summary": "Revised with measurements"})
     assert second.status_code == 201, second.text
-    assert second.json()["version_no"] == 2
+    assert second.json()["version_no"] == 3
     assert client.post(path+f"/progress-reports/{first['id']}/review", headers=version_headers(users[3], first), json={
         "decision": "CONFIRM", "comment": "A stale screen must not confirm version 1"}).status_code == 409
     confirmed = client.post(path+f"/progress-reports/{second.json()['id']}/review", headers=version_headers(users[3], second.json()), json={
@@ -125,7 +131,8 @@ def test_progress_revision_cross_comment_and_closed_milestone(workspace):
     assert confirmed.status_code == 200, confirmed.text
     assert client.post(path+"/progress-reports", headers=hdr(users[0]), json=payload).status_code == 409
     history = client.get(path+"/progress-reports", headers=hdr(users[0])).json()
-    assert {row["summary"] for row in history} == {payload["summary"], "Revised with measurements"}
+    assert {row["summary"] for row in history} == {
+        payload["summary"], "Teammate updated before advisor feedback", "Revised with measurements"}
     closed = client.post(path+f"/milestones/{milestone['id']}/close", headers=version_headers(users[4], milestone), json={"reason": "Checkpoint complete"})
     assert closed.status_code == 200, closed.text
     new_milestone = open_milestone(client, users, path)

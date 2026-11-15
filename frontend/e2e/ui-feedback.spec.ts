@@ -73,26 +73,40 @@ test("UI: modal chờ danh sách GV, giữ GV đề xuất khi dữ liệu tải
   await expect.poll(()=>decision?.receiving_lecturer_id).toBe("gv");
 });
 
-test("UI: làm mới hồ sơ lấy dữ liệu mới, giữ tab và bản nháp; lỗi không xóa dữ liệu cũ", async ({page}) => {
+test("UI: làm mới hồ sơ giữ nháp khi lỗi tạm thời và ẩn hồ sơ khi mất quyền", async ({page}) => {
   let title = "Khóa luận UI trước cập nhật";
   await mock(page, path => {
     if (path === "/theses/thesis") {
-      return {id:"thesis",title,state:"IN_PROGRESS",round_label:"UI-ROUND",advisor_name:"GV UI",members:[],advisor_history:[],cross_reviewers:[],actions:["document:view","document:submit"],row_version:1};
+      return {id:"thesis",title,state:"IN_PROGRESS",round_label:"UI-ROUND",advisor_name:"GV UI",members:[],advisor_history:[],cross_reviewers:[],actions:["document:submit","progress:view","progress:submit"],row_version:1};
     }
-  }, "LECTURER");
-  await page.goto("/theses/thesis?section=documents");
-  await page.getByLabel("Tên tài liệu",{exact:true}).fill("Bản nháp chưa gửi");
+    if (path === "/theses/thesis/milestones") {
+      return [{id:"milestone",scope:"THESIS",title:"Mốc kiểm thử",code:"UI",state:"OPEN",version_no:1,due_at:new Date(Date.now()+86400000).toISOString()}];
+    }
+  }, "STUDENT");
+  await page.goto("/theses/thesis?section=progress");
+  await page.getByLabel("Kết quả, khó khăn và kế hoạch",{exact:true}).fill("Bản nháp chưa gửi");
   title="Khóa luận UI đã cập nhật";
   await page.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
-  await expect(page.getByRole("heading",{name:title,exact:true})).toBeVisible();
-  await expect(page.getByLabel("Tên tài liệu",{exact:true})).toHaveValue("Bản nháp chưa gửi");
-  await expect(page).toHaveURL(/section=documents/);
-  await page.route("**/api/v1/theses/thesis", route=>route.fulfill({status:503,json:{detail:"UI server unavailable"}}));
+  await expect(page.getByText(title,{exact:false})).toBeVisible();
+  await expect(page.getByLabel("Kết quả, khó khăn và kế hoạch",{exact:true})).toHaveValue("Bản nháp chưa gửi");
+  await expect(page).toHaveURL(/section=progress/);
+  const respond = (status:number, detail:string) => page.route("**/api/v1/theses/thesis", route=>route.fulfill({
+    status,json:{detail},headers:{"Access-Control-Allow-Origin":new URL(page.url()).origin,"Access-Control-Allow-Credentials":"true"},
+  }));
+  await respond(503,"UI server unavailable");
   await page.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
   await expect(page.getByRole("alert")).toBeVisible();
-  await expect(page.getByRole("heading",{name:title,exact:true})).toBeVisible();
-  await expect(page.getByLabel("Tên tài liệu",{exact:true})).toHaveValue("Bản nháp chưa gửi");
+  await expect(page.getByText(title,{exact:false})).toBeVisible();
+  await expect(page.getByLabel("Kết quả, khó khăn và kế hoạch",{exact:true})).toHaveValue("Bản nháp chưa gửi");
+
+  await page.unroute("**/api/v1/theses/thesis");
+  await respond(404,"Không tìm thấy hồ sơ");
+  await page.getByRole("button",{name:"Làm mới dữ liệu",exact:true}).click();
+  await expect(page.getByRole("alert")).toContainText("Không tìm thấy hồ sơ");
+  await expect(page.getByText(title,{exact:false})).toHaveCount(0);
+  await expect(page.getByLabel("Kết quả, khó khăn và kế hoạch",{exact:true})).toHaveCount(0);
 });
+
 
 test("UI: tải lại danh sách GV lỗi không tự gán một GV khác khi GV đề xuất không còn hợp lệ", async ({page}) => {
   await mock(page, path => path === "/topics" ? [topic] : path === "/lecturers" ? [{id:"other",display_name:"GV khác",lecturer_code:"GV-OTHER"}] : [], "LECTURER");

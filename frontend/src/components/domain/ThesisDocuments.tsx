@@ -17,7 +17,7 @@ const documentPresets: Record<string, string> = {
   SUPPORTING: "Tài liệu hỗ trợ khác",
 };
 
-export type CoreRun = (action: () => Promise<unknown>, message: string) => Promise<boolean>;
+export type CoreRun = (action: () => Promise<unknown>, message: string, onConflict?: () => void) => Promise<boolean>;
 
 export function scanLabel(state: string) {
   if (state === "CLEAN") return "Đã quét an toàn";
@@ -39,11 +39,11 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
   const officialFile = ["PLAN", "REPORT"].includes(doc.document_type);
   const validFileType = !file || (officialFile ? /\.(pdf|docx)$/i : /\.(pdf|docx|txt)$/i).test(file.name);
   const beforeDue = deadline?.state === "OPEN" && Date.now() <= new Date(deadline.due_at).getTime();
-  const canSubmit = doc.document_type !== "PROPOSAL" && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && !!deadline && (
+  const canSubmit = officialFile && thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && !!deadline && (
     latest?.state === "REVISION_REQUESTED" ||
     (deadline.state === "OPEN" && !latest) ||
     (beforeDue && latest?.state === "SUBMITTED" && latest.reviews.length === 0));
-  const canWithdraw = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && doc.document_type !== "PROPOSAL" && doc.versions.every(version =>
+  const canWithdraw = thesis.actions.includes("document:submit") && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && officialFile && doc.versions.every(version =>
     ["SUBMITTED","SUPERSEDED"].includes(version.state) && version.reviews.length === 0 && !progressEvidenceIds.has(version.id));
   const latestAccepted = doc.versions.filter(version => ["ACCEPTED", "FINAL"].includes(version.state))
     .sort((a, b) => b.version_no - a.version_no)[0];
@@ -123,7 +123,7 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
         }}>Xuất bản đã duyệt để ký ngoài (footer 3 dòng: nguồn · mã hồ sơ · giờ xuất)</button>}
         {["PLAN", "REPORT"].includes(doc.document_type) && !canPrint && <p className="text-caption">{["ACCEPTED", "FINAL"].includes(version.state) ? "Chỉ bản đã duyệt hiện hành được xuất để ký ngoài." : "Sau khi GVHD tiếp nhận phiên bản này, nút xuất bản đã duyệt có footer để ký sẽ xuất hiện."}</p>}
         {["PLAN", "REPORT"].includes(doc.document_type) && <PrintHistory endpoint={`/theses/${thesis.id}/documents/${doc.id}/versions/${version.id}/print-history`} userId={userId} version={version.version_no} refreshKey={printRefresh} />}
-        {clean && <FileReviewButton userId={userId} run={run} disabled={busy} target={{
+        {clean && officialFile && <FileReviewButton userId={userId} run={run} disabled={busy} target={{
           versionId: version.id, fileName: version.file_name, versionNo: version.version_no, submittedBy: version.submitted_by_name,
           rowVersion: version.row_version, label: doc.title, reviews: version.reviews,
           annotationsPath: `/theses/${thesis.id}/documents/${doc.id}/versions/${version.id}/annotations`,
@@ -132,7 +132,7 @@ function DocumentCard({doc, thesis, deadline, progressEvidenceIds, userId, busy,
           choices: [{value:"ACCEPT", label:"Tiếp nhận bản này"}, {value:"REVISION_REQUIRED", label:"Yêu cầu chỉnh sửa"}],
         }} />}
         <Reviews items={version.reviews} />
-        {index === 0 && version.state === "SUBMITTED" && thesis.actions.includes("document:review") && doc.document_type !== "PROPOSAL" && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && <>
+        {index === 0 && version.state === "SUBMITTED" && thesis.actions.includes("document:review") && officialFile && ["ACTIVE", "PROPOSAL_APPROVED", "IN_PROGRESS", "EXTENDED"].includes(thesis.state) && <>
           {!clean && <p className="alert alert-warning">Tệp chưa được quét: GVHD có thể yêu cầu nộp lại theo tên tệp/trạng thái, nhưng chưa thể xem nội dung hoặc tiếp nhận. Cần bộ quét hoạt động để tải và duyệt.</p>}
           {!clean && <ReviewForm disabled={busy} choices={clean
             ? [{value: "ACCEPT", label: "Tiếp nhận bản này"}, {value: "REVISION_REQUIRED", label: "Yêu cầu chỉnh sửa"}]
@@ -158,7 +158,7 @@ export default function ThesisDocuments({thesis, docs, deadlines, reports, userI
   const progressEvidenceIds = new Set(reports.map(report => report.evidence_document_version_id).filter((id): id is string => !!id));
   const visibleDocs = docs.filter(doc => doc.document_type === kind && (!pendingOnly || doc.versions[0]?.state === "SUBMITTED") && !(kind === "SUPPORTING" && doc.title.startsWith("Minh chứng tiến độ ") && doc.versions.some(version => progressEvidenceIds.has(version.id))));
   const active = ["ACTIVE","PROPOSAL_APPROVED","IN_PROGRESS","EXTENDED"].includes(thesis.state);
-  const canCreate = !legacyOnly && thesis.actions.includes("document:submit") && active && (kind === "SUPPORTING" || visibleDocs.length === 0);
+  const canCreate = !legacyOnly && !["SUPPORTING"].includes(kind) && thesis.actions.includes("document:submit") && active && visibleDocs.length === 0;
   const validFile = !!file && file.size > 0 && file.size <= 10*1024*1024 && (kind === "SUPPORTING" ? /\.(pdf|docx|txt)$/i : /\.(pdf|docx)$/i).test(file.name);
   const deadline = deadlines.find(item => item.document_type === kind);
   const canFirstSubmit = deadline?.state === "OPEN";

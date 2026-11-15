@@ -46,7 +46,7 @@ export default function ThesesPage({context, section = "overview"}: {context: Co
     {error && <div className="alert alert-danger" role="alert">{error}</div>}
     {loading ? <p role="status">Đang tải khóa luận…</p> : visibleRows.length === 0 ? <div className="card"><div className="card-body">
       <h2>Chưa có khóa luận trong phạm vi của bạn</h2>
-      <p>{section === "progress" ? "Các mốc và báo cáo tiến độ xuất hiện trong hồ sơ sau khi GV chấp nhận đăng ký. Người mở, gia hạn hoặc đóng mốc cần được ADMIN giao quyền điều phối đợt." : section === "documents" ? "Tài liệu được nộp trong hồ sơ sau khi GV chấp nhận đăng ký; mở hồ sơ để tạo loại tài liệu và nộp các phiên bản." : "Khi giảng viên chấp nhận đăng ký, hệ thống tạo khóa luận, ghi nhận nhóm và gán GV đó làm GVHD chính trong cùng thao tác."}</p>
+      <p>{section === "progress" ? "Các mốc và báo cáo tiến độ xuất hiện trong hồ sơ sau khi GV chấp nhận đăng ký. GVHD quản lý mốc riêng của khóa luận. Điều phối viên quản lý mốc chung của đợt." : section === "documents" ? "Tài liệu được nộp trong hồ sơ sau khi GV chấp nhận đăng ký; mở hồ sơ để tạo loại tài liệu và nộp các phiên bản." : "Khi giảng viên chấp nhận đăng ký, hệ thống tạo khóa luận, ghi nhận nhóm và gán GV đó làm GVHD chính trong cùng thao tác."}</p>
       {context.base_role === "STUDENT" && <Link className="btn btn-secondary" to="/registrations">Xem đăng ký của tôi</Link>}
       {context.base_role === "LECTURER" && <Link className="btn btn-secondary" to="/registrations">Mở hồ sơ đăng ký</Link>}
     </div></div> : <div className="stack">{visibleRows.map(row => <article className="card" key={row.id}><div className="card-body">

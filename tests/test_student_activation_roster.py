@@ -14,6 +14,14 @@ def test_student_activation_requires_admin_and_confirmed_roster_and_preserves_se
     monkeypatch.setenv('AUTH_SESSION_SECRET', 'synthetic-student-activation-secret-at-least-32-characters')
     monkeypatch.setattr('backend.services.account_mail.mail_delivery_ready', lambda: True)
     monkeypatch.setattr('backend.services.account_mail.delivery_mode', lambda: 'smtp')
+    instant = datetime.now(timezone.utc)
+
+    class FixedMailClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+    monkeypatch.setattr('backend.api.roster.datetime', FixedMailClock)
     sent = []
     monkeypatch.setattr('backend.api.account._mail_link', lambda account, purpose: sent.append((account.id, purpose, account.identifier)))
     admin = m.UserAccount(id=uuid4(), external_subject='synthetic-admin-'+uuid4().hex, base_role='ADMIN', status='ACTIVE')
