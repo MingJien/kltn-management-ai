@@ -95,3 +95,19 @@ class CouncilAttendance(Input):
 class ReopenInput(Input):
     reason: str = Field(min_length=5, max_length=1000)
     confirm_unsigned: Literal[True]
+
+
+class CorrectionInput(Input):
+    kind: Literal['BALLOT','MINUTES']
+    reason: str = Field(min_length=10,max_length=2000)
+    reference: str = Field(min_length=5,max_length=500)
+    student_id: UUID | None = None
+    lecturer_id: UUID | None = None
+    scores: list[Decimal] = Field(default_factory=list,max_length=12)
+    note: str = Field(default='',max_length=3000)
+    minutes: MinutesInput | None = None
+
+
+class CorrectionDecision(Input):
+    decision: Literal['APPROVED','REJECTED','CANCELLED']
+    reason: str = Field(min_length=10,max_length=2000)

@@ -102,14 +102,16 @@ def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:U
               line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
               paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
               narrative_bold:bool|None=None,narrative_italic:bool|None=None,
-              line_breaks:Annotated[str|None,Query(max_length=6000)]=None,layout_fields:bool=False,
+              line_breaks:Annotated[str|None,Query(max_length=6000)]=None,layout_fields:bool=False,preview_revision:bool=False,expected_revision:str|None=None,
               user=Depends(current_user),session=Depends(transaction)):
     if request.method == "POST" and preview_sheet:
         raise HTTPException(422, "Dùng bản xem trước để kiểm tra cách trình bày")
     result = defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank,layout_fields=layout_fields,
-        record=request.method == "POST",
+        record=request.method == "POST",expected_revision=expected_revision,
         layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations,
             narrative_bold=narrative_bold,narrative_italic=narrative_italic,line_breaks=parse_line_breaks(line_breaks)))
+    if preview_revision:
+        return {'revision':result.headers.get('X-Preview-Revision')}
     return defense_export.preview_sheet(result) if preview_sheet and form=="6" and not layout_fields else result
 
 
@@ -168,13 +170,15 @@ def round_form(identifier:UUID,form:Literal["10","11"],request:Request,
                  font_size: Annotated[int|None,Query(ge=11,le=14)]=None,
                  line_spacing: Annotated[float|None,Query(ge=1,le=1.5)]=None,
                  paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
-                 course_code: Annotated[str|None,Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")]=None,
+                 course_code: Annotated[str|None,Query(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")]=None,preview_revision:bool=False,expected_revision:str|None=None,
                  user=Depends(current_user),session=Depends(transaction)):
     if request.method == "POST" and preview_sheet:
         raise HTTPException(422, "Dùng bản xem trước để kiểm tra cách trình bày")
     result = defense_export.export_round(session,user,identifier,int(form),str(request.base_url),
-        course_code=course_code.upper() if course_code else None,record=request.method == "POST",
+        course_code=course_code.upper() if course_code else None,record=request.method == "POST",expected_revision=expected_revision,
         layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations))
+    if preview_revision:
+        return {'revision':result.headers.get('X-Preview-Revision')}
     return defense_export.preview_sheet(result) if preview_sheet and form=="11" else result
 
 
@@ -191,3 +195,22 @@ def slot_prints(identifier:UUID,user=Depends(current_user),session=Depends(trans
 @router.get("/prints/{identifier}")
 def recorded_print(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
     return defense_export.download_print(session,user,identifier)
+
+
+from backend.api.defense_schemas import CorrectionInput, CorrectionDecision
+from backend.services import defense_corrections
+
+
+@router.get('/slots/{identifier}/corrections')
+def corrections(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_corrections.workspace(session,user,identifier)
+
+
+@router.post('/slots/{identifier}/corrections',status_code=204)
+def propose_correction(identifier:UUID,data:CorrectionInput,version:int=Header(alias='If-Match',ge=1),user=Depends(current_user),session=Depends(transaction)):
+    defense_corrections.propose(session,user,identifier,version,data)
+
+
+@router.post('/corrections/{identifier}/decision',status_code=204)
+def decide_correction(identifier:UUID,data:CorrectionDecision,version:int=Header(alias='If-Match',ge=1),user=Depends(current_user),session=Depends(transaction)):
+    defense_corrections.decide(session,user,identifier,version,data)

@@ -8,7 +8,7 @@ import "../styles/defense.css";
 
 type Version = {id:string;number:number;revision:number;state:"SUBMITTED"|"ACCEPTED"|"RETURNED";filename:string;created_at:string;decided_at:string|null;decided_by:string|null;decision_note:string|null};
 type Entry = {id:string;title:string;round_id:string;round:string;department:string;waiting:boolean;can_submit:boolean;can_decide:boolean;
-  snapshot:{title:string;advisor:string;students:{name:string;code:string}[]}|null;versions:Version[]};
+  snapshot:{title:string;advisor:string;students:{name:string;code:string}[]}|null;versions:Version[];blockers?:{message:string;url:string}[]};
 const versionLabels = {SUBMITTED:"Chờ bộ môn duyệt",ACCEPTED:"Đã duyệt lưu",RETURNED:"Cần nộp lại"};
 
 export default function ThesisArchivePage({context}: {context:Context}) {
@@ -92,6 +92,7 @@ export default function ThesisArchivePage({context}: {context:Context}) {
             {item.snapshot&&<><p>GVHD: {item.snapshot.advisor||"Chưa ghi nhận"}</p><p>Sinh viên: {item.snapshot.students.map(s=>`${s.name} (${s.code})`).join(", ")}</p></>}
             <Link to={`/theses/${item.id}`}>Mở hồ sơ khóa luận</Link>
             {item.waiting&&<p>Chờ kết quả của tất cả thành viên và khóa bảng điểm hội đồng.</p>}
+            {!!item.blockers?.length&&<ul>{item.blockers.map((blocker,i)=><li key={i}>{blocker.message} · <Link to={blocker.url}>Mở hồ sơ đối chiếu</Link></li>)}</ul>}
             {!item.waiting&&!latest&&!item.can_submit&&<p className="text-muted">Nhóm sinh viên cần nộp bản hoàn thiện sau bảo vệ. TBM sẽ duyệt khi nhóm gửi hồ sơ.</p>}
             {item.versions.map(version=><section key={version.id} className="defense-operation stack">
               <strong>Phiên bản {version.number} · {versionLabels[version.state]}</strong>

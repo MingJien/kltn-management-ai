@@ -87,15 +87,18 @@ def council_with_units(session, council):
     return SimpleNamespace(name=council.name,reference=council.reference,members=members)
 
 
-def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_id=None,*,blank=False,layout=None,layout_fields=False,record=False):
+def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_id=None,*,blank=False,layout=None,layout_fields=False,record=False,expected_revision=None):
     layout=layout or templates.PrintLayout()
-    slot,council,member,own,manager=defense.load_slot(session,user,identifier)
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
+    slot,council,member,own,manager=defense.load_slot(session,user,identifier,write=record)
     if own or not (member or manager):raise HTTPException(403,"Chỉ hội đồng và người phụ trách được tải mẫu")
     allowed={"note"} if form==6 else {"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}
     if set(layout.line_breaks)-allowed:raise HTTPException(422,"Chỉ định dạng các phần diễn giải có trong biểu mẫu này")
     blank=blank and form==6
     if record and (blank or not slot.finalized_at or layout_fields):
         raise HTTPException(409, "Chỉ lưu bản dùng để ký khi đã chốt phiên bảo vệ")
+    if record and form==9 and defense.minutes_blockers(slot):
+        raise HTTPException(409,'Biên bản lịch sử còn thiếu nội dung: '+'. '.join(defense.minutes_blockers(slot))+'. Lập đề nghị đính chính có căn cứ trước khi phát hành')
     if not slot.finalized_at and not blank and form!=6:raise HTTPException(409,"Chỉ xuất bản dùng để ký sau khi chốt kết quả")
     title=slot.minutes.get("title") or session.get(m.Thesis,slot.thesis_id).current_title
     roster=templates.academic_roster(session,slot)
@@ -132,7 +135,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         lecturer=session.get(m.LecturerProfile,lecturer_id)
         name = filename("Mau-06-Phieu-trong" if blank else "Mau-06-Phieu-cham",student["code"]+"-"+lecturer.lecturer_code,slot.row_version)
         return print_response(session, user, out, name, "xlsx", record_id, council.round_id, form, path, layout,
-            slot=slot, student_id=student_id, lecturer_id=lecturer_id)
+            slot=slot, student_id=student_id, lecturer_id=lecturer_id,expected_revision=expected_revision)
     templates.require_metadata(roster,["class_name"])
     if layout_fields:
         comments=notes(slot,council,roster)
@@ -146,10 +149,10 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         layout,slot.starts_at.astimezone(defense.VN))
     doc.save(out)
     name = filename("Mau-09-Bien-ban",council.name,slot.row_version)+f"-{slot.starts_at.astimezone(defense.VN):%Y%m%d-%H%M}"
-    return print_response(session, user, out, name, "docx", record_id, council.round_id, form, path, layout, slot=slot)
+    return print_response(session, user, out, name, "docx", record_id, council.round_id, form, path, layout, slot=slot,expected_revision=expected_revision)
 
 
-def export_round(session, user, identifier, form, base_url, *, layout=None, course_code=None, record=False):
+def export_round(session, user, identifier, form, base_url, *, layout=None, course_code=None, record=False,expected_revision=None):
     layout=layout or templates.PrintLayout()
     if record:
         session.execute(select(func.pg_advisory_xact_lock(66102)))
@@ -184,12 +187,27 @@ def export_round(session, user, identifier, form, base_url, *, layout=None, cour
     revision = record_id.hex[:12] if record_id else "xem-truoc"
     name = filename(prefix, round_.code + (f"-{course_code}" if form == 11 else "")) + f"-{revision}"
     return print_response(session,user,out,name,extension,record_id,identifier,form,path,layout,
-        course_code=course_code, result_hash=result_hash)
+        course_code=course_code, result_hash=result_hash,expected_revision=expected_revision)
 
 
 def print_response(session, user, out, name, extension, record_id, round_id, form, path, layout, *,
-                   slot=None, student_id=None, lecturer_id=None, course_code=None, result_hash=None):
+                   slot=None, student_id=None, lecturer_id=None, course_code=None, result_hash=None,expected_revision=None):
+    council=session.get(m.DefenseCouncil,slot.council_id) if slot else None
+    fingerprint={'form':form,'slot':str(slot.id) if slot else None,'revision':slot.row_version if slot else None,
+        'council':defense.council_signature(council) if council else None,'layout':layout.model_dump(mode='json'),
+        'template':sha256(path.read_bytes()).hexdigest(),'student':str(student_id),'lecturer':str(lecturer_id),
+        'course':course_code,'results':result_hash}
+    revision=sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
+    if expected_revision is not None and expected_revision!=revision:
+        raise HTTPException(409,'Dữ liệu hoặc định dạng đã đổi. Cập nhật bản xem trước rồi lưu lại bản dùng để ký')
     if record_id:
+        if expected_revision is None:
+            raise HTTPException(409,'Xem trước hồ sơ trước khi lưu bản dùng để ký')
+        affected=select(m.DefenseCorrection.id).join(m.DefenseSlot,m.DefenseSlot.id==m.DefenseCorrection.slot_id)
+        affected=affected.where(m.DefenseCorrection.state=='PENDING',m.DefenseSlot.id==slot.id) if slot else affected.join(
+            m.DefenseCouncil,m.DefenseCouncil.id==m.DefenseSlot.council_id).where(m.DefenseCorrection.state=='PENDING',m.DefenseCouncil.round_id==round_id)
+        if session.scalar(affected.limit(1)):
+            raise HTTPException(409,'Có đề nghị đính chính chờ xử lý; giải quyết trước khi phát hành bản mới')
         content = out.getvalue()
         if len(content) > 30 * 1024 * 1024:
             raise HTTPException(409, "Bản xuất vượt 30 MB. Cần kiểm tra tệp mẫu của Khoa trước khi lưu")
@@ -204,7 +222,9 @@ def print_response(session, user, out, name, extension, record_id, round_id, for
         audit(session,user,"DEFENSE_PRINT_SAVED","defense_slot" if slot else "thesis_round",slot.id if slot else round_id,
               f"Mẫu {form} · {record_id.hex[:12]}",after_hash=digest)
         session.commit()
-    return response(out, name, extension)
+    result=response(out, name, extension)
+    result.headers['X-Preview-Revision']=revision
+    return result
 
 
 def print_access(session, user, item):
@@ -219,21 +239,31 @@ def print_access(session, user, item):
 
 
 def print_history(session, user, *, round_id=None, slot_id=None):
+    current_revision=None
+    current_hash=None
     if slot_id:
-        _, _, member, own, manager = defense.load_slot(session, user, slot_id)
+        slot, _, member, own, manager = defense.load_slot(session, user, slot_id)
+        current_revision=slot.row_version
         if own or not (member or manager):
             raise HTTPException(404, "Không tìm thấy bản in trong phạm vi của bạn")
         query = select(m.DefensePrintRecord).where(m.DefensePrintRecord.slot_id == slot_id)
     else:
         defense_register.require_round_access(session, user, round_id)
+        current_hash=sha256(json.dumps(defense_register.rows_for_sessions(session,
+            defense_register.council_sessions(session,round_id)),sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         query = select(m.DefensePrintRecord).where(m.DefensePrintRecord.round_id == round_id, m.DefensePrintRecord.slot_id.is_(None))
+    pending_query=select(m.DefenseCorrection.id).join(m.DefenseSlot,m.DefenseSlot.id==m.DefenseCorrection.slot_id).where(m.DefenseCorrection.state=='PENDING')
+    pending_query=pending_query.where(m.DefenseSlot.id==slot_id) if slot_id else pending_query.join(m.DefenseCouncil,m.DefenseCouncil.id==m.DefenseSlot.council_id).where(m.DefenseCouncil.round_id==round_id)
+    pending=bool(session.scalar(pending_query.limit(1)))
     rows = []
     for item in session.scalars(query.order_by(m.DefensePrintRecord.created_at.desc(), m.DefensePrintRecord.id.desc())):
         if slot_id and item.form == 6 and not manager and member["role"] not in {"CHAIR", "SECRETARY"} and member["id"] != item.source.get("lecturer_id"):
             continue
         rows.append({"id": item.id, "form": item.form, "filename": item.filename, "created_at": item.created_at,
                      "actor": workflow_notices.actor_name(session, item.created_by),
-                     "course_code": item.source.get("course_code"), "code": item.id.hex[:12]})
+                     "course_code": item.source.get("course_code"), "code": item.id.hex[:12],
+                     'pending_correction':pending,
+                     "current": item.source.get('slot_revision')==current_revision if item.slot_id else item.source.get('result_sha256')==current_hash})
         if len(rows) == 50:
             break
     return rows

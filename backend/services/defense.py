@@ -581,6 +581,7 @@ def save_minutes(session,user,identifier,expected,data):
 
 def correct_academic_profile(session,user,identifier,expected,member_id,data):
     """Correct identity metadata with a basis; never reopen or alter grading."""
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
     slot,council,_,_,manager=load_slot(session,user,identifier,write=True)
     if not manager:raise HTTPException(403,"Chỉ TBM hoặc điều phối được đính chính thông tin học vụ")
     row_version(expected,slot.row_version)

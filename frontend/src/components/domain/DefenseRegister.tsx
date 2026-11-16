@@ -7,7 +7,7 @@ import DefensePrintPreview from "./DefensePrintPreview";
 
 type Round = {id:string;code:string};
 type Row = {name:string;code:string;class_name:string;grade:string|null;status:string;slot_id:string;council:string;has_birth_date:boolean};
-type Register = {code:string;issues:string[];rows:Row[]};
+type Register = {code:string;issues:string[];rows:Row[];unscheduled?:{name:string;code:string;thesis_id:string}[]};
 
 export default function DefenseRegister({rounds,refresh}: {rounds:Round[];refresh:number}) {
   const [selected,setSelected] = useState("");
@@ -44,6 +44,8 @@ export default function DefenseRegister({rounds,refresh}: {rounds:Round[];refres
       {error&&<p role="alert" className="alert alert-danger">{error}</p>}
       {selected&&!data&&!error&&<p role="status">Đang đối chiếu kết quả toàn đợt…</p>}
       {data&&<>
+        <p>Danh sách dưới đây gồm sinh viên đã xếp lịch bảo vệ trong đợt; không tự ghi không đạt cho SV chưa xếp lịch.</p>
+        {!!data.unscheduled?.length&&<aside className="defense-blockers"><strong>{data.unscheduled.length} SV đủ điều kiện chưa xếp lịch — cần đối chiếu trước khi phát hành</strong><ul>{data.unscheduled.map(row=><li key={row.code}><Link to={`/evaluation/${row.thesis_id}`}>{row.name} · {row.code}</Link></li>)}</ul></aside>}
         {!!data.issues.length&&<aside className="defense-blockers"><strong>Việc cần hoàn tất trước khi xuất</strong><ul>{data.issues.map(issue=><li key={issue}>{issue}</li>)}</ul></aside>}
         {!!data.rows.length&&<>
           <p><strong>{data.rows.length}</strong> sinh viên · {data.rows.filter(row=>row.grade!==null).length} đã có điểm</p>

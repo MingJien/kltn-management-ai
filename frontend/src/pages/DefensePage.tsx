@@ -8,6 +8,7 @@ import PageHeader from "../components/layout/PageHeader";
 import DefensePrintPreview from "../components/domain/DefensePrintPreview";
 import DefensePrintHistory from "../components/domain/DefensePrintHistory";
 import DefenseRegister from "../components/domain/DefenseRegister";
+import DefenseCorrections from "../components/domain/DefenseCorrections";
 
 type Person={id:string;name:string;role:string};
 type Student={id:string;name:string;code:string;class_name?:string;major?:string;major_code?:string;department_id?:string;birth_date?:string;training_cohort?:string};
@@ -429,7 +430,7 @@ export default function DefensePage({context}:{context:Context}) {
       <label>Tìm lịch theo đề tài, hội đồng, phòng, tên SV hoặc MSSV<input className="input" value={search} onChange={e=>{if(!hasDrafts())setSearch(e.target.value);else setError("Hãy lưu nội dung đang nhập trước khi lọc danh sách.");}}/></label>
       {filter&&<button className="btn btn-secondary" onClick={()=>{if(mayDiscard())setFilter("");}}>Hiện tất cả lịch</button>}
       {!slots.length&&<p>{search||filter?"Không có kết quả phù hợp. Hãy đổi từ khóa hoặc xóa bộ lọc.":"Chưa có lịch trong phạm vi của bạn."}</p>}
-      {[...slots].sort((a,b)=>Number(b.id===focused)-Number(a.id===focused)).map(slot=><details id={`slot-${slot.id}`} key={slot.id} className="defense-operation defense-session" open={slot.id===focused||slots.length===1}><summary>{when(slot.starts_at)} · {slot.room} · {slot.title}</summary><SlotCard slot={slot} data={data} act={act} download={download} busy={busy} initialTab={slot.id===focused?initialTab:undefined}/></details>)}
+      {[...slots].sort((a,b)=>Number(b.id===focused)-Number(a.id===focused)).map(slot=><details id={`slot-${slot.id}`} key={slot.id} className="defense-operation defense-session" open={slot.id===focused||slots.length===1}><summary>{when(slot.starts_at)} · {slot.room} · {slot.title}</summary><SlotCard slot={slot} data={data} act={act} download={download} busy={busy} initialTab={slot.id===focused?initialTab:undefined}/>{slot.finalized_at&&slot.council.closed_at&&(slot.can_manage||['CHAIR','SECRETARY'].includes(slot.role??''))&&<DefenseCorrections slot={slot} criteria={data.criteria} saved={()=>void load().catch(e=>setError(errorMessage(e)))}/>}</details>)}
     </>}
   </div>;
 }

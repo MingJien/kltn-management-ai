@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261115_0030.
--- 53 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261116_0031.
+-- 54 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -1202,6 +1202,31 @@ CREATE TABLE defense_absence_decision (
 	CONSTRAINT fk_defense_absence_decision_thesis_member_id_thesis_member FOREIGN KEY(thesis_member_id) REFERENCES thesis_member (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_defense_absence_decision_recorded_by_user_account FOREIGN KEY(recorded_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
+
+CREATE TABLE defense_correction (
+	slot_id UUID NOT NULL,
+	requested_by UUID NOT NULL,
+	source_version INTEGER NOT NULL,
+	state VARCHAR(20) NOT NULL,
+	proposal JSONB NOT NULL,
+	before JSONB NOT NULL,
+	reason TEXT NOT NULL,
+	reference VARCHAR(500) NOT NULL,
+	decided_by UUID,
+	decided_at TIMESTAMP WITH TIME ZONE,
+	decision_note TEXT,
+	id UUID NOT NULL,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
+	row_version INTEGER DEFAULT '1' NOT NULL,
+	CONSTRAINT pk_defense_correction PRIMARY KEY (id),
+	CONSTRAINT ck_defense_correction_state CHECK (state IN ('PENDING','APPROVED','REJECTED','CANCELLED')),
+	CONSTRAINT fk_defense_correction_slot_id_defense_slot FOREIGN KEY(slot_id) REFERENCES defense_slot (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_correction_requested_by_user_account FOREIGN KEY(requested_by) REFERENCES user_account (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_correction_decided_by_user_account FOREIGN KEY(decided_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX uq_defense_correction_pending ON defense_correction (slot_id) WHERE state = 'PENDING';
 
 CREATE TABLE defense_eligibility_check (
 	thesis_id UUID NOT NULL,

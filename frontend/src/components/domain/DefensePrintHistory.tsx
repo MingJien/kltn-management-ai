@@ -3,7 +3,7 @@ import {downloadFile, request} from "../../api";
 import {errorMessage} from "../../errors";
 import {when} from "../../evaluation";
 
-type Print = {id:string;form:number;filename:string;created_at:string;actor:string;code:string;course_code:string|null};
+type Print = {id:string;form:number;filename:string;created_at:string;actor:string;code:string;course_code:string|null;current?:boolean;pending_correction?:boolean};
 
 export default function DefensePrintHistory({endpoint, revision}: {endpoint:string;revision:number}) {
   const [open,setOpen] = useState(false);
@@ -30,6 +30,8 @@ export default function DefensePrintHistory({endpoint, revision}: {endpoint:stri
     {!busy&&!error&&!rows.length&&<p>Chưa có bản in được lưu từ chức năng xuất để ký.</p>}
     {!!rows.length&&<ul className="defense-print-list">{rows.map(row=><li key={row.id}>
       <div><strong>Mẫu {row.form} · {row.code}</strong>{row.course_code&&<span> · {row.course_code}</span>}
+        <p>{row.current===false?'Bản lịch sử — hồ sơ đã thay đổi. Xem trước và xuất bản mới để ký.':'Khớp phiên bản hồ sơ tại lần đối chiếu này.'}</p>
+        {row.pending_correction&&<p>Có đề nghị đính chính đang chờ. Cần giải quyết trước khi phát hành bản mới.</p>}
         <div className="text-muted text-body-sm">{when(row.created_at)} · {row.actor}</div><small>{row.filename}</small></div>
       <button type="button" className="btn btn-secondary" onClick={()=>void downloadFile(`/defense/prints/${row.id}`,row.filename).catch(cause=>setError(errorMessage(cause)))}>Tải lại bản đã lưu</button>
     </li>)}</ul>}

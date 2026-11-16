@@ -63,6 +63,7 @@ test("Mẫu 11 toàn đợt yêu cầu chọn mã và dùng cùng mã khi xem ho
       {name:"Sinh viên B",code:"0023000002",class_name:"CNTT22",grade:"8.0",status:"Đã chốt điểm",slot_id:"slot-extra",council:"Hội đồng bổ sung",has_birth_date:true},
     ]}});
     if(endpoint===register+"/forms/11"){
+      if(url.searchParams.has('preview_revision'))return route.fulfill({json:{revision:'synthetic-revision'}});
       const code=url.searchParams.get("course_code")??"";
       if(route.request().method()==="POST"){
         savedCode=code;
@@ -94,6 +95,36 @@ test("Mẫu 11 toàn đợt yêu cầu chọn mã và dùng cùng mã khi xem ho
   await page.getByRole("button",{name:"Lưu và tải bản dùng để ký",exact:true}).click();
   expect((await download).suggestedFilename()).toBe("Mau-11-KLTN-DEMO.xlsx");
   expect(savedCode).toBe("CT2026");
+});
+
+test('Đính chính sau khóa: nhập căn cứ, đối chiếu và duyệt không mở khóa điểm',async({page})=>{
+  let proposal:any=null,approved=false;
+  const minutes={objectives:'Mục tiêu có căn cứ',functions:'Chức năng đã trình bày',achievements:'Kết quả đã đối chiếu',discussion:'Nội dung trao đổi tại hội đồng',conclusion:'Kết luận của chủ tịch',recommendations:'Hoàn thiện tài liệu',classifications:{'student-1':'Giỏi','student-2':'Khá'}};
+  await page.route('**/api/v1/**',async route=>{
+    const endpoint=new URL(route.request().url()).pathname.replace('/api/v1','');
+    if(endpoint==='/me/context')return route.fulfill({json:context});
+    if(endpoint==='/defense')return route.fulfill({json:{...workspace,councils:[{...council,closed_at:'2026-11-16T01:00:00Z'}],slots:[{...slot,council:{...council,closed_at:'2026-11-16T01:00:00Z'},minutes,finalized_at:'2026-11-16T01:00:00Z',schedule_editable:false}]}});
+    if(endpoint==='/defense/slots/slot-demo/corrections'){
+      if(route.request().method()==='POST'){proposal=route.request().postDataJSON();expect(route.request().headers()['if-match']).toBe('1');return route.fulfill({status:204});}
+      return route.fulfill({json:{can_approve:true,missing:[],items:proposal?[{id:'correction',version:1,state:approved?'APPROVED':'PENDING',reference:proposal.reference,reason:proposal.reason,proposal,before:{marks:{},minutes},can_decide:true,can_cancel:false,decision_note:approved?'Đã kiểm tra biên bản và căn cứ':'Không'}]:[]}});
+    }
+    if(endpoint==='/defense/corrections/correction/decision'){expect(route.request().postDataJSON().decision).toBe('APPROVED');approved=true;return route.fulfill({status:204});}
+    if(endpoint.includes('/notifications'))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+    return route.fulfill({json:[]});
+  });
+  await page.goto('/defense');
+  await page.getByText('Đính chính hồ sơ sau khóa',{exact:true}).click();
+  const form=page.locator('form').filter({has:page.getByRole('button',{name:'Gửi đề nghị đính chính',exact:true})});
+  await form.getByLabel('Số văn bản / căn cứ đính chính',{exact:true}).fill('BB-CHINH-2026');
+  await form.getByLabel('Lý do đính chính',{exact:true}).fill('Bổ sung nội dung được hội đồng xác nhận');
+  await form.getByRole('button',{name:'Gửi đề nghị đính chính',exact:true}).click();
+  await expect(page.getByRole('columnheader',{name:'Đề nghị',exact:true})).toBeVisible();
+  await page.getByRole('combobox',{name:'Quyết định',exact:true}).selectOption('APPROVED');
+  await page.getByLabel('Nhận xét quyết định',{exact:true}).fill('Đã kiểm tra biên bản và căn cứ');
+  await page.getByRole('button',{name:'Lưu quyết định đính chính',exact:true}).click();
+  await expect(page.getByText('Đã duyệt · Biên bản',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Khóa bảng điểm hội đồng',exact:true})).toHaveCount(0);
+  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:960});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
 });
 
 test("Khoa quyết định SV vắng rồi xếp lịch bổ sung đúng người",async({page})=>{

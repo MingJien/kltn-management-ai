@@ -1015,6 +1015,25 @@ class DefensePrintRecord(UuidPrimaryKeyMixin, Base):
     source: Mapped[dict] = mapped_column(JSONB)
 
 
+class DefenseCorrection(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
+    __tablename__ = "defense_correction"
+    __table_args__ = (
+        CheckConstraint("state IN ('PENDING','APPROVED','REJECTED','CANCELLED')", name="state"),
+        Index("uq_defense_correction_pending", "slot_id", unique=True, postgresql_where=text("state = 'PENDING'")),
+    )
+    slot_id: Mapped[uuid.UUID] = fk("defense_slot.id")
+    requested_by: Mapped[uuid.UUID] = fk("user_account.id")
+    source_version: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(20))
+    proposal: Mapped[dict] = mapped_column(JSONB)
+    before: Mapped[dict] = mapped_column(JSONB)
+    reason: Mapped[str] = mapped_column(Text)
+    reference: Mapped[str] = mapped_column(String(500))
+    decided_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    decision_note: Mapped[Optional[str]] = mapped_column(Text)
+
+
 class ThesisArchiveVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "thesis_archive_version"
     __table_args__ = (

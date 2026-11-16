@@ -67,9 +67,25 @@ def workspace(session, user, *, round_id=None):
         snapshot = submission_snapshot(session, thesis, result_rows[thesis.round_id])
         history = versions(session, thesis.id)
         latest = history[0] if history else None
+        blockers=[]
+        by_student={row['student_id']:row for row in result_rows[thesis.round_id] if row['thesis_id']==str(thesis.id)}
+        students=[]
+        for active in evaluation.members(session,thesis):
+            student=session.get(m.StudentProfile,active.student_id)
+            students.append({'name':student.display_name,'code':student.student_code})
+            row=by_student.get(str(student.id))
+            if not row or row['status']=='PENDING' or not row['council_closed']:
+                message='Chưa xếp lịch' if not row else row['outcome_label'] if row['status']=='PENDING' else 'Hội đồng chưa khóa bảng điểm'
+                blockers.append({'message':f'{student.display_name} ({student.student_code}): {message}',
+                    'url':f"/defense?slot={row['slot_id']}&tab=results" if row else f'/evaluation/{thesis.id}'})
+        advisor_row=primary_advisor(session,thesis.id)
+        advisor_profile=session.get(m.LecturerProfile,advisor_row.lecturer_id) if advisor_row else None
+        identity={'title':thesis.current_title,'advisor':advisor_profile.display_name if advisor_profile else '', 'students':students}
+        if snapshot is None and not blockers:
+            blockers.append({'message':'Chưa có sinh viên được chốt điểm để nộp lưu bản báo cáo','url':f'/defense'})
         items.append({"id": thesis.id, "round_id": thesis.round_id, "title": thesis.current_title,
             "round": session.get(m.ThesisRound, thesis.round_id).code, "department": session.get(m.Department, thesis.department_id).name,
-            "snapshot": latest.snapshot if latest else snapshot,
+            "snapshot": latest.snapshot if latest else snapshot or identity, 'blockers':blockers,
             "can_submit": bool(member and snapshot and (not latest or latest.state == "RETURNED")),
             "can_decide": bool(approver and latest and latest.state == "SUBMITTED"),
             "waiting": snapshot is None and latest is None,

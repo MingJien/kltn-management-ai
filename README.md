@@ -16,6 +16,7 @@
 - NV6 tuần 2 có hội đồng, lịch bảo vệ, Mẫu 6, tổng hợp điểm, Mẫu 9–11 và đối chiếu báo cáo Word/PDF theo cặp, gồm OCR khi cấu hình Tesseract. [Hướng dẫn thao tác](docs/design/nv6-defense-operations.md).
 - Mẫu 6, 9, 10 và 11 điền từ tệp gốc của Khoa. Mẫu 10/11 tổng hợp toàn đợt, kể cả bảo vệ bổ sung; Mẫu 11 chọn mã học phần trước khi xuất. TBM hoặc điều phối bổ sung thông tin học vụ có căn cứ. Bản xem trước chỉ cho chỉnh trình bày; bản dùng để ký được lưu nguyên tệp để tải lại. [Hướng dẫn biểu mẫu](docs/design/defense-forms.md).
 - Kho nội bộ có SV nộp bản sau bảo vệ → TBM duyệt lưu hoặc yêu cầu nộp lại, lịch sử phiên bản và quyền tải theo hồ sơ. Báo cáo theo đợt/bộ môn tổng hợp điều kiện, kết quả, điểm, xếp loại, điểm danh, tiến độ nộp lưu và danh sách thiếu dữ liệu học vụ. [Hướng dẫn](docs/design/nv6-archive-reporting.md).
+- Hồ sơ đã khóa có đề nghị đính chính phiếu/biên bản và TBM khác người lập duyệt; giữ bản cũ, không mở khóa tùy ý. Bản xem trước gắn phiên bản nguồn và định dạng trước khi phát hành; lịch sử bản in cảnh báo khi hồ sơ đã đổi. [Luồng đính chính và phát hành](docs/design/defense-corrections.md).
 - Mẫu nhận xét Mẫu 7/8 gắn với đúng sinh viên và bản báo cáo; GV gửi nhận xét trên hệ thống, xuất phiếu có footer để ký ngoài. Người được phân công tiếp nhận hồ sơ hoặc TBM ghi nhận bản giấy theo mã bản xuất và căn cứ; không yêu cầu tải bản ký lên lại.
 - Điểm thưởng công bố khoa học có luồng SV nộp → GVHD xác nhận → TBM duyệt từng SV; tự đưa mức đã duyệt vào phiếu Mẫu 6 và khóa căn cứ khi đã chấm. [Kiểm chứng](docs/evidence/publication-bonus-approval.md).
 - Có hồ sơ chuyên môn GV, phân công theo đợt và kiểm tra điều kiện bảo vệ ở mức hiện tại.
@@ -39,4 +40,4 @@ Mở http://127.0.0.1:1573. Cấu hình máy và mật khẩu nằm trong .env c
     .\.venv\Scripts\python.exe -m tools.validate_official_database
     npm run build --prefix 'D:\KLTN\frontend'
 
-Các kiểm thử tích hợp dùng dữ liệu giả trong schema riêng. [Kiểm chứng hiện tại: bảng điểm toàn đợt, kho nội bộ, dashboard và bản in](docs/evidence/nv6-archive-register-validation.md). [Kết quả đối chiếu biểu mẫu trước đó](docs/evidence/nv6-export-workflow-validation.md).
+Các kiểm thử tích hợp dùng dữ liệu giả trong schema riêng. [Kiểm chứng mới nhất: đính chính và phát hành hồ sơ NV6](docs/evidence/nv6-final-closure-validation.md). [Bảng điểm toàn đợt, kho nội bộ, dashboard và bản in](docs/evidence/nv6-archive-register-validation.md). [Kết quả đối chiếu biểu mẫu trước đó](docs/evidence/nv6-export-workflow-validation.md).

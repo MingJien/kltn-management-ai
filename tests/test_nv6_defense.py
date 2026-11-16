@@ -182,6 +182,8 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
         complete_review(ctx,member=index)
         response = check(ctx,member=index)
         assert response.status_code == 200,response.text
+    unscheduled=client.get(register,headers=hdr(users[4])).json()
+    assert len(unscheduled['unscheduled'])==2 and unscheduled['scheduled_count']==0
     response = client.post(base+"/slots",headers=hdr(users[4]),json=body)
     assert response.status_code==201,response.text
     slot = response.json()["id"]
@@ -337,8 +339,16 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert "Synthetic conclusion corrected" in "\n".join(p.text for p in doc.paragraphs)
     assert "Mục tiêu kiểm thử" in "\n".join(p.text for p in doc.paragraphs)
     assert "Ý kiến từ phản biện tại cuộc họp" in "\n".join(p.text for p in doc.paragraphs)
-    issued_minutes=client.post(endpoint+"/forms/9",headers=hdr(users[5]))
+    def issue(url,user):
+        separator='&' if '?' in url else '?'
+        preview=client.get(url+separator+'preview_revision=true',headers=hdr(user))
+        assert preview.status_code==200,preview.text
+        return client.post(url+separator+'expected_revision='+preview.json()['revision'],headers=hdr(user))
+    issued_minutes=issue(endpoint+"/forms/9",users[5])
     assert issued_minutes.status_code==200,issued_minutes.text
+    waiting=client.get('/api/v1/thesis-archive',headers=hdr(users[0])).json()[0]
+    assert waiting['blockers'] and len(waiting['snapshot']['students'])==2
+    assert waiting['snapshot']['advisor'] and not waiting['can_submit']
     minutes_record=client.get(endpoint+"/prints",headers=hdr(users[5])).json()[0]
     assert client.get(base+"/prints/"+minutes_record["id"],headers=hdr(users[0])).status_code==404
     layout_fields=client.get(endpoint+"/forms/9?layout_fields=true",headers=hdr(users[5]))
@@ -362,7 +372,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     decision={"outcome":"NOT_PASSED","reference":"QD-ABSENCE-01","reason":"Faculty confirmed absence after reviewing the case","revision":0}
     assert client.post(decision_path,headers=hdr(users[0]),json=decision).status_code==403
     assert client.post(decision_path,headers=hdr(users[4]),json=decision).status_code==204
-    form10 = client.post(register+"/forms/10",headers=hdr(users[4]))
+    form10 = issue(register+"/forms/10",users[4])
     assert form10.status_code==200,form10.text
     assert any(row.cells[-1].text=="10.0" for row in Document(BytesIO(form10.content)).tables[1].rows)
     assert client.get(register+"/forms/11",headers=hdr(users[4])).status_code==422
@@ -428,7 +438,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert old["results"][first]["average"]=="10.0" and old["results"][second]["average"] is None
     assert new["results"][second]["average"]=="10.0" and first not in new["results"]
     assert client.post(base+"/councils/"+fresh_council.json()["id"]+"/close",headers=hdr(users[4])).status_code==204
-    final_form=client.post(register+"/forms/11?course_code=ALT_11",headers=hdr(users[4]))
+    final_form=issue(register+"/forms/11?course_code=ALT_11",users[4])
     assert final_form.status_code==200,final_form.text
     workbook=load_workbook(BytesIO(final_form.content)).active
     assert workbook["B5"].value=="Học phần: [ALT_11] - Khóa luận tốt nghiệp"
@@ -470,6 +480,58 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
     assert any("Đã đưa khóa luận vào kho nội bộ" in notice["message"] for notice in inbox)
 
+    # Closed records need an independently approved correction; never unlock.
+    correction_path=endpoint+'/corrections'
+    closed_slot=next(s for s in client.get(base,headers=hdr(users[4])).json()['slots'] if s['id']==slot)
+    assert client.get(correction_path,headers=hdr(users[1])).status_code==403
+    proposal={'kind':'BALLOT','student_id':second,'lecturer_id':str(lecturers[1].id),
+        'scores':['0']*12,'note':'Đính chính theo phiếu gốc đã đối chiếu',
+        'reason':'Nhập nhầm các điểm tiêu chí trên phiếu','reference':'QD-DINH-CHINH-2026'}
+    request_headers={**hdr(users[5]),'If-Match':str(closed_slot['version'])}
+    assert client.post(correction_path,headers=request_headers,json=proposal).status_code==204
+    pending=client.get(correction_path,headers=hdr(users[4])).json()['items'][0]
+    assert client.post(correction_path,headers=request_headers,json=proposal).status_code==409
+    assert issue(register+'/forms/11?course_code=ALT_11',users[4]).status_code==409
+    decision_url=base+'/corrections/'+pending['id']+'/decision'
+    approve={'decision':'APPROVED','reason':'Đã đối chiếu phiếu và quyết định của Khoa'}
+    assert client.post(decision_url,headers={**hdr(users[5]),'If-Match':'1'},json=approve).status_code==403
+    approved=client.post(decision_url,headers={**hdr(users[4]),'If-Match':'1'},json=approve)
+    assert approved.status_code==204,approved.text
+    assert client.post(decision_url,headers={**hdr(users[4]),'If-Match':'1'},json=approve).status_code==409
+    revised=next(s for s in client.get(base,headers=hdr(users[4])).json()['slots'] if s['id']==slot)
+    assert revised['finalized_at'] and revised['council']['closed_at'] and revised['results'][second]['average']!='10.0'
+    assert client.get(base+'/prints/'+minutes_record['id'],headers=hdr(users[5])).content==issued_minutes.content
+    assert any(not item['current'] for item in client.get(register+'/prints',headers=hdr(users[4])).json())
+    fresh=client.get(register+'/forms/11?course_code=ALT_11&preview_revision=true',headers=hdr(users[4])).json()['revision']
+    assert client.post(register+'/forms/11?course_code=ALT_11',headers=hdr(users[4])).status_code==409
+    assert client.post(register+'/forms/11?course_code=ALT_11&font_size=14&expected_revision='+fresh,headers=hdr(users[4])).status_code==409
+    # Fill missing historical minutes without changing the already locked score.
+    session.expire_all()
+    row=session.get(m.DefenseSlot,UUID(slot)); old_minutes=dict(row.minutes)
+    row.minutes={**row.minutes,'classifications':{}};row.row_version+=1;session.commit()
+    version=row.row_version
+    restored={k:v for k,v in old_minutes.items() if k in {'discussion','conclusion','objectives','functions','achievements','recommendations','no_recommendations','classifications','oral_comments'}}
+    missing=client.get(correction_path,headers=hdr(users[5])).json()
+    assert any('xếp loại' in s for s in missing['missing'])
+    requested=client.post(correction_path,headers={**hdr(users[5]),'If-Match':str(version)},json={
+        'kind':'MINUTES','minutes':restored,'reason':'Bổ sung xếp loại theo biên bản gốc','reference':'BB-HOI-DONG-2026'})
+    assert requested.status_code==204,requested.text
+    row_id=client.get(correction_path,headers=hdr(users[4])).json()['items'][0]['id']
+    result=client.post(base+'/corrections/'+row_id+'/decision',headers={**hdr(users[4]),'If-Match':'1'},json=approve)
+    assert result.status_code==204,result.text
+    final=next(s for s in client.get(base,headers=hdr(users[4])).json()['slots'] if s['id']==slot)
+    assert final['results'][second]['average']==revised['results'][second]['average']
+    assert not client.get(correction_path,headers=hdr(users[4])).json()['missing']
+    stale=client.post(correction_path,headers={**hdr(users[5]),'If-Match':str(final['version'])},json={
+        'kind':'MINUTES','minutes':restored,'reason':'Đề nghị kiểm tra lại nội dung đã ghi','reference':'BB-DOI-CHIEU-2026'})
+    assert stale.status_code==204,stale.text
+    pending_id=client.get(correction_path,headers=hdr(users[4])).json()['items'][0]['id']
+    session.expire_all();record=session.get(m.DefenseSlot,UUID(slot));record.row_version+=1;session.commit()
+    path_decision=base+'/corrections/'+pending_id+'/decision'
+    stale_approval=client.post(path_decision,headers={**hdr(users[4]),'If-Match':'1'},json=approve)
+    assert stale_approval.status_code==409 and 'Nguồn đã đổi' in stale_approval.json()['detail']
+    assert client.post(path_decision,headers={**hdr(users[4]),'If-Match':'1'},json={**approve,'decision':'REJECTED'}).status_code==204
+
 
 
 def test_only_ready_or_officially_extended_thesis_can_be_scheduled():
@@ -508,3 +570,16 @@ def test_each_ballot_rounds_before_final_average():
     assert results(slot,council)["sv"]["average"]=="7.3"
     slot.finalized_at=True
     assert results(slot,council)["sv"]["average"]=="7.25"
+
+
+def test_correcting_one_student_preserves_other_historical_precision():
+    from backend.services.defense_corrections import recalculated_results
+    frozen={'a':{'average':'7.25','scores':['7.24','7.25','7.25']},'b':{'average':'8.0'}}
+    slot=SimpleNamespace(finalized_at=True,minutes={'results_snapshot':frozen},roster=[{'id':'a'},{'id':'b'}],
+        attendance={'a':{'status':'PRESENT'},'b':{'status':'PRESENT'},'_council':{'present_ids':['x','y','z']}},
+        marks={s:{p:{'scores':['0']} for p in ['x','y','z']} for s in ['a','b']})
+    council=SimpleNamespace(members=[{'id':p} for p in ['x','y','z']])
+    changed=recalculated_results(slot,council,'b')
+    assert changed['a']==frozen['a'] and changed['a']['average']=='7.25'
+    assert changed['b']['average']=='0.0' and slot.finalized_at is True
+    assert frozen['b']['average']=='8.0'

@@ -45,6 +45,7 @@ export default function DefensePrintPreview({endpoint,name,label,record=false,on
   const [font,setFont]=useState(""),[spacing,setSpacing]=useState(""),[space,setSpace]=useState("");
   const [breakPage,setBreakPage]=useState(false),[active,setActive]=useState<string|null>(null);
   const [sheets,setSheets]=useState<Sheet[]>([]),[error,setError]=useState(""),[busy,setBusy]=useState(false);
+  const [revision,setRevision]=useState('');
   const isWord=name.endsWith(".docx");
   const hasNarrative=/\/forms\/(6|9)(\?|$)/.test(endpoint);
   const [fields,setFields]=useState<Narrative[]>([]),[breaks,setBreaks]=useState<Record<string,number[]>>({});
@@ -59,9 +60,11 @@ export default function DefensePrintPreview({endpoint,name,label,record=false,on
   if(Object.keys(breaks).length)query.set("line_breaks",JSON.stringify(breaks));
   const path=endpoint+(endpoint.includes("?")?"&":"?")+query.toString();
   async function preview(){
-    setError("");setBusy(true);
+    setError("");setRevision('');setBusy(true);
     try{
+      const source=await request<{revision:string}>(path+'&preview_revision=true','');
       if(!isWord)setSheets((await request<{sheets:Sheet[]}>(path+"&preview_sheet=true","")).sheets);
+      setRevision(source.revision);
       setActive(path);
     }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
   }
@@ -80,9 +83,10 @@ export default function DefensePrintPreview({endpoint,name,label,record=false,on
     </details>}
     {isWord&&hasNarrative&&<label className="defense-check"><input type="checkbox" checked={breakPage} onChange={e=>setBreakPage(e.target.checked)}/>Chuyển phần kết quả, kiến nghị và ký tên sang trang mới</label>}
     <div className="button-row"><button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void preview()}>Áp dụng & xem trước</button>
-      <button type="button" className="btn btn-primary" disabled={busy} onClick={async()=>{setError("");setBusy(true);try{await downloadFile(path,name,record?"POST":"GET");if(record)onRecord?.();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}}>{record?"Lưu và tải bản dùng để ký":"Tải bản theo định dạng đã chọn"}</button>
+      <button type="button" className="btn btn-primary" disabled={busy||record&&(!revision||active!==path)} onClick={async()=>{setError("");setBusy(true);try{await downloadFile(path+(record?'&expected_revision='+encodeURIComponent(revision):''),name,record?"POST":"GET");if(record)onRecord?.();}catch(e){setRevision('');setError(errorMessage(e));}finally{setBusy(false);}}}>{record?"Lưu và tải bản dùng để ký":"Tải bản theo định dạng đã chọn"}</button>
       <button type="button" className="btn btn-secondary" onClick={()=>{setFont("");setSpacing("");setSpace("");setBreakPage(false);setBold("");setItalic("");setBreaks({});setFields([]);setActive(null);setSheets([]);}}>Khôi phục định dạng mẫu</button></div>
     {error&&<p role="alert" className="alert alert-danger">{error}</p>}
+    {record&&!active&&<p>Chọn “Áp dụng & xem trước” để kiểm tra hồ sơ trước khi lưu bản dùng để ký.</p>}
     {active&&active!==path&&<p role="status">Tùy chọn đã đổi. Bấm “Áp dụng & xem trước” để cập nhật bản xem.</p>}
     {active&&<><p className="text-body-sm text-muted">Kiểm tra số trang và vùng ký trong Word hoặc Excel trước khi in. Cách ngắt trang trên trình duyệt có thể khác.</p>
       {isWord?<ReadOnlyFilePreview name={name} endpoint={active} onBack={()=>setActive(null)} label={label} backLabel="Đóng bản xem" caption="Dữ liệu lấy từ hồ sơ đã lưu, không sửa nội dung tại đây."/>

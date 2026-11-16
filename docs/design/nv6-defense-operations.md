@@ -30,7 +30,7 @@ Trong **Tra cứu AI → Đối chiếu báo cáo**, TBM hoặc điều phối c
 
 Máy chủ cần Tesseract và dữ liệu ngôn ngữ `vie+eng`. Trên Windows, ứng dụng tìm trong PATH hoặc thư mục cài Tesseract mặc định. Có thể cấu hình `KLTN_TESSERACT`, `KLTN_OCR_DATA_DIR` và `KLTN_OCR_LANG`. Mỗi báo cáo được xử lý tối đa 60 trang PDF, 24 ảnh và 24 giây OCR. Trang/ảnh không đọc đủ có cảnh báo phạm vi. Ảnh giống nhau là tín hiệu theo dấu vân tay ảnh, chưa có phân tích ngữ nghĩa hình ảnh. [Hướng dẫn cài Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html).
 
-Cập nhật PostgreSQL qua Alembic đến revision `20261115_0030`.
+Cập nhật PostgreSQL qua Alembic đến revision `20261116_0031`.
 
 
 Bổ sung rà soát ngày 09/11/2026. Trang bảo vệ có ô tìm theo đề tài/phòng/hội đồng, phần tạo hội đồng và xếp lịch thu gọn, tổng điểm dự kiến khi nhập Mẫu 6, danh sách phiếu/điểm danh/biên bản còn thiếu trước khi chốt. Chủ tịch hoặc thư ký có thể mở sửa bản chưa ký trước khi khóa bảng điểm hội đồng, bắt buộc lý do và xác nhận chưa ký. Dữ liệu cũ được lưu trong sự kiện lịch sử, bản in mới có phiên bản mới. Bảng điểm đã khóa được giữ nguyên.

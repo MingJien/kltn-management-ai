@@ -88,9 +88,19 @@ def export_readiness(rows, sessions):
 
 
 def workspace(session, user, round_id):
+    from backend.services import evaluation
     round_, sessions = require_round_access(session, user, round_id)
     rows = rows_for_sessions(session, sessions)
+    scheduled={row['student_id'] for row in rows}
+    unscheduled=[]
+    for thesis in session.scalars(select(m.Thesis).where(m.Thesis.round_id==round_id,m.Thesis.state!='WITHDRAWN')):
+        report=evaluation.report(session,thesis)
+        for member in evaluation.members(session,thesis):
+            if str(member.student_id) not in scheduled and evaluation.eligibility_out(session,thesis,member,report)['state']=='ELIGIBLE':
+                student=session.get(m.StudentProfile,member.student_id)
+                unscheduled.append({'name':student.display_name,'code':student.student_code,'thesis_id':str(thesis.id)})
     return {"code": round_.code, "issues": export_readiness(rows, sessions), "rows": [
         {"name": row["name"], "code": row["code"], "class_name": row["class_name"], "grade": row["grade"],
          "status": row["outcome_label"], "slot_id": row["slot_id"], "council": row["council"],
-         "has_birth_date": bool(row["birth_date"])} for row in rows]}
+         "has_birth_date": bool(row["birth_date"])} for row in rows], 'unscheduled':unscheduled,
+         'scheduled_count':len(rows),'graded_count':sum(row['grade'] is not None for row in rows)}

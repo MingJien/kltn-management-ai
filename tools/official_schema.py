@@ -16,12 +16,13 @@ SELECTED_TABLES = frozenset(
         "signature_confirmation", "stored_file", "student_profile", "thesis",
         "thesis_member", "thesis_round", "topic", "topic_registration",
         "topic_requirement", "topic_title_version", "user_account", "user_notification",
-        "defense_print_record", "thesis_archive_version",
+        "defense_print_record", "thesis_archive_version", "defense_correction",
         "publication_claim", "thesis_review", "defense_eligibility_check", "lecturer_profile_change", "thesis_withdrawal_request", "defense_council", "defense_slot", "defense_absence_decision", "thesis_change_request", "thesis_extension", "thesis_extension_request", "thesis_extension_consent",
     }
 )
 
 TABLE_INFO = {
+    "defense_correction": ("Đính chính hồ sơ bảo vệ", "Đề nghị, đối chiếu và quyết định sau khóa"),
     "defense_print_record": ("Bản in kết quả bảo vệ đã lưu", "Tệp xuất bất biến, phạm vi, phiên bản mẫu và mã đối chiếu"),
     "thesis_archive_version": ("Phiên bản khóa luận nộp lưu", "Bản báo cáo sau bảo vệ, hồ sơ tác giả và quyết định lưu nội bộ"),
     "publication_claim": ("Hồ sơ xét điểm thưởng công bố khoa học", "Phiên bản minh chứng, đóng góp, GVHD xác nhận và TBM duyệt mức thưởng theo từng sinh viên"),
