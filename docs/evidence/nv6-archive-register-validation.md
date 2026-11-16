@@ -38,3 +38,13 @@ Dùng chính hàm xuất sản phẩm với tệp gốc của Khoa, dữ liệu 
 | 11 | Hai SV một trang; 36 SV có họ đệm dài bốn trang. Tính chiều cao theo cột để không cắt chữ; lặp tiêu đề, giữ ít nhất ba dòng dữ liệu trên trang ký. Chọn mã CT2026 kiểm thử hiển thị đúng. |
 
 Kết quả trên xác nhận các dữ liệu và bố cục đã thử; không bảo đảm mọi độ dài nội dung hoặc máy in đều ngắt trang giống nhau. Người xuất có bước xem trước và các tùy chọn trình bày giới hạn, không sửa chữ/điểm trên bản xem trước. Mẫu Khoa đổi cấu trúc cần đối chiếu và kiểm lại ánh xạ. Không có yêu cầu tải bản ký giấy trở lại để hoàn tất luồng này.
+
+## Rà soát thao tác và giao diện ngày 16/11/2026
+
+Đã dùng Computer Use trong trình duyệt tích hợp, đăng nhập nhanh tài khoản TBM demo trên CSDL local đang dùng. Mở lập hội đồng và lựa chọn bộ môn, bảng điểm toàn đợt SYN-DEMO, chọn mã IN4299N và áp dụng bản xem trước Mẫu 11. Mở dashboard, bấm nhóm đã chốt điểm để lọc đúng hai SV; mở kho nội bộ, tìm không có kết quả rồi xóa từ khóa để khôi phục danh sách. Không lập thêm hội đồng hoặc thay đổi kết quả đã chốt trong lượt kiểm trực tiếp này.
+
+Phát hiện bộ lọc kho lệch hàng vì nhãn tìm kiếm xuống dòng. Đã tách tìm kiếm ra một hàng đầy đủ, ba ô chọn căn cùng hàng và chuyển một cột trên màn hình nhỏ. Thêm hướng dẫn người làm tiếp khi hồ sơ chưa nộp. Các màn dùng bố cục NV6 được tăng cỡ chữ nội dung 15 px, ô nhập 16 px; nút/ô nhập tối thiểu cao 44 px, nút dài tự xuống dòng. Tăng tương phản chữ phụ, viền ô/nút và viền lấy nét bàn phím; lưới con trong biểu mẫu chiếm đủ chiều ngang.
+
+Chạy lại 7 ca UI trong `defense-workspace.spec.ts`, `defense-drafts.spec.ts`, `archive-workspace.spec.ts`: đạt, gồm responsive và các kiểm tra accessibility đã khai báo. Đã quan sát trực tiếp bố cục kho ở chiều rộng 390 px. Đây là kiểm tra bổ sung cho các màn trên, không phải lượt click lại toàn bộ chức năng hoặc thao tác nộp/chốt mới qua Computer Use.
+
+Build frontend cuối đạt; Vite vẫn có cảnh báo kích thước gói chính. Tính tương phản cho các cặp màu được chọn: viền `#64748b`/trắng 4,76:1; chữ phụ `#475569`/nền `#f8fafc` 7,24:1; chữ chính `#0f172a`/trắng 17,85:1. Các số này áp dụng cho những cặp màu nêu trên, không phải chứng nhận tương phản cho toàn hệ thống.

@@ -55,3 +55,31 @@
 .defense-print-list > li > div { min-width: 0; flex: 1 1 240px; overflow-wrap: anywhere; }
 .defense-blockers .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .defense-page [id^="slot-"], .defense-page [id^="archive-"], #nv6-report-students { scroll-margin-top: 96px; }
+
+/* Readable controls and consistent action alignment across NV6 workspaces. */
+.defense-page { color: #1e293b; font-size: 15px; line-height: 1.65; }
+.defense-page label { color: #334155; font-size: 14px; font-weight: 600; align-content: start; }
+.defense-page label small { font-weight: 400; color: #475569; }
+.defense-page .text-muted { color: #475569; }
+.defense-page .input { min-height: 44px; height: auto; font-size: 16px; font-weight: 400; border-color: #64748b; background: #fff; color: #0f172a; }
+.defense-page textarea.input { line-height: 1.65; padding-block: 10px; }
+.defense-page .input::placeholder { color: #64748b; opacity: 1; }
+.defense-page .btn { min-height: 44px; height: auto; padding-block: 10px; white-space: normal; line-height: 1.4; text-align: center; }
+.defense-page .btn-secondary { border-color: #64748b; }
+.defense-page :is(.input,.btn,summary,a):focus-visible { outline: 3px solid #0f766e; outline-offset: 3px; }
+.defense-page .defense-operation > summary { font-size: 15px; line-height: 1.6; padding-block: 4px; overflow-wrap: anywhere; }
+.defense-page .defense-operation > summary:hover { color: #115e59; }
+.defense-page .defense-form-grid { align-items: end; }
+.defense-page .archive-filters { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.defense-page .archive-filters > label:last-child { grid-column: 1 / -1; }
+.defense-page form > .defense-form-grid { grid-column: 1 / -1; }
+.defense-results th { background: #eef2f6; color: #334155; font-size: 13px; letter-spacing: .025em; }
+.defense-results td { vertical-align: middle; font-variant-numeric: tabular-nums; }
+.defense-results small { color: #475569; font-size: 13px; }
+.defense-print .button-row { align-items: stretch; }
+@media (max-width:600px) {
+  .defense-page .archive-filters { grid-template-columns: 1fr; }
+  .defense-print .button-row > .btn { flex: 1 1 100%; }
+  .defense-page .defense-operation { padding: 12px; }
+  .defense-results th,.defense-results td { min-width: 88px; font-size: 14px; }
+}

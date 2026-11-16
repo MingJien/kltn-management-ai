@@ -75,7 +75,7 @@ export default function ThesisArchivePage({context}: {context:Context}) {
     {!items&&!error&&<p role="status">Đang tải hồ sơ lưu trữ…</p>}
     {items?.length===0&&<p>Chưa có khóa luận đã bảo vệ trong phạm vi của bạn.</p>}
     {!!items?.length&&<>
-      <div className="defense-form-grid">
+      <div className="defense-form-grid archive-filters">
         <label>Đợt KLTN<select className="input" value={round} onChange={e=>{setRound(e.target.value);setDepartment("");setLimit(20);}}><option value="">Tất cả đợt</option>{Array.from(rounds,([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
         <label>Bộ môn<select className="input" value={department} onChange={e=>{setDepartment(e.target.value);setLimit(20);}}><option value="">Tất cả bộ môn</option>{departments.map(value=><option key={value}>{value}</option>)}</select></label>
         <label>Trạng thái<select className="input" value={state} onChange={e=>{setState(e.target.value);setLimit(20);}}><option value="">Tất cả</option><option value="ACCEPTED">Đã duyệt lưu</option><option value="SUBMITTED">Chờ bộ môn duyệt</option><option value="RETURNED">Cần nộp lại</option><option value="EMPTY">Chưa nộp</option></select></label>
@@ -92,6 +92,7 @@ export default function ThesisArchivePage({context}: {context:Context}) {
             {item.snapshot&&<><p>GVHD: {item.snapshot.advisor||"Chưa ghi nhận"}</p><p>Sinh viên: {item.snapshot.students.map(s=>`${s.name} (${s.code})`).join(", ")}</p></>}
             <Link to={`/theses/${item.id}`}>Mở hồ sơ khóa luận</Link>
             {item.waiting&&<p>Chờ kết quả của tất cả thành viên và khóa bảng điểm hội đồng.</p>}
+            {!item.waiting&&!latest&&!item.can_submit&&<p className="text-muted">Nhóm sinh viên cần nộp bản hoàn thiện sau bảo vệ. TBM sẽ duyệt khi nhóm gửi hồ sơ.</p>}
             {item.versions.map(version=><section key={version.id} className="defense-operation stack">
               <strong>Phiên bản {version.number} · {versionLabels[version.state]}</strong>
               <span className="text-muted">{version.filename} · {when(version.created_at)}</span>
