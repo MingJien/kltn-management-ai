@@ -29,6 +29,11 @@ def stamp(identifier, version, instant, base_url):
     return f"{identifier} · {version} · {instant.astimezone(defense.VN):%d/%m/%Y %H:%M}"
 
 
+def next_print_number(session,round_id,slot_id,form,student_id=None,lecturer_id=None,course_code=None):
+    query=select(m.DefensePrintRecord).where(m.DefensePrintRecord.form==form,m.DefensePrintRecord.slot_id==slot_id) if slot_id else select(m.DefensePrintRecord).where(m.DefensePrintRecord.form==form,m.DefensePrintRecord.round_id==round_id,m.DefensePrintRecord.slot_id.is_(None))
+    return 1+sum(all(row.source.get(k)==v for k,v in {'student_id':str(student_id) if student_id else None,'lecturer_id':str(lecturer_id) if lecturer_id else None,'course_code':course_code}.items()) for row in session.scalars(query))
+
+
 def preview_sheet(result):
     """Read-only preview of the very same generated workbook, including merges."""
     book=load_workbook(BytesIO(result.body),data_only=True,rich_text=True)
@@ -58,6 +63,7 @@ def preview_sheet(result):
                 cells.append({"text":str(value) if value is not None else "","segments":segments,"rowspan":span[0],"colspan":span[1],
                     "color":"#"+rgb[-6:] if isinstance(rgb,str) and len(rgb)==8 else "#000000",
                     "bold":bool(c.font.bold),"italic":bool(c.font.italic),"size":c.font.sz or 12,
+                    "rule_below":sheet['A2'].value=='PHIẾU ĐÁNH GIÁ' and c.row==1 and c.column in {1,3},
                     "align":c.alignment.horizontal if c.alignment.horizontal in {"left","center","right"} else "left"})
             rows.append(cells)
         sheets.append({"name":sheet.title,"rows":rows,"truncated":sheet.max_row>1000 or sheet.max_column>30,
@@ -77,8 +83,8 @@ def notes(slot, council, roster):
             comment = "\n".join(filter(None, [written, f"Ý kiến tại buổi họp: {oral}" if oral else ""]))
             if comment:
                 result["REVIEWER" if person["role"]=="REVIEWER" else "OTHER"].append(
-                    f"{student['name']} ({student['code']}) — {person['name']} ({defense.ROLES[person['role']]}):\n{comment}")
-    return {key:"\n\n".join(value) for key,value in result.items()}
+                    (f"{student['name']} — " if len(roster)>1 else '')+f"{person['name']} ({defense.ROLES[person['role']]}):\n{comment}")
+    return {key:"\n".join(value) for key,value in result.items()}
 
 
 def council_with_units(session, council):
@@ -87,7 +93,7 @@ def council_with_units(session, council):
         lecturer=session.get(m.LecturerProfile,person["id"])
         department=session.get(m.Department,lecturer.department_id) if lecturer else None
         members.append({**person,"unit":department.name if department else ""})
-    return SimpleNamespace(name=council.name,reference=council.reference,members=members)
+    return SimpleNamespace(name=council.name,reference=council.reference,members=members,advisor_unit='')
 
 
 def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_id=None,*,blank=False,layout=None,layout_fields=False,record=False,expected_revision=None):
@@ -109,11 +115,9 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     roster=templates.academic_roster(session,slot)
     stamp_id=f"M{form}-{slot.id}"
     if form==6:stamp_id=f"M6-{str(slot.id).replace('-','')[:12]}-{str(student_id).replace('-','')[:8]}-{str(lecturer_id).replace('-','')[:8]}"
-    footer=stamp(stamp_id,f"v{slot.row_version}",slot.finalized_at or defense.now(),base_url)
     record_id = uuid4() if record else None
-    if record_id:
-        footer = f"Bản in {record_id.hex[:12]} · " + footer
-    footer+=f" · DL:{templates.metadata_code(roster)} · BT:{layout.code()}"
+    print_number=next_print_number(session,council.round_id,slot.id,form,student_id,lecturer_id)
+    footer=f"Mẫu {form} · "+(f"Mã tra cứu: {record_id.hex[:12]} · Bản {print_number}" if record_id else "Bản xem trước")+f" · {defense.now().astimezone(defense.VN):%d/%m/%Y}"
     out=BytesIO()
     if form==6:
         student=next((r for r in roster if r["id"]==str(student_id)),None)
@@ -132,13 +136,13 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         attendance=slot.attendance.get(student["id"],{})
         status="PHIẾU TRỐNG · CHƯA CÓ KẾT QUẢ · " if blank else "CHƯA CHỐT · " if not slot.finalized_at else ""
         path=templates.source(session,user,council.round_id,6)
-        footer+=f" · BM:{sha256(path.read_bytes()).hexdigest()[:10]}"
         book=templates.score_sheet(path,student,evaluator,
             defense.ROLES[evaluator["role"]],title,advisor_name,mark,attendance.get("bonus","0"),
             None if blank else defense.total(mark,attendance),blank,status+footer,layout,slot.starts_at.astimezone(defense.VN))
         book.save(out)
+        templates.restore_template_drawings(out,path)
         lecturer=session.get(m.LecturerProfile,lecturer_id)
-        name = filename("Mau-06-Phieu-trong" if blank else "Mau-06-Phieu-cham",student["code"]+"-"+lecturer.lecturer_code,slot.row_version)
+        name = filename("Mau-06-Phieu-trong" if blank else "Mau-06-Phieu-cham",student["code"]+"-"+lecturer.lecturer_code,print_number)
         return print_response(session, user, out, name, "xlsx", record_id, council.round_id, form, path, layout,
             slot=slot, student_id=student_id, lecturer_id=lecturer_id,expected_revision=expected_revision)
     templates.require_metadata(roster,["class_name"])
@@ -148,12 +152,18 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         labels={"objectives":"Mục tiêu","functions":"Chức năng","achievements":"Kết quả đạt được","discussion":"Nội dung họp","reviewer_comments":"Ý kiến phản biện","member_comments":"Ý kiến thành viên khác","conclusion":"Kết luận","recommendations":"Kiến nghị"}
         return JSONResponse({"fields":[{"key":key,"label":label,"text":values.get(key) or ""} for key,label in labels.items()]},headers={"Cache-Control":"private, no-store"})
     path=templates.source(session,user,council.round_id,9)
-    footer+=f" · BM:{sha256(path.read_bytes()).hexdigest()[:10]}"
+    council_data=council_with_units(session,council)
+    from backend.services.theses import primary_advisor
+    advisor=primary_advisor(session,slot.thesis_id)
+    lecturer=session.get(m.LecturerProfile,advisor.lecturer_id) if advisor else None
+    unit=session.get(m.Department,lecturer.department_id) if lecturer else None
+    council_data.advisor_unit=unit.name if unit else ''
     doc=templates.minutes_document(path,slot,
-        council_with_units(session,council),roster,defense.results(slot,council),notes(slot,council,roster),footer,
+        council_data,roster,defense.results(slot,council),notes(slot,council,roster),footer,
         layout,slot.starts_at.astimezone(defense.VN))
     doc.save(out)
-    name = filename("Mau-09-Bien-ban",council.name,slot.row_version)+f"-{slot.starts_at.astimezone(defense.VN):%Y%m%d-%H%M}"
+    thesis=session.get(m.Thesis,slot.thesis_id);topic=session.get(m.Topic,thesis.topic_id);round_=session.get(m.ThesisRound,council.round_id)
+    name=f"Bien-ban_{filename(round_.code)}_{filename(topic.code)}_{slot.starts_at.astimezone(defense.VN):%Y%m%d}_v{print_number}"
     return print_response(session, user, out, name, "docx", record_id, council.round_id, form, path, layout, slot=slot,expected_revision=expected_revision)
 
 
@@ -172,14 +182,11 @@ def export_round(session, user, identifier, form, base_url, *, layout=None, cour
     rows = [(row, row["grade"]) for row in data]
     instant = defense.now()
     record_id = uuid4() if record else None
-    footer = stamp(f"M{form}-{round_.code}", "Toàn đợt", instant, base_url)
-    if record_id:
-        footer = f"Bản in {record_id.hex[:12]} · " + footer
+    print_number=next_print_number(session,identifier,None,form,course_code=course_code)
+    footer=f"Mẫu {form} · "+(f"Mã tra cứu: {record_id.hex[:12]} · Bản {print_number}" if record_id else "Bản xem trước")+f" · {round_.code} · {instant.astimezone(defense.VN):%d/%m/%Y}"
     result_hash = sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    footer += f" · DL:{result_hash[:8]} · BT:{layout.code()}"
     out=BytesIO()
     path=templates.source(session,user,identifier,form)
-    footer+=f" · BM:{sha256(path.read_bytes()).hexdigest()[:10]}"
     scope = SimpleNamespace(name="Toàn đợt", reference=round_.code, summary_label=f"Đợt: {round_.code}",
                             members=[{"role": "SECRETARY", "name": ""}])
     if form == 10:
@@ -188,9 +195,8 @@ def export_round(session, user, identifier, form, base_url, *, layout=None, cour
     else:
         extension = "xlsx"
         templates.official_sheet(path,scope,round_,rows,footer,layout,course_code=course_code).save(out)
-    prefix = "Mau-10-Bang-diem-tong-hop" if form == 10 else "Mau-11-Bang-diem-chinh-thuc"
-    revision = record_id.hex[:12] if record_id else "xem-truoc"
-    name = filename(prefix, round_.code + (f"-{course_code}" if form == 11 else "")) + f"-{revision}"
+    prefix = "Tong-hop-diem" if form == 10 else "Diem-hoc-phan"
+    name = f"{prefix}_{filename(round_.code)}"+(f"_{course_code}" if form==11 else '')+f"_{instant.astimezone(defense.VN):%Y%m%d}_v{print_number}"
     return print_response(session,user,out,name,extension,record_id,identifier,form,path,layout,
         course_code=course_code, result_hash=result_hash,expected_revision=expected_revision)
 
@@ -221,6 +227,11 @@ def print_response(session, user, out, name, extension, record_id, round_id, for
                   "slot_revision": slot.row_version if slot else None, "student_id": str(student_id) if student_id else None,
                   "lecturer_id": str(lecturer_id) if lecturer_id else None, "course_code": course_code,
                   "result_sha256": result_hash}
+        source['print_number']=next_print_number(session,round_id,slot.id if slot else None,form,student_id,lecturer_id,course_code)
+        family=select(m.DefensePrintRecord).where(m.DefensePrintRecord.slot_id==slot.id) if slot else select(m.DefensePrintRecord).where(m.DefensePrintRecord.round_id==round_id,m.DefensePrintRecord.slot_id.is_(None))
+        for previous in session.scalars(family.where(m.DefensePrintRecord.form==form)):
+            if all(previous.source.get(key)==source.get(key) for key in ('student_id','lecturer_id','course_code')) and not previous.source.get('superseded_by'):
+                previous.source={**previous.source,'superseded_by':record_id.hex[:12],'superseded_at':defense.now().isoformat()}
         session.add(m.DefensePrintRecord(id=record_id, round_id=round_id, slot_id=slot.id if slot else None,
             created_by=user.id, created_at=defense.now(), form=form, filename=f"{name}.{extension}", sha256=digest,
             content=content, source=source))
@@ -261,17 +272,47 @@ def print_history(session, user, *, round_id=None, slot_id=None):
     pending_query=pending_query.where(m.DefenseSlot.id==slot_id) if slot_id else pending_query.join(m.DefenseCouncil,m.DefenseCouncil.id==m.DefenseSlot.council_id).where(m.DefenseCouncil.round_id==round_id)
     pending=bool(session.scalar(pending_query.limit(1)))
     rows = []
+    latest_family={}
     for item in session.scalars(query.order_by(m.DefensePrintRecord.created_at.desc(), m.DefensePrintRecord.id.desc())):
         if slot_id and item.form == 6 and not manager and member["role"] not in {"CHAIR", "SECRETARY"} and member["id"] != item.source.get("lecturer_id"):
             continue
+        family=(item.form,item.source.get('student_id'),item.source.get('lecturer_id'),item.source.get('course_code'))
+        superseded=item.source.get('superseded_by') or latest_family.get(family)
+        latest_family.setdefault(family,item.id.hex[:12])
         rows.append({"id": item.id, "form": item.form, "filename": item.filename, "created_at": item.created_at,
                      "actor": workflow_notices.actor_name(session, item.created_by),
                      "course_code": item.source.get("course_code"), "code": item.id.hex[:12],
-                     'pending_correction':pending,
-                     "current": item.source.get('slot_revision')==current_revision if item.slot_id else item.source.get('result_sha256')==current_hash})
+                     'print_number':item.source.get('print_number'),
+                     'can_withdraw':bool(manager or (member and member['role'] in {'CHAIR','SECRETARY'})) if slot_id else True,
+                     'pending_correction':pending,'superseded_by':superseded,'withdrawn_reason':item.source.get('withdrawn_reason'),
+                     "current": not superseded and not item.source.get('withdrawn_reason') and (item.source.get('slot_revision')==current_revision and bool(slot.finalized_at) if item.slot_id else item.source.get('result_sha256')==current_hash)})
         if len(rows) == 50:
             break
     return rows
+
+
+def lookup_print(session,user,code):
+    from sqlalchemy import cast,String
+    if len(code)!=12 or any(c not in '0123456789abcdef' for c in code.lower()):raise HTTPException(422,'Nhập mã tra cứu 12 ký tự trên footer')
+    matches=session.scalars(select(m.DefensePrintRecord).where(func.replace(cast(m.DefensePrintRecord.id,String),'-','').like(code.lower()+'%'))).all()
+    if len(matches)!=1:raise HTTPException(404,'Không tìm thấy mã bản in')
+    item=matches[0];print_access(session,user,item)
+    history=print_history(session,user,slot_id=item.slot_id) if item.slot_id else print_history(session,user,round_id=item.round_id)
+    return next((row for row in history if row['id']==item.id),{'id':item.id,'code':item.id.hex[:12],'filename':item.filename,'form':item.form,'current':False,'actor':workflow_notices.actor_name(session,item.created_by),'created_at':item.created_at})
+
+
+def withdraw_print(session,user,identifier,reason):
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
+    item=session.get(m.DefensePrintRecord,identifier)
+    if not item:raise HTTPException(404,'Không tìm thấy bản in')
+    print_access(session,user,item)
+    if item.slot_id:
+        _,_,member,_,manager=defense.load_slot(session,user,item.slot_id)
+        if not manager and (not member or member['role'] not in {'CHAIR','SECRETARY'}):raise HTTPException(403,'Chỉ thư ký, chủ tịch hoặc người quản lý được thu hồi bản in')
+    if item.source.get('withdrawn_reason') or item.source.get('superseded_by'):raise HTTPException(409,'Bản in đã được thu hồi hoặc thay thế')
+    item.source={**item.source,'withdrawn_reason':reason,'withdrawn_by':str(user.id),'withdrawn_at':defense.now().isoformat()}
+    audit(session,user,'DEFENSE_PRINT_WITHDRAWN','defense_slot' if item.slot_id else 'thesis_round',item.slot_id or item.round_id,reason,source_reference=item.id.hex[:12])
+    session.commit()
 
 
 def download_print(session, user, identifier):

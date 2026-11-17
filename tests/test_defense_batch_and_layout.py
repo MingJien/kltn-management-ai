@@ -52,21 +52,62 @@ def test_batch_schedule_is_atomic_and_accepts_adjacent_slots(evaluation):
     session.commit()
     response=client.post('/api/v1/defense/councils',headers=hdr(users[4]),json={'round_id':str(thesis.round_id),'department_id':str(thesis.department_id),'name':'Batch council','reference':'SYNTHETIC-BATCH','thesis_ids':[str(thesis.id),str(second.id)],'confirmed_no_conflict':True,'members':[{'lecturer_id':str(p.id),'role':r} for p,r in zip(people,['CHAIR','SECRETARY','REVIEWER','REVIEWER','MEMBER'])]})
     assert response.status_code==201,response.text
-    council=response.json()['id'];start=now()+timedelta(days=1)
-    def item(t,offset):return {'council_id':council,'thesis_id':str(t.id),'starts_at':(start+timedelta(minutes=offset)).isoformat(),'ends_at':(start+timedelta(minutes=offset+45)).isoformat(),'room':'BATCH-A1','confirmed_no_conflict':True}
+    council=response.json()['id'];start=(now()+timedelta(days=1)).astimezone(defense.VN).replace(hour=8,minute=0,second=0,microsecond=0)
+    def item(t,offset):return {'council_id':council,'thesis_id':str(t.id),'starts_at':(start+timedelta(minutes=offset)).isoformat(),'ends_at':(start+timedelta(minutes=offset+45)).isoformat(),'arrival_at':(start-timedelta(minutes=30)).isoformat(),'room':'BATCH-A1','confirmed_no_conflict':True}
     failed=client.post('/api/v1/defense/slots-batch',headers=hdr(users[4]),json={'slots':[item(thesis,0),item(second,20)]})
     assert failed.status_code==409,failed.text
     assert session.scalar(select(func.count()).select_from(m.DefenseSlot).where(m.DefenseSlot.council_id==UUID(council)))==0
     response=client.post('/api/v1/defense/slots-batch',headers=hdr(users[4]),json={'slots':[item(thesis,0),item(second,45)]})
     assert response.status_code==201,response.text
     assert len(response.json()['slots'])==2
+    slots=response.json()['slots']
+    preview=client.get(f'/api/v1/defense/councils/{council}/schedule-draft',headers=hdr(users[4])).json()
+    assert len(preview['snapshot']['rows'])==2
+    publish_path=f'/api/v1/defense/councils/{council}/publish-schedule'
+    assert client.post(publish_path,headers=hdr(users[0]),json={'fingerprint':preview['fingerprint']}).status_code==403
+    result=client.post(publish_path,headers=hdr(users[4]),json={'fingerprint':preview['fingerprint']})
+    assert result.status_code==201,result.text
+    notice=client.get('/api/v1/defense/schedule-notices',headers=hdr(users[0])).json()[0]
+    assert len(notice['snapshot']['rows'])==2 and notice['current']
+    assert 'marks' not in str(notice['snapshot']) and 'birth_date' not in str(notice['snapshot'])
+    assert client.post(publish_path,headers=hdr(users[4]),json={'fingerprint':preview['fingerprint']}).status_code==409
+    exported=client.get(f"/api/v1/defense/schedule-notices/{notice['id']}/download",headers=hdr(users[0]))
+    assert exported.status_code==200
+    sheet=load_workbook(BytesIO(exported.content)).active
+    assert sheet.max_row==6
+    user=m.UserAccount(external_subject='no-scope-'+uuid4().hex,base_role='STUDENT',status='ACTIVE');session.add(user);session.commit()
+    assert client.get('/api/v1/defense/schedule-notices',headers=hdr(user)).json()==[]
+    assert client.get(f"/api/v1/defense/schedule-notices/{notice['id']}/download",headers=hdr(user)).status_code==404
+    current=next(row for row in client.get('/api/v1/defense',headers=hdr(users[4])).json()['slots'] if row['id']==slots[0]['id'])
+    changed=client.put('/api/v1/defense/slots/'+slots[0]['id'],headers={**hdr(users[4]),'If-Match':str(current['version'])},json={**item(thesis,0),'room':'BATCH-B2'})
+    assert changed.status_code==200,changed.text
+    assert client.get('/api/v1/defense/schedule-notices',headers=hdr(users[0])).json()[0]['current'] is False
+    assert client.post(publish_path,headers=hdr(users[4]),json={'fingerprint':preview['fingerprint']}).status_code==409
+    fresh=client.get(f'/api/v1/defense/councils/{council}/schedule-draft',headers=hdr(users[4])).json()
+    result=client.post(publish_path,headers=hdr(users[4]),json={'fingerprint':fresh['fingerprint']})
+    assert result.status_code==201 and result.json()['version']==2
+    old_file=client.get(f"/api/v1/defense/schedule-notices/{notice['id']}/download",headers=hdr(users[0]))
+    assert 'BẢN CŨ' in load_workbook(BytesIO(old_file.content)).active['A2'].value
+    records=[r for r in client.get('/api/v1/defense',headers=hdr(users[4])).json()['slots'] if r['council']['id']==council]
+    shared={'slots':[{'id':r['id'],'version':r['version']} for r in records],'arrival_at':(start-timedelta(minutes=45)).isoformat(),'room':'BATCH-C3'}
+    applied=client.put(f'/api/v1/defense/councils/{council}/shared-arrival',headers=hdr(users[4]),json=shared)
+    assert applied.status_code==204,applied.text
+    changed_rows=[r for r in client.get('/api/v1/defense',headers=hdr(users[4])).json()['slots'] if r['council']['id']==council]
+    assert all(r['room']=='BATCH-C3' for r in changed_rows)
+    assert len({r['arrival_at'] for r in changed_rows})==1
+    assert client.put(f'/api/v1/defense/councils/{council}/shared-arrival',headers=hdr(users[4]),json=shared).status_code==409
 
 
 def test_m6_retains_template_rich_runs_and_styles_only_inserted_note():
     path=form_templates.OFFICIAL_DIR/next(x['filename'] for x in form_templates.OFFICIAL_FORMS if x['id']=='mau-06')
     original=load_workbook(path,rich_text=True).active
     result=defense_templates.score_sheet(path,{'name':'Synthetic student','code':'0026999999','class_name':'CNTT22','major':'Công nghệ thông tin','training_cohort':'2022–2026'}, {'name':'Synthetic lecturer'},'Phản biện','Synthetic thesis','Synthetic advisor',{'scores':['0']*12,'note':'Nội dung kiểm thử'},0,0,False,'SYNTHETIC',defense_templates.PrintLayout(tabs={'note':[9]},field_styles={'note':{'italic':True}}),now())
-    out=BytesIO();result.save(out);sheet=load_workbook(BytesIO(out.getvalue()),rich_text=True).active
+    out=BytesIO();result.save(out);defense_templates.restore_template_drawings(out,path)
+    from zipfile import ZipFile
+    with ZipFile(path) as source,ZipFile(BytesIO(out.getvalue())) as generated:
+        assert generated.read('xl/drawings/drawing1.xml')==source.read('xl/drawings/drawing1.xml')
+    sheet=load_workbook(BytesIO(out.getvalue()),rich_text=True).active
+    assert sheet.row_dimensions[31].height>=150
     for address in ['A1','C1','A2','A12','B18','B19','B25','B26','B28']:
         assert str(sheet[address].value)==str(original[address].value)
         assert copy(sheet[address].font)==copy(original[address].font)

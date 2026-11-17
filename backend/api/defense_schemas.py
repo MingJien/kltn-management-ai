@@ -32,6 +32,7 @@ class SlotInput(Input):
     thesis_id: UUID
     starts_at: AwareDatetime
     ends_at: AwareDatetime
+    arrival_at: AwareDatetime | None = None
     room: str = Field(min_length=2, max_length=200)
     prior_slot_id: UUID | None = None
     thesis_member_ids: list[UUID] = Field(default_factory=list, max_length=3)
@@ -40,6 +41,21 @@ class SlotInput(Input):
 
 class BatchSlotsInput(Input):
     slots: list[SlotInput] = Field(min_length=1, max_length=30)
+
+
+class NoticeInput(Input):
+    fingerprint: str = Field(min_length=64,max_length=64)
+
+
+class SlotRevision(Input):
+    id: UUID
+    version: int = Field(ge=1)
+
+
+class SharedArrivalInput(Input):
+    slots: list[SlotRevision] = Field(min_length=1,max_length=30)
+    arrival_at: AwareDatetime
+    room: str | None = Field(default=None,min_length=2,max_length=200)
 
 
 class AcademicProfileInput(Input):

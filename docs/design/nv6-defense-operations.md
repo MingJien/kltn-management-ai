@@ -58,3 +58,10 @@ Làm tròn theo Khoản 2 Điều 11 QĐ 2919: từng phiếu một chữ số, 
 Mở **Hội đồng và bảo vệ → Lịch và kết quả bảo vệ**, chọn phiên cần sửa và mở **Đổi đề tài, giờ, phòng hoặc hủy lịch**. Có thể chọn đề tài khác đã chốt đủ điều kiện, đúng đợt và bộ môn của hội đồng được chọn, chưa có lịch, không xung đột GVHD. Phiên bổ sung giữ đề tài và SV theo quyết định của Khoa. Khi đã ghi nhận buổi bảo vệ hoặc khóa hội đồng, lịch không còn được sửa.
 
 Khi lưu thay đổi, SV, thành viên hội đồng, GVHD và TBM liên quan nhận giờ, phòng và tên hội đồng mới trong tài khoản. Người rời lịch nhận thông báo riêng. Danh mục hiện bốn bộ môn BM-CNTT, BM-KHMT, BM-KT, BM-CNSTP theo danh mục Khoa. Các lựa chọn ngoài phạm vi phân công được hiển thị nhưng khóa; bộ môn giả lập chỉ xuất hiện với đợt SYN-DEMO.
+
+
+## Giờ tập trung và danh sách công bố
+
+Khi xếp nhiều đề tài, tick **Áp dụng cùng giờ tập trung và phòng** để cả nhóm cùng đến giờ được chỉ định (ví dụ 07:00), còn giờ bảo vệ dự kiến chia liên tiếp (ví dụ từ 07:30). Chỉ chọn các đề tài cùng ngày/buổi. Lịch đã có, chưa mở phiên: thẻ hội đồng có **Áp dụng giờ tập trung / phòng cho lịch đã xếp**; chọn lịch, giờ/phòng chung rồi lưu một lần. Giữ giờ bảo vệ và kết quả từng đề tài; kiểm phiên bản và rollback toàn bộ nếu một lịch không hợp lệ. Giờ tập trung không được sau giờ bảo vệ hoặc khác ngày.
+
+Sau đối chiếu, mở **Công bố danh sách bảo vệ cho sinh viên → Xem trước danh sách cần công bố → Công bố và thông báo danh sách**. Sinh viên đã xác nhận tham gia đúng bộ môn/đợt xem danh sách tất cả đề tài trong hội đồng tại **Danh sách công bố**, kể cả đề tài khác; có thứ tự, SV/MSSV/lớp, đề tài, GVHD, giờ tập trung, giờ dự kiến, phòng và tải Excel. GV trong phạm vi Khoa cũng được xem. Không công khai ngoài tài khoản, không có điểm, ngày sinh, hồ sơ kỷ luật hay tệp riêng. Nếu lịch thay đổi sau công bố, danh sách cảnh báo chờ cập nhật; người quản lý đối chiếu và công bố bản kế tiếp. Không phát lại thông báo khi không có thay đổi. Excel của bản cũ/đang chờ cập nhật được ghi cảnh báo.

@@ -12428,6 +12428,336 @@
         }
       }
     },
+    "/api/v1/defense/councils/{identifier}/schedule-draft": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Schedule Draft",
+        "operationId": "schedule_draft_api_v1_defense_councils__identifier__schedule_draft_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/councils/{identifier}/shared-arrival": {
+      "put": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Shared Arrival",
+        "operationId": "shared_arrival_api_v1_defense_councils__identifier__shared_arrival_put",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedArrivalInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/councils/{identifier}/publish-schedule": {
+      "post": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Publish Schedule",
+        "operationId": "publish_schedule_api_v1_defense_councils__identifier__publish_schedule_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/schedule-notices": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Schedule Notices",
+        "operationId": "schedule_notices_api_v1_defense_schedule_notices_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/schedule-notices/{identifier}/download": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Schedule Notice File",
+        "operationId": "schedule_notice_file_api_v1_defense_schedule_notices__identifier__download_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/defense/slots": {
       "post": {
         "tags": [
@@ -15020,6 +15350,140 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/print-lookup/{code}": {
+      "get": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Lookup Print",
+        "operationId": "lookup_print_api_v1_defense_print_lookup__code__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/prints/{identifier}/withdraw": {
+      "post": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Withdraw Print",
+        "operationId": "withdraw_print_api_v1_defense_prints__identifier__withdraw_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identifier"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reason"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -24003,6 +24467,22 @@
         ],
         "title": "Note"
       },
+      "NoticeInput": {
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Fingerprint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fingerprint"
+        ],
+        "title": "NoticeInput"
+      },
       "NotificationOut": {
         "properties": {
           "id": {
@@ -26178,6 +26658,44 @@
         ],
         "title": "SearchResult"
       },
+      "SharedArrivalInput": {
+        "properties": {
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotRevision"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Slots"
+          },
+          "arrival_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Arrival At"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slots",
+          "arrival_at"
+        ],
+        "title": "SharedArrivalInput"
+      },
       "SheetOut": {
         "properties": {
           "name": {
@@ -26281,6 +26799,18 @@
             "format": "date-time",
             "title": "Ends At"
           },
+          "arrival_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrival At"
+          },
           "room": {
             "type": "string",
             "maxLength": 200,
@@ -26324,6 +26854,27 @@
           "room"
         ],
         "title": "SlotInput"
+      },
+      "SlotRevision": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "SlotRevision"
       },
       "SpecialDecision": {
         "properties": {

@@ -1,5 +1,5 @@
--- Schema-only review snapshot at Alembic revision 20261116_0031.
--- 54 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
+-- Schema-only review snapshot at Alembic revision 20261117_0032.
+-- 55 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
 -- For an expendable empty PostgreSQL database only; this snapshot has no business data.
@@ -245,6 +245,20 @@ CREATE TABLE official_form (
 	CONSTRAINT ck_official_form_state CHECK (state IN ('ACTIVE','ARCHIVED')),
 	CONSTRAINT fk_official_form_round_id_thesis_round FOREIGN KEY(round_id) REFERENCES thesis_round (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_official_form_created_by_user_account FOREIGN KEY(created_by) REFERENCES user_account (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE defense_schedule_notice (
+	council_id UUID NOT NULL,
+	version INTEGER NOT NULL,
+	snapshot JSONB NOT NULL,
+	fingerprint VARCHAR(64) NOT NULL,
+	published_by UUID NOT NULL,
+	published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	id UUID NOT NULL,
+	CONSTRAINT pk_defense_schedule_notice PRIMARY KEY (id),
+	CONSTRAINT uq_defense_schedule_notice_council_id_version UNIQUE (council_id, version),
+	CONSTRAINT fk_defense_schedule_notice_council_id_defense_council FOREIGN KEY(council_id) REFERENCES defense_council (id) ON DELETE RESTRICT,
+	CONSTRAINT fk_defense_schedule_notice_published_by_user_account FOREIGN KEY(published_by) REFERENCES user_account (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE lecturer_profile_change (
@@ -976,6 +990,7 @@ CREATE TABLE defense_slot (
 	report_version_id UUID NOT NULL,
 	starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	arrival_at TIMESTAMP WITH TIME ZONE,
 	room VARCHAR(200) NOT NULL,
 	roster JSONB NOT NULL,
 	marks JSONB NOT NULL,
@@ -989,6 +1004,7 @@ CREATE TABLE defense_slot (
 	row_version INTEGER DEFAULT '1' NOT NULL,
 	CONSTRAINT pk_defense_slot PRIMARY KEY (id),
 	CONSTRAINT ck_defense_slot_time_order CHECK (ends_at > starts_at),
+	CONSTRAINT ck_defense_slot_arrival_order CHECK (arrival_at IS NULL OR arrival_at <= starts_at),
 	CONSTRAINT ck_defense_slot_finalized_stamp CHECK ((finalized_at IS NULL) = (finalized_by IS NULL)),
 	CONSTRAINT fk_defense_slot_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_defense_slot_prior_slot_id_defense_slot FOREIGN KEY(prior_slot_id) REFERENCES defense_slot (id) ON DELETE RESTRICT,

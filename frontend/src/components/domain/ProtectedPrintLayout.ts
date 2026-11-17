@@ -1,5 +1,5 @@
 export type Narrative={key:string;label:string;text:string};
-export type FieldStyle={bold?:boolean;italic?:boolean;font_size?:number;line_spacing?:number};
+export type FieldStyle={bold?:boolean;italic?:boolean;font_size?:number;line_spacing?:number;alignment?:'left'|'center'|'right'|'justify';space_after?:number};
 export type LayoutState={breaks:Record<string,number[]>;tabs:Record<string,number[]>;styles:Record<string,FieldStyle>};
 export function displayNarrative(text:string,key:string,state:LayoutState) {
  const characters=Array.from(text);let result="";
@@ -24,6 +24,8 @@ export function protectNarratives(root:ShadowRoot|HTMLElement,fields:Narrative[]
   const span=document.createElement("span");span.dataset.printField=field.key;span.contentEditable="true";span.spellcheck=false;span.setAttribute("role","textbox");span.setAttribute("aria-label",`Định dạng ${field.label}`);span.style.cssText="white-space:pre-wrap;outline:1px dashed #0f766e;cursor:text;tab-size:4";
   const initial=state().styles[field.key];if(initial?.bold!==undefined)span.style.fontWeight=initial.bold?"700":"400";if(initial?.italic!==undefined)span.style.fontStyle=initial.italic?"italic":"normal";if(initial?.font_size)span.style.fontSize=initial.font_size+"pt";if(initial?.line_spacing)span.style.lineHeight=String(initial.line_spacing);
   span.textContent=displayed;range.deleteContents();range.insertNode(span);
+  if(initial?.alignment&&span.closest('p'))span.closest('p')!.style.textAlign=initial.alignment;
+  if(initial?.space_after!==undefined&&span.closest('p'))span.closest('p')!.style.marginBottom=initial.space_after+'pt';
   span.onfocus=()=>select(field.key);
   span.onbeforeinput=e=>e.preventDefault();span.onpaste=e=>e.preventDefault();span.ondrop=e=>e.preventDefault();span.oncut=e=>e.preventDefault();
   span.oninput=()=>{span.textContent=displayNarrative(field.text,field.key,state());hint("Nội dung gốc được bảo vệ; chỉ chỉnh trình bày bằng thanh công cụ, Enter hoặc Tab.");};

@@ -57,11 +57,13 @@ test("Tách đợt/bộ môn, gợi ý tên và biểu mẫu riêng không đẩ
 
 test("Đổi lịch có đề tài hiện tại, giờ/phòng thẳng hàng và chặn giờ kết thúc sai",async({page})=>{
   let saved:Record<string,unknown>|null=null;
+  let shared:any=null;
   await page.route("**/api/v1/**",async route=>{
     const endpoint=new URL(route.request().url()).pathname.replace("/api/v1","");
     if(endpoint==="/me/context")return route.fulfill({json:context});
     if(endpoint==="/defense")return route.fulfill({json:{...workspace,slots:[{...slot,schedule_editable:true}],eligible:[{id:slot.thesis_id,title:slot.title,round_id:council.round_id,department_id:council.department_id,advisor_ids:[]}]}});
     if(endpoint==="/defense/slots/slot-demo"){saved=route.request().postDataJSON();return route.fulfill({status:204});}
+    if(endpoint==="/defense/councils/council-demo/shared-arrival"){shared=route.request().postDataJSON();return route.fulfill({status:204});}
     if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
     return route.fulfill({json:[]});
   });
@@ -81,6 +83,14 @@ test("Đổi lịch có đề tài hiện tại, giờ/phòng thẳng hàng và 
   await form.getByRole("button",{name:"Lưu thay đổi lịch",exact:true}).click();
   await expect.poll(()=>saved?.room).toBe("Phòng B.203");
   expect(saved?.thesis_id).toBe(slot.thesis_id);
+  await page.getByRole('button',{name:/Hội đồng \(/}).click();
+  await page.getByText('Áp dụng giờ tập trung / phòng cho lịch đã xếp',{exact:true}).click();
+  await page.getByRole('button',{name:'Chọn tất cả lịch',exact:true}).click();
+  await page.getByLabel('Giờ tập trung chung',{exact:true}).fill('2026-11-09T07:00');
+  await page.getByLabel('Phòng chung (để trống giữ phòng hiện tại)',{exact:true}).fill('B.301');
+  await page.getByRole('button',{name:'Áp dụng cho 1 lịch đã chọn',exact:true}).click();
+  await expect.poll(()=>shared?.room).toBe('B.301');
+  expect(shared.slots).toEqual([{id:slot.id,version:slot.version}]);
 });
 
 test("Xếp hai đề tài liên tiếp chỉ nhập hội đồng, phòng và thời gian một lần",async({page})=>{
@@ -97,6 +107,7 @@ test("Xếp hai đề tài liên tiếp chỉ nhập hội đồng, phòng và t
   const dialog=page.getByRole('dialog');await dialog.getByRole('combobox',{name:'Hội đồng',exact:true}).selectOption(council.id);
   await dialog.getByRole('button',{name:'Chọn tất cả',exact:true}).click();
   await dialog.getByLabel('Bắt đầu (giờ Việt Nam)',{exact:true}).fill('2026-11-20T08:00');
+  await dialog.getByLabel(/Giờ tập trung chung/).fill('2026-11-20T07:00');
   await dialog.getByLabel('Phòng bảo vệ',{exact:true}).fill('A.301');
   await dialog.getByRole('checkbox',{name:/Đã đối chiếu/}).check();
   for(const width of [320,768,1440]){await page.setViewportSize({width,height:960});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
@@ -104,6 +115,8 @@ test("Xếp hai đề tài liên tiếp chỉ nhập hội đồng, phòng và t
   await expect.poll(()=>saved?.slots?.length).toBe(2);
   expect(Date.parse(saved.slots[1].starts_at)-Date.parse(saved.slots[0].ends_at)).toBe(5*60000);
   expect(saved.slots[0].room).toBe('A.301');await expect(dialog).not.toBeVisible();
+  expect(saved.slots[0].arrival_at).toBe(saved.slots[1].arrival_at);
+  expect(saved.slots[0].arrival_at).toBe('2026-11-20T07:00:00+07:00');
 });
 
 test("Thư ký định dạng trực tiếp bản xem, Enter/Tab không thay đổi chữ hoặc điểm",async({page})=>{
@@ -134,6 +147,26 @@ test("Thư ký định dạng trực tiếp bản xem, Enter/Tab không thay đ�
  await expect.poll(()=>new URL(lastUrl).searchParams.get('line_breaks')).toContain('5');
  expect(new URL(lastUrl).searchParams.get('tabs')).toContain('5');
  expect(new URL(lastUrl).searchParams.get('field_styles')).toContain('"bold":true');
+});
+
+test("SV xem danh sách công bố chung và tải Excel, không có dữ liệu điểm",async({page})=>{
+ let downloaded=false;
+ await page.route('**/api/v1/**',async route=>{
+  const endpoint=new URL(route.request().url()).pathname.replace('/api/v1','');
+  if(endpoint==='/me/context')return route.fulfill({json:{...context,base_role:'STUDENT',lecturer_id:null,student_id:'synthetic-student'}});
+  if(endpoint==='/defense')return route.fulfill({json:{...workspace,scopes:[],councils:[],slots:[]}});
+  if(endpoint==='/defense/schedule-notices')return route.fulfill({json:[{id:'notice-demo',version:2,current:false,published_at:'2026-11-20T00:00:00Z',snapshot:{council:'Hội đồng chung',round:'DEMO',department:'CNTT',rows:[1,2].map(i=>({order:i,title:'Đề tài '+i,topic_code:'DT'+i,advisor:'GV demo',students:[{name:'Sinh viên '+i,code:'002300000'+i,class_name:'CNTT22'}],arrival_at:'2026-11-20T00:00:00Z',starts_at:'2026-11-20T01:00:00Z',ends_at:'2026-11-20T01:45:00Z',room:'A301'}))}}]});
+  if(endpoint==='/defense/schedule-notices/notice-demo/download'){downloaded=true;return route.fulfill({body:'Synthetic Excel download',contentType:'application/octet-stream',headers:{'content-disposition':'attachment; filename="Danh-sach-bao-ve.xlsx"'}});}
+  if(endpoint.includes('/notifications'))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+  return route.fulfill({json:[]});
+ });
+ await page.goto('/defense?section=announcements');
+ await page.getByText('Hội đồng chung · DEMO · Bản 2',{exact:true}).click();
+ await expect(page.getByRole('cell',{name:/Sinh viên 2/})).toBeVisible();
+ await expect(page.getByText(/Lịch đang được cập nhật/)).toBeVisible();
+ await page.getByRole('button',{name:'Tải danh sách Excel · bản 2',exact:true}).click();
+ await expect.poll(()=>downloaded).toBe(true);
+ for(const width of [320,768,1440]){await page.setViewportSize({width,height:960});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
 });
 
 test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có dữ liệu",async({page})=>{

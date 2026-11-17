@@ -350,6 +350,18 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert waiting['blockers'] and len(waiting['snapshot']['students'])==2
     assert waiting['snapshot']['advisor'] and not waiting['can_submit']
     minutes_record=client.get(endpoint+"/prints",headers=hdr(users[5])).json()[0]
+    replacement=issue(endpoint+'/forms/9',users[5])
+    assert replacement.status_code==200,replacement.text
+    history=client.get(endpoint+'/prints',headers=hdr(users[5])).json()
+    latest=history[0]
+    previous=next(r for r in history if r['id']==minutes_record['id'])
+    assert latest['current'] and not previous['current'] and previous['superseded_by']==latest['code']
+    assert latest['print_number']==2
+    lookup=client.get(base+'/print-lookup/'+minutes_record['code'],headers=hdr(users[5]))
+    assert lookup.status_code==200 and not lookup.json()['current']
+    assert client.get(base+'/print-lookup/'+minutes_record['code'],headers=hdr(users[0])).status_code in (403,404)
+    assert client.post(base+'/prints/'+latest['id']+'/withdraw',headers=hdr(users[5]),json={'reason':'Withdraw duplicate test print'}).status_code==204
+    assert not client.get(base+'/print-lookup/'+latest['code'],headers=hdr(users[5])).json()['current']
     assert client.get(base+"/prints/"+minutes_record["id"],headers=hdr(users[0])).status_code==404
     layout_fields=client.get(endpoint+"/forms/9?layout_fields=true",headers=hdr(users[5]))
     assert {r["key"] for r in layout_fields.json()["fields"]}=={"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}

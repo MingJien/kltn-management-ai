@@ -964,6 +964,7 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     __tablename__ = "defense_slot"
     __table_args__ = (
         CheckConstraint("ends_at > starts_at", name="time_order"),
+        CheckConstraint("arrival_at IS NULL OR arrival_at <= starts_at", name="arrival_order"),
         CheckConstraint("(finalized_at IS NULL) = (finalized_by IS NULL)", name="finalized_stamp"),
         Index("ix_defense_slot_council_start", "council_id", "starts_at"),
         Index("uq_defense_slot_active_thesis", "thesis_id", unique=True, postgresql_where=text("finalized_at IS NULL")),
@@ -974,6 +975,7 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     report_version_id: Mapped[uuid.UUID] = fk("document_version.id")
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    arrival_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     room: Mapped[str] = mapped_column(String(200), nullable=False)
     roster: Mapped[list] = mapped_column(JSONB, nullable=False)
     marks: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -981,6 +983,17 @@ class DefenseSlot(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):
     minutes: Mapped[dict] = mapped_column(JSONB, nullable=False)
     finalized_by: Mapped[Optional[uuid.UUID]] = fk("user_account.id", nullable=True)
     finalized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class DefenseScheduleNotice(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "defense_schedule_notice"
+    __table_args__ = (UniqueConstraint("council_id","version"),)
+    council_id: Mapped[uuid.UUID] = fk("defense_council.id")
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    published_by: Mapped[uuid.UUID] = fk("user_account.id")
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class DefenseAbsenceDecision(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, Base):

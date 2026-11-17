@@ -13,6 +13,9 @@ from backend.services import defense, defense_export, defense_register
 from backend.api.defense_schemas import AcademicProfileInput, CouncilAttendance, ReopenInput
 from backend.api.defense_schemas import AbsenceDecision
 from backend.api.defense_schemas import BatchSlotsInput
+from backend.api.defense_schemas import NoticeInput
+from backend.api.defense_schemas import SharedArrivalInput
+from backend.services import defense_notices
 
 router = APIRouter(prefix="/api/v1/defense", tags=["Hội đồng và bảo vệ"])
 
@@ -41,6 +44,31 @@ def update_council(identifier:UUID,data:CouncilInput,signature:str=Header(alias=
 @router.post("/councils/{identifier}/close",status_code=204)
 def close(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
     defense.close_council(session,user,identifier)
+
+
+@router.get('/councils/{identifier}/schedule-draft')
+def schedule_draft(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_notices.preview(session,user,identifier)
+
+
+@router.put('/councils/{identifier}/shared-arrival',status_code=204)
+def shared_arrival(identifier:UUID,data:SharedArrivalInput,user=Depends(current_user),session=Depends(transaction)):
+    defense.apply_shared_arrival(session,user,identifier,data)
+
+
+@router.post('/councils/{identifier}/publish-schedule',status_code=201)
+def publish_schedule(identifier:UUID,data:NoticeInput,user=Depends(current_user),session=Depends(transaction)):
+    return defense_notices.publish(session,user,identifier,data)
+
+
+@router.get('/schedule-notices')
+def schedule_notices(user=Depends(current_user),session=Depends(transaction)):
+    return defense_notices.listing(session,user)
+
+
+@router.get('/schedule-notices/{identifier}/download')
+def schedule_notice_file(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return defense_notices.download(session,user,identifier)
 
 
 @router.post("/slots",status_code=201)
@@ -206,6 +234,16 @@ def slot_prints(identifier:UUID,user=Depends(current_user),session=Depends(trans
 @router.get("/prints/{identifier}")
 def recorded_print(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
     return defense_export.download_print(session,user,identifier)
+
+
+@router.get('/print-lookup/{code}')
+def lookup_print(code:str,user=Depends(current_user),session=Depends(transaction)):
+    return defense_export.lookup_print(session,user,code)
+
+
+@router.post('/prints/{identifier}/withdraw',status_code=204)
+def withdraw_print(identifier:UUID,data:Reason,user=Depends(current_user),session=Depends(transaction)):
+    defense_export.withdraw_print(session,user,identifier,data.reason)
 
 
 from backend.api.defense_schemas import CorrectionInput, CorrectionDecision

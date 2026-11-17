@@ -252,6 +252,8 @@ def schedule(session, user, data, identifier=None, expected=None, *, commit=True
         raise HTTPException(422,"Cần đối chiếu quan hệ thân nhân giữa thành viên hội đồng và SV trong đề tài trước khi xếp lịch")
     if data.ends_at <= data.starts_at:
         raise HTTPException(422, "Giờ kết thúc phải sau giờ bắt đầu")
+    if data.arrival_at and (data.arrival_at>data.starts_at or data.arrival_at.astimezone(VN).date()!=data.starts_at.astimezone(VN).date()):
+        raise HTTPException(422,"Giờ tập trung phải cùng ngày và không muộn hơn giờ bảo vệ dự kiến")
     if not (slot.prior_slot_id if slot else data.prior_slot_id) and session.scalar(select(m.DefenseSlot.id).where(
             m.DefenseSlot.thesis_id == thesis.id, m.DefenseSlot.id != slot.id if slot else True).limit(1)):
         raise HTTPException(409, "Đề tài đã có lịch bảo vệ")
@@ -311,6 +313,7 @@ def schedule(session, user, data, identifier=None, expected=None, *, commit=True
         slot.row_version += 1
     slot.thesis_id, slot.council_id, slot.report_version_id = thesis.id, council.id, report.id
     slot.starts_at, slot.ends_at, slot.room, slot.roster = data.starts_at, data.ends_at, data.room, roster
+    slot.arrival_at=data.arrival_at
     session.flush()
     from backend.services.publications import sync_slot
     sync_slot(session, slot)
@@ -337,6 +340,21 @@ def schedule_batch(session, user, data):
     except Exception:
         session.rollback()
         raise
+
+
+def apply_shared_arrival(session,user,council_id,data):
+    from backend.api.defense_schemas import SlotInput
+    session.execute(select(func.pg_advisory_xact_lock(66102)))
+    if len({row.id for row in data.slots})!=len(data.slots):raise HTTPException(422,'Danh sách lịch bị trùng')
+    try:
+        for row in data.slots:
+            slot=session.get(m.DefenseSlot,row.id)
+            if not slot or slot.council_id!=council_id:raise HTTPException(404,'Lịch không thuộc hội đồng đã chọn')
+            item=SlotInput(council_id=council_id,thesis_id=slot.thesis_id,starts_at=slot.starts_at,ends_at=slot.ends_at,room=data.room or slot.room,arrival_at=data.arrival_at,confirmed_no_conflict=True,prior_slot_id=slot.prior_slot_id)
+            schedule(session,user,item,slot.id,row.version,commit=False)
+        session.commit()
+    except Exception:
+        session.rollback();raise
 
 
 def lecturer_accounts(session, ids):
@@ -366,7 +384,7 @@ def notify(session, user, slot, council, event, message):
         url = "/defense" if event == "DEFENSE_CANCELLED" else (
             f"/defense?slot={slot.id}" if recipient in participants else f"/theses/{thesis.id}")
         notices.emit(session,user.id,{recipient},event,"account",recipient,
-            f"{message} · {thesis.current_title} · {council.name} · {starts:%d/%m/%Y %H:%M} → {ends:%d/%m/%Y %H:%M} · {slot.room}",
+            f"{message} · {thesis.current_title} · {council.name} · Tập trung {(slot.arrival_at or slot.starts_at).astimezone(VN):%d/%m/%Y %H:%M}; bảo vệ dự kiến {starts:%H:%M} → {ends:%H:%M} · {slot.room}",
             url)
 
 
@@ -723,7 +741,7 @@ def workspace(session,user):
             for key,values in slot.marks.items()}
         slots.append({"id":slot.id,"prior_slot_id":slot.prior_slot_id,"absence_decisions":absence_out(session,slot,own),"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
             "report_filename":session.get(m.StoredFile,session.get(m.DocumentVersion,slot.report_version_id).stored_file_id).original_name,
-            "starts_at":slot.starts_at,"ends_at":slot.ends_at,"room":slot.room,"version":slot.row_version,
+            "starts_at":slot.starts_at,"ends_at":slot.ends_at,"arrival_at":slot.arrival_at,"room":slot.room,"version":slot.row_version,
             "roster":visible_academic_roster(session,slot,own,privileged),"results":totals,"marks":marks,
             "context_token":context_token(slot,council),"bonus_evidence":evidence_options(session,slot.thesis_id),
             "minutes":slot.minutes if privileged else {}, "finalized_at":slot.finalized_at,

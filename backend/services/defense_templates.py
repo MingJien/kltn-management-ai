@@ -30,6 +30,8 @@ class FieldStyle(BaseModel):
     italic: bool | None = None
     font_size: int | None = Field(default=None,ge=10,le=14)
     line_spacing: float | None = Field(default=None,ge=1,le=1.5)
+    alignment: Literal['left','center','right','justify'] | None = None
+    space_after: int | None = Field(default=None,ge=0,le=8)
 
 
 class PrintLayout(BaseModel):
@@ -75,13 +77,20 @@ def narrative_style(paragraph,layout,key=None):
             if style.italic is not None:run.italic=style.italic
             if style.font_size:run.font.size=Pt(style.font_size)
     if style and style.line_spacing:paragraph.paragraph_format.line_spacing=style.line_spacing
+    if style and style.space_after is not None:paragraph.paragraph_format.space_after=Pt(style.space_after)
+    if style and style.alignment:
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        paragraph.alignment={'left':WD_ALIGN_PARAGRAPH.LEFT,'center':WD_ALIGN_PARAGRAPH.CENTER,'right':WD_ALIGN_PARAGRAPH.RIGHT,'justify':WD_ALIGN_PARAGRAPH.JUSTIFY}[style.alignment]
 
 
 def source(session, user, round_id, number):
     key = f"mau-{number:02}"
     managed = school_forms.compatibility_download(session, user, key, round_id)
-    path = Path(managed.path) if managed else form_templates.OFFICIAL_DIR / next(
+    local = form_templates.OFFICIAL_DIR / next(
         item["filename"] for item in form_templates.OFFICIAL_FORMS if item["id"] == key)
+    path = local if local.is_file() else Path(managed.path) if managed else local
+    minutes_reference=form_templates.OFFICIAL_DIR / "Mẫu nd họp của 9.Bien ban hop hoi dong cham KLTN.docx"
+    if number==9 and minutes_reference.is_file():path=minutes_reference
     if not path.is_file():
         raise HTTPException(409, f"Chưa có Mẫu {number} gốc của Khoa trong môi trường này")
     if path.suffix.lower() != (".xlsx" if number in {6,11} else ".docx"):
@@ -203,7 +212,7 @@ def layout_word(doc, layout, footer, signature, anchor):
     if layout.break_recommendations:
         anchor.paragraph_format.page_break_before = True
     tr = signature.rows[0]
-    tr.height = Mm(40)
+    tr.height = Mm(45)
     from docx.enum.table import WD_ROW_HEIGHT_RULE
     tr.height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
     tr._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
@@ -219,10 +228,10 @@ def layout_word(doc, layout, footer, signature, anchor):
             row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
             if row.height is not None:row.height_rule=WD_ROW_HEIGHT_RULE.AT_LEAST
     for section in doc.sections:
-        p = section.footer.paragraphs[0]
-        put(p, footer)
-        for run in p.runs:
-            run.font.size = Pt(7)
+        for target in (section.footer,section.first_page_footer,section.even_page_footer):
+            p = target.paragraphs[0]
+            put(p, footer)
+            for run in p.runs:run.font.size = Pt(7)
     # Remove source placeholder whitespace immediately before signatures. Otherwise
     # keep-with-next joins only an empty line and allows an orphan signature page.
     node = signature._tbl.getprevious()
@@ -269,13 +278,15 @@ def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, tot
     sheet = book.active
     if "PHIẾU ĐÁNH GIÁ" not in str(sheet["A2"].value):
         raise HTTPException(409,"Cấu trúc Mẫu 6 đang phát hành chưa được hỗ trợ. Kiểm tra lại tệp gốc của Khoa")
+    if any(str(sheet[f'A{row}'].value).strip()!=code for row,code in zip([14,15,16,18,19,20,21,22,23,25,26,27],['1.1','1.2','1.3','2.1','2.2','2.3','2.4','2.5','2.6','3.1','3.2','3.3'])):
+        raise HTTPException(409,'Vị trí tiêu chí Mẫu 6 đã đổi. Cần cập nhật ánh xạ trước khi điền điểm')
     fields = {
         "A5": f"Họ và tên (học hàm, học vị) người đánh giá: {evaluator['name']}\nNhiệm vụ trong hội đồng: {role}",
         "A6": f"Họ và tên sinh viên: {student['name']}     Mã sinh viên: {student['code']}",
         "A7": f"Lớp: {student['class_name'] or 'Chưa cập nhật'}     Ngành: {student['major'] or 'Chưa cập nhật'}     Khóa học: {student.get('training_cohort') or 'Chưa cập nhật'}",
         "A8": f"Tên đề tài: {title}", "A9": "", "A10": f"Người hướng dẫn khoa học: {advisor}",
         "A30": "III. Đề nghị (nếu có): " + narrative_text(mark.get("note", ""),"note",layout),
-        "D31": f"Đồng Tháp, ngày {date.day:02} tháng {date.month:02} năm {date.year}\nNgười đánh giá\n(Ký, ghi rõ họ tên)\n\n\n{evaluator['name']}",
+        "D31": f"Đồng Tháp, ngày {date.day:02} tháng {date.month:02} năm {date.year}\nNgười đánh giá\n(Ký, ghi rõ họ tên)\n\n\n\n\n\n{evaluator['name']}",
     }
     for address, value in fields.items():
         sheet[address] = value
@@ -306,7 +317,7 @@ def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, tot
         for address in ("E12", "F12"):
             sheet[address].alignment=Alignment(horizontal="center",vertical="center",wrap_text=True)
         sheet.row_dimensions[12].height=max(sheet.row_dimensions[12].height,layout.font_size*2.6)
-    sheet.row_dimensions[31].height = 115
+    sheet.row_dimensions[31].height = 150
     if layout.narrative_bold is not None or layout.narrative_italic is not None:
         font=copy(sheet["A30"].font)
         if layout.narrative_bold is not None:font.b=layout.narrative_bold
@@ -375,6 +386,8 @@ def layout_sheet(sheet, layout, footer, area):
 def minutes_document(path, slot, council, roster, totals, notes, footer, layout, date):
     doc = Document(path)
     p, tables = doc.paragraphs, doc.tables
+    if len(tables)==3 and len(p)>=37 and p[16].text.startswith('IV.'):
+        return minutes_from_reference(doc,slot,council,roster,totals,notes,footer,layout,date)
     if len(tables)<6 or len(p)<26 or "IV." not in p[13].text:
         raise HTTPException(409,"Cấu trúc Mẫu 9 đã thay đổi. Cần cập nhật ánh xạ từ tệp gốc của Khoa trước khi xuất")
     cell(tables[1].cell(0,1), slot.minutes["title"])
@@ -431,6 +444,83 @@ def minutes_document(path, slot, council, roster, totals, notes, footer, layout,
     signature_names(tables[5], people["CHAIR"], people["SECRETARY"], date)
     layout_word(doc, layout.model_copy(update={"break_recommendations":False}), footer, tables[5], anchor)
     return doc
+
+
+def minutes_from_reference(doc,slot,council,roster,totals,notes,footer,layout,date):
+    """Fill the newly supplied worked example without retaining any sample personal data."""
+    from decimal import Decimal
+    p=doc.paragraphs
+    anchors={4:'1. Tên đề tài:',5:'2. Sinh viên thực hiện:',10:'II.',13:'III.',16:'IV.',21:'2. Ý kiến',24:'3. Ý kiến',26:'4. Kết luận',29:'5. Kết quả',33:'V.'}
+    if any(not p[index].text.strip().startswith(text) for index,text in anchors.items()):
+        raise HTTPException(409,'Bố trí mẫu nội dung họp Mẫu 9 đã đổi; cần cập nhật ánh xạ trước khi xuất')
+    put(p[4],'1. Tên đề tài: '+slot.minutes['title'])
+    put(p[5],'2. Sinh viên thực hiện: '+'; '.join(r['name'] for r in roster))
+    put(p[6],'\n'.join(f"Lớp: {r['class_name']}     Mã sinh viên: {r['code']}" for r in roster))
+    put(p[8],'Họ và tên (học hàm, học vị): '+slot.minutes.get('advisor',''))
+    put(p[9],'Đơn vị: '+getattr(council,'advisor_unit',''))
+    put(p[11],f'(Theo Quyết định: {council.reference})')
+    present=slot.attendance.get('_council',{}).get('present_ids',[])
+    put(p[12],f'Tổng số: 05          Số có mặt: {len(present):02}          Số vắng mặt: {5-len(present):02}')
+    put(p[14],f'1. Thời gian: {date:%H:%M}, ngày {date:%d/%m/%Y}');put(p[15],'2. Địa điểm: '+slot.room)
+    for index,key,label in [(18,'objectives','Mục tiêu'),(19,'functions','Chức năng'),(20,'achievements','Kết quả đạt được')]:
+        put(p[index],f'{label}: '+narrative_text(slot.minutes.get(key) or '',key,layout));narrative_style(p[index],layout,key)
+    if slot.minutes.get('discussion'):after(p[20],narrative_text(slot.minutes['discussion'],'discussion',layout),layout,'discussion')
+    for index,key,value in [(22,'reviewer_comments',notes['REVIEWER']),(25,'member_comments',notes['OTHER']),(27,'conclusion',slot.minutes['conclusion']),(34,'recommendations',slot.minutes.get('recommendations') or 'Hội đồng xác nhận không có kiến nghị.')]:
+        put(p[index],narrative_text(value,key,layout));narrative_style(p[index],layout,key)
+    for index in [23,28,35,36]:p[index]._element.getparent().remove(p[index]._element)
+    anchor=p[32]
+    for i,row in enumerate(roster):
+        result=totals[row['id']];scores=[Decimal(v) for v in result.get('scores',[]) if v is not None]
+        count=len(scores);issued=len(present) if result['attendance'].get('status')=='PRESENT' else 0
+        prefix=(row['name']+': ') if len(roster)>1 else ''
+        lines=[f'{prefix}- Số phiếu phát ra: {issued:02}     - Số phiếu thu về: {count:02}',f'- Số phiếu hợp lệ: {count:02}']
+        lines.append(f"- Kết quả: {sum(scores):.1f} điểm. Trung bình: {result['average']}     Xếp loại: {slot.minutes.get('classifications',{}).get(row['id'],'')}" if result.get('average') is not None else '- Vắng bảo vệ; chưa có điểm. '+result['attendance'].get('reason',''))
+        if i==0:
+            for index,value in zip([30,31,32],lines):put(p[index],value)
+        else:
+            for line in lines:anchor=after(anchor,line)
+    order={'CHAIR':0,'REVIEWER':1,'MEMBER':2,'SECRETARY':3}
+    for index,person in enumerate(sorted(council.members,key=lambda r:order[r['role']]),1):
+        for column,value in enumerate([index,person['name'],person.get('unit',''),{'CHAIR':'Chủ tịch hội đồng','SECRETARY':'Thư ký','REVIEWER':'Phản biện','MEMBER':'Ủy viên'}[person['role']]]):cell(doc.tables[1].cell(index,column),str(value))
+    people={person['role']:person['name'] for person in council.members}
+    signature_names(doc.tables[2],people['CHAIR'],people['SECRETARY'],date)
+    for index in [16,17,21,24,26,29,30,31,33]:p[index].paragraph_format.keep_with_next=True
+    layout_word(doc,layout,footer,doc.tables[2],p[34])
+    return doc
+
+
+def restore_template_drawings(out,path):
+    """openpyxl drops connector shapes. Retain the original drawing package for M6 rules."""
+    from io import BytesIO
+    from zipfile import ZipFile,ZIP_DEFLATED
+    from lxml import etree
+    ns={'s':'http://schemas.openxmlformats.org/spreadsheetml/2006/main','r':'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
+    relns='http://schemas.openxmlformats.org/package/2006/relationships'
+    with ZipFile(path) as original,ZipFile(BytesIO(out.getvalue())) as generated:
+        parts={name:generated.read(name) for name in generated.namelist()}
+        sheet=etree.fromstring(parts['xl/worksheets/sheet1.xml']);source=etree.fromstring(original.read('xl/worksheets/sheet1.xml'))
+        drawing=source.find('s:drawing',ns)
+        if drawing is None:return
+        for old in sheet.findall('s:drawing',ns):sheet.remove(old)
+        drawing=deepcopy(drawing);drawing.set('{'+ns['r']+'}id','rIdTemplateRules');sheet.append(drawing)
+        relpath='xl/worksheets/_rels/sheet1.xml.rels'
+        rels=etree.fromstring(parts[relpath]) if relpath in parts else etree.Element('{'+relns+'}Relationships',nsmap={None:relns})
+        for old in list(rels):
+            if old.get('Type','').endswith('/drawing'):rels.remove(old)
+        etree.SubElement(rels,'{'+relns+'}Relationship',Id='rIdTemplateRules',Type=ns['r']+'/drawing',Target='../drawings/drawing1.xml')
+        parts[relpath]=etree.tostring(rels);parts['xl/worksheets/sheet1.xml']=etree.tostring(sheet)
+        for name in original.namelist():
+            if name.startswith(('xl/drawings/','xl/media/')) and not name.endswith('/'):parts[name]=original.read(name)
+        types=etree.fromstring(parts['[Content_Types].xml']);src_types=etree.fromstring(original.read('[Content_Types].xml'))
+        known={(x.tag,x.get('PartName') or x.get('Extension')) for x in types}
+        for node in src_types:
+            if node.get('PartName') and node.get('PartName').lstrip('/') not in parts:continue
+            if (node.tag,node.get('PartName') or node.get('Extension')) not in known:types.append(deepcopy(node))
+        parts['[Content_Types].xml']=etree.tostring(types)
+    result=BytesIO()
+    with ZipFile(result,'w',ZIP_DEFLATED) as archive:
+        for name,content in parts.items():archive.writestr(name,content)
+    out.seek(0);out.truncate();out.write(result.getvalue());out.seek(0)
 
 
 def summary_document(path, council, rows, footer, layout, date):

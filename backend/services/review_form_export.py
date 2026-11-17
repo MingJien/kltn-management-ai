@@ -273,7 +273,10 @@ def export_review(session, user, thesis_id, review_id, expected):
         raise HTTPException(422, "Lưu đầy đủ nội dung phiếu và đề nghị trước khi xuất phiếu")
     template_id = "mau-07" if item.kind == "ADVISOR" else "mau-08"
     managed = school_forms.compatibility_download(session, user, template_id, thesis.round_id)
-    if managed is not None:
+    local_source = form_templates.OFFICIAL_DIR / next(meta['filename'] for meta in form_templates.OFFICIAL_FORMS if meta['id']==template_id)
+    if local_source.is_file():
+        source = local_source.read_bytes()
+    elif managed is not None:
         source = Path(managed.path).read_bytes()
     else:
         source, _, _ = form_templates.official_template_by_id(template_id, user.base_role)

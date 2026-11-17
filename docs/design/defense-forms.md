@@ -15,4 +15,15 @@ TBM hoặc điều phối đúng phạm vi mở **Kết quả & xuất → Thôn
 
 Mẫu 10/11 luôn xuất toàn đợt, kể cả khi đang tìm kiếm một SV trên màn hình. Quyền xuất thuộc **Điều phối KLTN theo đợt** có phạm vi bao quát các hội đồng; chủ tịch/thư ký chỉ được giao một hội đồng không tự có quyền xuất toàn đợt. Nếu còn phiên bổ sung chờ kết quả, hệ thống nêu rõ phần cần xử lý và chưa cho xuất bảng toàn đợt. Với SV không đạt do vắng theo quyết định Khoa, giữ điểm trống và ghi tình trạng; không tự cho 0.
 
-Khi triển khai sang máy mới, đặt tệp do Khoa cung cấp trong `docs/BieuMau` hoặc đặt đường dẫn bằng `KLTN_OFFICIAL_TEMPLATE_DIR`. Người quản lý có thể bổ sung các mẫu còn thiếu từ **Kho biểu mẫu & tài liệu Khoa** sau khi đối chiếu nguồn. Bộ xuất ưu tiên phiên bản đang phát hành theo đợt. Mẫu cần đúng cấu trúc Word/Excel đã tích hợp. Nếu Khoa ban hành bố cục khác, cần cập nhật ánh xạ và kiểm bản in trước khi áp dụng.
+Khi triển khai sang máy mới, đặt tệp do Khoa cung cấp trong `docs/BieuMau` hoặc đặt đường dẫn bằng `KLTN_OFFICIAL_TEMPLATE_DIR`. Người quản lý có thể bổ sung các mẫu còn thiếu từ **Kho biểu mẫu & tài liệu Khoa** sau khi đối chiếu nguồn. Thứ tự chọn nguồn theo hướng dẫn cập nhật bên dưới. Mẫu cần đúng cấu trúc Word/Excel đã tích hợp. Nếu Khoa ban hành bố cục khác, cần cập nhật ánh xạ và kiểm bản in trước khi áp dụng.
+
+
+## Bản dùng để ký và mẫu cập nhật ngày 17/11/2026
+
+Tải lại đúng bản đã phát hành tại **Bản in đã lưu** không tạo phiên bản mới. Khi chọn **Lưu và tải bản dùng để ký** lần nữa, bản mới có mã tra cứu riêng và tự thay thế bản trước cùng loại phiếu/SV/người chấm (hoặc cùng bảng toàn đợt/mã học phần). Tệp cũ giữ nguyên để đối chiếu; trạng thái hệ thống là hết hiệu lực, không được hồi sinh chỉ vì bản sau bị thu hồi. Thư ký/chủ tịch hoặc người quản lý có thể thu hồi bản hiện hành kèm lý do. Dùng ô **Mã tra cứu bản in** với đúng 12 ký tự trên footer để xem trạng thái. Các mã nguồn mẫu/dữ liệu/định dạng giữ ở metadata, không in dài trên footer.
+
+Mẫu 9 có tên `Bien-ban_<đợt>_<mã đề tài>_<ngày>_v<số lần phát hành>.docx`. Số lần phát hành tách với số phiên bản dữ liệu nội bộ. Bản chưa ký, hội đồng chưa khóa có mục **Mở lại để GV sửa điểm và xuất lại**: nhập lý do, xác nhận chưa ký, mở lại; từng GV sửa phiếu của mình, thư ký/chủ tịch chốt lại và phát hành bản mới. Điểm và biên bản trước sửa nằm trong audit; bản in trước đó không còn hiện hành. Hồ sơ đã khóa dùng đề nghị đính chính và TBM duyệt độc lập.
+
+Bộ xuất ưu tiên tệp hiện có trong `docs/BieuMau` hoặc thư mục cấu hình `KLTN_OFFICIAL_TEMPLATE_DIR`; khi không có tệp local mới dùng bản được phát hành trong kho. Mẫu 9 ưu tiên **Mẫu nd họp của 9.Bien ban hop hoi dong cham KLTN.docx** nếu có. Đây là nguồn bố trí/nội dung họp được người dùng cung cấp; các tên, MSSV và nội dung ví dụ được thay toàn bộ bằng dữ liệu hồ sơ. Nếu thiếu tệp tham chiếu, giữ ánh xạ Mẫu 9 cũ; không coi file ở máy khác là đã tự có trong Git. Không commit biểu mẫu nguồn theo quy tắc dự án.
+
+Mẫu 6 giữ cả phần drawing/connector của nguồn Excel để không mất hai đường gạch ở đầu trang. Vùng ký được tăng chiều cao và khoảng trống trước họ tên. Phần diễn giải Word còn có căn đoạn và khoảng cách sau đoạn; các thao tác này không nhận nội dung thay thế từ trình duyệt.
