@@ -9,6 +9,7 @@ import DefensePrintPreview from "../components/domain/DefensePrintPreview";
 import DefensePrintHistory from "../components/domain/DefensePrintHistory";
 import DefenseRegister from "../components/domain/DefenseRegister";
 import DefenseCorrections from "../components/domain/DefenseCorrections";
+import Dialog from "../components/ui/Dialog";
 
 type Person={id:string;name:string;role:string};
 type Student={id:string;name:string;code:string;class_name?:string;major?:string;major_code?:string;department_id?:string;birth_date?:string;training_cohort?:string};
@@ -32,6 +33,10 @@ const dateLocal=(iso:string)=>new Date(Date.parse(iso)+7*3600000).toISOString().
 const option=(value:string,label:string)=><option value={value} key={value}>{label}</option>;
 const text=(form:FormData,key:string)=>String(form.get(key)??"");
 const searchText = (value: string) => value.toLocaleLowerCase("vi").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/đ/g, "d").trim();
+const councilContext = (data:Workspace,council:Council) => {
+  const scope=(data.scope_catalog??data.scopes).find(s=>s.round_id===council.round_id&&s.department_id===council.department_id);
+  return scope ? `${scope.round_code} · ${scope.department_code??scope.department_name}` : "";
+};
 
 const hasDrafts=()=>!!document.querySelector('form[data-dirty="true"]');
 const mayDiscard=()=>!hasDrafts()||window.confirm("Còn nội dung chưa lưu. Bạn có muốn bỏ nội dung đang nhập?");
@@ -86,6 +91,16 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
   const [checkedTheses, setCheckedTheses] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const scope = council ? data.scopes.find(r => r.round_id === council.round_id && r.department_id === council.department_id) : data.scopes[scopeIndex];
+  const catalog=data.scope_catalog??data.scopes;
+  const rounds=Array.from(new Map(catalog.map(s=>[s.round_id,s.round_code])).entries());
+  const [roundId,setRoundId]=useState(scope?.round_id??rounds[0]?.[0]??"");
+  const [customName,setCustomName]=useState<string|null>(council?.name??null);
+  const sequence=data.councils.filter(c=>c.round_id===scope?.round_id&&c.department_id===scope?.department_id).length+1;
+  const suggestedName=`Hội đồng bảo vệ KLTN ${String(sequence).padStart(2,"0")}${scope?` · ${scope.department_code??scope.department_name} · ${scope.round_code}`:""}`;
+  function changeScope(index:number,nextRound=roundId) {
+    if(!mayDiscard())return;
+    setRoundId(nextRound);setScopeIndex(index);setCheckedTheses([]);setChosen(Array(5).fill(""));setSearch("");setCustomName(null);
+  }
   const plans = (data.planning_theses ?? data.eligible).filter(t =>
     t.round_id === scope?.round_id && t.department_id === scope?.department_id);
   const selectedPlans = plans.filter(t => checkedTheses.includes(t.id));
@@ -110,16 +125,22 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
       reference:text(form,"reference"),thesis_ids:checkedTheses,confirmed_no_conflict:form.has("conflict_checked"),
       confirmed_guests:form.has("guests_checked"),members:roles.map((role,i)=>({role,lecturer_id:text(form,"lecturer"+i)}))},council?.signature,council?"PUT":"POST");
   }
-  return <Card title="Lập hội đồng"><DraftForm className="stack" onSubmit={submit}>
-    <label>Đợt và bộ môn<select name="scope" className="input" value={scopeIndex} disabled={!!council}
-      onChange={e => {setScopeIndex(Number(e.target.value)); setCheckedTheses([]); setChosen(Array(5).fill("")); setSearch("");}}>
-      {(data.scope_catalog ?? data.scopes).map(r=>{
+  return <Card title={council?"Điều chỉnh hội đồng":"Thông tin hội đồng"}><DraftForm className="stack defense-council-form" onSubmit={submit}>
+    <label>Đợt KLTN<select name="round" className="input" value={roundId} disabled={!!council}
+      onChange={e=>changeScope(data.scopes.findIndex(s=>s.round_id===e.target.value),e.target.value)}>
+      {rounds.map(([id,code])=>option(id,code))}
+    </select></label>
+    <label>Bộ môn<select name="scope" className="input" value={scope?.round_id===roundId?scopeIndex:""} disabled={!!council}
+      onChange={e=>changeScope(Number(e.target.value))}>
+      <option value="" disabled>Chọn bộ môn được phân công</option>
+      {catalog.filter(r=>r.round_id===roundId).map(r=>{
         const index=data.scopes.findIndex(s=>s.round_id===r.round_id&&s.department_id===r.department_id);
         return <option key={r.round_id+r.department_id} value={index<0?r.round_id+r.department_id:String(index)} disabled={index<0}>
-          {[r.round_code,r.department_code==="SYN-DEMO-DEP"?null:r.department_code,r.department_name,index<0?"Chưa được phân quyền":null].filter(Boolean).join(" · ")}
+          {[r.department_code==="SYN-DEMO-DEP"?null:r.department_code,r.department_name,index<0?"Chưa được phân quyền":null].filter(Boolean).join(" · ")}
         </option>;
       })}
     </select></label>
+    <p className="defense-wide text-muted">Bộ môn hiển thị theo đợt đã chọn. Mục “Chưa được phân quyền” cần Admin giao nhiệm vụ hoặc kiểm tra chức vụ TBM trước khi lập hội đồng.</p>
     <fieldset className="defense-planning">
       <legend>Đề tài đối chiếu thành phần ({checkedTheses.length} đã chọn)</legend>
       <p>Chọn một hoặc nhiều đề tài để loại GVHD của các đề tài đó. Mỗi đề tài sẽ có giờ và phòng riêng ở bước xếp lịch.</p>
@@ -139,10 +160,10 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
         </details>}
       </> : <p>Chưa có đề tài trong phạm vi này. Có thể lập danh sách hội đồng theo quyết định và xếp lịch sau.</p>}
     </fieldset>
-    <label>Tên hội đồng<input name="name" defaultValue={council?.name} className="input" minLength={3} maxLength={200} required/></label>
+    <label>Tên hội đồng<input aria-label="Tên hội đồng" name="name" value={customName??suggestedName} onChange={e=>setCustomName(e.target.value)} className="input" minLength={3} maxLength={200} required/><small>Gợi ý để phân biệt các hội đồng trong cùng đợt; có thể sửa theo quyết định thành lập. Tên này dùng trên lịch và biểu mẫu.</small></label>
     <label>Số quyết định hoặc căn cứ phân công<input name="reference" defaultValue={council?.reference} className="input" minLength={3} maxLength={300} required/></label>
     {availableCount < roles.length && <p className="alert alert-warning">Có {availableCount}/{roles.length} giảng viên phù hợp với các đề tài đã chọn. Cần thêm giảng viên có tài khoản hoạt động hoặc điều chỉnh nhóm đề tài.</p>}
-    {roles.map((role,i)=><label key={i}>{data.roles[role]}{role==="REVIEWER"?` ${i-1}`:""}
+    <fieldset className="defense-planning defense-member-grid"><legend>Thành phần hội đồng · 5 giảng viên</legend>{roles.map((role,i)=><label key={i}>{data.roles[role]}{role==="REVIEWER"?` ${i-1}`:""}
       <select name={"lecturer"+i} className="input" value={chosen[i]} onChange={e=>setChosen(values=>values.map((v,index)=>index===i?e.target.value:v))} required>
         <option value="">Chọn giảng viên</option>
         {candidates.map(c=>{
@@ -154,7 +175,7 @@ function CouncilForm({data,act,busy,council}:{data:Workspace;act:Act;busy:boolea
           </option>;
         })}
       </select>
-    </label>)}
+    </label>)}</fieldset>
     {hasAdvisorConflict && <p className="alert alert-danger" role="alert">Hãy thay thành viên đang hướng dẫn một đề tài đã chọn.</p>}
     {checkedTheses.length>0?<label className="defense-check"><input key={conflictSelection} name="conflict_checked" type="checkbox" required/>Đã đối chiếu thành viên không có quan hệ thân nhân với SV của các đề tài đã chọn.</label>:<p className="text-muted">Hội đồng chưa gắn đề tài. Sẽ đối chiếu quan hệ thân nhân với SV khi xếp lịch cho từng đề tài.</p>}
     {hasGuest && <label className="defense-check"><input key={memberSelection} name="guests_checked" type="checkbox" required/>Đã đối chiếu người được mời ngoài Khoa với quyết định ghi trên.</label>}
@@ -191,11 +212,12 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
       starts_at:text(form,"start")+":00+07:00",ends_at:text(form,"end")+":00+07:00",room:text(form,"room"),prior_slot_id:supplementary?.id??slot?.prior_slot_id??null,thesis_member_ids:form.getAll("member"),confirmed_no_conflict:form.has("conflict_checked")},
       slot?.version,slot?"PUT":"POST");
   }
-  return <DraftForm className="stack" onSubmit={submit}>
+  return <DraftForm className="stack defense-schedule-form" onSubmit={submit}>
     <label>Hội đồng<select className="input" value={councilId} required onChange={e=>{setCouncilId(e.target.value);setThesisId(fixedTopic?.thesis_id??thesisId);}}>
-      <option value="" disabled>Chọn hội đồng</option>{available.map(c=>option(c.id,c.name))}</select></label>
+      <option value="" disabled>Chọn hội đồng</option>{available.map(c=>option(c.id,c.name.includes(councilContext(data,c).split(" · ")[0])?c.name:`${c.name} · ${councilContext(data,c)}`))}</select></label>
     <label>Đề tài đủ điều kiện<select key={councilId} name="thesis" className="input" required disabled={!council || !theses.length} value={theses.some(t=>t.id===thesisId)?thesisId:""} onChange={e=>setThesisId(e.target.value)}><option value="" disabled>{!council ? "Chọn hội đồng trước" : theses.length ? "Chọn đề tài đủ điều kiện" : "Chưa có đề tài đủ điều kiện"}</option>
       {theses.map(t=>option(t.id,t.title))}</select></label>
+    <details className="defense-wide"><summary>Vì sao đề tài chưa có trong danh sách?</summary><p>Đề tài phải cùng đợt và bộ môn với hội đồng; mọi SV đang thực hiện đã được TBM chốt đủ điều kiện trên bản báo cáo hiện tại; hồ sơ sẵn sàng bảo vệ (hoặc gia hạn còn hiệu lực), chưa có lịch khác và không có GVHD trong hội đồng. Giờ, phòng và lịch giảng viên tiếp tục được kiểm tra khi lưu.</p></details>
     {(!slot||slot.council.id!==councilId||slot.thesis_id!==thesisId)&&<label className="defense-check"><input key={councilId+thesisId} name="conflict_checked" type="checkbox" required/>Đã đối chiếu thành viên hội đồng không có quan hệ thân nhân với các SV của đề tài này.</label>}
     {supplementary&&<fieldset><legend>Sinh viên được Khoa cho bảo vệ bổ sung</legend>{supplementary.roster.filter(r=>supplementary.absence_decisions?.[r.id]?.outcome==="SUPPLEMENTARY"&&!data.slots.some(s=>s.prior_slot_id===supplementary.id&&s.roster.some(m=>m.id===r.id))).map(r=><label className="defense-check" key={r.id}><input type="checkbox" name="member" value={r.id}/>{r.name} · {r.code}</label>)}<p>Chỉ xếp lịch cho các SV được chọn. Điểm của thành viên đã bảo vệ được giữ nguyên.</p></fieldset>}
     {council && options.some(hasConflict) && <p>Đã loại đề tài có GVHD trong hội đồng. Chọn hội đồng khác cho đề tài đó.</p>}
@@ -205,7 +227,7 @@ function ScheduleForm({data,act,busy,slot,supplementary}:{data:Workspace;act:Act
     {slot&&<p>Khi lưu, hệ thống báo lịch mới cho các tài khoản liên quan. Nếu thay đề tài hoặc hội đồng, người không còn tham gia cũng nhận thông báo.</p>}
     <label>Bắt đầu (giờ Việt Nam)<input name="start" className="input" type="datetime-local" min={selected?.extension_starts_at?dateLocal(selected.extension_starts_at):undefined} max={selected?.extension_until_at?dateLocal(selected.extension_until_at):undefined} defaultValue={slot?dateLocal(slot.starts_at):""} required/></label>
     <label>Kết thúc (giờ Việt Nam)<input name="end" onInput={e=>e.currentTarget.setCustomValidity("")} className="input" type="datetime-local" min={selected?.extension_starts_at?dateLocal(selected.extension_starts_at):undefined} max={selected?.extension_until_at?dateLocal(selected.extension_until_at):undefined} defaultValue={slot?dateLocal(slot.ends_at):""} required/></label>
-    <label>Phòng bảo vệ<input name="room" className="input" defaultValue={slot?.room} required minLength={2} maxLength={200}/></label>
+    <label className="defense-wide">Phòng bảo vệ<input name="room" className="input" defaultValue={slot?.room} required minLength={2} maxLength={200}/></label>
     <button className="btn btn-primary" disabled={busy||!theses.some(t=>t.id===thesisId)}>{slot?"Lưu thay đổi lịch":"Lưu lịch"}</button>
   </DraftForm>;
 }
@@ -374,6 +396,8 @@ export default function DefensePage({context}:{context:Context}) {
   const [filter,setFilter]=useState("");
   const [search,setSearch]=useState("");
   const [refresh,setRefresh]=useState(0);
+  const [view,setView]=useState("schedules");
+  const [operation,setOperation]=useState<"council"|"schedule"|null>(null);
   const load=useCallback(async()=>{setData(await request<Workspace>(root,context.user_id));setRefresh(value=>value+1);},[context.user_id]);
   useEffect(()=>{void load().catch(e=>setError(errorMessage(e)));},[load]);
   useEffect(()=>{
@@ -404,33 +428,52 @@ export default function DefensePage({context}:{context:Context}) {
     <PageHeader title="Hội đồng và bảo vệ" description="Hội đồng → lịch bảo vệ → điểm danh → chấm Mẫu 6 → biên bản → chốt và xuất bảng điểm.">
       <button className="btn btn-secondary" disabled={busy} onClick={()=>{void load().catch(e=>setError(errorMessage(e)));}}>Làm mới dữ liệu</button>
     </PageHeader>
-    {error&&<p role="alert" className="alert alert-danger defense-notice">{error}</p>}
+    {error&&!operation&&<p role="alert" className="alert alert-danger defense-notice">{error}</p>}
     {message&&<p role="status" className="alert alert-success defense-notice">{message}</p>}
     {!data&&!error&&<p role="status">Đang tải…</p>}
     {data&&<>
-      {!!data.scopes.length&&<details className="defense-operation"><summary>Lập hội đồng mới</summary><CouncilForm data={data} act={act} busy={busy}/></details>}
-      {data.councils.some(c=>c.can_manage&&!c.closed_at)&&<details className="defense-operation"><summary>Xếp lịch bảo vệ</summary><Card title="Xếp lịch bảo vệ"><ScheduleForm data={data} act={act} busy={busy}/></Card></details>}
-      {!!data.export_rounds?.length&&<DefenseRegister rounds={data.export_rounds} refresh={refresh}/>}
-      {!!data.councils.length&&<section className="stack"><h2>Hội đồng</h2>
+      <div className="defense-workspace-bar">
+        <nav className="defense-tabs" aria-label="Quản lý bảo vệ">
+          <button className={`btn ${view==="councils"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="councils"} onClick={()=>setView("councils")}>Hội đồng ({data.councils.length})</button>
+          <button className={`btn ${view==="schedules"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="schedules"} onClick={()=>setView("schedules")}>Lịch & kết quả ({data.slots.length})</button>
+          {!!data.export_rounds?.length&&<button className={`btn ${view==="register"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="register"} onClick={()=>setView("register")}>Bảng điểm toàn đợt</button>}
+        </nav>
+        <div className="button-row">
+          {!!data.scopes.length&&<button className="btn btn-primary" onClick={()=>{if(mayDiscard())setOperation("council");}}>Lập hội đồng mới</button>}
+          {data.councils.some(c=>c.can_manage&&!c.closed_at)&&<button className="btn btn-secondary" onClick={()=>{if(mayDiscard())setOperation("schedule");}}>Xếp lịch bảo vệ</button>}
+        </div>
+      </div>
+      <Dialog open={!!operation} size="lg" title={operation==="council"?"Lập hội đồng mới":"Xếp lịch bảo vệ"} busy={busy} onClose={()=>{if(!busy&&mayDiscard())setOperation(null);}}>
+        {operation&&<div className="defense-page defense-editor">
+          {error&&<p role="alert" className="alert alert-danger">{error}</p>}
+          {operation==="council"?<CouncilForm data={data} busy={busy} act={async(...args)=>{const ok=await act(...args);if(ok){setOperation(null);setView("councils");}return ok;}}/>:<Card title="Xếp lịch bảo vệ"><ScheduleForm data={data} busy={busy} act={async(...args)=>{const ok=await act(...args);if(ok){setOperation(null);setView("schedules");}return ok;}}/></Card>}
+        </div>}
+      </Dialog>
+      <div hidden={view!=="register"}>{!!data.export_rounds?.length&&<DefenseRegister rounds={data.export_rounds} refresh={refresh}/>}</div>
+      <div hidden={view!=="councils"}>
+      {!data.councils.length&&<p>Chưa có hội đồng trong phạm vi của bạn. Chọn “Lập hội đồng mới” để bắt đầu nếu được phân quyền.</p>}
+      {!!data.councils.length&&<section className="stack"><h2>Danh sách hội đồng</h2><div className="defense-council-grid">
         {data.councils.map(c=>{
           const ownRole=data.slots.find(s=>s.council.id===c.id)?.role;
           const path=councilPath(c);
           return <Card key={c.id} title={c.name}>
-            <p>{c.reference} · {c.closed_at?"Đã khóa bảng điểm":"Đang xử lý"}</p>
-            <p>{data.slots.filter(s=>s.council.id===c.id&&s.finalized_at).length}/{data.slots.filter(s=>s.council.id===c.id).length} phiên đã chốt</p><ul>{c.members.map(m=><li key={m.id}>{data.roles[m.role]} · {m.name}</li>)}</ul>
-            <button className="btn btn-secondary" onClick={()=>{if(mayDiscard()){setFilter(c.id);document.getElementById("defense-schedules")?.scrollIntoView({behavior:"smooth"});}}}>Xem lịch hội đồng này</button>
+            <p>{councilContext(data,c)}</p><p>{c.reference} · {c.closed_at?"Đã khóa bảng điểm":"Đang xử lý"}</p>
+            <p>{data.slots.filter(s=>s.council.id===c.id&&s.finalized_at).length}/{data.slots.filter(s=>s.council.id===c.id).length} phiên đã chốt</p><details><summary>Thành phần hội đồng · {c.members.length} giảng viên</summary><ul>{c.members.map(m=><li key={m.id}>{data.roles[m.role]} · {m.name}</li>)}</ul></details>
+            <button className="btn btn-secondary" onClick={()=>{if(mayDiscard()){setFilter(c.id);setView("schedules");}}}>Xem lịch hội đồng này</button>
             {c.can_manage&&!c.closed_at&&data.scopes.some(s=>s.round_id===c.round_id&&s.department_id===c.department_id)&&!data.slots.some(s=>s.council.id===c.id&&!s.schedule_editable)&&<details className="defense-operation"><summary>Điều chỉnh hội đồng trước buổi họp</summary><CouncilForm council={c} data={data} act={act} busy={busy}/></details>}
             {(c.can_manage||["CHAIR","SECRETARY"].includes(ownRole??""))&&<details className="defense-operation"><summary>Đối chiếu bảng điểm trước khi khóa</summary><div className="defense-results"><table><thead><tr><th>Sinh viên</th><th>Điểm</th><th>Trạng thái</th></tr></thead><tbody>{data.slots.filter(s=>s.council.id===c.id).flatMap(s=>s.roster.map(r=><tr key={s.id+r.id}><td>{r.name} · {r.code}</td><td>{s.results[r.id]?.average??"—"}</td><td>{s.finalized_at?"Đã chốt":"Chưa chốt"}{s.results[r.id]?.attendance.status==="ABSENT"&&" · Vắng, chưa có kết quả học vụ"}</td></tr>))}</tbody></table></div></details>}
             {c.can_manage&&!c.closed_at&&<button className="btn btn-primary" disabled={busy||!data.slots.some(s=>s.council.id===c.id)||data.slots.some(s=>s.council.id===c.id&&!s.finalized_at)}
               onClick={()=>{if(window.confirm("Khóa điểm của các phiên đã chốt trong hội đồng này?"))act(path+"/close",{});}}>Khóa bảng điểm hội đồng</button>}
           </Card>;
         })}
-      </section>}
+      </div></section>}
+      </div><div hidden={view!=="schedules"} className="stack">
       <h2 id="defense-schedules">Lịch và kết quả bảo vệ</h2>
       <label>Tìm lịch theo đề tài, hội đồng, phòng, tên SV hoặc MSSV<input className="input" value={search} onChange={e=>{if(!hasDrafts())setSearch(e.target.value);else setError("Hãy lưu nội dung đang nhập trước khi lọc danh sách.");}}/></label>
       {filter&&<button className="btn btn-secondary" onClick={()=>{if(mayDiscard())setFilter("");}}>Hiện tất cả lịch</button>}
       {!slots.length&&<p>{search||filter?"Không có kết quả phù hợp. Hãy đổi từ khóa hoặc xóa bộ lọc.":"Chưa có lịch trong phạm vi của bạn."}</p>}
       {[...slots].sort((a,b)=>Number(b.id===focused)-Number(a.id===focused)).map(slot=><details id={`slot-${slot.id}`} key={slot.id} className="defense-operation defense-session" open={slot.id===focused||slots.length===1}><summary>{when(slot.starts_at)} · {slot.room} · {slot.title}</summary><SlotCard slot={slot} data={data} act={act} download={download} busy={busy} initialTab={slot.id===focused?initialTab:undefined}/>{slot.finalized_at&&slot.council.closed_at&&(slot.can_manage||['CHAIR','SECRETARY'].includes(slot.role??''))&&<DefenseCorrections slot={slot} criteria={data.criteria} saved={()=>void load().catch(e=>setError(errorMessage(e)))}/>}</details>)}
+      </div>
     </>}
   </div>;
 }

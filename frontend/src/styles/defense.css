@@ -74,6 +74,22 @@
 .defense-page .archive-filters { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .defense-page .archive-filters > label:last-child { grid-column: 1 / -1; }
 .defense-page form > .defense-form-grid { grid-column: 1 / -1; }
+.defense-workspace-bar { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; }
+.defense-workspace-bar .defense-tabs { border:0; padding:0; }
+.defense-workspace-bar .button-row { display:flex; flex-wrap:wrap; gap:10px; }
+.defense-council-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:20px; align-items:start; }
+.defense-council-grid > .card:has(form) { grid-column:1/-1; }
+.defense-page .defense-wide,.defense-page .defense-schedule-form > .defense-check,.defense-page .defense-council-form > .defense-check { grid-column:1/-1; }
+.defense-member-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.defense-member-grid > label:last-child { grid-column:1/-1; }
+.defense-editor { display:grid; gap:16px; }
+.defense-editor .card { box-shadow:none; }
+.defense-page .defense-schedule-form > button { justify-self:start; min-width:180px; }
+@media(max-width:600px) {
+  .defense-member-grid { grid-template-columns:1fr; }
+  .defense-workspace-bar > *, .defense-workspace-bar .button-row > .btn { flex:1 1 100%; }
+  .defense-page .defense-schedule-form > button { justify-self:stretch; }
+}
 .defense-results th { background: #eef2f6; color: #334155; font-size: 13px; letter-spacing: .025em; }
 .defense-results td { vertical-align: middle; font-variant-numeric: tabular-nums; }
 .defense-results small { color: #475569; font-size: 13px; }

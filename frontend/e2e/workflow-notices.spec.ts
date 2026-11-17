@@ -64,9 +64,10 @@ test("Cuốn báo cáo trước bảo vệ, chuông đúng nhóm/GVHD/TBM và da
     const advisorId=(await read(gv,"/me/context")).lecturer_id;
     await other.goto(web+"/defense");
     await other.getByText("Lập hội đồng mới",{exact:true}).click();
-    const scope=other.getByRole("combobox",{name:"Đợt và bộ môn",exact:true});
-    await expect(scope.locator("option")).toHaveCount(1);
-    await expect(scope.locator("option")).toContainText("SYN-DEMO · Bộ môn giả lập");
+    const scope=other.getByRole("combobox",{name:"Bộ môn",exact:true});
+    await expect(other.getByRole("combobox",{name:"Đợt KLTN",exact:true})).toHaveValue(/.+/);
+    await expect(scope.locator("option")).toHaveCount(2);
+    await expect(scope.locator("option").last()).toContainText("Bộ môn giả lập");
     await other.getByRole("searchbox",{name:"Tìm đề tài"}).fill("thong bao va cuon");
     const thesisPicker=other.getByRole("combobox",{name:"Thêm đề tài"});
     await expect(thesisPicker.locator("option")).toHaveCount(2);

@@ -13,6 +13,76 @@ const slot={id:'slot-demo',thesis_id:'thesis-demo',title:'Xây dựng hệ thố
 const workspace={scopes:[{round_id:'round-demo',round_code:'KLTN 2026',department_id:'department-demo',department_name:'Công nghệ thông tin'}],councils:[council],eligible:[],candidates:members.map((m,i)=>({...m,code:'GV00'+i})),slots:[slot],criteria,roles};
 const context={user_id:'user-demo',base_role:'LECTURER',student_id:null,lecturer_id:'lecturer-1',actions:[],display_name:'Trần Hoàng Bình',department_id:'department-demo',department_code:'CNTT',department_name:'Công nghệ thông tin',email:'secretary@example.test',student_code:null,class_name:null,major_code:null,major_name:null,lecturer_code:'GV001',lecturer_duties:[],csrf_token:'synthetic-ui-token',can_change_password:false};
 
+test("Tách đợt/bộ môn, gợi ý tên và biểu mẫu riêng không đẩy dài danh sách",async({page})=>{
+  const scopes=[{...workspace.scopes[0],department_code:"BM-CNTT"},{round_id:"round-next",round_code:"KLTN26-27-D02",department_id:"department-next",department_code:"BM-KHMT",department_name:"Khoa học máy tính"}];
+  const catalog=[...scopes,{...scopes[1],department_id:"department-locked",department_code:"BM-KT",department_name:"Kỹ thuật",can_manage:false}];
+  await page.route("**/api/v1/**",async route=>{
+    const endpoint=new URL(route.request().url()).pathname.replace("/api/v1","");
+    if(endpoint==="/me/context")return route.fulfill({json:context});
+    if(endpoint==="/defense")return route.fulfill({json:{...workspace,scopes,scope_catalog:catalog,slots:[]}});
+    if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+    return route.fulfill({json:[]});
+  });
+  await page.goto("/defense");
+  await page.getByRole("button",{name:"Lập hội đồng mới",exact:true}).click();
+  const editor=page.getByRole("dialog",{name:"Lập hội đồng mới",exact:true});
+  await expect(editor.getByRole("combobox",{name:"Đợt KLTN",exact:true})).toHaveValue("round-demo");
+  await expect(editor.locator('input[name="name"]')).toHaveValue(/Hội đồng bảo vệ KLTN 02.*BM-CNTT/);
+  await editor.getByRole("combobox",{name:"Đợt KLTN",exact:true}).selectOption("round-next");
+  await expect(editor.getByRole("combobox",{name:"Bộ môn",exact:true})).toHaveValue("1");
+  await expect(editor.getByRole("combobox",{name:"Bộ môn",exact:true}).locator('option[value="round-nextdepartment-locked"]')).toHaveJSProperty("disabled",true);
+  await expect(editor.locator('input[name="name"]')).toHaveValue(/Hội đồng bảo vệ KLTN 01.*BM-KHMT.*KLTN26-27-D02/);
+  await editor.getByRole("combobox",{name:"Chủ tịch",exact:true}).selectOption(members[0].id);
+  await expect(editor.getByRole("combobox",{name:"Thư ký",exact:true}).locator(`option[value="${members[0].id}"]`)).toHaveJSProperty("disabled",true);
+  for(const width of [320,390,768,1440]){
+    await page.setViewportSize({width,height:960});
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+    await expect.poll(()=>editor.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  }
+  const audit=await new AxeBuilder({page}).include(".defense-editor").withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze();
+  expect(audit.violations).toEqual([]);
+  page.once("dialog",d=>d.accept());
+  await editor.getByRole("button",{name:"Đóng",exact:true}).click();
+  await expect(editor).not.toBeVisible();
+  await page.getByRole("button",{name:/Hội đồng \(/}).click();
+  await expect(page.getByRole("heading",{name:"Danh sách hội đồng",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Xem lịch hội đồng này",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Lịch và kết quả bảo vệ",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Xếp lịch bảo vệ",exact:true}).click();
+  await page.getByRole("dialog").getByRole("combobox",{name:"Hội đồng",exact:true}).selectOption(council.id);
+  await expect(page.getByRole("dialog").getByRole("combobox",{name:"Đề tài đủ điều kiện",exact:true})).toBeDisabled();
+  await page.getByText("Vì sao đề tài chưa có trong danh sách?",{exact:true}).click();
+  await expect(page.getByText(/mọi SV đang thực hiện đã được TBM chốt/)).toBeVisible();
+});
+
+test("Đổi lịch có đề tài hiện tại, giờ/phòng thẳng hàng và chặn giờ kết thúc sai",async({page})=>{
+  let saved:Record<string,unknown>|null=null;
+  await page.route("**/api/v1/**",async route=>{
+    const endpoint=new URL(route.request().url()).pathname.replace("/api/v1","");
+    if(endpoint==="/me/context")return route.fulfill({json:context});
+    if(endpoint==="/defense")return route.fulfill({json:{...workspace,slots:[{...slot,schedule_editable:true}],eligible:[{id:slot.thesis_id,title:slot.title,round_id:council.round_id,department_id:council.department_id,advisor_ids:[]}]}});
+    if(endpoint==="/defense/slots/slot-demo"){saved=route.request().postDataJSON();return route.fulfill({status:204});}
+    if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+    return route.fulfill({json:[]});
+  });
+  await page.goto("/defense");
+  await page.getByText("Đổi đề tài, giờ, phòng hoặc hủy lịch",{exact:true}).click();
+  const form=page.locator(".defense-schedule-form");
+  await expect(form.getByRole("combobox",{name:"Đề tài đủ điều kiện",exact:true})).toHaveValue(slot.thesis_id);
+  for(const width of [320,768,1440]){
+    await page.setViewportSize({width,height:960});
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  }
+  await form.locator('[name="end"]').fill("2026-11-09T07:00");
+  await form.getByRole("button",{name:"Lưu thay đổi lịch",exact:true}).click();
+  expect(saved).toBeNull();
+  await form.locator('[name="end"]').fill("2026-11-09T10:00");
+  await form.locator('[name="room"]').fill("Phòng B.203");
+  await form.getByRole("button",{name:"Lưu thay đổi lịch",exact:true}).click();
+  await expect.poll(()=>saved?.room).toBe("Phòng B.203");
+  expect(saved?.thesis_id).toBe(slot.thesis_id);
+});
+
 test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có dữ liệu",async({page})=>{
   let revision=1;
   await page.route("**/api/v1/**",async route=>{
@@ -76,6 +146,7 @@ test("Mẫu 11 toàn đợt yêu cầu chọn mã và dùng cùng mã khi xem ho
     return route.fulfill({json:[]});
   });
   await page.goto("/defense");
+  await page.getByRole("button",{name:"Bảng điểm toàn đợt",exact:true}).click();
   await page.getByText("Bảng điểm toàn đợt · Mẫu 10 và 11",{exact:true}).click();
   await page.getByRole("combobox",{name:/Đợt bảo vệ/}).selectOption("round-demo");
   await expect(page.getByRole("cell",{name:"Hội đồng bổ sung",exact:true})).toBeVisible();
