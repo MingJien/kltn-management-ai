@@ -50,9 +50,9 @@ test("Tách đợt/bộ môn, gợi ý tên và biểu mẫu riêng không đẩ
   await expect(page.getByRole("heading",{name:"Lịch và kết quả bảo vệ",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Xếp lịch bảo vệ",exact:true}).click();
   await page.getByRole("dialog").getByRole("combobox",{name:"Hội đồng",exact:true}).selectOption(council.id);
-  await expect(page.getByRole("dialog").getByRole("combobox",{name:"Đề tài đủ điều kiện",exact:true})).toBeDisabled();
+  await expect(page.getByRole("dialog").getByText("Chưa có đề tài đủ điều kiện trong phạm vi hội đồng.",{exact:true})).toBeVisible();
   await page.getByText("Vì sao đề tài chưa có trong danh sách?",{exact:true}).click();
-  await expect(page.getByText(/mọi SV đang thực hiện đã được TBM chốt/)).toBeVisible();
+  await expect(page.getByText(/Cùng đợt và bộ môn; mọi SV/)).toBeVisible();
 });
 
 test("Đổi lịch có đề tài hiện tại, giờ/phòng thẳng hàng và chặn giờ kết thúc sai",async({page})=>{
@@ -81,6 +81,59 @@ test("Đổi lịch có đề tài hiện tại, giờ/phòng thẳng hàng và 
   await form.getByRole("button",{name:"Lưu thay đổi lịch",exact:true}).click();
   await expect.poll(()=>saved?.room).toBe("Phòng B.203");
   expect(saved?.thesis_id).toBe(slot.thesis_id);
+});
+
+test("Xếp hai đề tài liên tiếp chỉ nhập hội đồng, phòng và thời gian một lần",async({page})=>{
+  let saved:any=null;
+  await page.route("**/api/v1/**",async route=>{
+    const endpoint=new URL(route.request().url()).pathname.replace("/api/v1","");
+    if(endpoint==="/me/context")return route.fulfill({json:context});
+    if(endpoint==="/defense")return route.fulfill({json:{...workspace,slots:[],eligible:[1,2].map(i=>({id:'topic-'+i,title:'Đề tài demo '+i,round_id:council.round_id,department_id:council.department_id,advisor_ids:[]}))}});
+    if(endpoint==="/defense/slots-batch"){saved=route.request().postDataJSON();return route.fulfill({status:201,json:{slots:[{id:'one'},{id:'two'}]}});}
+    if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+    return route.fulfill({json:[]});
+  });
+  await page.goto('/defense');await page.getByRole('button',{name:'Xếp lịch bảo vệ',exact:true}).click();
+  const dialog=page.getByRole('dialog');await dialog.getByRole('combobox',{name:'Hội đồng',exact:true}).selectOption(council.id);
+  await dialog.getByRole('button',{name:'Chọn tất cả',exact:true}).click();
+  await dialog.getByLabel('Bắt đầu (giờ Việt Nam)',{exact:true}).fill('2026-11-20T08:00');
+  await dialog.getByLabel('Phòng bảo vệ',{exact:true}).fill('A.301');
+  await dialog.getByRole('checkbox',{name:/Đã đối chiếu/}).check();
+  for(const width of [320,768,1440]){await page.setViewportSize({width,height:960});await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
+  await dialog.getByRole('button',{name:'Lưu lịch cho 2 đề tài',exact:true}).click();
+  await expect.poll(()=>saved?.slots?.length).toBe(2);
+  expect(Date.parse(saved.slots[1].starts_at)-Date.parse(saved.slots[0].ends_at)).toBe(5*60000);
+  expect(saved.slots[0].room).toBe('A.301');await expect(dialog).not.toBeVisible();
+});
+
+test("Thư ký định dạng trực tiếp bản xem, Enter/Tab không thay đổi chữ hoặc điểm",async({page})=>{
+ const source='Nhận xét demo giữ nguyên';let lastUrl='';
+ await page.route('**/api/v1/**',async route=>{
+  const url=new URL(route.request().url()),endpoint=url.pathname.replace('/api/v1','');
+  if(endpoint==='/me/context')return route.fulfill({json:context});
+  if(endpoint==='/defense')return route.fulfill({json:{...workspace,slots:[{...slot,marks:{'student-1':{'lecturer-1':{scores:Array(12).fill('0.5'),note:source}}}}]}});
+  if(endpoint.endsWith('/forms/6')){
+   lastUrl=url.toString();
+   if(url.searchParams.has('layout_fields'))return route.fulfill({json:{fields:[{key:'note',label:'Đề nghị / nhận xét',text:source}]}});
+   if(url.searchParams.has('preview_revision'))return route.fulfill({json:{revision:'synthetic-layout'}});
+   return route.fulfill({json:{sheets:[{name:'Mẫu 6',rows:[[{text:'III. Đề nghị (nếu có): '+source,rowspan:1,colspan:1,bold:false,italic:false,size:10,align:'left'}]]}]}});
+  }
+  if(endpoint.includes('/notifications'))return route.fulfill({json:{items:[],unread_count:0,total:0}});
+  return route.fulfill({json:[]});
+ });
+ await page.goto('/defense');await page.getByRole('button',{name:'Phiếu chấm',exact:true}).click();
+ await page.getByText('Xem trước & định dạng · Mẫu 6 · '+members[1].name+' · '+roster[0].name,{exact:true}).click();
+ const print=page.locator('.defense-print').first();await print.getByRole('button',{name:'Áp dụng & xem trước',exact:true}).click();
+ const field=print.getByRole('textbox',{name:'Định dạng Đề nghị / nhận xét',exact:true});await expect(field).toHaveText(source);
+ await field.focus();await field.press('Home');for(let i=0;i<5;i++)await field.press('ArrowRight');
+ await field.press('Enter');await field.press('Tab');await field.press('X');
+ expect((await field.textContent())?.replace(/[\n\t]/g,'')).toBe(source);
+ await print.getByRole('button',{name:'Đậm',exact:true}).click();
+ await expect(print.getByRole('button',{name:'Tải bản theo định dạng đã chọn',exact:true})).toBeDisabled();
+ await print.getByRole('button',{name:'Áp dụng & xem trước',exact:true}).click();
+ await expect.poll(()=>new URL(lastUrl).searchParams.get('line_breaks')).toContain('5');
+ expect(new URL(lastUrl).searchParams.get('tabs')).toContain('5');
+ expect(new URL(lastUrl).searchParams.get('field_styles')).toContain('"bold":true');
 });
 
 test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có dữ liệu",async({page})=>{

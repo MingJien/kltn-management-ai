@@ -24,6 +24,14 @@ NarrativeKey=Literal["objectives","functions","achievements","discussion","concl
 LineBreaks=dict[NarrativeKey,Annotated[list[Annotated[int,Field(ge=0,le=100000,strict=True)]],Field(max_length=20)]]
 
 
+class FieldStyle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    bold: bool | None = None
+    italic: bool | None = None
+    font_size: int | None = Field(default=None,ge=10,le=14)
+    line_spacing: float | None = Field(default=None,ge=1,le=1.5)
+
+
 class PrintLayout(BaseModel):
     """Presentation only. No document text, scores or roster accepted from a client."""
     model_config = ConfigDict(extra="forbid")
@@ -34,6 +42,8 @@ class PrintLayout(BaseModel):
     narrative_bold: bool | None = None
     narrative_italic: bool | None = None
     line_breaks: LineBreaks = Field(default_factory=dict)
+    tabs: LineBreaks = Field(default_factory=dict)
+    field_styles: dict[NarrativeKey,FieldStyle] = Field(default_factory=dict)
 
     @field_validator("line_breaks")
     @classmethod
@@ -47,17 +57,24 @@ class PrintLayout(BaseModel):
 def narrative_text(text, key, layout):
     """Add line breaks only; preserve every character of the source content."""
     positions=layout.line_breaks.get(key,[])
-    for pos in positions:
+    tabs=layout.tabs.get(key,[])
+    for pos in [*positions,*tabs]:
         if pos>len(text) or not text or (0<pos<len(text) and not (text[pos-1].isspace() or text[pos].isspace())):
             raise HTTPException(422,"Chỉ ngắt dòng giữa các từ của nội dung đã lưu. Tải lại nội dung nếu hồ sơ đã thay đổi")
-    for pos in reversed(positions):text=text[:pos]+"\n"+text[pos:]
+    for pos,character in sorted([(p,"\n") for p in positions]+[(p,"\t") for p in tabs],reverse=True):text=text[:pos]+character+text[pos:]
     return text
 
 
-def narrative_style(paragraph,layout):
+def narrative_style(paragraph,layout,key=None):
+    style=layout.field_styles.get(key) if key else None
     for run in paragraph.runs:
         if layout.narrative_bold is not None:run.bold=layout.narrative_bold
         if layout.narrative_italic is not None:run.italic=layout.narrative_italic
+        if style:
+            if style.bold is not None:run.bold=style.bold
+            if style.italic is not None:run.italic=style.italic
+            if style.font_size:run.font.size=Pt(style.font_size)
+    if style and style.line_spacing:paragraph.paragraph_format.line_spacing=style.line_spacing
 
 
 def source(session, user, round_id, number):
@@ -136,7 +153,7 @@ def cell(cell_, value):
         p._element.getparent().remove(p._element)
 
 
-def after(paragraph, value, layout=None):
+def after(paragraph, value, layout=None, key=None):
     element = deepcopy(paragraph._p)
     paragraph._p.addnext(element)
     from docx.text.paragraph import Paragraph
@@ -151,7 +168,7 @@ def after(paragraph, value, layout=None):
     for run in result.runs:
         run.bold = False
         run.italic = False
-    if layout:narrative_style(result,layout)
+    if layout:narrative_style(result,layout,key)
     return result
 
 
@@ -248,7 +265,7 @@ def signature_names(table, chair, secretary, date, *, dean=False):
 
 
 def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, total, blank, footer, layout, date):
-    book = load_workbook(path)
+    book = load_workbook(path,rich_text=True)
     sheet = book.active
     if "PHIẾU ĐÁNH GIÁ" not in str(sheet["A2"].value):
         raise HTTPException(409,"Cấu trúc Mẫu 6 đang phát hành chưa được hỗ trợ. Kiểm tra lại tệp gốc của Khoa")
@@ -276,8 +293,10 @@ def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, tot
     sheet["F29"].number_format="0.0"
     for row in [5,6,7,8,10,30]:
         value = str(sheet[f"A{row}"].value or "")
-        lines = sum(max(1, ceil(len(line)/88)) for line in value.split("\n"))
-        sheet.row_dimensions[row].height = max(sheet.row_dimensions[row].height or 15, lines * 17 + 5)
+        note_style=layout.field_styles.get("note") if row==30 else None
+        size=note_style.font_size if note_style and note_style.font_size else sheet[f"A{row}"].font.sz or 10
+        lines = sum(max(1, ceil(len(line)/max(40,88*10/size))) for line in value.split("\n"))
+        sheet.row_dimensions[row].height = max(sheet.row_dimensions[row].height or 15, lines * max(17,size*1.3) + 5)
     for row in range(12,30):
         text=str(sheet[f"B{row}"].value or "")
         size=layout.font_size or sheet[f"B{row}"].font.sz or 10
@@ -287,13 +306,20 @@ def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, tot
         for address in ("E12", "F12"):
             sheet[address].alignment=Alignment(horizontal="center",vertical="center",wrap_text=True)
         sheet.row_dimensions[12].height=max(sheet.row_dimensions[12].height,layout.font_size*2.6)
-    sheet.row_dimensions[9].height=4
     sheet.row_dimensions[31].height = 115
     if layout.narrative_bold is not None or layout.narrative_italic is not None:
         font=copy(sheet["A30"].font)
         if layout.narrative_bold is not None:font.b=layout.narrative_bold
         if layout.narrative_italic is not None:font.i=layout.narrative_italic
         sheet["A30"].font=font
+    # Preserve rich formatting of fixed criteria; style only the inserted narrative.
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
+    style=layout.field_styles.get("note")
+    sheet["A30"]=CellRichText(TextBlock(InlineFont(rFont="Times New Roman",sz=sheet["A30"].font.sz,b=True),"III. Đề nghị (nếu có): "),
+        TextBlock(InlineFont(rFont="Times New Roman",sz=style.font_size if style and style.font_size else sheet["A30"].font.sz,
+            b=style.bold if style and style.bold is not None else bool(layout.narrative_bold),
+            i=style.italic if style and style.italic is not None else bool(layout.narrative_italic)),narrative_text(mark.get("note", ""),"note",layout)))
     sheet.page_setup.paperSize=sheet.PAPERSIZE_A4
     # The source uses zero top/bottom/footer margins, which clips signatures on
     # physical printers and even Excel PDF. Retain its grid, add print clearance.
@@ -319,8 +345,8 @@ def score_sheet(path, student, evaluator, role, title, advisor, mark, bonus, tot
             note.cell(i,1,text).data_type = "s"
             note.cell(i,1).alignment = Alignment(wrap_text=True, vertical="top")
             from openpyxl.styles import Font
-            note.cell(i,1).font=Font(name="Times New Roman",size=layout.font_size or 11,b=bool(layout.narrative_bold),i=bool(layout.narrative_italic))
-            note_size=layout.font_size or 11
+            note_size=style.font_size if style and style.font_size else layout.font_size or 11
+            note.cell(i,1).font=Font(name="Times New Roman",size=note_size,b=style.bold if style and style.bold is not None else bool(layout.narrative_bold),i=style.italic if style and style.italic is not None else bool(layout.narrative_italic))
             note_lines=sum(max(1,len(wrap(part,width=max(45,int(100*11/note_size))))) for part in text.split("\n"))
             note.row_dimensions[i].height = max(100,note_lines*note_size*1.3+8)
         sheet["A30"] = "III. Đề nghị (nếu có): Xem trang Nhận xét tiếp theo kèm cùng mã bản xuất."
@@ -369,11 +395,11 @@ def minutes_document(path, slot, council, roster, totals, notes, footer, layout,
     put(p[11], f"2. Địa điểm: {slot.room}")
     for index, key, label in [(15,"objectives","Mục tiêu"),(16,"functions","Chức năng"),(17,"achievements","Kết quả đạt được")]:
         put(p[index], f"{label}: {narrative_text(slot.minutes.get(key) or '',key,layout) or 'Chưa ghi nhận riêng; xem nội dung họp bên dưới.'}")
-        narrative_style(p[index],layout)
-    after(p[17], narrative_text(slot.minutes["discussion"],"discussion",layout),layout)
-    after(p[18], narrative_text(notes["REVIEWER"],"reviewer_comments",layout) or "Không có nhận xét bổ sung trên phiếu chấm đã lưu.",layout)
-    after(p[19], narrative_text(notes["OTHER"],"member_comments",layout) or "Không có nhận xét bổ sung trên phiếu chấm đã lưu.",layout)
-    after(p[20], narrative_text(slot.minutes["conclusion"],"conclusion",layout),layout)
+        narrative_style(p[index],layout,key)
+    after(p[17], narrative_text(slot.minutes["discussion"],"discussion",layout),layout,"discussion")
+    after(p[18], narrative_text(notes["REVIEWER"],"reviewer_comments",layout) or "Không có nhận xét bổ sung trên phiếu chấm đã lưu.",layout,"reviewer_comments")
+    after(p[19], narrative_text(notes["OTHER"],"member_comments",layout) or "Không có nhận xét bổ sung trên phiếu chấm đã lưu.",layout,"member_comments")
+    after(p[20], narrative_text(slot.minutes["conclusion"],"conclusion",layout),layout,"conclusion")
     counts = []
     for row in roster:
         result = totals[row["id"]]
@@ -395,7 +421,7 @@ def minutes_document(path, slot, council, roster, totals, notes, footer, layout,
     p[24].paragraph_format.keep_together=True
     for index in [13,14,18,19,20,21]:p[index].paragraph_format.keep_with_next=True
     recommendation_status = "Hội đồng xác nhận không có kiến nghị." if slot.minutes.get("no_recommendations") else "Chưa ghi nhận kiến nghị."
-    anchor = after(p[25], narrative_text(slot.minutes.get("recommendations") or "","recommendations",layout) or recommendation_status,layout)
+    anchor = after(p[25], narrative_text(slot.minutes.get("recommendations") or "","recommendations",layout) or recommendation_status,layout,"recommendations")
     p[25].paragraph_format.keep_with_next = True
     p[22].paragraph_format.keep_with_next = True
     p[23].paragraph_format.keep_with_next = True

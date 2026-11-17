@@ -64,15 +64,7 @@ def complete_review(ctx, member=0, user=3, kind="ADVISOR", allow=True):
     saved=client.put(base,headers=version_headers(users[user],review),json=data)
     assert saved.status_code==200,saved.text
     review=saved.json()
-    upload=client.post(base+"/signed-copy",headers={**version_headers(users[user],review),"X-File-Name":"signed.pdf","Content-Type":"application/octet-stream"},content=synthetic_pdf())
-    assert upload.status_code==201,upload.text
-    review=upload.json()
-    assert review["signed_file"]["scan_state"]!="CLEAN"
-    blocked=client.post(base+"/submit",headers=version_headers(users[user],review),json={"confirm_signed_copy":True})
-    assert blocked.status_code==409,blocked.text
-    item=session.get(m.ThesisReview,UUID(review["id"]))
-    session.get(m.StoredFile,item.signed_file_id).scan_state="CLEAN";session.commit()
-    sent=client.post(base+"/submit",headers=version_headers(users[user],review),json={"confirm_signed_copy":True})
+    sent=client.post(base+"/submit",headers=version_headers(users[user],review),json={"confirm_content":True})
     assert sent.status_code==200,sent.text
     return sent.json()
 
@@ -210,7 +202,7 @@ def test_signed_submitted_review_is_immutable_and_student_specific(evaluation):
     base=path+f"/evaluation/reviews/{sent['id']}"
     assert client.put(base,headers=version_headers(users[3],sent),json={"sections":{}}).status_code==409
     assert client.get(base+"/signed-copy",headers=hdr(users[other])).status_code==404
-    assert client.get(base+"/signed-copy",headers=hdr(users[student_id])).content==synthetic_pdf()
+    assert client.get(base+"/signed-copy",headers=hdr(users[student_id])).status_code==404
     assert create(ctx).status_code==201
     assert len(get(ctx,student_id)["reviews"])==1  # new draft remains private
 
@@ -271,14 +263,12 @@ def test_new_report_invalidates_review_and_eligibility_without_overwriting_histo
     assert check(ctx,data_override={"report_version_id":checked["report"]["id"],"advisor_review_id":sent["id"]}).status_code==409
 
 
-def test_editing_contents_detaches_previous_signed_copy(evaluation):
-    ctx,_=evaluation;client,users,_,_,session,path=ctx
+def test_signed_upload_and_receipt_are_not_available(evaluation):
+    ctx,_=evaluation;client,users,_,_,_,path=ctx
     draft=create(ctx).json();base=path+f"/evaluation/reviews/{draft['id']}"
-    uploaded=client.post(base+"/signed-copy",headers={**version_headers(users[3],draft),"X-File-Name":"signed.pdf","Content-Type":"application/octet-stream"},content=synthetic_pdf()).json()
-    assert uploaded["signed_file"]
-    saved=client.put(base,headers=version_headers(users[3],uploaded),json={"sections":{"attitude":"Changed after signing"}})
-    assert saved.status_code==200,saved.text
-    assert saved.json()["signed_file"] is None
+    assert client.post(base+"/signed-copy",headers=version_headers(users[3],draft),content=synthetic_pdf()).status_code==405
+    assert client.post(base+"/paper-receipt",headers=version_headers(users[3],draft),json={}).status_code==404
+    assert client.post(base+"/scan",headers=version_headers(users[3],draft),json={}).status_code==404
 
 
 def test_reviewer_revocation_preserves_submitted_history_and_reassignment_creates_new_identity(evaluation):
@@ -368,70 +358,29 @@ def test_export_fills_official_form_preserves_reference_and_requires_saved_compl
         xml=after.read("word/document.xml").decode()
         assert "SYNTHETIC EXPORT TEXT" in xml
         assert "Synthetic student" in xml
-        assert "Bản để ký" in after.read("word/footerNv6Review.xml").decode()
+        assert "Bản nhận xét trên hệ thống" in after.read("word/footerNv6Review.xml").decode()
     assert source.read_bytes()==original
     assert client.post(base+"/print-copy",headers=version_headers(users[0],saved)).status_code in (403,404)
     assert client.post(base+"/print-copy",headers=version_headers(users[user],review)).status_code==409
 
-def test_submit_without_scan_then_scoped_paper_receipt(evaluation):
-    ctx,_=evaluation;client,users,_,_,session,path=ctx
-    review=create(ctx).json();base=path+f"/evaluation/reviews/{review['id']}"
-    payload={"sections":{f["key"]:"Complete authenticated review "+f["key"] for f in FORM_FIELDS["ADVISOR"]},"thesis_completed":True,"allow_defense":True}
-    saved=client.put(base,headers=version_headers(users[3],review),json=payload).json()
-    assert client.post(base+"/submit",headers=version_headers(users[3],saved),json={}).status_code==422
-    sent=client.post(base+"/submit",headers=version_headers(users[3],saved),json={"confirm_content":True})
-    assert sent.status_code==200,sent.text
-    sent=sent.json();assert sent["signed_file"] is None
-    eligibility=get(ctx)["members"][0]["eligibility"]
-    assert next(c for c in eligibility["conditions"] if c["key"]=="completion")["met"]
-    assert not next(c for c in eligibility["conditions"] if c["key"]=="consent")["met"]
-    export=client.post(base+"/print-copy",headers=version_headers(users[3],sent))
-    assert export.status_code==200,export.text
-    code=export.headers["X-Document-Code"]
-    receipt={"reference":"PAPER-REGISTER-2026-01","export_code":code,"confirm_paper":True}
-    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json=receipt).status_code in (403,404)
-    session.add(m.ResourceAssignment(id=uuid4(),user_id=users[5].id,round_id=session.get(m.Thesis,UUID(path.split("/")[-1])).round_id,
-        assignment_type="REVIEW_RECORDS_MANAGER",state="ACTIVE",effective_from=now()))
-    session.commit()
-    assert "evaluation:record" in get(ctx,5)["actions"]
-    bad=client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json={**receipt,"export_code":"OTHER-EXPORT-CODE"})
-    assert bad.status_code==422
-    received=client.post(base+"/paper-receipt",headers=version_headers(users[5],sent),json=receipt)
-    assert received.status_code==200,received.text
-    item=next(r for r in received.json()["reviews"] if r["id"]==sent["id"])
-    assert item["paper_receipt"]["reference"]==receipt["reference"]
-    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],item),json=receipt).status_code==409
+def test_authenticated_submit_satisfies_consent_without_export_or_paper(evaluation):
+    ctx,_=evaluation
+    sent=complete_review(ctx)
+    assert sent["signed_file"] is None and sent["paper_receipt"] is None
+    assert sent["export_history"]==[]
     assert next(c for c in get(ctx)["members"][0]["eligibility"]["conditions"] if c["key"]=="consent")["met"]
+    result=check(ctx)
+    assert result.status_code==200 and result.json()["members"][0]["eligibility"]["state"]=="ELIGIBLE"
 
-def test_changed_review_cannot_receive_paper_for_old_export(evaluation):
+
+def test_revised_draft_does_not_replace_authenticated_submitted_consent(evaluation):
     ctx,_=evaluation;client,users,_,_,_,path=ctx
-    r=create(ctx).json();base=path+f"/evaluation/reviews/{r['id']}"
-    payload={"sections":{f["key"]:"Original text "+f["key"] for f in FORM_FIELDS["ADVISOR"]},"thesis_completed":True,"allow_defense":True}
-    r=client.put(base,headers=version_headers(users[3],r),json=payload).json()
-    export=client.post(base+"/print-copy",headers=version_headers(users[3],r))
-    assert export.status_code==200,export.text
-    payload["sections"]["attitude"]="Corrected content after first print"
-    r=client.put(base,headers=version_headers(users[3],r),json=payload).json()
-    r=client.post(base+"/submit",headers=version_headers(users[3],r),json={"confirm_content":True}).json()
-    result=client.post(base+"/paper-receipt",headers=version_headers(users[4],r),json={
-        "reference":"PAPER-OLD-CONTENT","export_code":export.headers["X-Document-Code"],"confirm_paper":True})
-    assert result.status_code==422
+    original=complete_review(ctx)
+    draft=create(ctx).json();base=path+f"/evaluation/reviews/{draft['id']}"
+    updated=client.put(base,headers=version_headers(users[3],draft),json={"sections":{"attitude":"Draft changed"}})
+    assert updated.status_code==200
+    assert get(ctx)["members"][0]["eligibility"]["advisor_review_id"]==original["id"]
 
-
-def test_review_author_can_confirm_signed_export_without_upload(evaluation):
-    ctx,_=evaluation;client,users,_,_,_,path=ctx
-    review=create(ctx).json();base=path+f"/evaluation/reviews/{review['id']}"
-    payload={"sections":{field["key"]:"Synthetic signed review "+field["key"] for field in FORM_FIELDS["ADVISOR"]},
-        "thesis_completed":True,"allow_defense":True}
-    review=client.put(base,headers=version_headers(users[3],review),json=payload).json()
-    review=client.post(base+"/submit",headers=version_headers(users[3],review),json={"confirm_content":True}).json()
-    exported=client.post(base+"/print-copy",headers=version_headers(users[3],review))
-    assert exported.status_code==200
-    receipt={"reference":"SYNTHETIC SIGNED PAPER","export_code":exported.headers["X-Document-Code"],"confirm_paper":True}
-    assert client.post(base+"/paper-receipt",headers=version_headers(users[5],review),json=receipt).status_code in (403,404)
-    response=client.post(base+"/paper-receipt",headers=version_headers(users[3],review),json=receipt)
-    assert response.status_code==200,response.text
-    assert next(c for c in get(ctx)["members"][0]["eligibility"]["conditions"] if c["key"]=="consent")["met"]
 
 @pytest.mark.parametrize("source_code,target_code", [("BM-CNTT","BM-KHMT"), ("BM-KHMT","BM-CNTT")])
 def test_computing_departments_can_assign_cross_reviewer(evaluation, source_code, target_code):

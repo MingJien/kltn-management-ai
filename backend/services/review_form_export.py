@@ -223,7 +223,7 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
         footer = E.Element(f"{{{W}}}ftr", nsmap={"w": W})
         from backend.services.proposal_export import _public_url
         local=instant.astimezone(timezone(timedelta(hours=7)))
-        for line in [f"Xuất tại: {_public_url()}",f"Mã số: {code} · Báo cáo v{values['report_version']}",f"Thời gian: {local:%H:%M %d/%m/%Y} (GMT+7) · Bản để ký"]:
+        for line in [f"Xuất tại: {_public_url()}",f"Mã số: {code} · Báo cáo v{values['report_version']}",f"Thời gian: {local:%H:%M %d/%m/%Y} (GMT+7) · Bản nhận xét trên hệ thống"]:
             p=E.SubElement(footer,f"{{{W}}}p")
             ppr=E.SubElement(p,f"{{{W}}}pPr")
             E.SubElement(ppr,f"{{{W}}}spacing").set(f"{{{W}}}after","0")
@@ -267,10 +267,10 @@ def export_review(session, user, thesis_id, review_id, expected):
         row_version(expected,item.row_version)
         author=session.get(m.LecturerProfile,item.lecturer_id).user_id
         if author!=user.id and "evaluation:record" not in service.permissions(session,user,thesis):
-            raise HTTPException(403,"Chỉ người viết hoặc người tiếp nhận được xuất phiếu để ký")
+            raise HTTPException(403,"Chỉ người viết hoặc người tiếp nhận được xuất phiếu nhận xét")
     if any(not item.sections.get(f["key"]) for f in service.FORM_FIELDS[item.kind]) or (
         item.kind == "ADVISOR" and (item.allow_defense is None or item.thesis_completed is None)):
-        raise HTTPException(422, "Lưu đầy đủ nội dung phiếu và đề nghị trước khi xuất để ký")
+        raise HTTPException(422, "Lưu đầy đủ nội dung phiếu và đề nghị trước khi xuất phiếu")
     template_id = "mau-07" if item.kind == "ADVISOR" else "mau-08"
     managed = school_forms.compatibility_download(session, user, template_id, thesis.round_id)
     if managed is not None:
@@ -295,7 +295,7 @@ def export_review(session, user, thesis_id, review_id, expected):
         "advisor": identity["advisor"],
         "report_version": report.version_no}, item.sections, completed=item.thesis_completed,
         allow=item.allow_defense, code=code, instant=instant)
-    audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu để ký; content_sha256="+service.review_fingerprint(session,item),
+    audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu nhận xét; content_sha256="+service.review_fingerprint(session,item),
         before_hash=hashlib.sha256(source).hexdigest(), after_hash=hashlib.sha256(content).hexdigest(), source_reference=code)
     session.commit()
     from urllib.parse import quote

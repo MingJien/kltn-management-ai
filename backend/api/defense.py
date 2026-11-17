@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Query
-from backend.services.defense_templates import LineBreaks, PrintLayout
+from backend.services.defense_templates import LineBreaks, PrintLayout, NarrativeKey, FieldStyle
 from pydantic import TypeAdapter, ValidationError
 
 from backend.api.dependencies import current_user
@@ -12,6 +12,7 @@ from backend.api.evaluation_schemas import Reason
 from backend.services import defense, defense_export, defense_register
 from backend.api.defense_schemas import AcademicProfileInput, CouncilAttendance, ReopenInput
 from backend.api.defense_schemas import AbsenceDecision
+from backend.api.defense_schemas import BatchSlotsInput
 
 router = APIRouter(prefix="/api/v1/defense", tags=["Hội đồng và bảo vệ"])
 
@@ -51,6 +52,11 @@ def schedule(data:SlotInput,user=Depends(current_user),session=Depends(transacti
 def reschedule(identifier:UUID,data:SlotInput,version:int=Header(alias="If-Match",ge=1),
                user=Depends(current_user),session=Depends(transaction)):
     return defense.schedule(session,user,data,identifier,version)
+
+
+@router.post("/slots-batch",status_code=201)
+def schedule_batch(data:BatchSlotsInput,user=Depends(current_user),session=Depends(transaction)):
+    return defense.schedule_batch(session,user,data)
 
 
 @router.post("/slots/{identifier}/cancel",status_code=204)
@@ -103,13 +109,18 @@ def slot_form(identifier:UUID,form:Literal["6","9"],request:Request,student_id:U
               paragraph_space: Annotated[int|None,Query(ge=0,le=8)]=None,break_recommendations:bool=False,preview_sheet:bool=False,
               narrative_bold:bool|None=None,narrative_italic:bool|None=None,
               line_breaks:Annotated[str|None,Query(max_length=6000)]=None,layout_fields:bool=False,preview_revision:bool=False,expected_revision:str|None=None,
+              tabs:Annotated[str|None,Query(max_length=6000)]=None,field_styles:Annotated[str|None,Query(max_length=6000)]=None,
               user=Depends(current_user),session=Depends(transaction)):
     if request.method == "POST" and preview_sheet:
         raise HTTPException(422, "Dùng bản xem trước để kiểm tra cách trình bày")
+    try:
+        styles=TypeAdapter(dict[NarrativeKey,FieldStyle]).validate_json(field_styles) if field_styles else {}
+    except ValidationError as exc:
+        raise HTTPException(422,"Định dạng phần diễn giải không hợp lệ") from exc
     result = defense_export.export_slot(session,user,identifier,int(form),str(request.base_url),student_id,lecturer_id,blank=blank,layout_fields=layout_fields,
         record=request.method == "POST",expected_revision=expected_revision,
         layout=PrintLayout(font_size=font_size,line_spacing=line_spacing,paragraph_space=paragraph_space,break_recommendations=break_recommendations,
-            narrative_bold=narrative_bold,narrative_italic=narrative_italic,line_breaks=parse_line_breaks(line_breaks)))
+            narrative_bold=narrative_bold,narrative_italic=narrative_italic,line_breaks=parse_line_breaks(line_breaks),tabs=parse_line_breaks(tabs),field_styles=styles))
     if preview_revision:
         return {'revision':result.headers.get('X-Preview-Revision')}
     return defense_export.preview_sheet(result) if preview_sheet and form=="6" and not layout_fields else result

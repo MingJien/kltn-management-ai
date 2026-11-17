@@ -38,6 +38,10 @@ class SlotInput(Input):
     confirmed_no_conflict: bool = False
 
 
+class BatchSlotsInput(Input):
+    slots: list[SlotInput] = Field(min_length=1, max_length=30)
+
+
 class AcademicProfileInput(Input):
     class_name: str = Field(min_length=1, max_length=100)
     major_code: str = Field(min_length=1, max_length=32)

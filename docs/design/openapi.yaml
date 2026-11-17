@@ -11431,260 +11431,6 @@
         }
       }
     },
-    "/api/v1/theses/{thesis_id}/evaluation/reviews/{review_id}/signed-copy": {
-      "post": {
-        "tags": [
-          "NV6 review and eligibility"
-        ],
-        "summary": "Upload",
-        "operationId": "upload_api_v1_theses__thesis_id__evaluation_reviews__review_id__signed_copy_post",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "thesis_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Thesis Id"
-            }
-          },
-          {
-            "name": "review_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Review Id"
-            }
-          },
-          {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "title": "If-Match"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "NV6 review and eligibility"
-        ],
-        "summary": "Download",
-        "operationId": "download_api_v1_theses__thesis_id__evaluation_reviews__review_id__signed_copy_get",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "thesis_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Thesis Id"
-            }
-          },
-          {
-            "name": "review_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Review Id"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/theses/{thesis_id}/evaluation/reviews/{review_id}/scan": {
-      "post": {
-        "tags": [
-          "NV6 review and eligibility"
-        ],
-        "summary": "Scan",
-        "operationId": "scan_api_v1_theses__thesis_id__evaluation_reviews__review_id__scan_post",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "thesis_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Thesis Id"
-            }
-          },
-          {
-            "name": "review_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Review Id"
-            }
-          },
-          {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "title": "If-Match"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/theses/{thesis_id}/evaluation/reviews/{review_id}/submit": {
       "post": {
         "tags": [
@@ -11758,6 +11504,81 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/theses/{thesis_id}/evaluation/reviews/{review_id}/signed-copy": {
+      "get": {
+        "tags": [
+          "NV6 review and eligibility"
+        ],
+        "summary": "Download",
+        "operationId": "download_api_v1_theses__thesis_id__evaluation_reviews__review_id__signed_copy_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thesis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Thesis Id"
+            }
+          },
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Review Id"
+            }
+          },
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -12084,101 +11905,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Reason"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/theses/{thesis_id}/evaluation/reviews/{review_id}/paper-receipt": {
-      "post": {
-        "tags": [
-          "NV6 review and eligibility"
-        ],
-        "summary": "Paper Receipt",
-        "operationId": "paper_receipt_api_v1_theses__thesis_id__evaluation_reviews__review_id__paper_receipt_post",
-        "security": [
-          {
-            "APIKeyCookie": []
-          },
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "thesis_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Thesis Id"
-            }
-          },
-          {
-            "name": "review_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Review Id"
-            }
-          },
-          {
-            "name": "If-Match",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "title": "If-Match"
-            }
-          },
-          {
-            "name": "X-Dev-User-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Dev-User-Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PaperReceipt"
               }
             }
           }
@@ -12832,6 +12558,71 @@
         },
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defense/slots-batch": {
+      "post": {
+        "tags": [
+          "Hội đồng và bảo vệ"
+        ],
+        "summary": "Schedule Batch",
+        "operationId": "schedule_batch_api_v1_defense_slots_batch_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Dev-User-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Dev-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSlotsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -13675,6 +13466,40 @@
             }
           },
           {
+            "name": "tabs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tabs"
+            }
+          },
+          {
+            "name": "field_styles",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field Styles"
+            }
+          },
+          {
             "name": "X-Dev-User-Id",
             "in": "header",
             "required": false,
@@ -13951,6 +13776,40 @@
                 }
               ],
               "title": "Expected Revision"
+            }
+          },
+          {
+            "name": "tabs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tabs"
+            }
+          },
+          {
+            "name": "field_styles",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 6000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Field Styles"
             }
           },
           {
@@ -21680,6 +21539,25 @@
         ],
         "title": "AuditOut"
       },
+      "BatchSlotsInput": {
+        "properties": {
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotInput"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Slots"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "slots"
+        ],
+        "title": "BatchSlotsInput"
+      },
       "Body_report_with_file_api_v1_theses__thesis_id__progress_submissions_post": {
         "properties": {
           "report": {
@@ -24223,35 +24101,6 @@
           "label"
         ],
         "title": "OpenRoundOut"
-      },
-      "PaperReceipt": {
-        "properties": {
-          "reference": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 5,
-            "title": "Reference"
-          },
-          "export_code": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 5,
-            "title": "Export Code"
-          },
-          "confirm_paper": {
-            "type": "boolean",
-            "const": true,
-            "title": "Confirm Paper"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "reference",
-          "export_code",
-          "confirm_paper"
-        ],
-        "title": "PaperReceipt"
       },
       "PasswordChange": {
         "properties": {

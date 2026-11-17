@@ -92,7 +92,7 @@ export default function AdministrationPage({
   const isAdmin = context.base_role === "ADMIN";
 
   const assignmentDescriptions: Record<string, string> = {
-    REVIEW_RECORDS_MANAGER: "Mở Tiếp nhận hồ sơ phản biện để đối chiếu bản giấy đã ký với đúng mã xuất Mẫu 7 hoặc Mẫu 8, rồi lưu biên nhận. TBM xét điều kiện dự bảo vệ.",
+    REVIEW_RECORDS_MANAGER: "Theo dõi nhận xét Mẫu 7/8 đã gửi trong Phản biện & điều kiện bảo vệ, đối chiếu đúng sinh viên và bản báo cáo. GV xác nhận nội dung trên tài khoản của mình; TBM xét điều kiện dự bảo vệ.",
     FORM_MANAGER: "Mở Quản lý kho biểu mẫu Khoa để thêm bản mới, phát hành hoặc thu hồi biểu mẫu và tài liệu của đợt được giao.",
     ELIGIBILITY_IMPORTER:
       "Mở Danh sách sinh viên, nhập danh sách được Khoa duyệt để xác nhận đủ điều kiện đăng ký KLTN. Sinh viên kích hoạt tài khoản trước khi gửi đăng ký.",

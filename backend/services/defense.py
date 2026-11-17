@@ -208,6 +208,8 @@ def validate_ready(session, thesis, council, member_ids=None):
         evaluation.eligibility_out(session, thesis, row, report)["state"] != "ELIGIBLE" for row in active):
         raise HTTPException(409, "Đề tài cần được chốt đủ điều kiện trên phiên bản báo cáo hiện tại")
     check_supervision_conflict(session, thesis, {UUID(row["id"]) for row in council.members})
+    if evaluation.pending_reviewer_forms(session,thesis,report):
+        raise HTTPException(409,"Cần đủ Mẫu 8 của tất cả giảng viên phản biện đang được phân công cho từng SV trên bản báo cáo hiện tại")
     return active, report
 
 
@@ -219,7 +221,7 @@ def validate_extension_window(extension, request, starts_at, ends_at):
         extension.until_at, starts_at, ends_at)
 
 
-def schedule(session, user, data, identifier=None, expected=None):
+def schedule(session, user, data, identifier=None, expected=None, *, commit=True):
     session.execute(select(func.pg_advisory_xact_lock(66102)))
     slot = None
     old_council = None
@@ -318,8 +320,23 @@ def schedule(session, user, data, identifier=None, expected=None):
     if identifier:
         notify_removed(session, user, old_recipients - schedule_recipients(session, slot, council),
             f"Bạn không còn được xếp trong lịch bảo vệ đã thay đổi · {old_title}")
-    session.commit()
+    if commit:
+        session.commit()
     return {"id":slot.id}
+
+
+def schedule_batch(session, user, data):
+    if len({item.council_id for item in data.slots}) != 1 or any(item.prior_slot_id for item in data.slots):
+        raise HTTPException(422, "Xếp liên tiếp dành cho một hội đồng và các phiên bảo vệ chính")
+    if len({item.thesis_id for item in data.slots}) != len(data.slots):
+        raise HTTPException(422, "Danh sách xếp lịch có đề tài trùng")
+    try:
+        result = [schedule(session,user,item,commit=False) for item in data.slots]
+        session.commit()
+        return {"slots": result}
+    except Exception:
+        session.rollback()
+        raise
 
 
 def lecturer_accounts(session, ids):
@@ -759,6 +776,8 @@ def workspace(session,user):
                 reason = "Thời hạn gia hạn đã hết."
             elif t.state not in {"READY_FOR_DEFENSE", "EXTENDED"}:
                 reason = "Hồ sơ chưa ở trạng thái sẵn sàng bảo vệ."
+            elif evaluation.pending_reviewer_forms(session,t,report):
+                reason = "Chưa nhận đủ Mẫu 8 từ tất cả phản biện đang được phân công cho từng SV."
             else:
                 reason = None
             planning_theses.append({**row, "schedule_reason": reason,

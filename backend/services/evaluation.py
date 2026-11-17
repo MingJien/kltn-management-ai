@@ -107,13 +107,12 @@ def last_check(session, member):
 
 def requirements(session, current_report, review, discipline_status):
     report_file = session.get(m.StoredFile, current_report.stored_file_id) if current_report else None
-    signed = session.get(m.StoredFile, review.signed_file_id) if review and review.signed_file_id else None
     complete = bool(review and review.thesis_completed and report_file and report_file.scan_state == "CLEAN")
-    consent = bool(review and review.allow_defense and ((signed and signed.scan_state == "CLEAN") or review.paper_confirmed_at))
+    consent = bool(review and review.state == "SUBMITTED" and review.allow_defense)
     return [
         {"key": "discipline", "label": "Không bị kỷ luật từ cảnh cáo toàn Trường", "met": discipline_status == "CLEAR"},
         {"key": "completion", "label": "Hoàn thành KLTN, GVHD xác nhận trên đúng bản báo cáo", "met": complete},
-        {"key": "consent", "label": "GVHD đồng ý bảo vệ bằng văn bản đã ký (Mẫu 7)", "met": consent},
+        {"key": "consent", "label": "GVHD xác nhận đồng ý bảo vệ trên hệ thống (Mẫu 7)", "met": consent},
     ]
 
 
@@ -150,6 +149,23 @@ def people(session, thesis):
 def assignments(session, thesis):
     return session.scalars(select(m.ReviewerAssignment).where(m.ReviewerAssignment.thesis_id == thesis.id,
         m.ReviewerAssignment.review_scope == "THESIS").order_by(m.ReviewerAssignment.assigned_at.desc())).all()
+
+
+def pending_reviewer_forms(session, thesis, current_report):
+    """Every active assignment must cover each current student and report version."""
+    pending=[]
+    for assignment in assignments(session,thesis):
+        if assignment.state != "ACTIVE":
+            continue
+        for member in members(session,thesis):
+            received=session.scalar(select(m.ThesisReview.id).where(
+                m.ThesisReview.reviewer_assignment_id==assignment.id,
+                m.ThesisReview.thesis_member_id==member.id,
+                m.ThesisReview.report_version_id==current_report.id,
+                m.ThesisReview.kind=="REVIEWER",m.ThesisReview.state=="SUBMITTED")) if current_report else None
+            if not received:
+                pending.append((assignment.id,member.id))
+    return pending
 
 
 def reviewer_department_ids(session, thesis):
@@ -311,40 +327,6 @@ def save_review(session, user, thesis_id, review_id, data, expected):
     return review_out(session, item, can_edit=True)
 
 
-async def upload_signed(session, user, thesis_id, review_id, request, expected):
-    path = None
-    try:
-        thesis, item = editable_review(session, user, thesis_id, review_id, expected)
-        name, content, mime = await documents.read_upload(request)
-        if Path(name).suffix.lower() not in {".pdf", ".docx"}:
-            raise HTTPException(422, "Bản đã ký phải là PDF hoặc DOCX, tối đa 10 MB")
-        stored, _, path = documents.persist_upload(session, name, content, mime)
-        session.flush()
-        file_scanner.scan(stored, path)
-        item.signed_file_id = stored.id
-        item.row_version += 1
-        thesis.row_version += 1
-        result = review_out(session, item, can_edit=True)
-        session.commit()
-        return result
-    except Exception:
-        session.rollback()
-        if path and path.is_file():
-            path.unlink()
-        raise
-
-
-def scan_signed(session, user, thesis_id, review_id, expected):
-    _, item = editable_review(session, user, thesis_id, review_id, expected)
-    stored = session.get(m.StoredFile, item.signed_file_id) if item.signed_file_id else None
-    if not stored:
-        raise HTTPException(404, "Chưa đính kèm bản đã ký")
-    file_scanner.scan(stored, documents.storage_root() / Path(stored.storage_key).name)
-    item.row_version += 1
-    session.commit()
-    return review_out(session, item, can_edit=True)
-
-
 def submit_review(session, user, thesis_id, review_id, data, expected):
     thesis, item = editable_review(session, user, thesis_id, review_id, expected)
     if any(not item.sections.get(field["key"], "").strip() for field in FORM_FIELDS[item.kind]):
@@ -353,8 +335,6 @@ def submit_review(session, user, thesis_id, review_id, data, expected):
         raise HTTPException(422, "GVHD cần xác nhận hoàn thành và đề nghị cho bảo vệ hoặc không")
     if not (getattr(data,"confirm_content",None) or getattr(data,"confirm_signed_copy",None)):
         raise HTTPException(422,"Xác nhận nội dung nhận xét trước khi gửi")
-    if item.signed_file_id:
-        documents.require_clean(session.get(m.StoredFile,item.signed_file_id),"gửi bản nhận xét có đính kèm")
     item.state, item.submitted_at = "SUBMITTED", now()
     item.row_version += 1
     thesis.row_version += 1
@@ -552,6 +532,8 @@ def workspace(session, user, thesis_id):
         "report": {"id": current.id, "version_no": current.version_no, "name": current_file.original_name,
             "scan_state": current_file.scan_state} if current else None,
         "assignments": [{"id": a.id, "lecturer_id": a.lecturer_id,
+            "submitted_count":sum(any(r.reviewer_assignment_id==a.id and r.thesis_member_id==member.id and current and r.report_version_id==current.id and r.state=="SUBMITTED" for r in reviews) for member in members(session,thesis)),
+            "expected_count":len(members(session,thesis)),
             "name": session.get(m.LecturerProfile, a.lecturer_id).display_name, "state": a.state,
             "due_at": a.due_at, "overdue": bool(a.due_at and a.due_at < now() and not all(
                 any(r.reviewer_assignment_id == a.id and r.thesis_member_id == member.id and r.state == "SUBMITTED"
@@ -591,30 +573,3 @@ def review_fingerprint(session,item):
     thesis=session.get(m.Thesis,item.thesis_id)
     values=[str(item.id),str(item.report_version_id),item.sections,item.thesis_completed,item.allow_defense,item.source_reference,thesis.current_title]
     return hashlib.sha256(json.dumps(values,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
-
-def record_paper(session,user,thesis_id,review_id,data,expected):
-    thesis=access(session,user,thesis_id,write=True)
-    item=session.scalar(select(m.ThesisReview).where(m.ThesisReview.id==review_id,m.ThesisReview.thesis_id==thesis.id).with_for_update())
-    if not item or item.state!="SUBMITTED":
-        raise HTTPException(409,"Chỉ ghi nhận bản giấy của phiếu đã gửi")
-    if "evaluation:record" not in permissions(session,user,thesis):
-        lecturer, assignment = writing_assignment(session, user, thesis, item.kind)
-        column = "advisor_assignment_id" if item.kind == "ADVISOR" else "reviewer_assignment_id"
-        if item.lecturer_id != lecturer.id or getattr(item, column) != assignment.id:
-            raise HTTPException(403, "Chỉ người viết phiếu hiện hành hoặc người được giao tiếp nhận được xác nhận")
-    row_version(expected,item.row_version)
-    if item.paper_confirmed_at:
-        raise HTTPException(409,"Bản giấy đã được ghi nhận; lịch sử được giữ nguyên")
-    exported=session.scalar(select(m.AuditEvent).where(m.AuditEvent.resource_type=="thesis_review",m.AuditEvent.resource_id==item.id,
-        m.AuditEvent.action=="THESIS_REVIEW_EXPORTED",m.AuditEvent.source_reference==data.export_code))
-    if not exported or ("content_sha256="+review_fingerprint(session,item)) not in (exported.reason or ""):
-        raise HTTPException(422,"Mã bản xuất không thuộc đúng nội dung phiếu này; xuất lại phiếu hiện tại để đối chiếu")
-    item.paper_reference,item.paper_export_code=data.reference,data.export_code
-    item.paper_confirmed_by,item.paper_confirmed_at=user.id,now()
-    item.row_version+=1;thesis.row_version+=1
-    audit(session,user,"THESIS_REVIEW_PAPER_RECEIVED","thesis_review",item.id,data.reference,source_reference=data.export_code)
-    author=session.get(m.LecturerProfile,item.lecturer_id).user_id
-    student=session.get(m.StudentProfile,session.get(m.ThesisMember,item.thesis_member_id).student_id).user_id
-    notify(session,user,thesis,people(session,thesis)|{author,student},"THESIS_REVIEW_PAPER_RECEIVED","Đã xác nhận văn bản nhận xét có chữ ký; bộ môn có thể xét lại điều kiện")
-    session.commit()
-    return workspace(session,user,thesis.id)

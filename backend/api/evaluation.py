@@ -2,7 +2,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Query, Request
 from backend.api.dependencies import current_user, get_session
-from backend.api.evaluation_schemas import ReviewerCreate, ReviewerDeadline, Reason, ReviewCreate, ReviewSave, ReviewSubmit, EligibilityCreate, PaperReceipt
+from backend.api.evaluation_schemas import ReviewerCreate, ReviewerDeadline, Reason, ReviewCreate, ReviewSave, ReviewSubmit, EligibilityCreate
 from backend.services import evaluation as service
 
 router = APIRouter(prefix="/api/v1", tags=["NV6 review and eligibility"])
@@ -57,20 +57,6 @@ def save(thesis_id: UUID, review_id: UUID, data: ReviewSave, if_match: int = Hea
     return service.save_review(session, user, thesis_id, review_id, data, if_match)
 
 
-@router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/signed-copy", status_code=201,
-    openapi_extra={"requestBody": {"required": True, "content": {"application/octet-stream": {
-        "schema": {"type": "string", "format": "binary"}}}}})
-async def upload(thesis_id: UUID, review_id: UUID, request: Request,
-                 if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(transaction)):
-    return await service.upload_signed(session, user, thesis_id, review_id, request, if_match)
-
-
-@router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/scan")
-def scan(thesis_id: UUID, review_id: UUID, if_match: int = Header(alias="If-Match", ge=1),
-         user=Depends(current_user), session=Depends(transaction)):
-    return service.scan_signed(session, user, thesis_id, review_id, if_match)
-
-
 @router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/submit")
 def submit(thesis_id: UUID, review_id: UUID, data: ReviewSubmit,
            if_match: int = Header(alias="If-Match", ge=1), user=Depends(current_user), session=Depends(transaction)):
@@ -104,8 +90,3 @@ def eligibility(thesis_id: UUID, data: EligibilityCreate, if_match: int = Header
 def reopen(thesis_id: UUID, data: Reason, if_match: int = Header(alias="If-Match", ge=1),
            user=Depends(current_user), session=Depends(transaction)):
     return service.reopen(session, user, thesis_id, data, if_match)
-
-@router.post("/theses/{thesis_id}/evaluation/reviews/{review_id}/paper-receipt")
-def paper_receipt(thesis_id: UUID,review_id: UUID,data:PaperReceipt,if_match:int=Header(alias="If-Match",ge=1),
-                  user=Depends(current_user),session=Depends(transaction)):
-    return service.record_paper(session,user,thesis_id,review_id,data,if_match)

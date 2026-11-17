@@ -31,7 +31,7 @@ def stamp(identifier, version, instant, base_url):
 
 def preview_sheet(result):
     """Read-only preview of the very same generated workbook, including merges."""
-    book=load_workbook(BytesIO(result.body),data_only=True)
+    book=load_workbook(BytesIO(result.body),data_only=True,rich_text=True)
     sheets=[]
     for sheet in book:
         merged={}
@@ -53,12 +53,15 @@ def preview_sheet(result):
                     value=f"{value:.{len(c.number_format)-2}f}"
                 color=c.font.color
                 rgb=color.rgb if color and color.type=="rgb" else None
-                cells.append({"text":str(value) if value is not None else "","rowspan":span[0],"colspan":span[1],
+                from openpyxl.cell.rich_text import CellRichText,TextBlock
+                segments=[{"text":part.text if isinstance(part,TextBlock) else str(part),"bold":bool(part.font.b) if isinstance(part,TextBlock) else bool(c.font.b),"italic":bool(part.font.i) if isinstance(part,TextBlock) else bool(c.font.i)} for part in value] if isinstance(value,CellRichText) else None
+                cells.append({"text":str(value) if value is not None else "","segments":segments,"rowspan":span[0],"colspan":span[1],
                     "color":"#"+rgb[-6:] if isinstance(rgb,str) and len(rgb)==8 else "#000000",
                     "bold":bool(c.font.bold),"italic":bool(c.font.italic),"size":c.font.sz or 12,
                     "align":c.alignment.horizontal if c.alignment.horizontal in {"left","center","right"} else "left"})
             rows.append(cells)
         sheets.append({"name":sheet.title,"rows":rows,"truncated":sheet.max_row>1000 or sheet.max_column>30,
+            "row_heights":[sheet.row_dimensions[i].height for i in range(1,len(rows)+1)],
             "widths":[min(120,sheet.column_dimensions[get_column_letter(i)].width or 13)*7 for i in range(1,min(sheet.max_column,30)+1)]})
     return JSONResponse({"sheets":sheets},headers={"Cache-Control":"private, no-store"})
 
@@ -93,7 +96,9 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     slot,council,member,own,manager=defense.load_slot(session,user,identifier,write=record)
     if own or not (member or manager):raise HTTPException(403,"Chỉ hội đồng và người phụ trách được tải mẫu")
     allowed={"note"} if form==6 else {"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}
-    if set(layout.line_breaks)-allowed:raise HTTPException(422,"Chỉ định dạng các phần diễn giải có trong biểu mẫu này")
+    if (set(layout.line_breaks)|set(layout.tabs)|set(layout.field_styles))-allowed:raise HTTPException(422,"Chỉ định dạng các phần diễn giải có trong biểu mẫu này")
+    if (layout_fields or layout.line_breaks or layout.tabs or layout.field_styles or layout.font_size or layout.narrative_bold is not None or layout.narrative_italic is not None) and (not member or member["role"]!="SECRETARY"):
+        raise HTTPException(403,"Chỉ thư ký hội đồng được chỉnh trình bày bản xuất")
     blank=blank and form==6
     if record and (blank or not slot.finalized_at or layout_fields):
         raise HTTPException(409, "Chỉ lưu bản dùng để ký khi đã chốt phiên bảo vệ")

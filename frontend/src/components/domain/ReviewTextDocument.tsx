@@ -40,15 +40,17 @@ section.review-word { margin:0 auto 18px; flex-shrink:0; box-shadow:0 3px 18px #
 `;
 
 /** Anchors use paragraphs/lines of an immutable version; DOCX page breaks may vary by renderer. */
-export default function ReviewTextDocument({data, fileName, notes, selectedId, pinMode, canAnnotate, showEmbeddedReviews=false, onSelect, onPin, onRendered}: {
+export default function ReviewTextDocument({data, fileName, notes, selectedId, pinMode, canAnnotate, showEmbeddedReviews=false, onSelect, onPin, onRendered,onDocumentReady}: {
   data: ArrayBuffer; fileName: string; notes: ProgressAnnotation[]; selectedId: string; pinMode: boolean; canAnnotate: boolean; showEmbeddedReviews?:boolean;
   onSelect: (id: string) => void; onPin: (label: string, quote: string) => void; onRendered: () => void;
+  onDocumentReady?: (root:ShadowRoot)=>void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [nativeComments,setNativeComments] = useState<NativeWordComment[]>([]);
   const rendered = useRef(onRendered); rendered.current = onRendered;
+  const documentReady=useRef(onDocumentReady);documentReady.current=onDocumentReady;
   const selected = useRef(onSelect); selected.current = onSelect;
   const pin = useRef(onPin); pin.current = onPin;
   const mode = useRef({pinMode, canAnnotate}); mode.current = {pinMode, canAnnotate};
@@ -103,7 +105,7 @@ export default function ReviewTextDocument({data, fileName, notes, selectedId, p
       blocks.forEach((block,index) => {block.dataset.reviewBlock = `${isText ? "Dòng" : "Đoạn"} ${index + 1}`;});
       if (!active) return;
       const style = document.createElement("style"); style.textContent = styles.join("\n") + "\n" + previewStyles;
-      root.replaceChildren(style, container); setReady(true);
+      root.replaceChildren(style, container); setReady(true);documentReady.current?.(root);
     };
     const point = (event: Event) => {
       const target = event.target as HTMLElement;
