@@ -4,13 +4,13 @@ import {errorMessage} from "../../errors";
 import {when} from "../../evaluation";
 import Dialog from "../ui/Dialog";
 
-export type ExtensionRequest={id:string;thesis_id:string;title:string;state:string;row_version:number;reason:string;
+export type ExtensionRequest={id:string;thesis_id:string;title:string;advisor_name?:string|null;state:string;row_version:number;reason:string;
   submitted_at:string;original_due_at:string;requested_until_at:string|null;extension_until_at:string|null;consent_due_at:string|null;
   defense:{status:string;message:string;starts_at:string|null;ends_at:string|null};reference:string|null;
   advisor_reason:string|null;decision_reason:string|null;decided_at:string|null;extension_starts_at:string|null;all_agreed:boolean;
   members:{student_id:string;user_id:string;name:string;decision:string;responded_at:string|null}[];
   can_consent:boolean;can_review:boolean;can_decide:boolean;can_cancel:boolean;can_manage_consent:boolean};
-type Thesis={id:string;title:string;row_version:number;can_request_extension:boolean;extension_request_blocker:string;baseline_due:string|null};
+type Thesis={id:string;title:string;advisor_name?:string|null;student_names?:string[];row_version:number;can_request_extension:boolean;extension_request_blocker:string;baseline_due:string|null};
 type Operation={kind:"create";thesis:Thesis}|{kind:"consent"|"review"|"decision"|"deadline"|"cancel";item:ExtensionRequest};
 const labels:Record<string,string>={SUBMITTED:"Đang lấy ý kiến",ADVISOR_REVIEWED:"Chờ TBM quyết định",APPROVED:"Đã ghi nhận gia hạn",REJECTED:"Không chấp thuận",CANCELLED:"Đã hủy yêu cầu",EXPIRED:"Hết hạn"};
 const local=(value:string)=>new Date(Date.parse(value)+7*3600000).toISOString().slice(0,16);
@@ -30,7 +30,7 @@ function ExtensionDialog({op,userId,close,saved}:{op:Operation;userId:string;clo
   const [starts,setStarts]=useState("");
   const item="item" in op?op.item:null;
   const ready=!!item?.all_agreed&&item?.state==="ADVISOR_REVIEWED";
-  const titles={create:"Xin gia hạn thực hiện KLTN",consent:"Xác nhận nguyện vọng gia hạn",review:"GVHD cho ý kiến gia hạn",decision:"TBM quyết định gia hạn",deadline:"Hạn lấy ý kiến và nhắc xác nhận",cancel:"Hủy yêu cầu gia hạn"};
+  const titles={create:"Xin gia hạn thực hiện KLTN",consent:"Ý kiến xác nhận gia hạn",review:"GVHD cho ý kiến gia hạn",decision:"TBM quyết định gia hạn",deadline:"Hạn lấy ý kiến và nhắc xác nhận",cancel:"Hủy yêu cầu gia hạn"};
   async function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();if(busy)return;
     const data=new FormData(event.currentTarget);const get=(key:string)=>String(data.get(key)||"");
@@ -51,11 +51,11 @@ function ExtensionDialog({op,userId,close,saved}:{op:Operation;userId:string;clo
   }
   return <Dialog open size="lg" title={titles[op.kind]} busy={busy} onClose={()=>{if(!busy)close();}} footer={<>
     <button className="btn btn-secondary" disabled={busy} onClick={close}>Quay lại</button>
-    <button className="btn btn-primary" form="extension-operation" type="submit" disabled={busy||((op.kind==="create"||(op.kind==="decision"&&answer==="APPROVE"))&&!confirmed)}>{busy?"Đang xử lý…":op.kind==="create"?"Gửi yêu cầu gia hạn":op.kind==="deadline"?"Lưu và nhắc xác nhận":"Xác nhận"}</button>
+    <button className="btn btn-primary" form="extension-operation" type="submit" disabled={busy||((op.kind==="create"||(op.kind==="decision"&&answer==="APPROVE"))&&!confirmed)}>{busy?"Đang xử lý…":op.kind==="create"?"Gửi yêu cầu gia hạn":op.kind==="deadline"?"Lưu và nhắc xác nhận":op.kind==="consent"?"Gửi ý kiến xác nhận":"Xác nhận"}</button>
   </>}><form id="extension-operation" className="change-form" onSubmit={event=>void submit(event)}>
     {error&&<p role="alert" className="alert alert-danger">{error}</p>}
     <fieldset disabled={busy} className="change-fieldset">
-      <p className="change-context"><strong>{op.kind==="create"?op.thesis.title:op.item.title}</strong></p>
+      <p className="change-context"><strong>{op.kind==="create"?op.thesis.title:op.item.title}</strong><span>SV · {(op.kind==="create"?op.thesis.student_names:item?.members.map(m=>m.name))?.join(", ")||"Chưa ghi nhận"}</span><span>GVHD · {(op.kind==="create"?op.thesis.advisor_name:item?.advisor_name)||"Chưa ghi nhận"}</span></p>
       {op.kind==="create"&&<>
         <p>Đề nghị chỉ có hiệu lực sau khi đủ đồng thuận nhóm, GVHD đồng ý và TBM ghi nhận quyết định. Trong lúc chờ, hạn hiện tại vẫn áp dụng.</p>
         <p>Hạn báo cáo hiện hành: <strong>{when(op.thesis.baseline_due)}</strong></p>
@@ -71,10 +71,10 @@ function ExtensionDialog({op,userId,close,saved}:{op:Operation;userId:string;clo
       {op.kind==="consent"&&<p>Bạn xác nhận nguyện vọng của chính mình. Không đồng ý sẽ kết thúc yêu cầu gia hạn nhóm, không hủy quyền tham gia KLTN của ai.</p>}
       {op.kind==="decision"&&!ready&&<p className="alert alert-info">Chưa đủ đồng thuận của các thành viên hoặc ý kiến đồng ý của GVHD. Bạn có thể từ chối kèm lý do; chưa thể chấp thuận.</p>}
       {op.kind==="decision"&&answer==="APPROVE"&&<>
-        <p className="change-note">Thời hạn gia hạn theo quyết định của Khoa, tối đa 5 tháng. Kỳ bảo vệ tiếp theo theo lịch thực tế của Khoa, có thể diễn ra bất kỳ lúc nào trong khoảng được duyệt. Toàn bộ phiên bảo vệ phải kết thúc trong hạn.</p>
+        <p className="change-note">Có thể duyệt hạn ngay khi đã có quyết định của Khoa. Ngày bảo vệ được xếp riêng sau. Thời hạn gia hạn tối đa 5 tháng. Kỳ bảo vệ tiếp theo theo lịch thực tế của Khoa, có thể diễn ra bất kỳ lúc nào trong khoảng được duyệt. Toàn bộ phiên bảo vệ phải kết thúc trong hạn.</p>
         <div className="change-field-grid"><label>Ngày quyết định<input className="input" name="day" type="date" required/></label>
           <label>Bắt đầu gia hạn theo quyết định (giờ Việt Nam)<input className="input" name="starts" type="datetime-local" required value={starts} onChange={e=>setStarts(e.target.value)}/></label></div>
-        <label>Hạn mới được duyệt (giờ Việt Nam)<input className="input" name="until" type="datetime-local" required min={starts||undefined} max={starts?maximumUntil(starts):undefined} defaultValue={item?.requested_until_at?local(item.requested_until_at):""}/></label>
+        <label>Hạn cuối gia hạn theo quyết định (giờ Việt Nam)<input className="input" name="until" type="datetime-local" required min={starts||undefined} max={starts?maximumUntil(starts):undefined} defaultValue={item?.requested_until_at?local(item.requested_until_at):""}/></label>
         <label>Số hoặc căn cứ quyết định<input className="input" name="reference" required minLength={5} maxLength={500}/></label>
         <label className="change-checkbox"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>Tôi đã đối chiếu quyết định và mốc thời gian ghi nhận.</span></label>
       </>}
@@ -99,6 +99,7 @@ export default function ThesisExtensionRequests({userId,thesis,items,reload}:{us
     {!visible.length&&<div className="changes-empty card"><p>Chưa có yêu cầu trong bộ lọc. Chọn hồ sơ ở bên trái để xem thao tác phù hợp với quyền của bạn.</p></div>}
     {visible.map(item=><article className="change-card card" key={item.id}><div className="card-body stack">
       <div className="change-card__heading"><h3>{item.title}</h3><span className={"change-status change-status--"+item.state.toLowerCase()}>{item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED"?"Không đạt":labels[item.state]}</span></div>
+      <p>GVHD · <strong>{item.advisor_name||"Chưa ghi nhận"}</strong></p>
       <ol className="change-steps" aria-label="Tiến trình gia hạn">{["Thành viên đồng ý","GVHD cho ý kiến","TBM quyết định","Kết quả"].map((label,index)=>
         <li key={label} className={(index===0?item.all_agreed:index===1?!!item.advisor_reason:index===2?!!item.decided_at:!["SUBMITTED","ADVISOR_REVIEWED"].includes(item.state))?"is-done":""}><span>{index+1}</span>{label}</li>)}</ol>
       <div className="extension-date-grid"><div><span>Hạn tại thời điểm gửi</span><p>{when(item.original_due_at)}</p></div>{item.requested_until_at&&<div><span>Hạn SV đề nghị trước đây</span><p>{when(item.requested_until_at)}</p></div>}{item.extension_until_at&&<div><span>Hạn gia hạn được ghi nhận</span><p>{when(item.extension_until_at)}</p></div>}</div>
@@ -111,7 +112,7 @@ export default function ThesisExtensionRequests({userId,thesis,items,reload}:{us
       {item.decision_reason&&<p className="change-result"><strong>Quyết định / ý kiến xử lý</strong><br/>{item.decision_reason}</p>}
       {item.state==="EXPIRED"&&<p className={"alert "+(item.defense.status==="NOT_PASSED"?"alert-danger":"alert-info")}>{item.defense.message||item.decision_reason||"Yêu cầu đã hết hạn xác nhận. Hồ sơ KLTN và quyền tham gia của các thành viên vẫn giữ nguyên."}</p>}
       <div className="change-actions">
-        {item.can_consent&&<button className="btn btn-primary" onClick={()=>setOp({kind:"consent",item})}>Xác nhận xin gia hạn</button>}
+        {item.can_consent&&<button className="btn btn-primary" onClick={()=>setOp({kind:"consent",item})}>Ý kiến xác nhận</button>}
         {item.can_review&&<button className="btn btn-primary" onClick={()=>setOp({kind:"review",item})}>GVHD cho ý kiến</button>}
         {item.can_decide&&<button className="btn btn-primary" onClick={()=>setOp({kind:"decision",item})}>TBM xét gia hạn</button>}
         {item.can_manage_consent&&<button className="btn btn-secondary" onClick={()=>setOp({kind:"deadline",item})}>Hạn lấy ý kiến / nhắc xác nhận</button>}

@@ -358,7 +358,9 @@ def test_export_fills_official_form_preserves_reference_and_requires_saved_compl
         xml=after.read("word/document.xml").decode()
         assert "SYNTHETIC EXPORT TEXT" in xml
         assert "Synthetic student" in xml
-        assert "Bản nhận xét trên hệ thống" in after.read("word/footerNv6Review.xml").decode()
+        footer = after.read("word/footerNv6Review.xml").decode()
+        assert "Xuất tại:" in footer and "Mã số:" in footer
+        assert " · v" in footer
     assert source.read_bytes()==original
     assert client.post(base+"/print-copy",headers=version_headers(users[0],saved)).status_code in (403,404)
     assert client.post(base+"/print-copy",headers=version_headers(users[user],review)).status_code==409

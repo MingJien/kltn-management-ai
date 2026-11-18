@@ -23,3 +23,8 @@
 Tạo bản kiểm tra local bằng bộ xuất hiện tại, không ghi bản ký vào hệ thống. Mẫu 9 dùng đúng **Mẫu nd họp của 9.Bien ban hop hoi dong cham KLTN.docx**. Kết xuất sang PDF bằng Microsoft Word chạy ẩn; xem ảnh cả hai trang sau căn gọn nhận xét: 2 trang, phần ký đi cùng kiến nghị, footer có trên từng trang. `render_docx.py` không chạy được vì thiếu LibreOffice, nên dùng Word và Poppler để kiểm thay thế. Mẫu 6 kết xuất bằng Excel chạy ẩn: 1 trang, thấy hai đường gạch chân, rich text, bảng tiêu chí và vùng ký đã tăng. Các bản PDF/PNG/DOCX/XLSX kiểm tra chỉ ở local, không commit.
 
 Kiểm thử tích hợp xác nhận: lịch hai đề tài cùng hội đồng, chung giờ tập trung, xung đột rollback; danh sách công bố không có điểm/ngày sinh, SV ngoài phạm vi không tải được; nguồn đổi phải xem lại rồi công bố phiên bản mới. Bản in cũ tải lại đúng byte, tra mã nhận diện bản đã thay thế, quyền thu hồi và số lần phát hành đúng phạm vi. Các thử nghiệm này không khẳng định mọi độ dài nội dung và mọi máy in đã được kiểm.
+
+## Kiểm chứng bổ sung ngày 18/11/2026
+
+- 33 ca backend cho hội đồng, phiếu nhận xét và Mẫu 4 đạt. Mã in ở góc trái dưới của Mẫu 9 khớp mã lịch sử phát hành.
+- 12 ca trình duyệt cho hội đồng và đổi đề tài/gia hạn đạt. Yêu cầu đính chính chỉ gửi các trường biên bản được phép, giữ ý kiến đã ghi và thể hiện luồng duyệt độc lập. Ca gia hạn duyệt trên CSDL kiểm thử khi chưa biết ngày bảo vệ.

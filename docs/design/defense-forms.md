@@ -26,4 +26,6 @@ Mẫu 9 có tên `Bien-ban_<đợt>_<mã đề tài>_<ngày>_v<số lần phát 
 
 Bộ xuất ưu tiên tệp hiện có trong `docs/BieuMau` hoặc thư mục cấu hình `KLTN_OFFICIAL_TEMPLATE_DIR`; khi không có tệp local mới dùng bản được phát hành trong kho. Mẫu 9 ưu tiên **Mẫu nd họp của 9.Bien ban hop hoi dong cham KLTN.docx** nếu có. Đây là nguồn bố trí/nội dung họp được người dùng cung cấp; các tên, MSSV và nội dung ví dụ được thay toàn bộ bằng dữ liệu hồ sơ. Nếu thiếu tệp tham chiếu, giữ ánh xạ Mẫu 9 cũ; không coi file ở máy khác là đã tự có trong Git. Không commit biểu mẫu nguồn theo quy tắc dự án.
 
-Mẫu 6 giữ cả phần drawing/connector của nguồn Excel để không mất hai đường gạch ở đầu trang. Vùng ký được tăng chiều cao và khoảng trống trước họ tên. Phần diễn giải Word còn có căn đoạn và khoảng cách sau đoạn; các thao tác này không nhận nội dung thay thế từ trình duyệt.
+Mẫu 6 giữ cả phần drawing/connector của nguồn Excel để không mất hai đường gạch ở đầu trang. Vùng ký được tăng chiều cao và khoảng trống trước họ tên. Phần diễn giải Word còn có căn đoạn và khoảng cách sau đoạn.
+
+Bản phát hành mới in ở góc trái dưới theo thứ tự địa chỉ hệ thống, mã số tra cứu, `v<n>` và giờ xuất `HH:mm dd/mm/yyyy` theo giờ Việt Nam. `v<n>` trong tên tệp và footer của Mẫu 6/9/10/11 là lần phát hành cùng phạm vi. Khi đối chiếu hồ sơ, dùng mã số trên footer ở **Bản in đã lưu**. Phiên bản dữ liệu nguồn và dấu vết đối chiếu được giữ trong hệ thống. Số quyết định hoặc căn cứ của Khoa vẫn nằm trong nội dung biểu mẫu. Tệp lịch sử giữ nguyên footer của lần phát hành tương ứng.

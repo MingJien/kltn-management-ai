@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.properties import PageSetupProperties
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from backend.db.models import entities as m
 from backend.services import documents, form_templates, school_forms
@@ -45,7 +45,7 @@ def safe_value(cell, value):
         cell.data_type = "s"  # Text from accounts/topics must never become an Excel formula.
 
 
-def render_nop_ds(path, year_code, records):
+def render_nop_ds(path, year_code, records, footer=None):
     """Populate a copy of Mẫu 4 while preserving the actual Nộp ds worksheet."""
     workbook = load_workbook(path, data_only=False, keep_links=False)
     try:
@@ -143,6 +143,10 @@ def render_nop_ds(path, year_code, records):
         sheet.page_setup.fitToHeight = 0
         sheet.print_title_rows = "1:7"
         sheet.print_area = f"A1:H{34 + extra}"
+        if footer:
+            sheet.oddFooter.left.text = footer.replace("&", "&&")
+            sheet.oddFooter.left.size = 8
+            sheet.page_margins.bottom = max(sheet.page_margins.bottom, .45)
         result = BytesIO()
         workbook.save(result)
         return result.getvalue()
@@ -182,12 +186,21 @@ def export_mau_04(session, user, round_id):
     if not records:
         raise HTTPException(409, "Đợt này chưa có sinh viên đang thực hiện khóa luận; hãy chọn đợt khác hoặc hoàn tất bước GV tiếp nhận.")
     year = session.get(m.AcademicYear, round_.academic_year_id)
-    content = render_nop_ds(template_path(session, round_id), year.code, records)
+    from uuid import uuid4
+    from backend.services.proposal_export import compact_footer
+    session.execute(select(func.pg_advisory_xact_lock(func.hashtext(f"mau04:{round_id}"))))
+    previous = session.scalar(select(func.count()).select_from(m.AuditEvent).where(
+        m.AuditEvent.action == "ROUND_MAU04_EXPORTED", m.AuditEvent.resource_type == "thesis_round",
+        m.AuditEvent.resource_id == round_id))
+    edition = previous + 1
+    code = f"M4-{uuid4().hex[:12]}"
+    instant = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    content = render_nop_ds(template_path(session, round_id), year.code, records, compact_footer(code, instant, edition))
     audit(session, user, "ROUND_MAU04_EXPORTED", "thesis_round", round_id,
-          f"Xuất danh sách Mẫu 4: {len(records)} sinh viên; {datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).isoformat()}")
+          f"Xuất danh sách Mẫu 4 v{edition} cho {len(records)} sinh viên", source_reference=code)
     session.commit()
     from backend.services.download_names import filename
-    name=filename("Mau-04-Danh-sach-SV-GVHD",round_.code,extension=".xlsx")
+    name=filename("Mau-04-Danh-sach-SV-GVHD",round_.code,edition,extension=".xlsx")
     return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{name}"',
                  "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})

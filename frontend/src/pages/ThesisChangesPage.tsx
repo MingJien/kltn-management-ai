@@ -14,11 +14,11 @@ type Consent={decision:string;at:string};
 type Change={scope:"GROUP"|"INDIVIDUAL";requested_by:string;result_thesis_id:string|null;id:string;code:string;thesis_id:string;kind:string;state:string;reason:string;proposed_title:string;
   proposed_description:string;row_version:number;submitted_at:string;decided_at:string|null;decided_by:string|null;
   decision_reason:string|null;consents:Record<string,Consent>;reviews:Record<string,Consent&{reason:string}>;
-  snapshot:{title:string;description:string;target_advisor_name?:string;members:{user_id:string;name:string}[]};
+  advisor_name?:string|null; snapshot:{title:string;description:string;target_advisor_name?:string;members:{user_id:string;name:string}[]};
   can_consent:boolean;can_cancel:boolean;review_roles:string[];can_decide:boolean;ready:boolean};
 type Extension={extension_starts_at:string|null;until_at:string;original_due_at:string;decision_on:string;reference:string;reason:string;recorded_by:string;recorded_at:string;
   file:{id:string;name:string;scan_state:string}|null};
-type Thesis={can_request_extension:boolean;extension_request_blocker:string;id:string;title:string;description:string;state:string;row_version:number;round_label:string;round_id:string;
+type Thesis={advisor_name?:string|null;student_names?:string[];can_request_extension:boolean;extension_request_blocker:string;id:string;title:string;description:string;state:string;row_version:number;round_label:string;round_id:string;
   round_version:number;starts_on:string|null;cutoff:string|null;can_request:boolean;message:string;can_extend:boolean;
   extension_blocker:string;can_set_start:boolean;baseline_due:string|null;extension_max:string|null;extension:Extension|null;
   member_count:number;candidates:{group_available:boolean;individual_available:boolean;id:string;code:string;title:string;description:string;advisor:string;capacity:number}[];
@@ -38,6 +38,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
   return <article className="change-card card" id={"change-"+item.id}><div className="card-body stack">
     <div className="change-card__heading"><div><p className="change-eyebrow">{item.code} · {item.scope==="INDIVIDUAL"?"Tách cá nhân · ":""}{item.kind==="REPLACEMENT"?"Chuyển sang đề tài khác":"Điều chỉnh tên và phạm vi"}</p>
       <h3>{item.proposed_title}</h3></div><span className={"change-status change-status--"+item.state.toLowerCase()}>{labels[item.state]}</span></div>
+    <p>SV · {item.snapshot.members.map(m=>m.name).join(", ")} · GVHD · {item.advisor_name||"Chưa ghi nhận"}</p>
     <ol className="change-steps" aria-label="Tiến trình xét duyệt">
       {[item.scope==="INDIVIDUAL"?"Người đề nghị xác nhận":"Thành viên đồng ý","GVHD xem xét","Bộ môn quyết định","Kết quả"].map((text,index)=><li key={text} aria-current={pending(item)&&index===current?"step":undefined}
         className={completed[index]?"is-done":pending(item)&&index===current?"is-current":""}><span>{completed[index]?<Check size={14} aria-hidden="true"/>:index+1}</span>{text}</li>)}
@@ -100,7 +101,7 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
     <form id="thesis-change-operation" className="change-form" onSubmit={e=>void save(e)}>
       {error&&<p role="alert" className="alert alert-danger">{error}</p>}
       <fieldset disabled={busy} className="change-fieldset">
-      {t&&<p className="change-context"><strong>{t.title}</strong><span>{t.round_label}</span></p>}
+      {t&&<p className="change-context"><strong>{t.title}</strong><span>{t.round_label} · SV · {t.student_names?.join(", ")||"Chưa ghi nhận"}</span><span>GVHD · {t.advisor_name||"Chưa ghi nhận"}</span></p>}
       {op.kind==="create"&&t&&<>
         {t.member_count>1&&<label>Phạm vi thay đổi<select aria-label="Phạm vi thay đổi" className="input" value={scope} onChange={e=>{setScope(e.target.value);setTarget("");if(e.target.value==="INDIVIDUAL")setKind("REPLACEMENT");}}><option value="GROUP">Cả nhóm cùng thay đổi đề tài</option><option value="INDIVIDUAL">Tôi chuyển sang đề tài khác, nhóm còn lại tiếp tục</option></select></label>}
         {scope==="INDIVIDUAL"&&<p className="alert alert-info">Bạn vẫn thuộc nhóm hiện tại khi chờ xét. Chỉ khi TBM duyệt, hệ thống mới tạo hồ sơ riêng; nhóm còn lại giữ đề tài và GVHD cũ. Hai bên cần cập nhật Mẫu 1–3.</p>}
@@ -130,7 +131,7 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
         <label>Căn cứ kế hoạch<input name="reference" className="input" minLength={5} maxLength={500} required/></label>
       </>}
       {item&&<>
-        <div className="change-context"><strong>{item.proposed_title}</strong><span>{item.code}</span></div>
+        <div className="change-context"><strong>{item.proposed_title}</strong><span>{item.code} · SV · {item.snapshot.members.map(m=>m.name).join(", ")}</span><span>GVHD khi gửi · {item.advisor_name||"Chưa ghi nhận"}</span></div>
         {op.kind==="cancel"?<p>Hủy yêu cầu còn chờ này để tiếp tục hồ sơ hiện tại. Nếu cần thay nội dung, bạn có thể lập lại trong thời hạn.</p>:<>
           <label>Kết quả<select className="input" value={answer} onChange={e=>setAnswer(e.target.value)}>
             {op.kind==="decision"?<><option value="APPROVE">Chấp thuận</option><option value="REJECT">Không chấp thuận</option></>:
@@ -201,6 +202,7 @@ export default function ThesisChangesPage({context}:{context:Context}) {
               {!selected&&selectedId&&<option value={selectedId}>Hồ sơ từ thông báo</option>}
               {data.theses.map(t=><option key={t.id} value={t.id}>{t.title} · {t.round_label}</option>)}</select></label>
             {selected&&<>
+              <p>SV · {selected.student_names?.join(", ")||"Chưa ghi nhận"} · GVHD · {selected.advisor_name||"Chưa ghi nhận"}</p>
               <p className="change-prose">{selected.description||"Xem chi tiết trong hồ sơ khóa luận."}</p>
               <Link className="change-link" to={"/theses/"+selected.id}>Mở hồ sơ khóa luận <ChevronRight size={15}/></Link>
               <div className="changes-deadline"><CalendarClock size={19} aria-hidden="true"/><div><span>Hạn gửi đổi đề tài</span>

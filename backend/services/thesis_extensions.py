@@ -55,9 +55,12 @@ def defense_outcome(session, item):
     if not extension:
         return {"status": "NOT_APPROVED", "message": "", "starts_at": None, "ends_at": None}
     thesis = session.get(m.Thesis, item.thesis_id)
-    slot = session.scalar(select(m.DefenseSlot).where(m.DefenseSlot.thesis_id == item.thesis_id))
+    slots = session.scalars(select(m.DefenseSlot).where(m.DefenseSlot.thesis_id == item.thesis_id)
+        .order_by(m.DefenseSlot.starts_at.desc(), m.DefenseSlot.id)).all()
+    valid_slots = [slot for slot in slots if slot.starts_at >= item.extension_starts_at and slot.ends_at <= extension.until_at]
+    slot = next(iter(valid_slots or slots), None)
     info = {"starts_at": slot.starts_at if slot else None, "ends_at": slot.ends_at if slot else None}
-    if thesis.state in {"DEFENDED", "COMPLETED"} or (slot and slot.finalized_at):
+    if thesis.state in {"DEFENDED", "COMPLETED"} or (slot and slot.finalized_at and all(s.finalized_at for s in slots)):
         return {**info, "status": "COMPLETED", "message": "Đã ghi nhận kết quả phiên bảo vệ."}
     if thesis.state == "WITHDRAWN":
         return {**info, "status": "WITHDRAWN", "message": "Khóa luận đã kết thúc theo thủ tục xin thôi."}
@@ -73,7 +76,7 @@ def defense_outcome(session, item):
     if c.now() > extension.until_at:
         return {**info, "status": "PENDING_RESULT", "message": "Có lịch bảo vệ trong hạn. Chờ Thư ký/Chủ tịch đối chiếu và chốt kết quả thực tế; không tự kết luận không đạt do nhập kết quả muộn."}
     return {**info, "status": "SCHEDULED" if valid else "WAITING", "message":
-        "Đã xếp lịch bảo vệ trong thời hạn gia hạn." if valid else "Chờ Khoa xếp kỳ bảo vệ tiếp theo trong thời hạn gia hạn được duyệt."}
+        "Đã xếp lịch bảo vệ trong thời hạn gia hạn." if valid else "Đã có hạn gia hạn. Khoa chưa xếp lịch bảo vệ phù hợp; theo dõi thông báo xếp lịch trong thời hạn được duyệt."}
 
 
 def expire_without_council(session,item):
@@ -225,6 +228,7 @@ def output(session,user,item):
     rows={str(row.student_id):row for row in consents(session,item)}
     everyone=unanimous(session,item);opened=item.state in OPEN
     return {"id":item.id,"thesis_id":item.thesis_id,"title":item.snapshot["title"],"state":item.state,"row_version":item.row_version,
+        "advisor_name":c.request_advisor_name(session,item.snapshot),
         "reason":item.reason,"submitted_at":item.submitted_at,"original_due_at":item.original_due_at,
         "requested_until_at":item.requested_until_at,"consent_due_at":item.consent_due_at,
         "advisor_reason":item.advisor_reason,"decision_reason":item.decision_reason,"decided_at":item.decided_at,

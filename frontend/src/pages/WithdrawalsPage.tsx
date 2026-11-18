@@ -6,11 +6,11 @@ import PageHeader from "../components/layout/PageHeader";
 import WorkflowSteps from "../components/domain/WorkflowSteps";
 import "../styles/withdrawals.css";
 
-type Withdrawal = {id:string; code:string; title:string; student_name:string; student_code:string;
+type Withdrawal = {id:string; code:string; title:string; student_name:string; student_code:string; advisor_name?:string|null;
   reason:string; state:string; submitted_at:string; row_version:number; outcome_note:string|null;
   effective_on:string|null; can_cancel:boolean; can_record:boolean; history:{action:string;at:string;actor:string}[]};
 type Round = {id:string; code:string; starts_on:string|null; reference:string|null; row_version:number; can_edit:boolean};
-type Thesis = {id:string; title:string; round_code:string; starts_on:string|null; last_request_on:string|null; can_submit:boolean; message:string};
+type Thesis = {id:string; title:string; student_name?:string; advisor_name?:string|null; round_code:string; starts_on:string|null; last_request_on:string|null; can_submit:boolean; message:string};
 type Workspace = {requests:Withdrawal[]; rounds:Round[]; theses:Thesis[]};
 const date = (v:string|null) => v ? v.split("-").reverse().join("/") : "Chưa thiết lập";
 type Run = (action:()=>Promise<unknown>,success:string)=>Promise<boolean>;
@@ -35,7 +35,7 @@ function CreateRequest({thesis,run,userId,busy,focused}:{thesis:Thesis;run:Run;u
       "Đã gửi yêu cầu đến điều phối đợt. Bạn vẫn tiếp tục tham gia KLTN trong lúc chờ kết quả.");
     if(ok){setReason("");setConfirm(false);}
   }
-  return <section className="card" id={`withdrawal-thesis-${thesis.id}`}><div className="card-body stack"><h2>{thesis.title}</h2><WorkflowSteps steps={["Gửi yêu cầu","Điều phối xử lý","Nhận kết quả"]} current={0}/>
+  return <section className="card" id={`withdrawal-thesis-${thesis.id}`}><div className="card-body stack"><h2>{thesis.title}</h2><p>SV · {thesis.student_name} · GVHD · {thesis.advisor_name||"Chưa ghi nhận"}</p><WorkflowSteps steps={["Gửi yêu cầu","Điều phối xử lý","Nhận kết quả"]} current={0}/>
     <p>{thesis.round_code} · Bắt đầu: <strong>{date(thesis.starts_on)}</strong> · Hạn gửi đơn: <strong>{thesis.last_request_on?`hết ngày ${date(thesis.last_request_on)}`:"Chưa thiết lập"}</strong></p>
     <Link to={`/theses/${thesis.id}`}>Mở hồ sơ khóa luận</Link>
     {thesis.can_submit ? <details open={focused}><summary>Lập yêu cầu xin thôi KLTN</summary><form className="stack" onSubmit={e=>void submit(e)} style={{marginTop:16}}>
@@ -60,7 +60,7 @@ function RequestCard({row,run,userId,busy}:{row:Withdrawal;run:Run;userId:string
     }),success);
   }
   return <article className="card" id={`withdrawal-${row.id}`}><div className="card-body stack">
-    <h3>{row.title}</h3><p><strong>{row.student_name}</strong> · {row.student_code} · <span>{status(row.state)}</span></p>
+    <h3>{row.title}</h3><p><strong>{row.student_name}</strong> · {row.student_code} · GVHD · {row.advisor_name||"Chưa ghi nhận"} · <span>{status(row.state)}</span></p>
     <p className="text-muted">{row.code} · Gửi lúc {new Date(row.submitted_at).toLocaleString("vi-VN")}</p>
     <p style={{whiteSpace:"pre-wrap"}}>{row.reason}</p>
     {row.outcome_note && <p><strong>Kết quả ngày {date(row.effective_on)}</strong> · {row.outcome_note}</p>}

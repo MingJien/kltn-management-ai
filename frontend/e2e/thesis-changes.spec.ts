@@ -95,8 +95,8 @@ test("Đổi đề tài và gia hạn theo quyết định, bố cục 320–192
     await expect(dialog).toHaveCount(0);
     await peer.reload();
     await peer.getByRole("button",{name:"Xin gia hạn KLTN",exact:true}).click();
-    await peer.getByRole("button",{name:"Xác nhận xin gia hạn",exact:true}).click();
-    await peer.getByRole("dialog").getByRole("button",{name:"Xác nhận",exact:true}).click();
+    await peer.getByRole("button",{name:"Ý kiến xác nhận",exact:true}).click();
+    await peer.getByRole("dialog").getByRole("button",{name:"Gửi ý kiến xác nhận",exact:true}).click();
     await expect(peer.getByRole("dialog")).toHaveCount(0);
     await gv.reload();
     await gv.getByRole("button",{name:"Xin gia hạn KLTN",exact:true}).click();
@@ -111,7 +111,7 @@ test("Đổi đề tài và gia hạn theo quyết định, bố cục 320–192
     await dialog.getByLabel("Kết quả",{exact:true}).selectOption("APPROVE");
     await dialog.getByLabel("Ngày quyết định",{exact:true}).fill(new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Ho_Chi_Minh"}));
     await dialog.getByLabel("Bắt đầu gia hạn theo quyết định (giờ Việt Nam)",{exact:true}).fill(new Date(Date.now()+7*86400000+7*3600000).toISOString().slice(0,16));
-    const untilInput=dialog.getByLabel("Hạn mới được duyệt (giờ Việt Nam)",{exact:true});
+    const untilInput=dialog.getByLabel("Hạn cuối gia hạn theo quyết định (giờ Việt Nam)",{exact:true});
     await untilInput.fill(new Date(Date.now()+220*86400000+7*3600000).toISOString().slice(0,16));
     expect(await untilInput.evaluate((element:HTMLInputElement)=>element.validity.rangeOverflow)).toBe(true);
     await untilInput.fill(extended);
@@ -121,11 +121,11 @@ test("Đổi đề tài và gia hạn theo quyết định, bố cục 320–192
     await dialog.getByRole("button",{name:"Xác nhận",exact:true}).click();
     await expect(dialog).toHaveCount(0);
     await expect(tbm.getByText("Đã ghi nhận một lần",{exact:true})).toBeVisible();
-    await expect(tbm.getByText("Chờ Khoa xếp kỳ bảo vệ tiếp theo trong thời hạn gia hạn được duyệt.",{exact:true})).toBeVisible();
+    await expect(tbm.getByText("Đã có hạn gia hạn. Khoa chưa xếp lịch bảo vệ phù hợp; theo dõi thông báo xếp lịch trong thời hạn được duyệt.",{exact:true})).toBeVisible();
     await expect(tbm.getByText("QD-SYN-EXTENSION-01",{exact:true}).last()).toBeVisible();
     await sv.reload();
     await sv.getByRole("button",{name:"Xin gia hạn KLTN",exact:true}).click();
-    await expect(sv.getByText("Chờ Khoa xếp kỳ bảo vệ tiếp theo trong thời hạn gia hạn được duyệt.",{exact:true})).toBeVisible();
+    await expect(sv.getByText("Đã có hạn gia hạn. Khoa chưa xếp lịch bảo vệ phù hợp; theo dõi thông báo xếp lịch trong thời hạn được duyệt.",{exact:true})).toBeVisible();
 
 
     await sv.reload();

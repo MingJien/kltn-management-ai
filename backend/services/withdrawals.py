@@ -56,6 +56,7 @@ def output(session, user, item):
         .order_by(m.AuditEvent.occurred_at, m.AuditEvent.id)).all()
     return {"id": item.id, "code": code(item), "thesis_id": thesis.id, "title": item.application_data["title"],
         "student_name": student.display_name, "student_code": student.student_code,
+        "advisor_name": item.application_data.get("advisor_name"),
         "state": item.state, "reason": item.reason, "submitted_at": item.submitted_at,
         "row_version": item.row_version, "outcome_note": item.outcome_note,
         "effective_on": item.effective_on, "recorded_at": item.recorded_at,
@@ -95,7 +96,10 @@ def workspace(session, user):
                 "Ngoài thời hạn 02 tuần; liên hệ đơn vị phụ trách. Hồ sơ KLTN chưa tự động bị hủy." if not in_window else
                 "Hồ sơ đã chốt đủ điều kiện bảo vệ; liên hệ TBM mở xét lại trước khi xử lý thay đổi thành viên." if thesis.state == "READY_FOR_DEFENSE" else
                 "Khóa luận hoặc quyền đăng ký không còn cho phép xin thôi theo luồng này")
+            advisor = primary_advisor(session, thesis.id)
+            lecturer = session.get(m.LecturerProfile, advisor.lecturer_id) if advisor else None
             theses.append({"id": thesis.id, "title": thesis.current_title, "round_id": round_.id,
+                "student_name": own_student.display_name, "advisor_name": lecturer.display_name if lecturer else None,
                 "round_code": round_.code, "starts_on": start,
                 "last_request_on": start + timedelta(days=13) if start else None,
                 "can_submit": can_submit, "message": message})

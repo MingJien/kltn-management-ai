@@ -29,7 +29,15 @@
 .defense-results{overflow-x:auto;max-width:100%;border:1px solid #dbe3eb;border-radius:10px}
 .defense-results table{width:100%;border-collapse:collapse;text-align:left}
 .defense-results caption{padding:12px;text-align:left;font-weight:600}
-.defense-results th,.defense-results td{padding:12px;border-bottom:1px solid #e5e7eb;overflow-wrap:anywhere}
+.defense-results th,.defense-results td{padding:12px 14px;border-bottom:1px solid #e5e7eb;overflow-wrap:break-word;word-break:normal;line-height:1.55}
+.defense-results th{white-space:nowrap}
+.defense-results .defense-schedule-table{min-width:820px}
+.defense-schedule-table th:nth-child(2){min-width:240px;width:35%}
+.defense-schedule-table th:nth-child(3){min-width:135px}
+.defense-schedule-table :is(th,td):nth-child(4),.defense-schedule-table :is(th,td):nth-child(5){white-space:nowrap}
+.defense-results .defense-comparison-table{min-width:560px;table-layout:fixed}
+.defense-comparison-table th:first-child{width:25%}
+.defense-comparison-table td{white-space:pre-wrap}
 .defense-form-status{grid-column:1/-1;font-weight:600;color:#234657}
 .defense-notice{position:sticky;top:72px;z-index:31;box-shadow:0 2px 8px #0001}
 .defense-session>summary{line-height:1.7}

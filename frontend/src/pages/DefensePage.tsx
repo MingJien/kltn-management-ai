@@ -21,7 +21,7 @@ type Scope={can_manage?:boolean;round_id:string;round_code:string;department_id:
 type PlanningThesis={id:string;title:string;round_id:string;department_id:string;advisor_ids?:string[];schedule_reason?:string|null;can_review_eligibility?:boolean};
 type Mark={scores:string[];note:string;revision?:number};
 type Result={average?:string|null;attendance:{status?:string;reason?:string;bonus?:string;bonus_reference?:string;bonus_evidence_version_id?:string};scores?:Array<string|null>};
-type Slot={arrival_at?:string|null;report_filename?:string;prior_slot_id?:string|null;absence_decisions?:Record<string,{outcome:string;reference:string;reason:string;recorded_by:string;recorded_at:string;revision:number}>;context_token:string;bonus_evidence:{id:string;name:string;filename?:string}[];id:string;thesis_id:string;title:string;council:Council;starts_at:string;ends_at:string;room:string;version:number;
+type Slot={advisor_name?:string|null;arrival_at?:string|null;report_filename?:string;prior_slot_id?:string|null;absence_decisions?:Record<string,{outcome:string;reference:string;reason:string;recorded_by:string;recorded_at:string;revision:number}>;context_token:string;bonus_evidence:{id:string;name:string;filename?:string}[];id:string;thesis_id:string;title:string;council:Council;starts_at:string;ends_at:string;room:string;version:number;
   roster:Student[];results:Record<string,Result>;marks:Record<string,Record<string,Mark>>;
   role:string|null;lecturer_id:string|null;minutes:{discussion?:string;conclusion?:string;objectives?:string;functions?:string;achievements?:string;recommendations?:string;no_recommendations?:boolean;classifications?:Record<string,string>;oral_comments?:Record<string,Record<string,string>>};finalized_at:string|null;
   can_manage:boolean;schedule_editable:boolean;blockers:string[];council_attendance:{present_ids?:string[];reason?:string}};
@@ -303,6 +303,7 @@ function SlotCard({slot,data,act,download,busy,initialTab}:{slot:Slot;data:Works
   const onRecord=()=>setHistory(value=>value+1);
   useEffect(()=>{if(initialTab)setTab(initialTab);},[initialTab]);
   return <Card title={slot.title}>
+    <p>SV · {slot.roster.map(s=>s.name).join(", ")} · GVHD · {slot.advisor_name||"Chưa ghi nhận"}</p>
     <div className="defense-session-head"><strong>{slot.council.name} · {slot.room}</strong><span>Tập trung: {when(slot.arrival_at??slot.starts_at)}<br/>Bảo vệ dự kiến: {when(slot.starts_at)} → {when(slot.ends_at)}</span>
     <button className="btn btn-secondary" onClick={()=>setViewReport(true)}>Xem nhanh báo cáo</button>
     <button className="btn btn-secondary" onClick={()=>download(endpoint+"/report",slot.report_filename??"Bao-cao-bao-ve")}>Tải báo cáo dùng để bảo vệ</button></div>

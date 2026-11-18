@@ -10,6 +10,7 @@ from backend.db.models import entities as m
 from backend.services import defense,workflow_notices
 from backend.services.theses import now,primary_advisor,audit
 from backend.services.defense_export import response
+from backend.services.proposal_export import compact_footer
 
 def can_view(session,user,council):
     lecturer=defense.lecturer_for(session,user)
@@ -88,7 +89,8 @@ def download(session,user,identifier):
     for column,width in zip('ABCDEFGHIJ',[9,16,27,20,24,55,28,24,24,20]):sheet.column_dimensions[column].width=width
     for row in range(4,sheet.max_row+1):sheet.row_dimensions[row].height=48
     sheet.freeze_panes='A4';sheet.auto_filter.ref=f'A3:J{sheet.max_row}';sheet.print_title_rows='1:3';sheet.page_setup.orientation='landscape';sheet.page_setup.paperSize=sheet.PAPERSIZE_A4;sheet.page_setup.fitToWidth=1;sheet.page_setup.fitToHeight=0;sheet.sheet_properties.pageSetUpPr.fitToPage=True
-    sheet.oddFooter.left.text=f'Danh sách công bố v{item.version} · {item.published_at.astimezone(defense.VN):%d/%m/%Y %H:%M}'
+    sheet.oddFooter.left.text=compact_footer(item.id.hex[:12], now(), item.version).replace("&", "&&")
+    sheet.oddFooter.left.size=8
     out=BytesIO();book.save(out)
     from backend.services.download_names import filename
     label=data['council'].split(' · ')[0].replace('Hội đồng bảo vệ KLTN','HD').strip()

@@ -1,6 +1,6 @@
 """Fill the faculty's retained Mẫu 7/8 without rebuilding its DOCX package."""
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import io
 import re
 import zipfile
@@ -221,9 +221,8 @@ def fill_review_form(source, kind, values, sections, *, completed, allow, code, 
         reference.set(f"{{{R}}}id", rid)
         sect.insert(0, reference)
         footer = E.Element(f"{{{W}}}ftr", nsmap={"w": W})
-        from backend.services.proposal_export import _public_url
-        local=instant.astimezone(timezone(timedelta(hours=7)))
-        for line in [f"Xuất tại: {_public_url()}",f"Mã số: {code} · Báo cáo v{values['report_version']}",f"Thời gian: {local:%H:%M %d/%m/%Y} (GMT+7) · Bản nhận xét trên hệ thống"]:
+        from backend.services.proposal_export import compact_footer
+        for line in [compact_footer(code, instant, values.get("review_version"))]:
             p=E.SubElement(footer,f"{{{W}}}p")
             ppr=E.SubElement(p,f"{{{W}}}pPr")
             E.SubElement(ppr,f"{{{W}}}spacing").set(f"{{{W}}}after","0")
@@ -290,13 +289,14 @@ def export_review(session, user, thesis_id, review_id, expected):
     report = session.get(m.DocumentVersion, item.report_version_id)
     from backend.services.thesis_changes import historical_identity
     identity = historical_identity(session,thesis,report.submitted_at)
-    code = f"M{'7' if item.kind == 'ADVISOR' else '8'}-{item.id.hex[:8].upper()}-V{item.version_no}-R{item.row_version}-{instant:%Y%m%d%H%M%S%f}"
+    from uuid import uuid4
+    code = f"M{'7' if item.kind == 'ADVISOR' else '8'}-{uuid4().hex[:12]}"
     content = fill_review_form(source, item.kind, {"student": student.display_name, "student_code": student.student_code,
         "class_name": student.class_name or "Chưa cập nhật", "title": identity["title"],
         "faculty": faculty.name,
         "lecturer": lecturer.display_name, "unit": department.name+" · "+faculty.name,
         "advisor": identity["advisor"],
-        "report_version": report.version_no}, item.sections, completed=item.thesis_completed,
+        "report_version": report.version_no, "review_version": item.version_no}, item.sections, completed=item.thesis_completed,
         allow=item.allow_defense, code=code, instant=instant)
     audit(session, user, "THESIS_REVIEW_EXPORTED", "thesis_review", item.id, "Xuất phiếu nhận xét; content_sha256="+service.review_fingerprint(session,item),
         before_hash=hashlib.sha256(source).hexdigest(), after_hash=hashlib.sha256(content).hexdigest(), source_reference=code)

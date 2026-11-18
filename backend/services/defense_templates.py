@@ -231,6 +231,8 @@ def layout_word(doc, layout, footer, signature, anchor):
         for target in (section.footer,section.first_page_footer,section.even_page_footer):
             p = target.paragraphs[0]
             put(p, footer)
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             for run in p.runs:run.font.size = Pt(7)
     # Remove source placeholder whitespace immediately before signatures. Otherwise
     # keep-with-next joins only an empty line and allows an orphan signature page.

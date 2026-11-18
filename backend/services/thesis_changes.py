@@ -48,11 +48,19 @@ def snapshot(session,thesis):
         raise HTTPException(409,"Khóa luận chưa có GVHD chính thức")
     topic = session.get(m.Topic,thesis.topic_id)
     members = active_members(session,thesis)
+    lecturer = session.get(m.LecturerProfile, advisor.lecturer_id)
     return {"topic_id":str(topic.id),"topic_version":topic.row_version,"title":thesis.current_title,
         "description":topic.description or "","advisor_assignment_id":str(advisor.id),
-        "advisor_id":str(advisor.lecturer_id),"advisor_user_id":str(session.get(m.LecturerProfile,advisor.lecturer_id).user_id),
+        "advisor_id":str(advisor.lecturer_id),"advisor_user_id":str(lecturer.user_id),"advisor_name":lecturer.display_name,
         "members":[{"student_id":str(member.student_id),"user_id":str(session.get(m.StudentProfile,member.student_id).user_id),
             "name":session.get(m.StudentProfile,member.student_id).display_name} for member in members]}
+
+
+def request_advisor_name(session, snapshot):
+    if snapshot.get("advisor_name"):
+        return snapshot["advisor_name"]
+    lecturer = session.get(m.LecturerProfile, UUID(snapshot["advisor_id"]))
+    return lecturer.display_name if lecturer else None
 
 
 def mutable(session,thesis,*,allow_ready=False):
@@ -433,6 +441,7 @@ def request_out(session,user,item):
     pending=item.state in OPEN
     return {"id":item.id,"code":"DOI-"+item.id.hex[:12].upper(),"thesis_id":item.thesis_id,
         "kind":item.kind,"requested_by":item.requested_by,"scope":item.scope,"result_thesis_id":item.snapshot.get("result_thesis_id"),"state":item.state,"reason":item.reason,"proposed_title":item.proposed_title,
+        "advisor_name":request_advisor_name(session,item.snapshot),
         "proposed_description":item.proposed_description,"snapshot":item.snapshot,"consents":item.consents,
         "reviews":item.reviews,"submitted_at":item.submitted_at,"decided_at":item.decided_at,
         "decision_reason":item.decision_reason,"decided_by":notices.actor_name(session,item.decided_by) if item.decided_by else None,
@@ -529,9 +538,13 @@ def workspace(session,user):
                 select(m.StoredFile).join(m.DocumentVersion,m.DocumentVersion.stored_file_id==m.StoredFile.id)
                 .join(m.Document,m.Document.id==m.DocumentVersion.document_id)
                 .where(m.Document.thesis_id==thesis.id,m.StoredFile.scan_state=="CLEAN").distinct())]
+        lecturer=session.get(m.LecturerProfile,advisor.lecturer_id) if advisor else None
+        participants=active_members(session,thesis)
         theses.append({"id":thesis.id,"title":thesis.current_title,"description":current_topic.description or "",
+            "advisor_name":lecturer.display_name if lecturer else None,
+            "student_names":[session.get(m.StudentProfile,row.student_id).display_name for row in participants],
             "round_label":round_.code,"round_id":round_.id,"round_version":round_.row_version,"state":thesis.state,"row_version":thesis.row_version,
-            "registration_id":thesis.registration_id,"member_count":len(active_members(session,thesis)),"starts_on":round_.execution_starts_on,"cutoff":cutoff,
+            "registration_id":thesis.registration_id,"member_count":len(participants),"starts_on":round_.execution_starts_on,"cutoff":cutoff,
             "can_request":can_request,"message":block or ("Nhóm đang có yêu cầu chờ xử lý" if pending or extension_request else
                 "Quyền tham gia đợt đã bị thu hồi. Liên hệ Khoa để đối chiếu." if own and not eligible else
                 "Chưa có ngày bắt đầu thực hiện" if not cutoff else "Ngoài thời hạn đổi đề tài" if not in_window else ""),

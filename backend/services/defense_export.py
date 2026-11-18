@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from backend.db.models import entities as m
 from backend.services import defense, defense_register, defense_templates as templates, workflow_notices
 from backend.services.download_names import filename
+from backend.services.proposal_export import compact_footer
 from backend.services.theses import audit
 
 MIME = {"docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -117,7 +118,8 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     if form==6:stamp_id=f"M6-{str(slot.id).replace('-','')[:12]}-{str(student_id).replace('-','')[:8]}-{str(lecturer_id).replace('-','')[:8]}"
     record_id = uuid4() if record else None
     print_number=next_print_number(session,council.round_id,slot.id,form,student_id,lecturer_id)
-    footer=f"Mẫu {form} · "+(f"Mã tra cứu: {record_id.hex[:12]} · Bản {print_number}" if record_id else "Bản xem trước")+f" · {defense.now().astimezone(defense.VN):%d/%m/%Y}"
+    instant = defense.now()
+    footer = compact_footer(record_id.hex[:12] if record_id else "", instant, print_number if record_id else None)
     out=BytesIO()
     if form==6:
         student=next((r for r in roster if r["id"]==str(student_id)),None)
@@ -163,7 +165,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
         layout,slot.starts_at.astimezone(defense.VN))
     doc.save(out)
     thesis=session.get(m.Thesis,slot.thesis_id);topic=session.get(m.Topic,thesis.topic_id);round_=session.get(m.ThesisRound,council.round_id)
-    name=f"Bien-ban_{filename(round_.code)}_{filename(topic.code)}_{slot.starts_at.astimezone(defense.VN):%Y%m%d}_v{print_number}"
+    name=f"Bien-ban_{filename(round_.code)}_{filename(topic.code)}_{instant.astimezone(defense.VN):%Y%m%d}_v{print_number}"
     return print_response(session, user, out, name, "docx", record_id, council.round_id, form, path, layout, slot=slot,expected_revision=expected_revision)
 
 
@@ -183,7 +185,7 @@ def export_round(session, user, identifier, form, base_url, *, layout=None, cour
     instant = defense.now()
     record_id = uuid4() if record else None
     print_number=next_print_number(session,identifier,None,form,course_code=course_code)
-    footer=f"Mẫu {form} · "+(f"Mã tra cứu: {record_id.hex[:12]} · Bản {print_number}" if record_id else "Bản xem trước")+f" · {round_.code} · {instant.astimezone(defense.VN):%d/%m/%Y}"
+    footer = compact_footer(record_id.hex[:12] if record_id else "", instant, print_number if record_id else None)
     result_hash = sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     out=BytesIO()
     path=templates.source(session,user,identifier,form)

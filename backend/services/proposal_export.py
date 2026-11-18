@@ -88,6 +88,16 @@ def _footer_lines(public_url: str, code: str, instant: datetime) -> list[str]:
     ]
 
 
+def compact_footer(code: str, instant: datetime, version: int | None = None) -> str:
+    """Print provenance for system-generated documents and spreadsheets."""
+    from zoneinfo import ZoneInfo
+
+    local = instant.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
+    identity = f"Mã số: {code}" if code else "Bản xem trước"
+    edition = f" · v{version}" if version is not None else ""
+    return f"Xuất tại: {_public_url()} · {identity}{edition} · {local:%H:%M %d/%m/%Y}"
+
+
 def _pdf_text(value: str) -> str:
     # Built-in PDF Helvetica has no Vietnamese glyphs; preserve readable labels.
     return unicodedata.normalize("NFKD", value.replace("đ", "d").replace("Đ", "D")).encode("ascii", "ignore").decode()

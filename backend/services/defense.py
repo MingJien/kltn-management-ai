@@ -380,9 +380,12 @@ def notify(session, user, slot, council, event, message):
     participants = council_accounts | student_accounts
     schedule_event = event in {"DEFENSE_SCHEDULED", "DEFENSE_RESCHEDULED", "DEFENSE_CANCELLED", "DEFENSE_COUNCIL_REVISED"}
     recipients = schedule_recipients(session, slot, council) if schedule_event else participants
+    correction_event = event.startswith("DEFENSE_CORRECTION_")
+    if correction_event:
+        recipients |= notices.department_heads(session, council.department_id)
     for recipient in recipients:
         url = "/defense" if event == "DEFENSE_CANCELLED" else (
-            f"/defense?slot={slot.id}" if recipient in participants else f"/theses/{thesis.id}")
+            f"/defense?slot={slot.id}" if correction_event or recipient in participants else f"/theses/{thesis.id}")
         notices.emit(session,user.id,{recipient},event,"account",recipient,
             f"{message} · {thesis.current_title} · {council.name} · Tập trung {(slot.arrival_at or slot.starts_at).astimezone(VN):%d/%m/%Y %H:%M}; bảo vệ dự kiến {starts:%H:%M} → {ends:%H:%M} · {slot.room}",
             url)
@@ -730,6 +733,8 @@ def workspace(session,user):
         council = visible.get(slot.council_id) or session.get(m.DefenseCouncil,slot.council_id)
         member = membership(council,lecturer)
         thesis = session.get(m.Thesis,slot.thesis_id)
+        assignment = primary_advisor(session, thesis.id)
+        advisor = session.get(m.LecturerProfile, assignment.lecturer_id) if assignment else None
         privileged = slot.council_id in managed or (member and member["role"] in {"CHAIR","SECRETARY"})
         totals = results(slot,council)
         if own:
@@ -740,6 +745,7 @@ def workspace(session,user):
             key:{lecturer_id:mark for lecturer_id,mark in values.items() if member and lecturer_id == member["id"]}
             for key,values in slot.marks.items()}
         slots.append({"id":slot.id,"prior_slot_id":slot.prior_slot_id,"absence_decisions":absence_out(session,slot,own),"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
+            "advisor_name":slot.minutes.get("advisor") or (advisor.display_name if advisor else None),
             "report_filename":session.get(m.StoredFile,session.get(m.DocumentVersion,slot.report_version_id).stored_file_id).original_name,
             "starts_at":slot.starts_at,"ends_at":slot.ends_at,"arrival_at":slot.arrival_at,"room":slot.room,"version":slot.row_version,
             "roster":visible_academic_roster(session,slot,own,privileged),"results":totals,"marks":marks,

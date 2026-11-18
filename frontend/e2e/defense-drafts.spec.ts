@@ -256,13 +256,13 @@ test("Mẫu 11 toàn đợt yêu cầu chọn mã và dùng cùng mã khi xem ho
 
 test('Đính chính sau khóa: nhập căn cứ, đối chiếu và duyệt không mở khóa điểm',async({page})=>{
   let proposal:any=null,approved=false;
-  const minutes={objectives:'Mục tiêu có căn cứ',functions:'Chức năng đã trình bày',achievements:'Kết quả đã đối chiếu',discussion:'Nội dung trao đổi tại hội đồng',conclusion:'Kết luận của chủ tịch',recommendations:'Hoàn thiện tài liệu',classifications:{'student-1':'Giỏi','student-2':'Khá'}};
+  const minutes={title:'Đề tài đã chốt',advisor:'GVHD',results_snapshot:{},oral_comments:{'student-1':{gv1:'Ý kiến đã ghi'}},objectives:'Mục tiêu có căn cứ',functions:'Chức năng đã trình bày',achievements:'Kết quả đã đối chiếu',discussion:'Nội dung trao đổi tại hội đồng',conclusion:'Kết luận của chủ tịch',recommendations:'Hoàn thiện tài liệu',classifications:{'student-1':'Giỏi','student-2':'Khá'}};
   await page.route('**/api/v1/**',async route=>{
     const endpoint=new URL(route.request().url()).pathname.replace('/api/v1','');
     if(endpoint==='/me/context')return route.fulfill({json:context});
     if(endpoint==='/defense')return route.fulfill({json:{...workspace,councils:[{...council,closed_at:'2026-11-16T01:00:00Z'}],slots:[{...slot,council:{...council,closed_at:'2026-11-16T01:00:00Z'},minutes,finalized_at:'2026-11-16T01:00:00Z',schedule_editable:false}]}});
     if(endpoint==='/defense/slots/slot-demo/corrections'){
-      if(route.request().method()==='POST'){proposal=route.request().postDataJSON();expect(route.request().headers()['if-match']).toBe('1');return route.fulfill({status:204});}
+      if(route.request().method()==='POST'){proposal=route.request().postDataJSON();expect(proposal.minutes).not.toHaveProperty('results_snapshot');expect(proposal.minutes).not.toHaveProperty('title');expect(proposal.minutes.oral_comments).toEqual(minutes.oral_comments);expect(route.request().headers()['if-match']).toBe('1');return route.fulfill({status:204});}
       return route.fulfill({json:{can_approve:true,missing:[],items:proposal?[{id:'correction',version:1,state:approved?'APPROVED':'PENDING',reference:proposal.reference,reason:proposal.reason,proposal,before:{marks:{},minutes},can_decide:true,can_cancel:false,decision_note:approved?'Đã kiểm tra biên bản và căn cứ':'Không'}]:[]}});
     }
     if(endpoint==='/defense/corrections/correction/decision'){expect(route.request().postDataJSON().decision).toBe('APPROVED');approved=true;return route.fulfill({status:204});}

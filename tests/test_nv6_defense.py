@@ -357,6 +357,12 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     previous=next(r for r in history if r['id']==minutes_record['id'])
     assert latest['current'] and not previous['current'] and previous['superseded_by']==latest['code']
     assert latest['print_number']==2
+    import re
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    printed_footer = Document(BytesIO(replacement.content)).sections[0].footer.paragraphs[0]
+    assert printed_footer.alignment == WD_ALIGN_PARAGRAPH.LEFT
+    assert printed_footer.text.startswith("Xuất tại: http")
+    assert re.search(rf"Mã số: {latest['code']} · v2 · \d{{2}}:\d{{2}} \d{{2}}/\d{{2}}/\d{{4}}$", printed_footer.text)
     lookup=client.get(base+'/print-lookup/'+minutes_record['code'],headers=hdr(users[5]))
     assert lookup.status_code==200 and not lookup.json()['current']
     assert client.get(base+'/print-lookup/'+minutes_record['code'],headers=hdr(users[0])).status_code in (403,404)
