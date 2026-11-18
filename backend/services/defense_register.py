@@ -15,11 +15,13 @@ def rounds_for_export(session, user):
             if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=round_.id)]
 
 
-def council_sessions(session, round_id):
-    return session.execute(select(m.DefenseSlot, m.DefenseCouncil)
+def council_sessions(session, round_id, *, thesis_id=None):
+    query = (select(m.DefenseSlot, m.DefenseCouncil)
         .join(m.DefenseCouncil, m.DefenseCouncil.id == m.DefenseSlot.council_id)
-        .where(m.DefenseCouncil.round_id == round_id)
-        .order_by(m.DefenseSlot.starts_at, m.DefenseSlot.id)).all()
+        .where(m.DefenseCouncil.round_id == round_id))
+    if thesis_id is not None:
+        query = query.where(m.DefenseSlot.thesis_id == thesis_id)
+    return session.execute(query.order_by(m.DefenseSlot.starts_at, m.DefenseSlot.id)).all()
 
 
 def require_round_access(session, user, round_id, sessions=None):
@@ -74,7 +76,7 @@ def rows_for_sessions(session, sessions):
     return sorted(rows.values(), key=lambda row: (row["class_name"].casefold(), row["code"]))
 
 
-def export_readiness(rows, sessions):
+def export_readiness(rows, sessions, unscheduled):
     issues = []
     if not rows:
         issues.append("Chưa có sinh viên được xếp lịch trong đợt")
@@ -84,22 +86,35 @@ def export_readiness(rows, sessions):
     pending = sum(row["status"] == "PENDING" for row in rows)
     if pending:
         issues.append(f"Còn {pending} sinh viên chờ kết quả hoặc quyết định của Khoa")
+    if unscheduled:
+        issues.append(f"Còn {len(unscheduled)} sinh viên đủ điều kiện chưa được xếp lịch")
     return issues
 
 
-def workspace(session, user, round_id):
+def unscheduled_students(session, round_id, rows):
     from backend.services import evaluation
-    round_, sessions = require_round_access(session, user, round_id)
-    rows = rows_for_sessions(session, sessions)
     scheduled={row['student_id'] for row in rows}
     unscheduled=[]
-    for thesis in session.scalars(select(m.Thesis).where(m.Thesis.round_id==round_id,m.Thesis.state!='WITHDRAWN')):
+    theses = session.scalars(select(m.Thesis).where(
+        m.Thesis.round_id == round_id, m.Thesis.state.not_in(["WITHDRAWN", "ARCHIVED"])
+    ).order_by(m.Thesis.current_title, m.Thesis.id))
+    for thesis in theses:
+        members = [member for member in evaluation.members(session, thesis) if str(member.student_id) not in scheduled]
+        if not members:
+            continue
         report=evaluation.report(session,thesis)
-        for member in evaluation.members(session,thesis):
-            if str(member.student_id) not in scheduled and evaluation.eligibility_out(session,thesis,member,report)['state']=='ELIGIBLE':
+        for member in members:
+            if evaluation.eligibility_out(session,thesis,member,report)['state']=='ELIGIBLE':
                 student=session.get(m.StudentProfile,member.student_id)
                 unscheduled.append({'name':student.display_name,'code':student.student_code,'thesis_id':str(thesis.id)})
-    return {"code": round_.code, "issues": export_readiness(rows, sessions), "rows": [
+    return unscheduled
+
+
+def workspace(session, user, round_id):
+    round_, sessions = require_round_access(session, user, round_id)
+    rows = rows_for_sessions(session, sessions)
+    unscheduled = unscheduled_students(session, round_id, rows)
+    return {"code": round_.code, "issues": export_readiness(rows, sessions, unscheduled), "rows": [
         {"name": row["name"], "code": row["code"], "class_name": row["class_name"], "grade": row["grade"],
          "status": row["outcome_label"], "slot_id": row["slot_id"], "council": row["council"],
          "has_birth_date": bool(row["birth_date"])} for row in rows], 'unscheduled':unscheduled,

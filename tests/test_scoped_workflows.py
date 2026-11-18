@@ -216,3 +216,10 @@ def test_confirmed_extension_window_allows_decision_and_records_outcome(workspac
     assert thesis_extensions.output(session,users[4],request)['defense']['status']=='NOT_PASSED'
     assert not thesis_extensions.expire_without_council(session,request)
     assert thesis.state=='ARCHIVED'
+    report = client.get(f"/api/v1/nv6-reports/{thesis.round_id}", headers=hdr(users[4]))
+    assert report.status_code == 200, report.text
+    rows = report.json()["rows"]
+    expired = [row for row in rows if row["thesis_id"] == str(thesis.id)]
+    assert expired
+    assert report.json()["results"]["EXTENSION_EXPIRED"] == len(expired)
+    assert all(row["result"] == "EXTENSION_EXPIRED" and row["grade"] is None for row in expired)

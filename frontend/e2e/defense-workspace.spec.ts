@@ -36,5 +36,5 @@ test("Điều phối xem báo cáo theo đợt và mở kho nội bộ",async({p
   }
   await page.goto("/repository");
   await expect(page.getByRole("heading",{name:"Kho khóa luận nội bộ",exact:true})).toBeVisible();
-  await expect(page.getByText("Chưa có khóa luận đã bảo vệ trong phạm vi của bạn.",{exact:true})).toBeVisible();
+  await expect(page.getByText("Chưa tìm thấy bản khóa luận đã duyệt trong phạm vi đang xem.",{exact:true})).toBeVisible();
 });

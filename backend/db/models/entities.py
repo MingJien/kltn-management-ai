@@ -1051,8 +1051,8 @@ class ThesisArchiveVersion(UuidPrimaryKeyMixin, TimestampMixin, VersionedMixin, 
     __tablename__ = "thesis_archive_version"
     __table_args__ = (
         UniqueConstraint("thesis_id", "version_no"),
-        CheckConstraint("state IN ('SUBMITTED','RETURNED','ACCEPTED')", name="state"),
-        CheckConstraint("(state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)", name="decision"),
+        CheckConstraint("state IN ('SUBMITTED','RETURNED','ACCEPTED','REOPENED')", name="state"),
+        CheckConstraint("(state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED','REOPENED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)", name="decision"),
         Index("uq_thesis_archive_pending", "thesis_id", unique=True, postgresql_where=text("state = 'SUBMITTED'")),
     )
     thesis_id: Mapped[uuid.UUID] = fk("thesis.id")

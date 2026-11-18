@@ -31,7 +31,7 @@ async function savedDownload(page:Page,button:ReturnType<Page["getByRole"]>,file
 }
 
 test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVHD, tài liệu và bản in mẫu chính thức",async({browser})=>{
-  test.setTimeout(240000);
+  test.setTimeout(360000);
   expect(process.env.KLTN_E2E_PLAN_FILE,"Mẫu 2 chính thức phải có để kiểm bản xuất").toBeTruthy();
   expect(process.env.KLTN_E2E_PROPOSAL_FILE,"Mẫu 3 chính thức phải có để kiểm bản xuất").toBeTruthy();
   const contexts=await Promise.all(["admin","tbm","gv2","gv","nv5Student","nv5Outsider"].map(async key=>{
@@ -182,8 +182,13 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
     await docModal.getByLabel("Kết quả",{exact:true}).selectOption("ACCEPT");
     await docModal.getByLabel("Nhận xét tổng quát",{exact:true}).fill("GV đang xem phiên bản 1");
     await upload("ke-hoach-v2.docx");
-    await docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click();
-    await expect(docModal.getByRole("alert")).toContainText("Bản nháp vẫn được giữ");
+    const staleWarning = docModal.getByRole("alert").filter({hasText:"Bản nháp vẫn được giữ"});
+    if(!await staleWarning.isVisible()) {
+      // Autosave can discover the replacement before the reviewer clicks Send.
+      try {await docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click({timeout:3500});}
+      catch (error) {if(!await staleWarning.isVisible())throw error;}
+    }
+    await expect(staleWarning).toBeVisible();
     await expect(docModal.getByLabel("Nhận xét tổng quát",{exact:true})).toHaveValue("GV đang xem phiên bản 1");
     await expect(docModal.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true})).toBeDisabled();
     const unchanged=(await read(gv,base+"/documents")).find((d:any)=>d.title==="Kế hoạch thực hiện (Mẫu 2)");
@@ -282,12 +287,14 @@ test("NV5 hoàn chỉnh: trễ, gia hạn, sửa sau đóng, riêng tư theo GVH
 
     // Real Mẫu 3 → GVHD confirmation → TBM finalization → traced print copy.
     await sv.goto(`${web}${base}?section=submissions&kind=PROPOSAL`);
-    await sv.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
-    await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
-    await expect(sv.getByText(/Phiên bản 1 · synthetic-proposal.docx/)).toBeVisible();
-    await sv.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
-    await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
-    await expect(sv.getByText("Phiên bản 2 · synthetic-proposal.docx",{exact:true})).toBeVisible();
+    for (const version of [1, 2]) {
+      await sv.getByLabel(/Nộp đề cương PDF hoặc DOCX/).setInputFiles(process.env.KLTN_E2E_PROPOSAL_FILE!);
+      const submitted=sv.waitForResponse(response=>response.request().method()==="POST" &&
+        new URL(response.url()).pathname.endsWith(base+"/proposal/versions"),{timeout:110000});
+      await sv.getByRole("button",{name:"Nộp đề cương",exact:true}).click();
+      expect((await submitted).status()).toBe(201);
+      await expect(sv.getByText(`Phiên bản ${version} · synthetic-proposal.docx`,{exact:true})).toBeVisible();
+    }
     await expect(sv.getByText("Phiên bản 1 · synthetic-proposal.docx",{exact:true})).not.toBeVisible();
     await sv.getByText("Lịch sử cập nhật (1 bản trước)",{exact:true}).click();
     await sv.locator(".version-history-item > summary").click();

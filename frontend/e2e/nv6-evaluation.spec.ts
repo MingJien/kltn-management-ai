@@ -83,21 +83,19 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     await dialog.getByRole("button",{name:"Lưu nháp",exact:true}).click();
     await expect(dialog.getByRole("button",{name:"Lưu nháp",exact:true})).toBeDisabled();
     expect((await read(tbm,base)).reviews).toHaveLength(0);
-    const export8=reviewer.waitForEvent("download");await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
-    await (await export8).saveAs(path.join(output,"nv6-mau8-filled.docx"));
-    await dialog.getByText("Đính kèm bản quét (tùy chọn)",{exact:true}).click();
-    await expect(dialog.getByLabel(/Đính kèm bản đã ký/)).toBeEnabled();
-    await dialog.getByLabel(/Đính kèm bản đã ký/).setInputFiles(fixture);
-    await expect(dialog.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
+    await expect(dialog.getByLabel(/Đính kèm bản đã ký/)).toHaveCount(0);
     await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
     await dialog.getByRole("checkbox",{name:/Tôi xác nhận nội dung nhận xét này/}).check();
     await dialog.getByRole("button",{name:"Xác nhận gửi nhận xét",exact:true}).click();await expect(dialog).toHaveCount(0);
+    const [export8]=await Promise.all([reviewer.waitForEvent("download"),
+      reviewer.getByRole("button",{name:"Tải phiếu nhận xét (tùy chọn)",exact:true}).click()]);
+    await export8.saveAs(path.join(output,"nv6-mau8-filled.docx"));
     expect((await read(tbm,base)).reviews.filter((r:{kind:string})=>r.kind==="REVIEWER")).toHaveLength(1);
     await tbm.getByRole("button",{name:"Làm mới",exact:true}).click();
     await tbm.screenshot({path:path.join(output,"nv6-department-desktop.png"),fullPage:true});
   });
 
-  test("GVHD gửi hai Mẫu 7; TBM xét từng SV; kết quả cá nhân và bản ký được bảo vệ",async()=>{
+  test("GVHD xác nhận hai Mẫu 7; TBM xét từng SV và chỉ hiện kết quả cho đúng tài khoản",async()=>{
     for(const memberId of studentMemberIds){
       await advisor.goto(web+`/evaluation/${id}`);
       await advisor.getByLabel("Sinh viên trong hồ sơ").selectOption(memberId);
@@ -109,16 +107,13 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
       await dialog.getByLabel("Đề nghị của GVHD",{exact:true}).selectOption("true");
       await dialog.getByRole("button",{name:"Lưu nháp",exact:true}).click();
       await expect(dialog.getByRole("button",{name:"Lưu nháp",exact:true})).toBeDisabled();
-      await expect(dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true})).toBeEnabled();
-      const export7=advisor.waitForEvent("download");await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
-      await (await export7).saveAs(path.join(output,`nv6-mau7-${memberId}-filled.docx`));
-      await dialog.getByText("Đính kèm bản quét (tùy chọn)",{exact:true}).click();
-      await expect(dialog.getByLabel(/Đính kèm bản đã ký/)).toBeEnabled();
-      await dialog.getByLabel(/Đính kèm bản đã ký/).setInputFiles(fixture);
-      await expect(dialog.getByText("Đã quét an toàn",{exact:true})).toBeVisible();
       await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
       await dialog.getByRole("checkbox",{name:/Tôi xác nhận nội dung nhận xét này/}).check();
       await dialog.getByRole("button",{name:"Xác nhận gửi nhận xét",exact:true}).click();await expect(dialog).toHaveCount(0);
+      const [export7]=await Promise.all([advisor.waitForEvent("download"),
+        advisor.getByRole("button",{name:"Tải phiếu nhận xét (tùy chọn)",exact:true}).click()]);
+      expect(export7.suggestedFilename()).toMatch(/^Mau-07-GVHD-.+-v\d+\.docx$/);
+      await export7.saveAs(path.join(output,`nv6-mau7-${memberId}-filled.docx`));
       await tbm.goto(web+`/evaluation/${id}`);await tbm.getByLabel("Sinh viên trong hồ sơ").selectOption(memberId);
       await tbm.getByRole("button",{name:"Xét và lưu điều kiện",exact:true}).click();
       const check=tbm.getByRole("dialog");await check.getByLabel("Tình trạng kỷ luật theo nguồn đã đối chiếu").selectOption("CLEAR");
@@ -141,7 +136,7 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     const first=await read(student,base),other=await read(member,base);
     const ownReview=first.reviews.find((r:{kind:string})=>r.kind==="ADVISOR");
     expect((await member.request.get(api+base+`/reviews/${ownReview.id}/signed-copy`)).status()).toBe(404);
-    const allowed=await student.request.get(api+base+`/reviews/${ownReview.id}/signed-copy`);expect(allowed.status()).toBe(200);
+    expect(ownReview.signed_file).toBeNull();
     await student.screenshot({path:path.join(output,"nv6-student-desktop.png"),fullPage:true});
     expect(other.eligibility_history.every((h:{thesis_member_id:string})=>h.thesis_member_id===other.members[0].id)).toBe(true);
   });
@@ -167,59 +162,46 @@ test.describe.serial("NV6 tuần 1 · luồng thật theo từng vai trò",()=>{
     expect(axe.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}))).toEqual([]);
     await student.screenshot({path:path.join(output,"nv6-student-mobile.png"),fullPage:true});
   });
-  test("Gửi nhận xét không bắt bản quét; cán bộ được giao nhận giấy đúng mã xuất",async()=>{
+  test("Báo cáo mới cần Mẫu 7 mới, xác nhận bằng tài khoản và giữ phiếu cũ",async()=>{
+    const previous = await read(tbm,base);
+    const docs = await read(student,`/theses/${id}/documents`);
+    const report = docs.find((doc:any)=>doc.document_type==="REPORT");
+    const auth = await read(student,"/me/context");
+    const upload = await student.request.post(api+`/theses/${id}/documents/${report.id}/versions`,{
+      data:await (await import("node:fs/promises")).readFile(fixture),
+      headers:{"X-CSRF-Token":auth.csrf_token,"If-Match":String(report.row_version),
+        "X-File-Name":"synthetic-report-revised.pdf","Content-Type":"application/octet-stream"},
+    });
+    expect(upload.status(),await upload.text()).toBe(201);
+    const changed = await read(tbm,base);
+    expect(changed.report.id).not.toBe(previous.report.id);
+    expect(changed.members.every((m:any)=>m.eligibility.state!=="ELIGIBLE")).toBe(true);
+
     await advisor.goto(web+"/evaluation/"+id);
     await advisor.getByLabel("Sinh viên trong hồ sơ").selectOption(studentMemberIds[0]);
     await advisor.getByRole("button",{name:"Lập phiếu Mẫu 7",exact:true}).click();
-    await advisor.getByRole("dialog").getByLabel("Lý do lập phiếu / phiên bản sửa",{exact:true}).fill("Lập phiên bản nhận xét mới để thử tiếp nhận giấy không tải bản quét");
+    await advisor.getByRole("dialog").getByLabel("Lý do lập phiếu / phiên bản sửa",{exact:true}).fill("Đối chiếu Mẫu 7 trên bản báo cáo đã cập nhật.");
     await advisor.getByRole("dialog").getByRole("button",{name:"Tạo phiếu nháp",exact:true}).click();
-    let dialog=advisor.getByRole("dialog");
+    const dialog=advisor.getByRole("dialog");
     for(const label of ["1. Tinh thần, thái độ của sinh viên","2. Sự đáp ứng của nội dung khóa luận","3. Hình thức khóa luận"])
-      await dialog.getByLabel(label,{exact:false}).fill("Nhận xét đã xác thực tài khoản, đối chiếu bản giấy sau khi ký.");
+      await dialog.getByLabel(label,{exact:false}).fill("Nhận xét bản báo cáo đã chỉnh sửa theo yêu cầu.");
     await dialog.getByLabel("Xác nhận hoàn thành khóa luận",{exact:true}).selectOption("true");
     await dialog.getByLabel("Đề nghị của GVHD",{exact:true}).selectOption("true");
     await dialog.getByRole("button",{name:"Lưu nháp",exact:true}).click();
     await expect(dialog.getByRole("button",{name:"Lưu nháp",exact:true})).toBeDisabled();
-    const exported=advisor.waitForEvent("download");
-    await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
-    const download=await exported;expect(download.suggestedFilename()).toMatch(/^Mau-07-GVHD-.+-v\d+\.docx$/);
-    await download.saveAs(path.join(output,"nv6-paper-review.docx"));
     await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
     await dialog.getByRole("checkbox",{name:/Tôi xác nhận nội dung nhận xét này/}).check();
     await dialog.getByRole("button",{name:"Xác nhận gửi nhận xét",exact:true}).click();
     await expect(dialog).toHaveCount(0);
-    const submitted=(await read(advisor,base)).reviews.filter((r:any)=>r.kind==="ADVISOR"&&r.thesis_member_id===studentMemberIds[0]).sort((a:any,b:any)=>b.version_no-a.version_no)[0];
+    const view=await read(tbm,base);
+    const submitted=view.reviews.find((r:any)=>r.kind==="ADVISOR"&&r.thesis_member_id===studentMemberIds[0]&&r.report_version_id===view.report.id);
+    expect(submitted.state).toBe("SUBMITTED");
     expect(submitted.signed_file).toBeNull();
-    let view=await read(tbm,base),memberState=view.members.find((m:any)=>m.id===studentMemberIds[0]);
+    const memberState=view.members.find((m:any)=>m.id===studentMemberIds[0]);
     expect(memberState.eligibility.conditions.find((c:any)=>c.key==="completion").met).toBe(true);
-    expect(memberState.eligibility.conditions.find((c:any)=>c.key==="consent").met).toBe(false);
-    const round=view.round_id,receiver=(await read(reviewer,"/me/context")).user_id;
-    await admin.goto(web+"/administration/assignments");
-    const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
-    await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("REVIEW_RECORDS_MANAGER");
-    await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round);
-    await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(receiver);
-    await assignment.getByLabel("Căn cứ phân công").fill("DEMO giao tiếp nhận hồ sơ Mẫu 7–8");
-    await assignment.getByRole("button",{name:"Lưu phân công",exact:true}).click();
-    await expect(admin.getByRole("status").filter({hasText:"Đã lưu phân công"})).toBeVisible();
-    await reviewer.bringToFront();await reviewer.evaluate(()=>window.dispatchEvent(new Event("focus")));
-    await reviewer.getByRole("link",{name:"Tiếp nhận hồ sơ phản biện",exact:true}).click();
-    await reviewer.getByRole("link",{name:"NV6 · Phản biện và bảo vệ theo từng sinh viên",exact:true}).click();
-    await reviewer.getByLabel("Sinh viên trong hồ sơ").selectOption(studentMemberIds[0]);
-    const card=reviewer.locator(".evaluation-review").filter({hasText:"Mẫu 7 · GVHD · Phiếu v"+submitted.version_no});
-    await card.getByRole("button",{name:"Xác nhận văn bản đã ký",exact:true}).click();
-    dialog=reviewer.getByRole("dialog");
-    await dialog.getByLabel("Số / căn cứ tiếp nhận bản giấy",{exact:true}).fill("SO-TIEP-NHAN-DEMO-2026/01");
-    await dialog.getByRole("checkbox",{name:/Tôi xác nhận văn bản đã có chữ ký/}).check();
-    await dialog.getByRole("button",{name:"Lưu xác nhận văn bản đã ký",exact:true}).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(card.getByText("Đã xác nhận văn bản có chữ ký",{exact:true})).toBeVisible();
-    view=await read(tbm,base);memberState=view.members.find((m:any)=>m.id===studentMemberIds[0]);
     expect(memberState.eligibility.conditions.find((c:any)=>c.key==="consent").met).toBe(true);
-    const grant=(await read(admin,"/admin/round-assignments")).find((g:any)=>g.round_id===round&&g.user_id===receiver&&g.assignment_type==="REVIEW_RECORDS_MANAGER");
-    expect((await post(admin,"/admin/round-assignments/"+grant.id+"/revoke",{reason:"End DEMO paper reception duty"})).status()).toBe(204);
-    await reviewer.bringToFront();await reviewer.evaluate(()=>window.dispatchEvent(new Event("focus")));
-    await expect(reviewer.getByRole("link",{name:"Tiếp nhận hồ sơ phản biện",exact:true})).toHaveCount(0);
+    expect(memberState.eligibility.state).not.toBe("ELIGIBLE");
+    expect(view.reviews.some((r:any)=>r.kind==="ADVISOR"&&r.report_version_id===previous.report.id)).toBe(true);
     expect((await reviewer.request.get(api+base)).status()).toBe(404);
   });
 

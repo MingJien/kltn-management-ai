@@ -318,6 +318,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
     dialog = sv1.page.getByRole("dialog");
     await dialog.getByRole("checkbox").check();
     await dialog.getByRole("button", { name: "Lập đăng ký của tôi", exact: true }).click();
+    await expect(sv1.page).toHaveURL(/\/registrations$/);
 
     // SV2 tham gia nhóm (thành viên 2/2)
     await sv2.page.goto(web + "/topics");
@@ -328,6 +329,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
     dialog = sv2.page.getByRole("dialog");
     await dialog.getByRole("checkbox").check();
     await dialog.getByRole("button", { name: "Tham gia đề tài", exact: true }).click();
+    await expect(sv2.page).toHaveURL(/\/registrations$/);
 
     // Trưởng nhóm gửi đăng ký cho GV
     await sv1.page.goto(web + "/registrations");

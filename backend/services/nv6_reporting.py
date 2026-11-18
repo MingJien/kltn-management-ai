@@ -6,6 +6,7 @@ import json
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
+from backend.api.defense_schemas import normalize_academic_text
 from backend.db.models import entities as m
 from backend.services import defense, defense_register, evaluation
 from backend.services.theses import audit
@@ -24,6 +25,8 @@ def scopes(session, user):
 
 
 def workspace(session, user, round_id, department_id):
+    from backend.services.thesis_archive import submission_snapshot
+
     available = {scope["department_id"] for scope in scopes(session,user) if scope["round_id"] == round_id}
     if not available or (department_id and department_id not in available):
         raise HTTPException(404,"Không tìm thấy báo cáo trong phạm vi được giao")
@@ -33,7 +36,11 @@ def workspace(session, user, round_id, department_id):
     theses = session.scalars(select(m.Thesis).where(m.Thesis.round_id == round_id, m.Thesis.department_id.in_(selected),
         m.Thesis.state != "WITHDRAWN").order_by(m.Thesis.current_title)).all()
     majors = {(row.department_id,row.code): row.name for row in session.scalars(
-        select(m.DepartmentMajor).where(m.DepartmentMajor.department_id.in_(selected),m.DepartmentMajor.active.is_(True)))}
+        select(m.DepartmentMajor).where(m.DepartmentMajor.department_id.in_(selected)))}
+    expired = set(session.scalars(select(m.ThesisExtensionRequest.thesis_id)
+        .join(m.Thesis, m.Thesis.id == m.ThesisExtensionRequest.thesis_id)
+        .where(m.Thesis.round_id == round_id, m.Thesis.department_id.in_(selected), m.Thesis.state == "ARCHIVED",
+               m.ThesisExtensionRequest.state == "EXPIRED", m.ThesisExtensionRequest.extension_id.is_not(None))))
     eligibility_counts, result_counts, score_counts = Counter(), Counter(), Counter()
     archive_counts, attendance_counts, classification_counts = Counter(), Counter(), Counter()
     rows = []
@@ -41,13 +48,18 @@ def workspace(session, user, round_id, department_id):
         report = evaluation.report(session,thesis)
         archive_state = session.scalar(select(m.ThesisArchiveVersion.state).where(m.ThesisArchiveVersion.thesis_id == thesis.id)
             .order_by(m.ThesisArchiveVersion.version_no.desc()).limit(1))
-        if archive_state or thesis.state in {"DEFENDED", "COMPLETED"}:
-            archive_counts[archive_state or "NOT_SUBMITTED"] += 1
+        if archive_state:
+            archive_counts[archive_state] += 1
+        elif thesis.state in {"DEFENDED", "COMPLETED"}:
+            ready_to_submit = submission_snapshot(session, thesis, results.values())
+            archive_counts["NOT_SUBMITTED" if ready_to_submit else "WAITING_RESULTS"] += 1
         for member in evaluation.members(session,thesis):
             student = session.get(m.StudentProfile,member.student_id)
             latest = results.get(str(student.id))
+            if latest and latest["thesis_id"] != str(thesis.id):
+                latest = None
             eligibility = evaluation.eligibility_out(session,thesis,member,report)["state"]
-            status = latest["status"] if latest else "NOT_SCHEDULED"
+            status = latest["status"] if latest else "EXTENSION_EXPIRED" if thesis.id in expired else "NOT_SCHEDULED"
             eligibility_counts[eligibility] += 1
             result_counts[status] += 1
             grade = latest["grade"] if latest else None
@@ -56,14 +68,20 @@ def workspace(session, user, round_id, department_id):
             if grade is not None:
                 score_counts[str(grade)] += 1
                 classification_counts[latest["classification"] or "Chưa ghi nhận"] += 1
-            major = majors.get((student.department_id,student.major_code))
-            issues = [label for label, value in (
-                ("Lớp", latest["class_name"] if latest else student.class_name),
-                ("Ngành", latest["major"] if latest else major if major and not major.startswith("Chưa xác minh") else None),
-                ("Khóa học", latest["training_cohort"] if latest else student.training_cohort),
-                ("Ngày sinh", latest["birth_date"] if latest else student.birth_date)) if not value]
+            class_name = latest["class_name"] if latest else student.class_name
+            cohort = latest["training_cohort"] if latest else student.training_cohort
+            major_code = latest["major_code"] if latest else student.major_code
+            major = majors.get((student.department_id, major_code))
+            issues = [f"Thiếu {label}" for label, value in (
+                ("lớp", class_name), ("ngành", major_code), ("khóa học", cohort),
+                ("ngày sinh", latest["birth_date"] if latest else student.birth_date)) if not value]
+            if major_code and (not major or major.startswith("Chưa xác minh")):
+                issues.append("Ngành chưa đối chiếu danh mục")
+            for label, value in (("Lớp", class_name), ("Khóa học", cohort)):
+                if value and normalize_academic_text(value) != value:
+                    issues.append(f"{label} cần chuẩn hóa cách ghi")
             rows.append({"id": str(member.id), "thesis_id": thesis.id, "title": thesis.current_title,
-                "name": student.display_name, "code": student.student_code, "class_name": latest["class_name"] if latest else student.class_name,
+                "name": student.display_name, "code": student.student_code, "class_name": class_name,
                 "eligibility": eligibility, "result": status, "grade": grade, "issues": issues,
                 "attendance": latest["attendance_status"] if latest else None,
                 "classification": latest["classification"] if latest else None, "slot_id": latest["slot_id"] if latest else None})

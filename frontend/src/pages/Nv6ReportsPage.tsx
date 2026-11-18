@@ -10,9 +10,10 @@ import "../styles/defense.css";
 type Scope = {round_id:string;round_code:string;department_id:string;department:string};
 type Row = {id:string;thesis_id:string;title:string;name:string;code:string;class_name:string|null;eligibility:string;result:string;grade:string|null;issues:string[];slot_id:string|null;classification:string|null;attendance:string|null};
 type Summary = {generated_at:string;theses:number;students:number;sessions:number;councils:number;eligibility:Record<string,number>;results:Record<string,number>;score_counts:Record<string,number>;archives:Record<string,number>;attendance:Record<string,number>;classifications:Record<string,number>;incomplete_profiles:number;rows:Row[]};
-const resultLabels: Record<string,string> = {GRADED:"Đã chốt điểm",ABSENT_FINAL:"Không đạt do vắng",PENDING:"Chờ kết quả hoặc quyết định",NOT_SCHEDULED:"Chưa xếp lịch"};
-const archiveLabels: Record<string,string> = {ACCEPTED:"Đã duyệt lưu",SUBMITTED:"Chờ bộ môn duyệt",RETURNED:"Cần nộp lại",NOT_SUBMITTED:"Chưa nộp lưu"};
+const resultLabels: Record<string,string> = {GRADED:"Đã chốt điểm",ABSENT_FINAL:"Không đạt do vắng",PENDING:"Chờ kết quả hoặc quyết định",NOT_SCHEDULED:"Chưa xếp lịch",EXTENSION_EXPIRED:"Không đạt do hết hạn gia hạn"};
+const archiveLabels: Record<string,string> = {ACCEPTED:"Đã duyệt lưu",SUBMITTED:"Chờ bộ môn duyệt",RETURNED:"Cần nộp lại",NOT_SUBMITTED:"Đủ điều kiện, chưa nộp",WAITING_RESULTS:"Chờ chốt trước khi nộp",REOPENED:"Đã thu hồi bản lưu"};
 const attendanceLabels: Record<string,string> = {PRESENT:"Có mặt",ABSENT:"Vắng",NOT_RECORDED:"Chưa điểm danh"};
+const searchable = (value:string) => value.toLocaleLowerCase("vi").normalize("NFD").replace(/\p{Diacritic}/gu,"").replace(/đ/g,"d").trim();
 
 type Profile = {class_name:string;major_code:string;birth_date:string;training_cohort:string;revision:string;majors:{code:string;name:string}[]};
 
@@ -91,8 +92,9 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
   },[round,department,context.user_id,revision]);
 
   const visible = data?.rows.filter(row=>(!filter||row.eligibility===filter||row.result===filter||(filter==="issues"&&row.issues.length))&&
-    `${row.name} ${row.code} ${row.title}`.toLocaleLowerCase("vi").includes(search.trim().toLocaleLowerCase("vi")))??[];
-  function selectFilter(value:string) {
+    searchable(`${row.name} ${row.code} ${row.title}`).includes(searchable(search)))??[];
+  function selectFilter(value:string, clearSearch=false) {
+    if (clearSearch) setSearch("");
     setFilter(value);
     setLimit(25);
     document.getElementById("nv6-report-students")?.scrollIntoView({block:"start"});
@@ -100,7 +102,7 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
   function breakdown(title:string, values:Record<string,number>, names:Record<string,string>, links=false) {
     return <section className="card"><div className="card-body"><h3>{title}</h3>
       {Object.keys(values).length?<ul className="dashboard-status-list">{Object.entries(values).map(([key,value])=><li key={key}>
-        <span>{names[key]??key}</span>{links&&!!data?.rows.length?<button className="btn btn-secondary btn-sm" aria-label={`Xem ${value} · ${names[key]??key}`} onClick={()=>selectFilter(key)}>{value}</button>:<strong>{value}</strong>}
+        <span>{names[key]??key}</span>{links&&!!data?.rows.length?<button className="btn btn-secondary btn-sm" aria-label={`Xem ${value} · ${names[key]??key}`} onClick={()=>selectFilter(key,true)}>{value}</button>:<strong>{value}</strong>}
       </li>)}</ul>:<p className="text-muted">Chưa có dữ liệu trong phạm vi đang xem.</p>}
     </div></section>;
   }
@@ -137,9 +139,10 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
         <h2>Đối chiếu từng sinh viên</h2>
         <div className="defense-form-grid">
           <label>Tìm tên, MSSV hoặc đề tài<input className="input" value={search} onChange={event=>{setSearch(event.target.value);setLimit(25);}}/></label>
-          <label>Nhóm cần xem<select className="input" value={filter} onChange={event=>selectFilter(event.target.value)}><option value="">Tất cả</option><option value="issues">Thiếu thông tin học vụ</option>
+          <label>Nhóm cần xem<select className="input" value={filter} onChange={event=>selectFilter(event.target.value)}><option value="">Tất cả</option><option value="issues">Dữ liệu học vụ cần đối chiếu</option>
             {[...Object.keys(data.eligibility),...Object.keys(data.results)].map(key=><option key={key} value={key}>{labels[key]??resultLabels[key]}</option>)}</select></label>
         </div>
+        <p role="status">{visible.length} sinh viên phù hợp · Hiển thị {Math.min(visible.length,limit)}</p>
         <div className="defense-results" role="region" tabIndex={0} aria-label="Danh sách đối chiếu sinh viên"><table><thead><tr><th>Sinh viên và đề tài</th><th>Điều kiện</th><th>Kết quả</th><th>Dữ liệu học vụ</th></tr></thead><tbody>{visible.slice(0,limit).map(row=><tr key={row.id}>
           <td><strong>{row.name}</strong><br/><small>{row.code} · {row.class_name||"Chưa có lớp"}</small><br/>{row.title}</td>
           <td><Link to={`/evaluation/${row.thesis_id}`}>{labels[row.eligibility]??row.eligibility}</Link></td><td>{row.grade?.replace(".",",")??resultLabels[row.result]}{row.classification&&<><br/><small>{row.classification}</small></>}</td>

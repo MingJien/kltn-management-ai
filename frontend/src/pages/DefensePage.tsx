@@ -406,6 +406,9 @@ export default function DefensePage({context}:{context:Context}) {
   const [search,setSearch]=useState("");
   const [refresh,setRefresh]=useState(0);
   const [view,setView]=useState(params.get('section')==='announcements'?'announcements':"schedules");
+  const changeView = (next: string) => {
+    if (next !== view && mayDiscard()) setView(next);
+  };
   useEffect(()=>{if(params.get('section')==='announcements')setView('announcements');else if(params.get('slot')||params.get('focus'))setView('schedules');},[params]);
   const [operation,setOperation]=useState<"council"|"schedule"|null>(null);
   const load=useCallback(async()=>{setData(await request<Workspace>(root,context.user_id));setRefresh(value=>value+1);},[context.user_id]);
@@ -444,10 +447,10 @@ export default function DefensePage({context}:{context:Context}) {
     {data&&<>
       <div className="defense-workspace-bar">
         <nav className="defense-tabs" aria-label="Quản lý bảo vệ">
-          <button className={`btn ${view==="councils"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="councils"} onClick={()=>setView("councils")}>Hội đồng ({data.councils.length})</button>
-          <button className={`btn ${view==="schedules"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="schedules"} onClick={()=>setView("schedules")}>Lịch & kết quả ({data.slots.length})</button>
-          {!!data.export_rounds?.length&&<button className={`btn ${view==="register"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="register"} onClick={()=>setView("register")}>Bảng điểm toàn đợt</button>}
-          <button className={`btn ${view==='announcements'?'btn-primary':'btn-secondary'}`} aria-pressed={view==='announcements'} onClick={()=>setView('announcements')}>Danh sách công bố</button>
+          <button className={`btn ${view==="councils"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="councils"} onClick={()=>changeView("councils")}>Hội đồng ({data.councils.length})</button>
+          <button className={`btn ${view==="schedules"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="schedules"} onClick={()=>changeView("schedules")}>Lịch & kết quả ({data.slots.length})</button>
+          {!!data.export_rounds?.length&&<button className={`btn ${view==="register"?"btn-primary":"btn-secondary"}`} aria-pressed={view==="register"} onClick={()=>changeView("register")}>Bảng điểm toàn đợt</button>}
+          <button className={`btn ${view==='announcements'?'btn-primary':'btn-secondary'}`} aria-pressed={view==='announcements'} onClick={()=>changeView('announcements')}>Danh sách công bố</button>
         </nav>
         <div className="button-row">
           {!!data.scopes.length&&<button className="btn btn-primary" onClick={()=>{if(mayDiscard())setOperation("council");}}>Lập hội đồng mới</button>}

@@ -147,6 +147,7 @@ test("Thư ký định dạng trực tiếp bản xem, Enter/Tab không thay đ�
  await expect.poll(()=>new URL(lastUrl).searchParams.get('line_breaks')).toContain('5');
  expect(new URL(lastUrl).searchParams.get('tabs')).toContain('5');
  expect(new URL(lastUrl).searchParams.get('field_styles')).toContain('"bold":true');
+ expect(new URL(lastUrl).searchParams.get('expected_revision')).toBe('synthetic-layout');
 });
 
 test("SV xem danh sách công bố chung và tải Excel, không có dữ liệu điểm",async({page})=>{
@@ -183,6 +184,9 @@ test("Giữ nháp khi lưu điểm danh, làm tròn đúng và responsive có d�
   await page.getByRole("button",{name:"Biên bản",exact:true}).click();
   const discussion=page.getByLabel("Nội dung trao đổi và trả lời câu hỏi",{exact:true});
   await discussion.fill("Biên bản đang soạn chưa lưu");
+  page.once("dialog",dialog=>dialog.dismiss());
+  await page.getByRole("button",{name:/Hội đồng \(/}).click();
+  await expect(discussion).toHaveValue("Biên bản đang soạn chưa lưu");
   await page.getByRole("button",{name:"Phiếu chấm",exact:true}).click();
   await page.getByText("Phiếu chấm Mẫu 6 · Điểm thưởng 0",{exact:true}).first().click();
   const values=["0.27","0.01","0.31","0.10","0.40","0.73","0.62","0.28","0.07","0.29","0.70","0.07"];

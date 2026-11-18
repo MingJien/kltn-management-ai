@@ -1,9 +1,10 @@
 from decimal import Decimal
 from datetime import date
 from typing import Literal
+from unicodedata import normalize
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 from typing import Annotated
 
 
@@ -58,6 +59,10 @@ class SharedArrivalInput(Input):
     room: str | None = Field(default=None,min_length=2,max_length=200)
 
 
+def normalize_academic_text(value: str) -> str:
+    return " ".join(normalize("NFC", value).split())
+
+
 class AcademicProfileInput(Input):
     class_name: str = Field(min_length=1, max_length=100)
     major_code: str = Field(min_length=1, max_length=32)
@@ -65,6 +70,11 @@ class AcademicProfileInput(Input):
     training_cohort: str = Field(default="", max_length=50)
     source_reference: str = Field(min_length=3, max_length=500)
     reason: str = Field(min_length=5, max_length=1000)
+
+    @field_validator("class_name", "training_cohort", mode="before")
+    @classmethod
+    def normalize_spaces(cls, value):
+        return normalize_academic_text(value) if isinstance(value, str) else value
 
 
 class AbsenceDecision(Input):

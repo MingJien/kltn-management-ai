@@ -14,15 +14,15 @@ test("SV nộp bản lưu, thấy trạng thái mới và không thể nộp tr�
   await page.route("**/api/v1/**",async route=>{
     const endpoint=new URL(route.request().url()).pathname.replace("/api/v1","");
     if(endpoint==="/me/context")return route.fulfill({json:context});
-    if(endpoint==="/thesis-archive/theses/thesis"){
+    if(endpoint==="/thesis-archive/theses/thesis" && route.request().method()==="POST"){
       expect(route.request().method()).toBe("POST");
       expect(route.request().headers()["x-csrf-token"]).toBe("synthetic-csrf");
       expect(route.request().headers()["x-file-name"]).toBe("Ban-hoan-thien.pdf");
       submitted=true;return route.fulfill({status:201,json:{id:"version"}});
     }
-    if(endpoint==="/thesis-archive")return route.fulfill({json:[submitted?{...entry,can_submit:false,versions:[{
+    if(endpoint==="/thesis-archive/theses/thesis")return route.fulfill({json:submitted?{...entry,can_submit:false,versions:[{
       id:"version",number:1,revision:1,state:"SUBMITTED",filename:"Ban-hoan-thien.pdf",created_at:"2026-11-15T02:00:00Z",
-      decided_at:null,decided_by:null,decision_note:null}]}:entry]});
+      decided_at:null,decided_by:null,decision_note:null}]}:entry});
     if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
     return route.fulfill({json:[]});
   });
@@ -52,9 +52,9 @@ test("TBM trả bản lưu kèm lý do rồi thấy kết quả và người x�
       expect(route.request().postDataJSON()).toEqual({decision:"RETURNED",reason:"Cần bổ sung tài liệu triển khai theo kết luận hội đồng."});
       processed=true;return route.fulfill({status:204});
     }
-    if(endpoint==="/thesis-archive")return route.fulfill({json:[{...entry,can_submit:false,can_decide:!processed,
+    if(endpoint==="/thesis-archive/theses/thesis")return route.fulfill({json:{...entry,can_submit:false,can_decide:!processed,
       versions:[processed?{...version,state:"RETURNED",decided_at:"2026-11-15T03:00:00Z",decided_by:"Trưởng bộ môn",
-        decision_note:"Cần bổ sung tài liệu triển khai theo kết luận hội đồng."}:version]}]});
+        decision_note:"Cần bổ sung tài liệu triển khai theo kết luận hội đồng."}:version]}});
     if(endpoint.includes("/notifications"))return route.fulfill({json:{items:[],unread_count:0,total:0}});
     return route.fulfill({json:[]});
   });

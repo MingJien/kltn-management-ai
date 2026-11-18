@@ -1,10 +1,11 @@
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import Field
 
 from backend.api.defense_schemas import AcademicProfileInput, Input
+from backend.api.evaluation_schemas import Reason
 from backend.api.dependencies import current_user
 from backend.api.evaluation import transaction
 from backend.services import nv6_reporting, thesis_archive
@@ -44,6 +45,22 @@ def archive(round_id:UUID|None=None,user=Depends(current_user),session=Depends(t
     return thesis_archive.workspace(session,user,round_id=round_id)
 
 
+@router.get("/thesis-archive/search")
+def archive_search(mode: Literal["catalog", "work"] = "catalog",
+                   state: Literal["SUBMITTED", "RETURNED", "REOPENED", "ACCEPTED", "EMPTY"] | None = None,
+                   q: Annotated[str, Query(max_length=150)] = "", round_id: UUID | None = None,
+                   department_id: UUID | None = None, page: Annotated[int, Query(ge=1)] = 1,
+                   limit: Annotated[int, Query(ge=1, le=50)] = 20,
+                   user=Depends(current_user), session=Depends(transaction)):
+    return thesis_archive.catalog_query(session, user, mode=mode, state=state, search=q.strip(),
+        round_id=round_id, department_id=department_id, page=page, limit=limit)
+
+
+@router.get("/thesis-archive/theses/{identifier}")
+def archive_detail(identifier:UUID,user=Depends(current_user),session=Depends(transaction)):
+    return thesis_archive.details(session,user,identifier)
+
+
 @router.post("/thesis-archive/theses/{identifier}",status_code=201)
 async def submit_archive(identifier:UUID,request:Request,user=Depends(current_user),session=Depends(transaction)):
     return await thesis_archive.submit(session,user,identifier,request)
@@ -53,6 +70,12 @@ async def submit_archive(identifier:UUID,request:Request,user=Depends(current_us
 def archive_decision(identifier:UUID,data:ArchiveDecision,version:int=Header(alias="If-Match",ge=1),
                      user=Depends(current_user),session=Depends(transaction)):
     thesis_archive.decide(session,user,identifier,version,data.decision,data.reason)
+
+
+@router.post("/thesis-archive/versions/{identifier}/reopen", status_code=204)
+def reopen_archive_version(identifier: UUID, data: Reason, version: int = Header(alias="If-Match", ge=1),
+                           user=Depends(current_user), session=Depends(transaction)):
+    thesis_archive.reopen(session, user, identifier, version, data.reason)
 
 
 @router.get("/thesis-archive/versions/{identifier}/file")

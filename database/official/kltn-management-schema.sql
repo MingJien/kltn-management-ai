@@ -1,4 +1,4 @@
--- Schema-only review snapshot at Alembic revision 20261117_0032.
+-- Schema-only review snapshot at Alembic revision 20261118_0033.
 -- 55 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.
@@ -678,8 +678,8 @@ CREATE TABLE thesis_archive_version (
 	row_version INTEGER DEFAULT '1' NOT NULL,
 	CONSTRAINT pk_thesis_archive_version PRIMARY KEY (id),
 	CONSTRAINT uq_thesis_archive_version_thesis_id_version_no UNIQUE (thesis_id, version_no),
-	CONSTRAINT ck_thesis_archive_version_state CHECK (state IN ('SUBMITTED','RETURNED','ACCEPTED')),
-	CONSTRAINT ck_thesis_archive_version_decision CHECK ((state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)),
+	CONSTRAINT ck_thesis_archive_version_state CHECK (state IN ('SUBMITTED','RETURNED','ACCEPTED','REOPENED')),
+	CONSTRAINT ck_thesis_archive_version_decision CHECK ((state = 'SUBMITTED' AND decided_at IS NULL AND decided_by IS NULL AND decision_note IS NULL) OR (state IN ('RETURNED','ACCEPTED','REOPENED') AND decided_at IS NOT NULL AND decided_by IS NOT NULL AND decision_note IS NOT NULL AND length(trim(decision_note)) >= 5)),
 	CONSTRAINT fk_thesis_archive_version_thesis_id_thesis FOREIGN KEY(thesis_id) REFERENCES thesis (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_archive_version_file_id_stored_file FOREIGN KEY(file_id) REFERENCES stored_file (id) ON DELETE RESTRICT,
 	CONSTRAINT fk_thesis_archive_version_submitted_by_user_account FOREIGN KEY(submitted_by) REFERENCES user_account (id) ON DELETE RESTRICT,
