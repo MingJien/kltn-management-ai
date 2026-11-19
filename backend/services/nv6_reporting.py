@@ -1,7 +1,10 @@
 """Round reports and data checks share the same result register as Mẫu 10/11."""
-from collections import Counter
+from collections import Counter, OrderedDict
 from hashlib import sha256
 import json
+from threading import Lock
+from time import monotonic
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -12,11 +15,22 @@ from backend.services import defense, defense_register, evaluation
 from backend.services.theses import audit
 
 
-def scopes(session, user):
+REPORT_CACHE_TTL_SECONDS = 15 * 60
+REPORT_CACHE_MAX_ENTRIES = 64
+_report_cache: OrderedDict[tuple[UUID, str, UUID, frozenset[UUID]], tuple[float, dict]] = OrderedDict()
+_report_cache_lock = Lock()
+# Coalesce concurrent work for the same report without holding the cache lock during database I/O.
+_report_build_locks = tuple(Lock() for _ in range(16))
+
+
+def scopes(session, user, *, round_id=None):
     lecturer = defense.lecturer_for(session, user)
     if not lecturer and user.base_role != "ADMIN":
         return []
-    rounds = session.scalars(select(m.ThesisRound).order_by(m.ThesisRound.created_at.desc())).all()
+    round_query = select(m.ThesisRound).order_by(m.ThesisRound.created_at.desc())
+    if round_id is not None:
+        round_query = round_query.where(m.ThesisRound.id == round_id)
+    rounds = session.scalars(round_query).all()
     departments = session.scalars(select(m.Department).order_by(m.Department.code)).all()
     return [{"round_id": round_.id, "round_code": round_.code, "department_id": department.id,
              "department": department.name} for round_ in rounds for department in departments
@@ -24,17 +38,43 @@ def scopes(session, user):
                 user.base_role == "ADMIN" or defense.manages(session,user,lecturer,round_.id,department.id))]
 
 
-def workspace(session, user, round_id, department_id):
-    from backend.services.thesis_archive import submission_snapshot
-
-    available = {scope["department_id"] for scope in scopes(session,user) if scope["round_id"] == round_id}
+def workspace(session, user, round_id, department_id, *, refresh=False):
+    available = {scope["department_id"] for scope in scopes(session, user, round_id=round_id)}
     if not available or (department_id and department_id not in available):
         raise HTTPException(404,"Không tìm thấy báo cáo trong phạm vi được giao")
     selected = {department_id} if department_id else available
+    key = (user.id, user.base_role, round_id, frozenset(selected))
+    requested_at = monotonic()
+    with _report_build_locks[hash(key) % len(_report_build_locks)]:
+        with _report_cache_lock:
+            cached = _report_cache.get(key)
+            if cached:
+                generated_at, report = cached
+                if (monotonic() - generated_at < REPORT_CACHE_TTL_SECONDS
+                        and (not refresh or generated_at > requested_at)):
+                    _report_cache.move_to_end(key)
+                    return report
+
+        report = build_report(session, user, round_id, selected)
+        with _report_cache_lock:
+            _report_cache[key] = (monotonic(), report)
+            _report_cache.move_to_end(key)
+            if len(_report_cache) > REPORT_CACHE_MAX_ENTRIES:
+                _report_cache.popitem(last=False)
+        return report
+
+
+def build_report(session, user, round_id, selected):
+    from backend.services.thesis_archive import submission_snapshot
+
     sessions = [(slot,council) for slot,council in defense_register.council_sessions(session,round_id) if council.department_id in selected]
     results = {row["student_id"]: row for row in defense_register.rows_for_sessions(session,sessions)}
     theses = session.scalars(select(m.Thesis).where(m.Thesis.round_id == round_id, m.Thesis.department_id.in_(selected),
         m.Thesis.state != "WITHDRAWN").order_by(m.Thesis.current_title)).all()
+    archive = m.ThesisArchiveVersion
+    archive_states = dict(session.execute(select(archive.thesis_id, archive.state)
+        .where(archive.thesis_id.in_([thesis.id for thesis in theses]))
+        .distinct(archive.thesis_id).order_by(archive.thesis_id, archive.version_no.desc())).all())
     majors = {(row.department_id,row.code): row.name for row in session.scalars(
         select(m.DepartmentMajor).where(m.DepartmentMajor.department_id.in_(selected)))}
     expired = set(session.scalars(select(m.ThesisExtensionRequest.thesis_id)
@@ -46,8 +86,7 @@ def workspace(session, user, round_id, department_id):
     rows = []
     for thesis in theses:
         report = evaluation.report(session,thesis)
-        archive_state = session.scalar(select(m.ThesisArchiveVersion.state).where(m.ThesisArchiveVersion.thesis_id == thesis.id)
-            .order_by(m.ThesisArchiveVersion.version_no.desc()).limit(1))
+        archive_state = archive_states.get(thesis.id)
         if archive_state:
             archive_counts[archive_state] += 1
         elif thesis.state in {"DEFENDED", "COMPLETED"}:

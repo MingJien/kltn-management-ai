@@ -25,8 +25,9 @@ def scopes(user=Depends(current_user),session=Depends(transaction)):
 
 
 @router.get("/nv6-reports/{round_id}")
-def report(round_id:UUID,department_id:UUID|None=None,user=Depends(current_user),session=Depends(transaction)):
-    return nv6_reporting.workspace(session,user,round_id,department_id)
+def report(round_id: UUID, department_id: UUID | None = None, refresh: bool = False,
+           user=Depends(current_user), session=Depends(transaction)):
+    return nv6_reporting.workspace(session, user, round_id, department_id, refresh=refresh)
 
 
 @router.get("/nv6-reports/{round_id}/students/{member_id}")

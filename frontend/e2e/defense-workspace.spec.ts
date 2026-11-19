@@ -30,6 +30,15 @@ test("Điều phối xem báo cáo theo đợt và mở kho nội bộ",async({p
   await expect(page.getByRole("heading",{name:"Báo cáo và thống kê KLTN",exact:true})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Điều kiện dự bảo vệ · theo SV",exact:true})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Đối chiếu từng sinh viên",exact:true})).toBeVisible();
+  const [refreshed] = await Promise.all([
+    page.waitForResponse(response=>{
+      const url = new URL(response.url());
+      return url.pathname.startsWith("/api/v1/nv6-reports/") && url.searchParams.get("refresh")==="true";
+    }),
+    page.getByRole("button",{name:"Làm mới thống kê",exact:true}).click(),
+  ]);
+  expect(refreshed.ok()).toBe(true);
+  await expect(page.getByText(/^Số liệu cập nhật lúc /)).toBeVisible();
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:900});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);

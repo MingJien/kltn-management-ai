@@ -15820,6 +15820,16 @@
             }
           },
           {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
+            }
+          },
+          {
             "name": "X-Dev-User-Id",
             "in": "header",
             "required": false,

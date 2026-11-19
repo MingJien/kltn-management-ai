@@ -9,3 +9,8 @@ Phạm vi từ phản biện đến bảng điểm, kho nội bộ, báo cáo v�
 - Báo cáo đếm nộp lưu theo khóa luận, điểm và kết quả theo SV. Kiểm kết quả của phiên bổ sung không đếm thêm SV và trường hợp hết hạn gia hạn không rơi vào nhóm chưa xếp lịch. Khi còn đề nghị đính chính kết quả, kho chặn nộp/duyệt bản hoàn thiện.
 - Build frontend đạt. Cảnh báo kích thước gói chính của Vite vẫn còn. Alembic local ở head `20261118_0033`, 55 bảng nghiệp vụ, `alembic check` không có thay đổi chưa được migration.
 - Kiểm chỉ đọc trên demo đang dùng: TBM vào hàng hồ sơ nộp lưu và mở đúng đề tài mượn sách. Mở bản xem Mẫu 9 và xác nhận nút phát hành chỉ khả dụng sau khi Word hiển thị. Không nộp lưu, sửa điểm, gửi thông báo hay phát hành bản ký trên hồ sơ demo.
+
+## Bổ sung kiểm chứng thống kê ngày 19/11/2026
+
+- 17 ca pytest đạt trên schema PostgreSQL riêng, gồm tái sử dụng số liệu trước hạn 15 phút, tính lại khi hết hạn hoặc khi yêu cầu làm mới, từ chối tài khoản đã bị thu hồi quyền và lấy đúng trạng thái của bản nộp lưu mới nhất.
+- 1 ca trình duyệt đạt trên API và PostgreSQL với tài khoản giả. Nút **Làm mới thống kê** gửi yêu cầu tính lại và trang hiển thị thời điểm cập nhật. Build frontend và kiểm tra đặc tả OpenAPI đạt.

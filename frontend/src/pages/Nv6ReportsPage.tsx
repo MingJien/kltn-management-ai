@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {Link} from "react-router-dom";
 import {request,type Context} from "../api";
 import {errorMessage} from "../errors";
@@ -63,6 +63,7 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
   const [data,setData] = useState<Summary|null>(null);
   const [error,setError] = useState("");
   const [revision,setRevision] = useState(0);
+  const requestedRevision = useRef(0);
   const [filter,setFilter] = useState("");
   const [search,setSearch] = useState("");
   const [limit,setLimit] = useState(25);
@@ -84,7 +85,11 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
     setData(null);
     if(!round)return;
     const controller = new AbortController();
-    const path = `/nv6-reports/${round}${department?`?department_id=${encodeURIComponent(department)}`:""}`;
+    const params = new URLSearchParams();
+    if(department)params.set("department_id",department);
+    if(revision !== requestedRevision.current)params.set("refresh","true");
+    requestedRevision.current = revision;
+    const path = `/nv6-reports/${round}${params.size?`?${params}`:""}`;
     void request<Summary>(path,context.user_id,{signal:controller.signal}).then(result=>{
       if(!controller.signal.aborted)setData(result);
     }).catch(cause=>{if(!controller.signal.aborted)setError(errorMessage(cause));});
@@ -109,7 +114,7 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
 
   return <div className="stack defense-page">
     <PageHeader title="Báo cáo và thống kê KLTN" description="Theo dõi điều kiện bảo vệ, kết quả và tiến độ nộp lưu theo đợt và bộ môn.">
-      <button className="btn btn-secondary" onClick={()=>{setError("");setRevision(value=>value+1);}}>Làm mới thống kê</button>
+      <button className="btn btn-secondary" disabled={!round||(!data&&!error)} onClick={()=>{setError("");setRevision(value=>value+1);}}>Làm mới thống kê</button>
     </PageHeader>
     {error&&<p className="alert alert-danger" role="alert">{error}</p>}
     {notice&&<p className="alert alert-success" role="status">{notice}</p>}
@@ -134,7 +139,7 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
         {breakdown("Xếp loại đã ghi trong biên bản",data.classifications,{})}
       </div>
       {Object.keys(data.score_counts).length>0&&breakdown("Phân bố điểm đã chốt",Object.fromEntries(Object.entries(data.score_counts).sort(([a],[b])=>Number(b)-Number(a)).map(([key,value])=>[`${key.replace(".",",")} điểm`,value])),{})}
-      <p className="text-muted">Cập nhật {when(data.generated_at)} · {data.incomplete_profiles} sinh viên cần bổ sung dữ liệu học vụ.{rounds.get(round)==="SYN-DEMO"?" Đợt đang xem là dữ liệu giả lập.":""}</p>
+      <p className="text-muted">Số liệu cập nhật lúc {when(data.generated_at)} · {data.incomplete_profiles} sinh viên cần bổ sung dữ liệu học vụ.{rounds.get(round)==="SYN-DEMO"?" Đợt đang xem là dữ liệu giả lập.":""}</p>
       {context.base_role==="LECTURER"&&<section id="nv6-report-students" className="stack">
         <h2>Đối chiếu từng sinh viên</h2>
         <div className="defense-form-grid">

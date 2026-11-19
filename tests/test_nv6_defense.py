@@ -9,6 +9,7 @@ from docx import Document
 from openpyxl import load_workbook
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from backend.db.models import entities as m
 from backend.services.theses import now
@@ -16,6 +17,44 @@ from backend.services.defense import thesis_state_allows_schedule, validate_exte
 from test_core_workspace import workspace, synthetic_pdf, version_headers
 from test_nv6_evaluation import check, complete_review, evaluation, get
 from test_registration import hdr, scenario
+
+
+def test_report_cache_refresh_expiration_and_scope(workspace, monkeypatch):
+    from backend.services import nv6_reporting
+
+    client, users, students, lecturers, session, path = workspace
+    thesis = session.get(m.Thesis, UUID(path.rsplit("/", 1)[-1]))
+    endpoint = f"/api/v1/nv6-reports/{thesis.round_id}"
+    headers = hdr(users[4])
+    elapsed = 100.0
+    monkeypatch.setattr(nv6_reporting, "monotonic", lambda: elapsed)
+
+    first = client.get(endpoint, headers=headers)
+    assert first.status_code == 200, first.text
+    assert len(first.json()["rows"]) == 2
+    thesis.current_title = "Synthetic renamed thesis"
+    session.commit()
+    assert client.get(endpoint, headers=headers).json() == first.json()
+    assert client.get(endpoint, headers=hdr(users[0])).status_code == 404
+
+    refreshed = client.get(endpoint, headers=headers, params={"refresh": True}).json()
+    assert all(row["title"] == "Synthetic renamed thesis" for row in refreshed["rows"])
+    thesis.current_title = "Synthetic latest thesis title"
+    session.commit()
+    elapsed += 899
+    assert client.get(endpoint, headers=headers).json() == refreshed
+    elapsed += 1
+    expired = client.get(endpoint, headers=headers).json()
+    assert expired["rows"][0]["title"] == "Synthetic latest thesis title"
+
+    coordinator = session.scalar(select(m.ResourceAssignment).where(
+        m.ResourceAssignment.user_id == users[4].id,
+        m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR"))
+    head = session.scalar(select(m.PositionAssignment).where(m.PositionAssignment.lecturer_id == lecturers[1].id))
+    coordinator.state = head.state = "REVOKED"
+    session.commit()
+    assert client.get(endpoint, headers=headers).status_code == 404
+    assert client.get(endpoint, headers=headers, params={"refresh": True, "department_id": students[0].department_id}).status_code == 404
 
 
 def test_academic_profile_before_schedule_uses_scope_and_revision(evaluation):
@@ -517,6 +556,8 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     latest_archive=archive+"/versions/"+resubmitted.json()["id"]
     accepted=client.post(latest_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"ACCEPTED","reason":"Đã đối chiếu bản hoàn thiện"})
     assert accepted.status_code==204,accepted.text
+    assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"NOT_SUBMITTED":1}
+    assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"ACCEPTED":1}
     inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
     assert any("Đã đưa khóa luận vào kho nội bộ" in notice["message"] for notice in inbox)
     assert client.get(latest_archive+"/file",headers=hdr(users[1])).status_code==200
@@ -534,7 +575,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert detail["can_submit"] and detail["versions"][0]["state"]=="REOPENED"
     assert detail["versions"][0]["decision_note"]=="Đã đối chiếu bản hoàn thiện"
     assert detail["versions"][0]["reopened"]["reason"]==reopen_data["reason"]
-    assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"REOPENED":1}
+    assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"REOPENED":1}
     assert client.get(latest_archive+"/file",headers=hdr(users[1])).content==synthetic_pdf()
     assert client.get(archive,headers=hdr(users[2])).json()==[]
     inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]

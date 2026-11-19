@@ -19,6 +19,8 @@ Mở **Tổng quan → Báo cáo và thống kê**, chọn đợt rồi bộ mô
 
 Trang hiển thị số SV, khóa luận, hội đồng có lịch, phiên bảo vệ, điều kiện bảo vệ, kết quả sau cùng theo SV, điểm danh, xếp loại đã ghi, phân bố điểm đã chốt và tiến độ nộp lưu. Phiên bổ sung thay kết quả chờ của đúng SV. Hết hạn gia hạn đã ghi kết quả được phân biệt với chưa xếp lịch. Nộp lưu đếm theo khóa luận, phân biệt chờ chốt, đủ điều kiện chưa nộp và bản thu hồi.
 
+Web dùng lại số liệu thống kê tối đa 15 phút theo tài khoản, đợt và phạm vi bộ môn, sau khi kiểm tra lại quyền truy cập. Xem thời điểm tính ở dòng **Số liệu cập nhật lúc**. Chọn **Làm mới thống kê** để tính lại ngay, chẳng hạn sau khi duyệt lưu một báo cáo.
+
 Trong **Đối chiếu từng sinh viên**, tìm theo tên/MSSV/đề tài hoặc chọn nhóm còn thiếu. Bấm số lượng trong nhóm điều kiện/kết quả để lọc danh sách. Hồ sơ đã xếp lịch dẫn tới phiên bảo vệ để đính chính thông tin học vụ đúng bản xuất. Hồ sơ chưa xếp lịch có nút **Bổ sung thông tin** để nhập lớp, ngành từ danh mục bộ môn, khóa học, ngày sinh, căn cứ và lý do. Thay đổi dữ liệu không thay điểm; xung đột phiên bản yêu cầu tải lại. Các đợt được xem riêng, không trộn dữ liệu demo vào đợt thật.
 
 ## Biểu mẫu toàn đợt
