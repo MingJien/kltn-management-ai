@@ -32,10 +32,11 @@ def scopes(session, user, *, round_id=None):
         round_query = round_query.where(m.ThesisRound.id == round_id)
     rounds = session.scalars(round_query).all()
     departments = session.scalars(select(m.Department).order_by(m.Department.code)).all()
+    managed = defense.managed_scope_pairs(session, lecturer, rounds, departments) if lecturer else set()
     return [{"round_id": round_.id, "round_code": round_.code, "department_id": department.id,
              "department": department.name} for round_ in rounds for department in departments
             if defense.valid_council_scope(round_, department) and (
-                user.base_role == "ADMIN" or defense.manages(session,user,lecturer,round_.id,department.id))]
+                user.base_role == "ADMIN" or (round_.id, department.id) in managed)]
 
 
 def workspace(session, user, round_id, department_id, *, refresh=False):
@@ -65,7 +66,7 @@ def workspace(session, user, round_id, department_id, *, refresh=False):
 
 
 def build_report(session, user, round_id, selected):
-    from backend.services.thesis_archive import submission_snapshot
+    from backend.services.thesis_archive import ready_results
 
     sessions = [(slot,council) for slot,council in defense_register.council_sessions(session,round_id) if council.department_id in selected]
     results = {row["student_id"]: row for row in defense_register.rows_for_sessions(session,sessions)}
@@ -90,7 +91,7 @@ def build_report(session, user, round_id, selected):
         if archive_state:
             archive_counts[archive_state] += 1
         elif thesis.state in {"DEFENDED", "COMPLETED"}:
-            ready_to_submit = submission_snapshot(session, thesis, results.values())
+            ready_to_submit = ready_results(session, thesis, results.values())
             archive_counts["NOT_SUBMITTED" if ready_to_submit else "WAITING_RESULTS"] += 1
         for member in evaluation.members(session,thesis):
             student = session.get(m.StudentProfile,member.student_id)

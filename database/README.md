@@ -1,6 +1,6 @@
 # PostgreSQL `kltn_management`
 
-The application database uses 43 business tables and `alembic_version`. Current Alembic head is `20261102_0019`. NV6 adds version-bound Mẫu 7/8 reviews and per-student defense eligibility history, plus individual withdrawal requests and version-specific proposal approvals.
+The application database uses 55 business tables and `alembic_version`. Current Alembic head is `20261119_0034`. This revision marks a defended thesis as completed when its latest archive submission has already been approved. It preserves the submitted files and approval history.
 
 | File | Purpose |
 | --- | --- |

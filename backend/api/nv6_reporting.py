@@ -63,8 +63,9 @@ def archive_detail(identifier:UUID,user=Depends(current_user),session=Depends(tr
 
 
 @router.post("/thesis-archive/theses/{identifier}",status_code=201)
-async def submit_archive(identifier:UUID,request:Request,user=Depends(current_user),session=Depends(transaction)):
-    return await thesis_archive.submit(session,user,identifier,request)
+async def submit_archive(identifier:UUID,request:Request,version:int|None=Header(None,alias="If-Match",ge=0),
+                         user=Depends(current_user),session=Depends(transaction)):
+    return await thesis_archive.submit(session,user,identifier,request,version)
 
 
 @router.post("/thesis-archive/versions/{identifier}/decision",status_code=204)

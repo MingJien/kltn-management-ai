@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import type { Ref } from "react";
 import { Menu, LogOut } from "lucide-react";
 import { plannedPages, type PlannedPageId } from "../../plannedPages";
 import type { Context } from "../../api";
@@ -40,12 +41,14 @@ const BREADCRUMB_MAP: Record<string, string> = {
 };
 
 interface HeaderProps {
+  menuButton: Ref<HTMLButtonElement>;
+  menuOpen: boolean;
   context: Context;
   onToggleSidebar: () => void;
   onLogout: () => void;
 }
 
-export default function Header({ context, onToggleSidebar, onLogout }: HeaderProps) {
+export default function Header({ context, menuButton, menuOpen, onToggleSidebar, onLogout }: HeaderProps) {
   const location = useLocation();
   const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
   const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
@@ -58,6 +61,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
         <div className="header__left">
           <button
             className="header__toggle"
+            ref={menuButton} aria-controls="main-sidebar" aria-expanded={menuOpen}
             onClick={onToggleSidebar}
             aria-label="Mở hoặc đóng menu"
           >
@@ -73,7 +77,7 @@ export default function Header({ context, onToggleSidebar, onLogout }: HeaderPro
           <NotificationsBell userId={context.user_id} />
           <ProfilePopup context={context} onLogout={onLogout} />
           <button className="btn btn-ghost btn-sm header__logout-standalone" onClick={onLogout} aria-label="Đăng xuất">
-            <LogOut size={18} /> Đăng xuất
+            <LogOut size={18} aria-hidden="true"/> <span>Đăng xuất</span>
           </button>
         </div>
       </div>

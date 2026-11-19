@@ -9,6 +9,8 @@
   min-height: 100dvh;
 }
 
+.sidebar-overlay, .sidebar__mobile-close { display: none; }
+
 .app-shell__sidebar {
   position: fixed;
   top: 0;
@@ -133,9 +135,12 @@
 
   .app-shell__main {
     margin-left: 0;
+    transition: none;
   }
 
   .sidebar-overlay {
+    display: block;
+    visibility: hidden;
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.4);
@@ -146,9 +151,16 @@
   }
 
   .sidebar-overlay--visible {
+    visibility: visible;
     opacity: 1;
     pointer-events: auto;
   }
+  .sidebar__mobile-close {
+    position: absolute; top: 8px; right: 8px; z-index: 1;
+    display: grid; place-items: center; width: 44px; height: 44px;
+    border-radius: var(--radius-md); color: var(--neutral-700); background: white;
+  }
+  .sidebar__mobile-close:focus-visible { outline: 2px solid var(--primary-700); outline-offset: -3px; }
 }
 
 @media (max-width: 639px) {

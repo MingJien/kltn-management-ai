@@ -108,7 +108,7 @@ test("Tệp GV phản hồi, Word/PDF comments, nháp chung trên máy chủ và
     await expect(preview.locator(".review-text-sheet del")).toContainText("Old sentence to remove.");
     await preview.getByRole("button",{name:"Về bản SV",exact:true}).click();
     await modal.locator(".review-feedback-file").filter({hasText:"gv-nhan-xet.pdf"}).getByRole("button",{name:"Xem bản GV nhận xét",exact:true}).click();
-    await preview.getByRole("button",{name:"Trang phản hồi sau",exact:true}).click();
+    await preview.getByRole("button",{name:"Trang sau của tài liệu",exact:true}).click();
     await expect(preview.getByText("Add evidence for this conclusion.",{exact:true})).toBeVisible();
     await preview.getByRole("button",{name:"Về bản SV",exact:true}).click();
     await modal.getByLabel("Kết quả",{exact:true}).selectOption("REVISION_REQUIRED");

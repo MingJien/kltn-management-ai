@@ -544,6 +544,23 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     upload_headers={**hdr(users[0]),"X-File-Name":"synthetic-final.pdf","Content-Type":"application/octet-stream"}
     assert client.get(archive,headers=hdr(users[0])).json()[0]["can_submit"]
     submission_path=archive+"/theses/"+thesis["thesis_id"]
+    thesis_path = "/api/v1/theses/" + thesis["thesis_id"]
+    assert "archive:view" in client.get(thesis_path, headers=hdr(users[0])).json()["actions"]
+    assert any("Nhóm có thể nộp bản hoàn thiện" in n["message"] for n in
+               client.get("/api/v1/notifications", headers=hdr(users[0])).json()["items"])
+    work = client.get(archive+"/search", headers=hdr(users[0]), params={"mode":"work","state":"EMPTY"}).json()
+    assert {s["code"] for s in work["items"][0]["snapshot"]["students"]} == {s.student_code for s in students[:2]}
+    from test_participation_revocation import verifier
+    verifier(session, users[4], UUID(thesis["round_id"]))
+    roster_path = f"/api/v1/rounds/{thesis['round_id']}/roster"
+    payload = {"student_id": str(students[0].id), "reason": "Kiểm thử thu hồi trong đợt", "basis_ref": "E2E-123"}
+    assert client.post(roster_path+"/revoke", headers=hdr(users[4]), json=payload).status_code == 200
+    blocked = client.get(submission_path, headers=hdr(users[0])).json()
+    assert blocked["submission_suspended"] and not blocked["can_submit"]
+    assert client.get(submission_path, headers=hdr(users[1])).json()["can_submit"]
+    assert client.post(submission_path, headers=upload_headers, content=synthetic_pdf()).status_code == 403
+    assert client.post(roster_path+"/restore", headers=hdr(users[4]), json=payload).status_code == 200
+    assert client.get(submission_path, headers=hdr(users[0])).json()["can_submit"]
     sent=client.post(submission_path,headers=upload_headers,content=synthetic_pdf())
     assert sent.status_code==201,sent.text
     assert client.post(submission_path,headers=upload_headers,content=synthetic_pdf()).status_code==409
@@ -551,11 +568,13 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert client.get(first_archive+"/file",headers=hdr(users[2])).status_code==404
     returned=client.post(first_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"RETURNED","reason":"Bổ sung kết luận theo biên bản"})
     assert returned.status_code==204,returned.text
+    assert client.post(submission_path,headers={**upload_headers,"If-Match":"0"},content=synthetic_pdf()).status_code==409
     resubmitted=client.post(submission_path,headers=upload_headers,content=synthetic_pdf())
     assert resubmitted.status_code==201,resubmitted.text
     latest_archive=archive+"/versions/"+resubmitted.json()["id"]
     accepted=client.post(latest_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"ACCEPTED","reason":"Đã đối chiếu bản hoàn thiện"})
     assert accepted.status_code==204,accepted.text
+    assert client.get(thesis_path, headers=hdr(users[0])).json()["state"] == "COMPLETED"
     assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"NOT_SUBMITTED":1}
     assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"ACCEPTED":1}
     inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
@@ -565,11 +584,22 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     catalog=client.get(archive+"/search",headers=hdr(users[0]),params={"q":students[0].student_code})
     assert catalog.status_code==200,catalog.text
     assert catalog.json()["total"]==1 and catalog.json()["items"][0]["state"]=="ACCEPTED"
+    frozen = catalog.json()["items"][0]["snapshot"]
+    assert frozen["topic_code"] and frozen["department_code"]
+    assert {s["student_id"] for s in frozen["students"]} == {str(s.id) for s in students[:2]}
+    thesis_row = session.get(m.Thesis, UUID(thesis["thesis_id"]))
+    old_title = thesis_row.current_title
+    thesis_row.current_title = "Tiêu đề thay đổi sau khi duyệt"
+    session.commit()
+    assert client.get(archive+"/search",headers=hdr(users[4]),params={"q":"tieu de thay doi"}).json()["total"]==0
+    thesis_row.current_title = old_title
+    session.commit()
     assert client.get(archive+"/search",headers=hdr(users[2])).json()["total"]==0
     reopen_data={"reason":"Phát hiện lưu nhầm tài liệu, yêu cầu bản thay thế"}
     assert client.post(latest_archive+"/reopen",headers={**hdr(users[0]),"If-Match":"2"},json=reopen_data).status_code==404
     assert client.post(latest_archive+"/reopen",headers={**hdr(users[4]),"If-Match":"1"},json=reopen_data).status_code==409
     assert client.post(latest_archive+"/reopen",headers={**hdr(users[4]),"If-Match":"2"},json=reopen_data).status_code==204
+    assert client.get(thesis_path, headers=hdr(users[0])).json()["state"] == "DEFENDED"
     assert client.get(archive+"/search",headers=hdr(users[0])).json()["total"]==0
     detail=client.get(submission_path,headers=hdr(users[0])).json()
     assert detail["can_submit"] and detail["versions"][0]["state"]=="REOPENED"

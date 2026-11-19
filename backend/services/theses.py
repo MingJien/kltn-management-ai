@@ -37,6 +37,12 @@ def primary_advisor(session, thesis_id):
         m.AdvisorAssignment.thesis_id == thesis_id, effective(m.AdvisorAssignment)))
 
 
+def participation_revoked(session, student_id, round_id):
+    return session.scalar(select(m.EligibilitySnapshot.state).where(
+        m.EligibilitySnapshot.student_id == student_id, m.EligibilitySnapshot.round_id == round_id,
+    ).order_by(m.EligibilitySnapshot.version.desc()).limit(1)) == "REJECTED"
+
+
 def resource_role(session, user_id, role, *, thesis_id=None, round_id=None):
     query = select(m.ResourceAssignment).where(m.ResourceAssignment.user_id == user_id,
         m.ResourceAssignment.assignment_type == role, effective(m.ResourceAssignment))
@@ -87,13 +93,8 @@ def rights(session, user, thesis):
             result.update({"view", "proposal:view", "proposal:comment"})
         if resource_role(session, user.id, "KLTN_COORDINATOR", round_id=thesis.round_id):
             result.update({"view", "milestone:manage"})
-    if user.base_role == "STUDENT":
-        latest = session.scalar(select(m.EligibilitySnapshot).where(
-            m.EligibilitySnapshot.student_id == student.id,
-            m.EligibilitySnapshot.round_id == thesis.round_id,
-        ).order_by(m.EligibilitySnapshot.version.desc()).limit(1))
-        if latest is not None and latest.state == "REJECTED":
-            result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit", "extension:request"})
+    if user.base_role == "STUDENT" and participation_revoked(session, student.id, thesis.round_id):
+        result.difference_update({"progress:submit", "document:submit", "work:submit", "proposal:submit", "extension:request"})
     from backend.services.evaluation import permissions
     evaluation_actions = permissions(session, user, thesis)
     if evaluation_actions:
@@ -134,6 +135,10 @@ def workspace_out(session, user, thesis):
         return ThesisMemberOut(student_id=student.id, display_name=student.display_name,
             student_code=student.student_code, is_coordinator=member.is_coordinator)
     actions = rights(session, user, thesis)
+    if thesis.state in {"DEFENDED", "COMPLETED", "ARCHIVED"}:
+        from backend.services import thesis_archive
+        if thesis_archive.visible(session, thesis) and thesis_archive.access(session, user, thesis).can_view:
+            actions.add("archive:view")
     from backend.services.documents import supporting_open
     if "document:submit" in actions and supporting_open(session, thesis):
         actions.add("document:supporting_submit")

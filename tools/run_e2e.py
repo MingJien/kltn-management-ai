@@ -160,7 +160,7 @@ def main() -> int:
         synthetic_pdf = directory / 'synthetic-nv6.pdf'
         writer.write(synthetic_pdf)
         env['KLTN_E2E_NV6_FILE'] = str(synthetic_pdf)
-        if "archive-live.spec.ts" in sys.argv[1:]:
+        if any(Path(arg).name == "archive-live.spec.ts" for arg in sys.argv[1:]):
             from tools.e2e_archive_fixture import add_defended_thesis
             with Session(private_engine) as session, session.begin():
                 assert session.scalar(text('select current_schema()')) == schema

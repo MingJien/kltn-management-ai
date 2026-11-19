@@ -1,4 +1,4 @@
--- Schema-only review snapshot at Alembic revision 20261118_0033.
+-- Schema-only review snapshot at Alembic revision 20261119_0034.
 -- 55 business tables plus alembic_version; each table has one complete CREATE TABLE statement.
 -- Columns, primary/foreign keys, UNIQUE, and CHECK constraints are defined in that statement.
 -- CREATE INDEX statements follow their tables; this file contains no ALTER TABLE statements.

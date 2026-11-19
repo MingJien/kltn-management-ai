@@ -8,14 +8,14 @@
 - Theo dõi đề cương, tiến độ, tài liệu và phản hồi theo phiên bản; thông báo hạn nộp và kết quả xử lý. Hỗ trợ đổi đề tài, gia hạn và xin thôi KLTN trên hệ thống.
 - Phân công phản biện, nhận xét Mẫu 7/8, xác nhận điều kiện bảo vệ và xét điểm thưởng công bố khoa học theo từng sinh viên.
 - Lập hội đồng, xếp và đổi lịch, điểm danh, chấm điểm, lập biên bản, chốt kết quả và xuất Mẫu 6, 9, 10, 11 từ biểu mẫu gốc. Có xử lý bảo vệ bổ sung, đính chính sau khóa và lịch sử phát hành bản in.
-- Nộp và duyệt bản hoàn thiện sau bảo vệ; tra cứu, xem và tải khóa luận trong kho nội bộ. Dashboard tổng hợp tiến độ, kết quả và tình trạng lưu kho theo đợt, bộ môn.
+- Sau bảo vệ, nhóm nộp bản hoàn thiện, TBM duyệt hoặc yêu cầu sửa. Kho nội bộ cho tìm theo mã đề tài, MSSV, tiêu đề, tên SV hoặc GVHD, có hỗ trợ tiếng Việt không dấu. Từ thống kê có thể mở danh sách nộp lưu đúng đợt và bộ môn.
 - Có bản thử nghiệm tìm đề tài tương tự và so sánh cặp báo cáo PDF/Word, hỗ trợ OCR khi cấu hình Tesseract. Chatbot hiện truy xuất đoạn nguồn và trích dẫn; chất lượng AI trên dữ liệu thực tế và chức năng sinh câu trả lời cần tiếp tục hoàn thiện, đánh giá.
 
 ## Ràng buộc chính
 
 - Thao tác, tài liệu và thống kê giới hạn theo vai trò và phạm vi được giao. GVHD không tham gia hội đồng đánh giá đề tài mình hướng dẫn.
 - Hồ sơ bảo vệ cần đủ điều kiện và đúng phiên bản báo cáo. Kết quả, lịch sử đính chính và bản in đã phát hành được lưu để đối chiếu. Mẫu 10/11 tổng hợp toàn đợt; Mẫu 11 cần chọn hoặc nhập mã học phần.
-- Kho chỉ đưa bản đã duyệt vào tra cứu; bản thu hồi và quyết định xử lý vẫn được giữ trong lịch sử. Tệp tải lên cần được ClamAV xác nhận an toàn trước khi sử dụng.
+- Khi các hội đồng đã khóa điểm và từng thành viên đã có kết quả cuối, nhóm có thể nộp lưu nếu có ít nhất một SV đã được chấm điểm. Duyệt lưu chuyển khóa luận sang **Hoàn thành**. Thu hồi có căn cứ đưa khóa luận về **Đã bảo vệ** và giữ nguyên tệp cùng lịch sử duyệt. Tệp nộp lưu cần qua ClamAV.
 - Gia hạn theo quyết định của Khoa, tối đa 5 tháng. Thời hạn xin thôi và các bước xác nhận áp dụng theo cấu hình và trạng thái hồ sơ trên hệ thống.
 - CSDL hiện có được cập nhật bằng Alembic; không chạy lại SQL khởi tạo trên CSDL đang sử dụng. Cấu hình cục bộ và dữ liệu thật không đưa lên Git.
 

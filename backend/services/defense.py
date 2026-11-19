@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 
 from backend.db.models import entities as m
 from backend.services import evaluation, workflow_notices as notices
-from backend.services.registration import _is_department_head, row_version
-from backend.services.theses import audit, now, primary_advisor, resource_role
+from backend.services.registration import _is_department_head, head_departments_query, row_version
+from backend.services.theses import audit, effective, now, primary_advisor, resource_role
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CRITERIA = (
@@ -46,9 +46,8 @@ def manages(session, user, lecturer, round_id, department_id):
     round_ = session.get(m.ThesisRound, round_id)
     if not home or not target or not round_:
         return False
-    if round_.code == "SYN-DEMO":
-        return council_faculty_id(session, home) == council_faculty_id(session, target)
-    return not demo_department(home.code) and home.faculty_id == target.faculty_id
+    return coordinator_scope_matches(round_, home, target, council_faculty_id(session, home),
+                                     council_faculty_id(session, target))
 
 
 def demo_department(code):
@@ -67,8 +66,27 @@ def valid_council_scope(round_, department):
     return round_.code == "SYN-DEMO" or not demo_department(department.code)
 
 
+def coordinator_scope_matches(round_, home, target, home_council_faculty, target_council_faculty):
+    if round_.code == "SYN-DEMO":
+        return home_council_faculty == target_council_faculty
+    return not demo_department(home.code) and home.faculty_id == target.faculty_id
+
+
+def managed_scope_pairs(session, lecturer, rounds, departments):
+    """Resolve live grants once when listing a matrix of rounds and departments."""
+    headed = set(session.scalars(head_departments_query(lecturer.id)))
+    coordinated = set(session.scalars(select(m.ResourceAssignment.round_id).where(
+        m.ResourceAssignment.user_id == lecturer.user_id, m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR",
+        effective(m.ResourceAssignment), m.ResourceAssignment.round_id.in_([r.id for r in rounds]))))
+    home = session.get(m.Department, lecturer.department_id) if lecturer.department_id else None
+    faculties = {d.id: council_faculty_id(session, d) for d in departments} if coordinated and home else {}
+    home_faculty = council_faculty_id(session, home) if faculties else None
+    return {(r.id, d.id) for r in rounds for d in departments
+            if valid_council_scope(r, d) and (d.id in headed or (home and r.id in coordinated and
+                coordinator_scope_matches(r, home, d, home_faculty, faculties[d.id])))}
+
+
 def supervising_ids(session, thesis_id):
-    from backend.services.theses import effective
     return set(session.scalars(select(m.AdvisorAssignment.lecturer_id).where(
         m.AdvisorAssignment.thesis_id == thesis_id, effective(m.AdvisorAssignment))))
 
@@ -744,7 +762,11 @@ def workspace(session,user):
         marks = {} if own else slot.marks if privileged else {
             key:{lecturer_id:mark for lecturer_id,mark in values.items() if member and lecturer_id == member["id"]}
             for key,values in slot.marks.items()}
+        from backend.services import thesis_archive
+        archive_visible = bool(slot.finalized_at and thesis_archive.visible(session, thesis)
+                               and thesis_archive.access(session, user, thesis).can_view)
         slots.append({"id":slot.id,"prior_slot_id":slot.prior_slot_id,"absence_decisions":absence_out(session,slot,own),"thesis_id":thesis.id,"title":thesis.current_title,"council":council_out(council),
+            "can_view_archive":archive_visible, "absence_outcome_locked":thesis.state in {"COMPLETED","ARCHIVED"},
             "advisor_name":slot.minutes.get("advisor") or (advisor.display_name if advisor else None),
             "report_filename":session.get(m.StoredFile,session.get(m.DocumentVersion,slot.report_version_id).stored_file_id).original_name,
             "starts_at":slot.starts_at,"ends_at":slot.ends_at,"arrival_at":slot.arrival_at,"room":slot.room,"version":slot.row_version,
@@ -763,17 +785,20 @@ def workspace(session,user):
         departments = session.scalars(select(m.Department).where(m.Department.active.is_(True)).order_by(m.Department.code)).all()
         rounds = session.scalars(select(m.ThesisRound).where(m.ThesisRound.state != "ARCHIVED")).all()
         home = session.get(m.Department, lecturer.department_id) if lecturer.department_id else None
+        managed_pairs = managed_scope_pairs(session, lecturer, rounds, departments)
+        faculties = {d.id: council_faculty_id(session, d) for d in departments}
+        home_faculty = council_faculty_id(session, home) if home else None
         for round_ in rounds:
             for department in departments:
                 if not valid_council_scope(round_, department):
                     continue
-                can_manage = manages(session, user, lecturer, round_.id, department.id)
-                same_faculty = home and council_faculty_id(session, home) == council_faculty_id(session, department)
+                can_manage = (round_.id, department.id) in managed_pairs
+                same_faculty = home and home_faculty == faculties[department.id]
                 if not (can_manage or same_faculty):
                     continue
                 row = {"round_id": round_.id, "round_code": round_.code, "department_id": department.id,
                     "department_name": department.name, "department_code": department.code,
-                    "faculty_id": council_faculty_id(session, department), "can_manage": can_manage}
+                    "faculty_id": faculties[department.id], "can_manage": can_manage}
                 catalog.append(row)
                 if can_manage:
                     scopes.append(row)
@@ -858,6 +883,10 @@ def close_council(session,user,identifier):
         raise HTTPException(409,"Cần chốt toàn bộ lịch của hội đồng trước khi khóa bảng điểm")
     council.closed_at = now()
     audit(session,user,"DEFENSE_COUNCIL_CLOSED","defense_council",identifier)
+    session.flush()
+    from backend.services.thesis_archive import notify_ready
+    for thesis_id in {slot.thesis_id for slot in slots}:
+        notify_ready(session, user, session.get(m.Thesis, thesis_id))
     session.commit()
 
 
@@ -920,6 +949,10 @@ def decide_absence(session,user,identifier,student,data):
         raise HTTPException(409,"Đã dùng quyết định để xếp lịch bổ sung; không được thay đổi căn cứ")
     row=session.scalar(select(m.DefenseAbsenceDecision).where(m.DefenseAbsenceDecision.slot_id==slot.id,m.DefenseAbsenceDecision.thesis_member_id==student))
     row_version(data.revision,row.row_version if row else 0)
+    thesis = session.get(m.Thesis, slot.thesis_id)
+    changed_outcome = not row or row.outcome != data.outcome
+    if changed_outcome and thesis.state in {"COMPLETED", "ARCHIVED"}:
+        raise HTTPException(409, "Hồ sơ đã hoàn thành. Cần đối chiếu và thu hồi bản lưu trước khi đổi kết quả xử lý vắng.")
     if row:
         audit(session,user,"DEFENSE_ABSENCE_BEFORE_REVISION","defense_slot",slot.id,json.dumps(absence_out(session,slot),default=str,ensure_ascii=False))
         row.row_version+=1
@@ -930,4 +963,8 @@ def decide_absence(session,user,identifier,student,data):
     row.recorded_at,row.recorded_by=now(),user.id
     audit(session,user,"DEFENSE_ABSENCE_DECIDED","defense_slot",slot.id,f"{key} · {data.outcome} · {data.reason}",source_reference=data.reference)
     notify(session,user,slot,council,"DEFENSE_ABSENCE_DECIDED","Khoa đã ghi nhận quyết định xử lý SV vắng; xem chi tiết theo từng sinh viên")
+    if changed_outcome and council.closed_at and data.outcome == "NOT_PASSED":
+        from backend.services.thesis_archive import notify_ready
+        session.flush()
+        notify_ready(session, user, thesis)
     session.commit()

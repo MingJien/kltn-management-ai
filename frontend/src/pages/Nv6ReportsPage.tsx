@@ -104,11 +104,12 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
     setLimit(25);
     document.getElementById("nv6-report-students")?.scrollIntoView({block:"start"});
   }
-  function breakdown(title:string, values:Record<string,number>, names:Record<string,string>, links=false) {
+  function breakdown(title:string, values:Record<string,number>, names:Record<string,string>, links=false, archiveLink?:string) {
     return <section className="card"><div className="card-body"><h3>{title}</h3>
       {Object.keys(values).length?<ul className="dashboard-status-list">{Object.entries(values).map(([key,value])=><li key={key}>
         <span>{names[key]??key}</span>{links&&!!data?.rows.length?<button className="btn btn-secondary btn-sm" aria-label={`Xem ${value} · ${names[key]??key}`} onClick={()=>selectFilter(key,true)}>{value}</button>:<strong>{value}</strong>}
       </li>)}</ul>:<p className="text-muted">Chưa có dữ liệu trong phạm vi đang xem.</p>}
+      {archiveLink&&<Link to={archiveLink}>Xem hồ sơ nộp lưu của đợt</Link>}
     </div></section>;
   }
 
@@ -134,7 +135,8 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
       <div className="dashboard-breakdown">
         {breakdown("Điều kiện dự bảo vệ · theo SV",data.eligibility,labels,true)}
         {breakdown("Kết quả bảo vệ · theo SV",data.results,resultLabels,true)}
-        {breakdown("Nộp lưu · theo khóa luận",data.archives,archiveLabels)}
+        {breakdown("Nộp lưu · theo khóa luận",data.archives,archiveLabels,false,
+          context.base_role==="LECTURER" ? `/repository?mode=work&round_id=${round}${department?"&department_id="+department:""}` : undefined)}
         {breakdown("Điểm danh · phiên sau cùng",data.attendance,attendanceLabels)}
         {breakdown("Xếp loại đã ghi trong biên bản",data.classifications,{})}
       </div>

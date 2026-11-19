@@ -117,6 +117,7 @@ function ThesisWorkspace({context}: {context: Context}) {
       <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14} aria-hidden="true" />{refreshing ? "Đang làm mới…" : "Làm mới dữ liệu"}</button>
     </PageHeader>
     {(showRequests || thesis.actions.includes("evaluation:view")) && <nav className="flex gap-2" aria-label="Quy trình liên quan" style={{flexWrap:"wrap"}}>
+      {thesis.actions.includes("archive:view") && <Link className="btn btn-primary btn-sm" to={`/repository?mode=work&focus=${thesis.id}`}>Hồ sơ nộp lưu sau bảo vệ</Link>}
       {showRequests && <Link className="btn btn-secondary btn-sm" to={`/withdrawals?thesis=${thesis.id}`}>Xin thôi thực hiện KLTN</Link>}
       {showRequests && <Link className="btn btn-secondary btn-sm" to={`/changes?thesis=${thesis.id}`}>Đổi đề tài &amp; gia hạn</Link>}
       {thesis.actions.includes("evaluation:view") && <Link className="btn btn-secondary btn-sm" to={`/evaluation/${thesis.id}`}>Phản biện & điều kiện dự bảo vệ</Link>}

@@ -16352,6 +16352,23 @@
             }
           },
           {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
             "name": "X-Dev-User-Id",
             "in": "header",
             "required": false,

@@ -890,6 +890,11 @@ textarea.input {
   flex: none;
 }
 
+@media (max-width: 639px) {
+  .header__logout-standalone span { display: none; }
+  .header .header__logout-standalone, .header .header__toggle { min-width: 44px; min-height: 44px; padding: 0; flex-shrink: 0; }
+}
+
 .notifications { position: relative; }
 .notifications__trigger {
   position: relative; display: grid; place-items: center; width: 38px; height: 38px;

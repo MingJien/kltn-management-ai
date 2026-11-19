@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, type Ref } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { BookOpen, Bot, CalendarDays, ChevronsLeft, ChevronsRight, ChevronDown, ClipboardList, FileText, FolderOpen, GraduationCap, History, LayoutDashboard, UserRound, UsersRound, ShieldCheck } from "lucide-react";
+import { BookOpen, Bot, CalendarDays, ChevronsLeft, ChevronsRight, ChevronDown, ClipboardList, FileText, FolderOpen, GraduationCap, History, LayoutDashboard, UserRound, UsersRound, ShieldCheck, X } from "lucide-react";
 import type { Context, Thesis } from "../../api";
 import { request } from "../../api";
 import { plannedPages, type PlannedPageId } from "../../plannedPages";
@@ -30,7 +30,8 @@ function PlannedLink({id, icon, onClose, collapsed}: {id: PlannedPageId; icon: R
     {icon}<span className="sidebar__item-copy"><span>{plannedPages[id].title}</span><small>Đang phát triển</small></span>
   </NavLink>;
 }
-export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, onClose}: {
+export default function Sidebar({context, isOpen, collapsed, closeButton, onToggleCollapsed, onClose}: {
+  closeButton: Ref<HTMLButtonElement>;
   context: Context; isOpen: boolean; collapsed: boolean; onToggleCollapsed: () => void; onClose: () => void;
 }) {
   const location = useLocation();
@@ -86,8 +87,9 @@ export default function Sidebar({context, isOpen, collapsed, onToggleCollapsed, 
 
   return <>
     <div className={"sidebar-overlay " + (isOpen ? "sidebar-overlay--visible" : "")} onClick={onClose} aria-hidden="true" />
-    <aside className={"app-shell__sidebar " + (isOpen ? "sidebar--open" : "")} aria-label="Điều hướng chính">
+    <aside id="main-sidebar" className={"app-shell__sidebar " + (isOpen ? "sidebar--open" : "")} aria-label="Điều hướng chính">
       <div className="sidebar">
+        <button type="button" className="sidebar__mobile-close" ref={closeButton} aria-label="Đóng menu điều hướng" onClick={onClose}><X size={20} aria-hidden="true"/></button>
         <div className="sidebar__brand">
           <img className="sidebar__brand-mark" src="/assets/dthu-logo.png" alt="Đại học Đồng Tháp" />
           <span className="sidebar__brand-eyebrow">HỆ THỐNG QUẢN LÝ</span>

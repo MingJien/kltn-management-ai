@@ -318,6 +318,7 @@ def revoke_eligibility(round_id: UUID, payload: RevokeStudent,
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
     if len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5:
         raise HTTPException(422, "A reference and reason are required")
+    session.scalar(select(m.StudentProfile.id).where(m.StudentProfile.id == payload.student_id).with_for_update())
     latest = session.scalar(select(m.EligibilitySnapshot).where(
         m.EligibilitySnapshot.student_id == payload.student_id,
         m.EligibilitySnapshot.round_id == round_id,
@@ -349,6 +350,7 @@ def restore_eligibility(round_id: UUID, payload: RevokeStudent,
     require_assignment(session, user, round_id, "ELIGIBILITY_VERIFIER")
     if len(payload.basis_ref.strip()) < 3 or len(payload.reason.strip()) < 5:
         raise HTTPException(422, "Cần căn cứ và lý do khôi phục")
+    session.scalar(select(m.StudentProfile.id).where(m.StudentProfile.id == payload.student_id).with_for_update())
     latest = session.scalar(select(m.EligibilitySnapshot).where(
         m.EligibilitySnapshot.student_id == payload.student_id,
         m.EligibilitySnapshot.round_id == round_id,

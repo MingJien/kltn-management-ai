@@ -133,18 +133,14 @@ test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 
   await dialog.getByLabel("Đề nghị của GVHD",{exact:true}).selectOption("true");
   await dialog.getByRole("button",{name:"Lưu nháp",exact:true}).click();
   await expect(dialog.getByRole("button",{name:"Lưu nháp",exact:true})).toBeDisabled();
-  const exportReady=gv.waitForEvent("download");
-  await dialog.getByRole("button",{name:"Xuất phiếu đã điền để ký",exact:true}).click();
-  expect((await exportReady).suggestedFilename()).toMatch(/^Mau-07-GVHD-/);
-  // No mandatory scan upload: record the exact exported document through the authorized UI.
   await dialog.getByRole("button",{name:"Kiểm tra và gửi nhận xét",exact:true}).click();
-  await dialog.getByRole("checkbox",{name:/Tôi xác nhận (nội dung nhận xét này|bản đính kèm đã ký)/}).check();
+  await dialog.getByRole("checkbox",{name:/Tôi xác nhận nội dung nhận xét này/}).check();
   await dialog.getByRole("button",{name:"Xác nhận gửi nhận xét",exact:true}).click();await expect(dialog).toHaveCount(0);
+  const [exported]=await Promise.all([gv.waitForEvent("download"),
+    gv.getByRole("button",{name:"Tải phiếu nhận xét (tùy chọn)",exact:true}).click()]);
+  expect(exported.suggestedFilename()).toMatch(/^Mau-07-GVHD-.+-v\d+\.docx$/);
   await tbm.goto(`/evaluation/${id}`);
-  await tbm.getByRole("button",{name:"Xác nhận văn bản đã ký",exact:true}).click();dialog=tbm.getByRole("dialog");
-  await dialog.getByLabel("Số / căn cứ tiếp nhận bản giấy",{exact:true}).fill("DEMO-DOI-CHIEU-M7-NHOM-MOI");
-  await dialog.getByRole("checkbox",{name:/Tôi xác nhận văn bản đã có chữ ký/}).check();
-  await dialog.getByRole("button",{name:"Lưu xác nhận văn bản đã ký",exact:true}).click();await expect(dialog).toHaveCount(0);
+  await expect(tbm.getByText("Đã xác nhận và gửi nhận xét trên hệ thống",{exact:true})).toBeVisible();
   await tbm.getByRole("button",{name:"Xét và lưu điều kiện",exact:true}).click();dialog=tbm.getByRole("dialog");
   await dialog.getByLabel("Tình trạng kỷ luật theo nguồn đã đối chiếu",{exact:true}).selectOption("CLEAR");
   await dialog.getByLabel("Căn cứ / số văn bản đối chiếu",{exact:true}).fill("CTSV-TEST-GROUP-2026");

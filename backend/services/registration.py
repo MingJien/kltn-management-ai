@@ -707,17 +707,19 @@ def resolve_rejected_student_proposal(
         raise
 
 
-def _is_department_head(session: Session, lecturer_id: UUID, department_id: UUID) -> bool:
+def head_departments_query(lecturer_id: UUID):
     now = datetime.now(timezone.utc)
-    return session.scalar(
-        select(m.PositionAssignment.id)
+    return (select(m.PositionAssignment.department_id)
         .join(m.OrganizationalPosition, m.PositionAssignment.position_id == m.OrganizationalPosition.id)
         .where(
             m.PositionAssignment.lecturer_id == lecturer_id,
-            m.PositionAssignment.department_id == department_id,
             m.PositionAssignment.state == "ACTIVE",
             m.PositionAssignment.effective_from <= now,
             (m.PositionAssignment.effective_to.is_(None) | (m.PositionAssignment.effective_to > now)),
             m.OrganizationalPosition.code == "DEPARTMENT_HEAD",
-        ).limit(1)
-    ) is not None
+        ))
+
+
+def _is_department_head(session: Session, lecturer_id: UUID, department_id: UUID) -> bool:
+    return session.scalar(head_departments_query(lecturer_id).where(
+        m.PositionAssignment.department_id == department_id).limit(1)) is not None

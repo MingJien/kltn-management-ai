@@ -43,7 +43,15 @@ test("Điều phối xem báo cáo theo đợt và mở kho nội bộ",async({p
     await page.setViewportSize({width,height:900});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   }
-  await page.goto("/repository");
+  const round = page.getByRole("combobox",{name:"Đợt KLTN",exact:true});
+  const roundId = await round.inputValue();
+  const roundLabel = (await round.locator("option:checked").textContent())!;
+  await page.getByRole("link",{name:"Xem hồ sơ nộp lưu của đợt"}).click();
   await expect(page.getByRole("heading",{name:"Kho khóa luận nội bộ",exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Hồ sơ nộp lưu",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(round).toHaveValue(roundId);
+  await expect(round.locator("option:checked")).toHaveText(roundLabel);
+  await page.getByRole("button",{name:"Xóa bộ lọc",exact:true}).click();
+  await page.getByRole("button",{name:"Tra cứu bản đã lưu",exact:true}).click();
   await expect(page.getByText("Chưa tìm thấy bản khóa luận đã duyệt trong phạm vi đang xem.",{exact:true})).toBeVisible();
 });
