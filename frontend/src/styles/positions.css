@@ -32,14 +32,14 @@
 .positions-pagination { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; color: #536b76; font-size: 13px; }
 .positions-selected { margin: 0; padding: 12px 14px; border-radius: 8px; background: #f0f8f6; color: #345a54; line-height: 1.6; }
 .positions-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 22px; align-items: start; }
-.positions-form label { display: grid; gap: 7px; font-weight: 600; font-size: 13px; color: #294e55; }
+.positions-form label { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: 7px; font-weight: 600; font-size: 13px; color: #294e55; }
 .positions-form input, .positions-form select, .positions-form textarea { width: 100%; font-weight: 400; }
 .positions-form textarea { resize: vertical; min-height: 76px; }
 .positions-form > p, .positions-form > div { grid-column: 1 / -1; }
 .positions-form small { color: #637b85; font-weight: 400; line-height: 1.45; }
 .positions-form__actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 16px; border-top: 1px solid #edf2f2; }
 @media (max-width: 800px) {
-  .positions-form { grid-template-columns: 1fr; }
+  .positions-form { grid-template-columns: minmax(0, 1fr); }
   .positions-form > p, .positions-form > div { grid-column: auto; }
   .positions-section-heading { flex-direction: column; }
   .positions-filter { align-items: flex-start; flex-direction: column; gap: 8px; }

@@ -23,3 +23,10 @@ Phạm vi từ phản biện đến bảng điểm, kho nội bộ, báo cáo v�
 - PostgreSQL trả trước mã đề tài và MSSV khớp chính xác, kể cả mã có số 0 ở đầu. Đã kiểm tra tiếng Việt có dấu và không dấu, Unicode dạng tổ hợp, ký tự tìm kiếm `%` và `_`, phân trang và dữ liệu phiên bản cũ. Chạy migration hai lần trên bộ dữ liệu kiểm thử giữ nguyên lịch sử và số phiên bản sau lần đầu.
 - Đã áp dụng migration `20261119_0034` trên CSDL local. Kiểm tra sau nâng cấp có 55 bảng nghiệp vụ, không còn khóa luận có bản lưu mới nhất đã duyệt mà trạng thái vẫn là **Đã bảo vệ**. `alembic check` và đối chiếu OpenAPI đạt.
 - Build TypeScript/Vite đạt. Tải trình xem theo loại tệp giúp gói JavaScript đầu vào giảm từ 397,90 KB xuống 198,07 KB sau gzip. Vite còn cảnh báo kích thước gói đầu vào trước nén. Bộ pytest ghi nhận 6 cảnh báo deprecation của các thư viện.
+
+## Kiểm tra bố cục di động ngày 20/11/2026
+
+- Bộ [mobile-layout.spec.ts](../../frontend/e2e/mobile-layout.spec.ts) đạt 6/6 ca trên Chromium và 6/6 trên WebKit. Mỗi lượt mở 108 trường hợp kết hợp trang và vai trò, gồm trang công khai, quản trị, SV có hoặc chưa có khóa luận, GVHD và TBM. Dữ liệu giả đặt trong schema kiểm thử riêng.
+- Kiểm ở 320×568, 360×800, 375×812, 390×844, 430×932, 768×1024 và 844×390. Đối chiếu chiều rộng trang, khả năng tiếp cận nút và ô nhập, vị trí hộp thoại, bảng cuộn riêng và thao tác chạm mở hồ sơ GV. Các ca còn mở thông báo, hồ sơ cá nhân, biểu mẫu cập nhật GV, lập hội đồng và lịch bảo vệ. Đây là mô phỏng trình duyệt, chưa kiểm trên thiết bị Android/iOS vật lý.
+- Khắc phục bảng thông báo lệch mép, ô tìm tài khoản và nhập Excel tràn trên máy hẹp, nhãn bộ lọc đề tài bị khuất và danh sách chọn dài làm WebKit cuộn ngang ở trang chức vụ và thống kê. Danh bạ GV hiện từng thẻ trên điện thoại. Đã đối chiếu ảnh kết quả của nhật ký, danh bạ, quản trị tài khoản, hội đồng và kho.
+- 9 ca hồi quy liên quan đến nhật ký, tài khoản và hồ sơ GV, chức vụ, hội đồng, biểu mẫu và nộp lưu đạt. Build TypeScript/Vite đạt, còn cảnh báo dung lượng gói JavaScript đầu vào.

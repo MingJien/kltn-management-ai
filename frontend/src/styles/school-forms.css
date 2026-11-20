@@ -74,7 +74,8 @@
 .school-forms-toolbar__export a { font-weight:600; }
 .school-forms-toolbar__actions { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; border-top:1px solid var(--neutral-200); padding-top:14px; }
 @media (max-width:700px) {
-  .school-forms-toolbar__filters label { flex:1 1 100%; }
+  .school-forms-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .school-forms-toolbar__filters label { flex:1 1 100%; min-width: 0; }
   .school-forms-toolbar__filters > button { order:3; }
   .school-forms-toolbar__actions > a { width:100%; }
 }

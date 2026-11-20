@@ -160,12 +160,18 @@ def main() -> int:
         synthetic_pdf = directory / 'synthetic-nv6.pdf'
         writer.write(synthetic_pdf)
         env['KLTN_E2E_NV6_FILE'] = str(synthetic_pdf)
-        if any(Path(arg).name == "archive-live.spec.ts" for arg in sys.argv[1:]):
+        specs = {Path(arg).name for arg in sys.argv[1:]}
+        if specs & {"archive-live.spec.ts", "mobile-layout.spec.ts"}:
             from tools.e2e_archive_fixture import add_defended_thesis
             with Session(private_engine) as session, session.begin():
                 assert session.scalar(text('select current_schema()')) == schema
                 env["KLTN_E2E_ARCHIVE_THESIS"] = str(add_defended_thesis(
                     session, datetime.now(timezone.utc), synthetic_pdf.read_bytes()))
+                if "mobile-layout.spec.ts" in specs:
+                    env["KLTN_E2E_LECTURER_ID"] = str(seed_demo.uid("lecturer-1"))
+                    for duty in ("REVIEW_RECORDS_MANAGER", "ELIGIBILITY_VERIFIER"):
+                        session.add(m.ResourceAssignment(user_id=seed_demo.uid("user-lecturer-2"),
+                            round_id=seed_demo.uid("round"), assignment_type=duty, effective_from=now, state="ACTIVE"))
             private_engine.dispose()
         # Read the actual faculty templates and fill a synthetic local copy for print QA.
         # The original templates are never written to, and copies stay Git-ignored.

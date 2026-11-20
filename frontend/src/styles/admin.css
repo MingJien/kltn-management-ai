@@ -285,6 +285,11 @@
   pointer-events: none;
 }
 
+@media (max-width: 639px) {
+  .admin-toolbar .account-search { width: 100%; min-width: 0; }
+  .admin-toolbar .admin-search-wrap { min-width: 0; }
+}
+
 .admin-search-wrap .input {
   width: 100%;
   padding-left: 38px;
@@ -1202,6 +1207,12 @@
   .import-step__filters .input-group {
     min-width: 0;
   }
+  .import-step__body .import-step__file {
+    min-width: 0;
+    width: 100%;
+    flex: none;
+  }
+  .import-step__file input { width: 100%; min-width: 0; }
 
   .import-step__actions .btn-primary {
     margin-left: 0;

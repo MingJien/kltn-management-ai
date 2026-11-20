@@ -41,3 +41,25 @@
 @media(max-width:1100px) {.lecturer-review-layout {grid-template-columns:minmax(0,1fr) 270px;}.lecturer-comparison-heading,.lecturer-comparison-row {gap:12px;padding:13px;font-size:12px;}}
 @media(max-width:850px) {.lecturer-review-layout {grid-template-columns:1fr;}.lecturer-review-aside {grid-row:1;}.lecturer-review-aside .stack {gap:12px;}.lecturer-self-summary {flex-wrap:wrap;}.lecturer-self-summary>.btn {margin-left:0;}.lecturer-profile-full {padding:22px;}}
 @media(max-width:560px) {.lecturer-profile-hero {gap:16px;align-items:flex-start;}.lecturer-profile-hero .lecturer-avatar--lg {width:76px;height:76px;}.lecturer-profile-hero h2 {font-size:20px;}.lecturer-profile-facts,.lecturer-contact-grid,.lecturer-form-grid {grid-template-columns:1fr;}.lecturer-directory-toolbar>* {width:100%;min-width:0;}.lecturer-search {min-width:0;}.lecturer-page .page-header h1 {font-size:23px;}.lecturer-self-summary {padding:20px;}.lecturer-self-summary>.lecturer-avatar {width:80px;height:80px;}.lecturer-self-summary>div {flex:1;min-width:150px;}.lecturer-editor {padding:18px;}.lecturer-avatar-editor {align-items:flex-start;gap:14px;flex-direction:column;}.lecturer-pending {flex-direction:column;padding:20px;}.lecturer-editor-actions {justify-content:stretch;}.lecturer-editor-actions>.text-caption {order:5;width:100%;}.lecturer-history summary {flex-direction:column;}.lecturer-review-main {padding:18px;}.lecturer-comparison-heading {display:none;}.lecturer-comparison-row {grid-template-columns:1fr;font-size:13px;gap:10px;}.lecturer-comparison-row>p:nth-of-type(1)::before {content:"Trước cập nhật: ";font-weight:600;color:#597163;}.lecturer-comparison-row>p:nth-of-type(2)::before {content:"Đề nghị cập nhật: ";font-weight:600;color:#1b6d4b;}.lecturer-pagination {justify-content:space-between;gap:7px;font-size:12px;}.lecturer-profile-full {padding:16px;}}
+.lecturer-cell-label { display: none; }
+@media (max-width: 639px) {
+  .lecturer-page .lecturer-directory-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .lecturer-directory-tabs button[role="tab"] {
+    justify-content: center; white-space: normal; text-align: center; padding: 10px 6px; min-height: 48px;
+  }
+  .lecturer-page .lecturer-directory-results { overflow: visible; border: 0; background: transparent; }
+  .lecturer-page .lecturer-directory-table { display: block; min-width: 0; width: 100%; border: 0; background: transparent; }
+  .lecturer-directory-table thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .lecturer-directory-table tbody { display: grid; gap: 12px; }
+  .lecturer-directory-table tbody tr {
+    display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px;
+    border: 1px solid #dce6e3; border-radius: 10px; padding: 16px; background: #fff;
+  }
+  .lecturer-directory-table tbody td { padding: 0; border: 0; max-width: none; min-width: 0; white-space: normal; }
+  .lecturer-directory-table td:first-child, .lecturer-directory-table td:last-child { grid-column: 1 / -1; }
+  .lecturer-directory-table tbody td:first-child { padding-bottom: 12px; border-bottom: 1px solid #e5eeea; }
+  .lecturer-directory-table .lecturer-cell-label { display: block; margin-bottom: 4px; color: #425d54; font-weight: 600; font-size: 12px; }
+  .lecturer-directory-table .lecturer-table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+}

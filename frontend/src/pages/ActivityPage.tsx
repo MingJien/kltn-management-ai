@@ -54,7 +54,7 @@ export default function ActivityPage({context}: {context: Context}) {
           <div className="input-group"><label htmlFor="activity-from">Từ ngày</label><input className="input" type="date" id="activity-from" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} /></div>
           <div className="input-group"><label htmlFor="activity-to">Đến ngày</label><input className="input" type="date" id="activity-to" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} /></div>
         </div>
-        <div className="flex gap-2" style={{flexWrap: "wrap"}}>
+        <div className="activity-actions">
           <button className="btn btn-primary" disabled={loading}><Search size={16} aria-hidden="true" />Tra cứu</button>
           <button type="button" className="btn btn-secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}><RefreshCw size={16} aria-hidden="true" />Làm mới</button>
           <button type="button" className="btn btn-ghost" disabled={loading} onClick={() => {setSearch(""); setAction(""); setFrom(""); setTo(""); setPage(0); setFilters({search:"",action:"",from:"",to:""});}}>Xóa bộ lọc</button>

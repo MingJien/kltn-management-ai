@@ -177,3 +177,47 @@ tbody tr:hover { background: #f7faf9; }
 
 
 .dialog-overlay { background: rgba(15,23,42,.45); }
+@media (max-width: 639px) {
+  .header { padding-inline: 8px; }
+  .header__left, .header__right { gap: 4px; }
+  .header__breadcrumb-root, .header__breadcrumb-sep { display: none; }
+  .header__toggle, .notifications__trigger, .header__icon-btn { width: 44px; height: 44px; flex-shrink: 0; }
+  .notifications__panel, .profile-popup {
+    position: fixed;
+    inset: 68px max(10px, env(safe-area-inset-right)) auto max(10px, env(safe-area-inset-left));
+    width: auto;
+    max-height: calc(100dvh - 80px - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .profile-popup__footer { flex-wrap: wrap; }
+  .app-shell__content .btn, .dialog .btn, .profile-popup .btn {
+    white-space: normal; overflow-wrap: anywhere; max-width: 100%; line-height: 1.35;
+  }
+  .btn svg { flex-shrink: 0; }
+  .app-shell__content .tabs { flex-wrap: wrap; row-gap: 4px; }
+  .tabs__tab { min-height: 44px; padding: 8px 12px; }
+  .page-header.flex { flex-direction: column; align-items: stretch; row-gap: 12px; }
+  .page-header > .flex { justify-content: flex-start; gap: 8px; }
+  .dialog-overlay { padding: 10px; }
+  .dialog { min-width: 0; max-height: calc(100dvh - 20px); }
+  .dialog__header, .dialog__body, .dialog__footer { padding: 14px 16px; }
+  .dialog__header { gap: 8px; }
+  .dialog__header h2 { min-width: 0; overflow-wrap: anywhere; }
+  .dialog__footer { flex-wrap: wrap; gap: 8px; }
+  .dialog__header .btn-icon { flex-shrink: 0; }
+  .app-shell__content .input-group, .app-shell__content .flex > label {
+    min-width: 0; max-width: 100%;
+  }
+  input.input, select.input, textarea.input { font-size: 16px; min-width: 0; max-width: 100%; }
+  /* WebKit can include the full native option label in the page's scroll area. */
+  select.input:not([multiple]):not([size]) { contain: paint; text-overflow: ellipsis; }
+}
+@media (max-width: 1023px) {
+  body:has(.sidebar--open) { overflow: hidden; }
+  .sidebar__nav { overscroll-behavior: contain; }
+}
+@media (max-height: 480px) and (max-width: 1023px) {
+  .profile-popup { max-height: calc(100dvh - 78px); overflow-y: auto; }
+  .dialog { max-height: calc(100dvh - 24px); }
+}
