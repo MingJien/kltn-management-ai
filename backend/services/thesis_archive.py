@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import Text, case, cast, func, or_, select, tuple_
+from sqlalchemy import Text, case, cast, column, func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import JSONB, JSONPATH, aggregate_order_by
 
 from backend.db.models import entities as m
@@ -97,10 +97,11 @@ def normalized_identity(source):
         if isinstance(identity.get(field), str):
             identity[field] = normalize_academic_text(identity[field])
     student_fields = {"name", "code", "class_name", "major_code", "major", "training_cohort"}
+    students = source.get("students")
     identity["students"] = [
         {key: normalize_academic_text(value) if key in student_fields and isinstance(value, str) else value
-         for key, value in student.items()} for student in source.get("students") or []
-    ]
+         for key, value in student.items()} for student in students if isinstance(student, dict)
+    ] if isinstance(students, list) else []
     return identity
 
 
@@ -117,9 +118,26 @@ def submission_snapshot(session, thesis, results):
                           "class_name", "major_code", "major", "training_cohort")} for row in results]})
 
 
-def matches_defense(snapshot, results):
-    saved = {(normalize_academic_text(row.get("code") or ""), row.get("slot_id")) for row in snapshot.get("students") or []}
-    return saved == {(normalize_academic_text(row["code"]), row["slot_id"]) for row in results}
+def defense_changes(snapshot, results):
+    def key(row):
+        return normalize_academic_text(row.get("code") or ""), row.get("slot_id")
+
+    current = {key(row): row for row in results}
+    saved = normalized_identity(snapshot)["students"]
+    if len(saved) != len(results) or {key(row) for row in saved} != current.keys():
+        return [("Danh sách sinh viên, MSSV hoặc phiên bảo vệ đã thay đổi.", None)]
+    # Older deposits did not record all academic fields. Compare the fields they actually captured.
+    fields = {"student_id":"tài khoản sinh viên", "name":"họ tên", "class_name":"lớp",
+              "major_code":"mã ngành", "major":"ngành", "training_cohort":"khóa học"}
+    changes = []
+    for row in saved:
+        official = current[key(row)]
+        labels = [label for field, label in fields.items() if field in row and
+                  (row[field] or "") != normalize_academic_text(official.get(field) or "")]
+        if labels:
+            changes.append((f"{official['name']} ({official['code']}) đã được đính chính {', '.join(labels)}.",
+                            official["slot_id"]))
+    return changes
 
 
 def notify_ready(session, user, thesis):
@@ -140,7 +158,7 @@ def version_out(session, row):
             "filename": file.original_name, "created_at": row.created_at, "decided_at": row.decided_at,
             "submitted_by": workflow_notices.actor_name(session, row.submitted_by),
             "decided_by": workflow_notices.actor_name(session, row.decided_by) if row.decided_by else None,
-            "decision_note": row.decision_note,
+            "decision_note": row.decision_note, "snapshot": normalized_identity(row.snapshot),
             "reopened": {"by": workflow_notices.actor_name(session, reopened.actor_id),
                          "at": reopened.occurred_at, "reason": reopened.reason} if reopened else None}
 
@@ -171,10 +189,11 @@ def entry(session, thesis, permissions, rows):
         slot_id = pending_correction(session, by_student.values())
         blockers.append({"message": "Còn đề nghị đính chính kết quả đang chờ xử lý", "url": result_link(str(slot_id))}
                         if slot_id else {"message": "Chưa có sinh viên được chốt điểm để nộp lưu bản báo cáo", "url": "/defense"})
-    source_changed = bool(results and latest and latest.state == "SUBMITTED" and not matches_defense(latest.snapshot, results))
-    if source_changed:
-        blockers.append({"message": "Phiên bảo vệ hoặc MSSV đã thay đổi. Bộ môn cần yêu cầu nhóm nộp lại bản hoàn thiện.",
-                         "url": "/defense"})
+    changes = defense_changes(latest.snapshot, results) if results and latest and latest.state == "SUBMITTED" else []
+    for message, slot_id in changes:
+        blockers.append({"message": message, "url": result_link(slot_id) if slot_id else None})
+    if changes:
+        blockers.append({"message": "Bộ môn cần yêu cầu nhóm nộp lại theo hồ sơ đã đính chính.", "url": None})
     if latest:
         identity = normalized_identity(latest.snapshot)
     elif results:
@@ -194,7 +213,8 @@ def entry(session, thesis, permissions, rows):
             "snapshot": identity, "blockers": blockers, "submission_suspended": permissions.suspended,
             "can_submit": bool(writable and permissions.member and not permissions.suspended and results and (not latest or latest.state in RESUBMISSION_STATES)),
             "can_decide": bool(writable and permissions.approver and latest and latest.state == "SUBMITTED"),
-            "can_approve": bool(writable and results and not source_changed),
+            "can_approve": bool(writable and permissions.approver and latest and latest.state == "SUBMITTED"
+                                and results and not changes),
             "can_reopen": bool(writable and permissions.approver and latest and latest.state == "ACCEPTED"),
             "waiting": results is None and latest is None,
             "versions": [version_out(session, row) for row in history]}
@@ -240,7 +260,8 @@ def catalog_query(session, user, *, mode, state, search, round_id, department_id
         .join(m.Department, m.Department.id == m.Thesis.department_id).where(*visible)
         .distinct().order_by(m.ThesisRound.code.desc(), m.Department.name)).all()
     live_students = (select(func.jsonb_agg(aggregate_order_by(
-        func.jsonb_build_object("name", m.StudentProfile.display_name, "code", m.StudentProfile.student_code),
+        func.jsonb_build_object("name", m.StudentProfile.display_name, "code", m.StudentProfile.student_code,
+                                "class_name", m.StudentProfile.class_name, "major_code", m.StudentProfile.major_code),
         m.ThesisMember.is_coordinator.desc(), m.StudentProfile.student_code)))
         .select_from(m.ThesisMember).join(m.StudentProfile, m.StudentProfile.id == m.ThesisMember.student_id)
         .where(m.ThesisMember.thesis_id == m.Thesis.id, m.ThesisMember.active.is_(True)).correlate(m.Thesis).scalar_subquery())
@@ -249,9 +270,10 @@ def catalog_query(session, user, *, mode, state, search, round_id, department_id
         .where(m.AdvisorAssignment.thesis_id == m.Thesis.id, effective(m.AdvisorAssignment))
         .correlate(m.Thesis).limit(1).scalar_subquery())
     # Search the same identity that the reader sees. Historical names stay with the deposited file.
-    title = func.coalesce(latest.c.snapshot["title"].astext, m.Thesis.current_title)
+    title = func.coalesce(func.nullif(func.btrim(latest.c.snapshot["title"].astext), ""), m.Thesis.current_title)
     advisor = case((latest.c.id.is_(None), live_advisor), else_=latest.c.snapshot["advisor"].astext)
-    students = case((latest.c.id.is_(None), live_students), else_=latest.c.snapshot["students"])
+    students = case((latest.c.id.is_(None), live_students),
+                    (func.jsonb_typeof(latest.c.snapshot["students"]) == "array", latest.c.snapshot["students"]))
     query = (select(m.Thesis.id, title.label("current_title"),
         func.coalesce(latest.c.snapshot["topic_code"].astext, m.Topic.code).label("topic_code"),
         func.coalesce(latest.c.snapshot["round"].astext, m.ThesisRound.code).label("round"),
@@ -284,8 +306,13 @@ def catalog_query(session, user, *, mode, state, search, round_id, department_id
             return func.translate(func.lower(func.normalize(value)), VIETNAMESE_LETTERS, PLAIN_LETTERS)
 
         codes = func.jsonb_path_query_array(col.students, cast("$[*].code", JSONPATH))
-        names = func.jsonb_path_query_array(col.students, cast("$[*].name", JSONPATH))
-        haystack = folded(func.concat_ws(" ", col.topic_code, col.current_title, col.advisor, cast(names, Text), cast(codes, Text)))
+        fields = ("name", "code", "class_name", "major_code", "major")
+        objects = func.jsonb_path_query_array(col.students, cast('$[*] ? (@.type() == "object")', JSONPATH))
+        authors = func.jsonb_to_recordset(objects).table_valued(
+            *(column(field, Text) for field in fields)).render_derived(with_types=True)
+        author_text = select(func.string_agg(func.concat_ws(" ", *authors.c), " ")).select_from(
+            authors).correlate(entries).scalar_subquery()
+        haystack = folded(func.concat_ws(" ", col.topic_code, col.current_title, col.advisor, author_text))
         for term in dict.fromkeys(needle.split()):
             query = query.where(haystack.contains(term, autoescape=True))
         exact_code = or_(folded(col.topic_code) == needle, func.jsonb_exists(cast(folded(cast(codes, Text)), JSONB), needle))
@@ -309,7 +336,8 @@ def catalog_query(session, user, *, mode, state, search, round_id, department_id
         item["snapshot"] = normalized_identity(item["snapshot"])
         for field in ("topic_code", "round", "department"):
             item[field] = normalize_academic_text(item[field])
-        item["current_title"], item["advisor"] = item["snapshot"]["title"], item["snapshot"].get("advisor")
+        item["current_title"] = normalize_academic_text(item["current_title"])
+        item["advisor"] = item["snapshot"].get("advisor")
         items.append(item)
     # Keep an authorized round selectable even before its first defense.
     filters = {(s["round_id"], s["department_id"]): {"round_id": s["round_id"], "round": s["round_code"],
@@ -345,8 +373,9 @@ def readers(session, thesis):
 
 
 def notice(session, user, thesis, event, label):
+    mode = "" if event == "THESIS_ARCHIVE_ACCEPTED" else "mode=work&"
     workflow_notices.emit(session,user.id,readers(session,thesis),event,"thesis_archive",thesis.id,
-        f"{label} · {thesis.current_title}",f"/repository?focus={thesis.id}")
+        f"{label} · {thesis.current_title}",f"/repository?{mode}focus={thesis.id}")
 
 
 def check_submission(session, user, identifier, expected, *, lock=False):
@@ -414,8 +443,11 @@ def decide(session, user, identifier, expected, decision, reason):
         raise HTTPException(404,"Không tìm thấy hồ sơ lưu trữ trong bộ môn của bạn")
     if thesis.state not in VISIBLE_STATES:
         raise HTTPException(409, "Hồ sơ khóa luận đã đóng thao tác nộp lưu")
-    item = session.scalar(select(m.ThesisArchiveVersion).where(m.ThesisArchiveVersion.id == identifier)
-        .with_for_update().execution_options(populate_existing=True))
+    item = session.scalar(select(m.ThesisArchiveVersion).where(m.ThesisArchiveVersion.thesis_id == thesis.id)
+        .order_by(m.ThesisArchiveVersion.version_no.desc()).limit(1).with_for_update()
+        .execution_options(populate_existing=True))
+    if item.id != identifier:
+        raise HTTPException(409, "Nhóm đã có bản nộp mới hơn. Mở phiên bản mới nhất để xử lý.")
     row_version(expected,item.row_version)
     if item.state != "SUBMITTED":
         raise HTTPException(409,"Hồ sơ đã được xử lý. Làm mới danh sách để xem kết quả")
@@ -424,8 +456,8 @@ def decide(session, user, identifier, expected, decision, reason):
         rows = ready_results(session, thesis, defense_register.rows_for_sessions(session, sessions))
         if not rows:
             raise HTTPException(409,"Kết quả bảo vệ đang được đối chiếu. Chỉ duyệt lưu khi hồ sơ đủ điều kiện")
-        if not matches_defense(item.snapshot, rows):
-            raise HTTPException(409, "Phiên bảo vệ hoặc MSSV đã thay đổi. Yêu cầu nhóm nộp lại bản hoàn thiện theo kết quả mới.")
+        if defense_changes(item.snapshot, rows):
+            raise HTTPException(409, "Thông tin sinh viên hoặc phiên bảo vệ đã thay đổi. Yêu cầu nhóm nộp lại theo hồ sơ đã đính chính.")
         download(session,user,identifier)
         if thesis.state == "DEFENDED":
             thesis.state = "COMPLETED"

@@ -20,11 +20,11 @@ test("Kho thật: nộp và quét, trả, duyệt, tra không dấu, thu hồi v
   expect(id).toBeTruthy();
   expect(path).toBeTruthy();
   const url = `/repository?focus=${id}`;
-  const contexts = await Promise.all([browser.newContext(),browser.newContext(),browser.newContext()]);
+  const contexts = await Promise.all([browser.newContext(),browser.newContext(),browser.newContext(),browser.newContext()]);
   try {
-    const [student,head,outsider] = await Promise.all(contexts.map(c=>c.newPage()));
-    for (const page of [student,head,outsider]) page.setDefaultTimeout(15000);
-    await Promise.all([login(student,"sv1"),login(head,"tbm"),login(outsider,"sv2")]);
+    const [student,head,outsider,advisor] = await Promise.all(contexts.map(c=>c.newPage()));
+    for (const page of [student,head,outsider,advisor]) page.setDefaultTimeout(15000);
+    await Promise.all([login(student,"sv1"),login(head,"tbm"),login(outsider,"sv2"),login(advisor,"gv")]);
     await outsider.goto(url);
     await expect(outsider.getByRole("alert")).toContainText("Không tìm thấy hồ sơ");
     await student.goto(`/theses/${id}`);
@@ -62,6 +62,13 @@ test("Kho thật: nộp và quét, trả, duyệt, tra không dấu, thu hồi v
     await head.getByLabel("Nhận xét và căn cứ",{exact:true}).fill("Đã kiểm tra đúng bản hoàn thiện.");
     await head.getByRole("button",{name:"Lưu quyết định",exact:true}).click();
     await expect(head.getByText("Phiên bản 2 · Đã duyệt lưu",{exact:true})).toBeVisible();
+
+    await advisor.goto("/repository");
+    await advisor.getByLabel("Tìm khóa luận",{exact:true}).fill("lop e2e");
+    await advisor.getByRole("link",{name:title,exact:true}).click();
+    await expect(advisor.getByText("Phiên bản 2 · Đã duyệt lưu",{exact:true})).toBeVisible();
+    await expect(advisor.getByRole("button",{name:"Tải phiên bản 2",exact:true})).toBeVisible();
+    await expect(advisor.getByText("Thu hồi bản lưu và yêu cầu nộp lại",{exact:true})).toHaveCount(0);
 
     await student.goto(`/theses/${id}`);
     await expect(student.locator(".core-toolbar__status")).toContainText("Hoàn thành");
@@ -111,6 +118,11 @@ test("Kho thật: nộp và quét, trả, duyệt, tra không dấu, thu hồi v
     await expect(student.getByRole("button",{name:"Nộp bản thay thế",exact:true})).toBeVisible();
     await student.getByText("Lịch sử bản nộp (1 bản trước)",{exact:true}).click();
     await expect(student.getByText("Phiên bản 1 · Cần nộp lại",{exact:true})).toBeVisible();
+    await student.getByText("Thông tin tại lần nộp v1",{exact:true}).click();
+    await expect(student.locator(".archive-version details[open]")).toContainText(title);
+    await student.getByRole("button",{name:"Quay về danh sách",exact:true}).click();
+    await expect(student.getByRole("button",{name:"Hồ sơ nộp lưu",exact:true})).toHaveAttribute("aria-pressed","true");
+    await expect(student.getByRole("link",{name:title,exact:true})).toBeVisible();
   } finally {
     await Promise.all(contexts.map(c=>c.close()));
   }

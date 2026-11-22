@@ -54,12 +54,18 @@ def test_legacy_catalog_ranking_and_completion_migration(scenario):
         assert page["total"] == 2 and page["items"][0]["id"] == str(records[0][0].id)
         assert search(q=exact, limit=1, page=2)["items"][0]["id"] == str(records[1][0].id)
     assert search(q="tran binh")["total"] == 2
-    for literal in ("%", "_"):
+    for literal in ("%", "_", '"', "["):
         assert search(q=literal)["total"] == 0
     first, original = records[0]
     shown = search(q="0012345678")["items"][0]["snapshot"]
     assert shown == {"title":"Đồ án","advisor":"Trần Bình","students":[{"name":"Nguyễn An","code":"0012345678"}]}
     assert original.snapshot["title"] != shown["title"]
+
+    original.snapshot = {**original.snapshot, "students":[{**original.snapshot["students"][0],
+        "class_name":"ĐHCNTT22A", "major_code":"7480201", "major":"Công nghệ thông tin"}]}
+    session.commit()
+    for term in ("dhcntt22a", "7480201", "cong nghe thong tin", "dhcntt22a binh"):
+        assert [item["id"] for item in search(q=term)["items"]] == [str(first.id)]
 
     second, withdrawn = records[1]
     withdrawn.state = "REOPENED"
@@ -74,3 +80,8 @@ def test_legacy_catalog_ranking_and_completion_migration(scenario):
     assert (first.state, first.row_version) == ("COMPLETED", 2)
     assert (second.state, second.row_version) == ("DEFENDED", 1)
     assert search()["total"] == 1 and original.snapshot["title"] != shown["title"]
+    original.snapshot = {"students": None}
+    session.commit()
+    legacy = search(q=first.current_title)["items"][0]
+    assert legacy["id"] == str(first.id) and legacy["current_title"] == first.current_title
+    assert legacy["snapshot"] == {"students":[]}

@@ -14,6 +14,7 @@ type Identity = {title:string; advisor:string; academic_year?:string; students:{
 }[]};
 type Version = {id:string; number:number; revision:number; state:State; filename:string; created_at:string;
   submitted_by:string; decided_at:string|null; decided_by:string|null; decision_note:string|null;
+  snapshot:Identity;
   reopened?: {by:string; at:string; reason:string}|null};
 type Entry = {id:string; title:string; topic_code:string; round:string; department:string; waiting:boolean;
   submission_suspended?:boolean;
@@ -27,6 +28,16 @@ const labels:Record<State,string> = {
   SUBMITTED:"Chờ bộ môn duyệt", ACCEPTED:"Đã duyệt lưu", RETURNED:"Cần nộp lại", REOPENED:"Đã thu hồi bản lưu",
 };
 const versionPath = (version: Version) => `/thesis-archive/versions/${version.id}`;
+
+function AcademicFacts({identity}:{identity:Identity}) {
+  return <dl className="archive-facts">
+    <div><dt>Giảng viên hướng dẫn</dt><dd>{identity.advisor || "Chưa ghi nhận"}</dd></div>
+    <div><dt>Sinh viên</dt><dd>{identity.students.length ? <ul className="archive-authors">{identity.students.map(s=>{
+      const study=[s.class_name && `Lớp ${s.class_name}`, s.major || s.major_code, s.training_cohort && `Khóa ${s.training_cohort}`].filter(Boolean);
+      return <li key={s.code}>{s.name} ({s.code}){study.length>0 && <small>{study.join(" · ")}</small>}</li>;
+    })}</ul> : "Chưa ghi nhận"}</dd></div>
+  </dl>;
+}
 
 function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:string; refresh:()=>void; loading:boolean}) {
   const [preview,setPreview] = useState<Version|null>(null);
@@ -91,6 +102,11 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
     return <section key={`version-${version.id}`} className="defense-operation stack archive-version">
       <strong>Phiên bản {version.number} · {labels[version.state]}</strong>
       <span className="text-muted">{version.filename} · {when(version.created_at)}{version.submitted_by && ` · ${version.submitted_by}`}</span>
+      {version.id!==latest?.id && <details>
+        <summary>Thông tin tại lần nộp v{version.number}</summary>
+        <p>{version.snapshot.title || "Chưa ghi nhận tên đề tài"}</p>
+        <AcademicFacts identity={version.snapshot}/>
+      </details>}
       {version.decided_by && <p className="archive-note">{version.decided_by} · {when(version.decided_at)}<br/>{version.decision_note}</p>}
       {version.reopened && <p className="alert alert-warning">Thu hồi bởi {version.reopened.by} · {when(version.reopened.at)}<br/>{version.reopened.reason}</p>}
       <div className="button-row">
@@ -106,11 +122,7 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
   return <section className="card"><div className="card-body stack">
     <div className="archive-heading"><div><p className="text-muted">{[item.topic_code,item.round,item.snapshot?.academic_year&&`Năm học ${item.snapshot.academic_year}`,item.department].filter(Boolean).join(" · ")}</p>
       <h2>{title}</h2></div><span className="archive-status" data-state={latest?.state??"EMPTY"}>{status}</span></div>
-    <dl className="archive-facts"><div><dt>Giảng viên hướng dẫn</dt><dd>{item.snapshot?.advisor||"Chưa ghi nhận"}</dd></div>
-      <div><dt>Sinh viên</dt><dd>{item.snapshot?.students.length ? <ul className="archive-authors">{item.snapshot.students.map(s=>{
-        const study=[s.class_name&&`Lớp ${s.class_name}`,s.major||s.major_code,s.training_cohort&&`Khóa ${s.training_cohort}`].filter(Boolean);
-        return <li key={s.code}>{s.name} ({s.code}){study.length>0&&<small>{study.join(" · ")}</small>}</li>;
-      })}</ul>:"Chưa ghi nhận"}</dd></div></dl>
+    <AcademicFacts identity={item.snapshot}/>
     <Link to={`/theses/${item.id}`}>Mở hồ sơ khóa luận</Link>
     {error && <p className="alert alert-danger" role="alert">{error}</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
@@ -210,6 +222,7 @@ export default function ThesisArchivePage({context}: {context:Context}) {
     if (location.state?.fromArchiveList) {navigate(-1);return;}
     const next = new URLSearchParams(params);
     next.delete("focus");
+    if (!next.has("mode") && detail?.id===focus && detail.versions[0]?.state!=="ACCEPTED") next.set("mode","work");
     setParams(next,{replace:true});
   }
   const pageCount = list ? Math.max(1,Math.ceil(list.total/list.limit)) : 1;
@@ -232,7 +245,7 @@ export default function ThesisArchivePage({context}: {context:Context}) {
       <section className="card"><div className="card-body stack">
         <div className="defense-form-grid archive-filters" data-mode={mode}>
           <label className="archive-search">Tìm khóa luận<input className="input" type="search" value={search} maxLength={150}
-            placeholder="Mã đề tài, tiêu đề, MSSV, tên sinh viên hoặc GVHD" onChange={e=>changeFilters({q:e.target.value},true)}/></label>
+            placeholder="Mã đề tài, tiêu đề, SV, GVHD, lớp, mã ngành…" onChange={e=>changeFilters({q:e.target.value},true)}/></label>
           <label>Đợt KLTN<select className="input" value={round} onChange={e=>changeFilters({round_id:e.target.value,department_id:""})}>
             <option value="">Tất cả đợt</option>{round&&!rounds.has(round)&&<option value={round}>{loading?"Đang tải đợt…":"Đợt đã chọn ngoài danh sách hiện tại"}</option>}{Array.from(rounds,([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
           <label>Bộ môn<select className="input" value={department} onChange={e=>changeFilters({department_id:e.target.value})}>

@@ -8,7 +8,7 @@
 - Theo dõi đề cương, tiến độ, tài liệu và phản hồi theo phiên bản; thông báo hạn nộp và kết quả xử lý. Hỗ trợ đổi đề tài, gia hạn và xin thôi KLTN trên hệ thống.
 - Phân công phản biện, nhận xét Mẫu 7/8, xác nhận điều kiện bảo vệ và xét điểm thưởng công bố khoa học theo từng sinh viên.
 - Lập hội đồng, xếp và đổi lịch, điểm danh, chấm điểm, lập biên bản, chốt kết quả và xuất Mẫu 6, 9, 10, 11 từ biểu mẫu gốc. Có xử lý bảo vệ bổ sung, đính chính sau khóa và lịch sử phát hành bản in.
-- Sau bảo vệ, nhóm nộp bản hoàn thiện, TBM duyệt hoặc yêu cầu sửa. Kho nội bộ cho tìm theo mã đề tài, MSSV, tiêu đề, tên SV hoặc GVHD, có hỗ trợ tiếng Việt không dấu. Từ thống kê có thể mở danh sách nộp lưu đúng đợt và bộ môn.
+- Sau bảo vệ, nhóm nộp bản hoàn thiện và TBM duyệt đúng phiên bản. Kho nội bộ giữ lịch sử từng lần nộp, hỗ trợ tìm không dấu theo đề tài, MSSV, tên SV, GVHD, lớp và ngành. Từ thống kê có thể mở danh sách nộp lưu đúng đợt và bộ môn.
 - Có bản thử nghiệm tìm đề tài tương tự và so sánh cặp báo cáo PDF/Word, hỗ trợ OCR khi cấu hình Tesseract. Chatbot hiện truy xuất đoạn nguồn và trích dẫn; chất lượng AI trên dữ liệu thực tế và chức năng sinh câu trả lời cần tiếp tục hoàn thiện, đánh giá.
 
 ## Ràng buộc chính

@@ -182,8 +182,8 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     expect(round).toBeTruthy();
     const lecturer = (await read(admin.page,"/admin/users?search="+encodeURIComponent(accounts.gv.email)))[0];
     await admin.page.goto(web+"/administration/assignments");
-    const assignment = admin.page.locator("section.card").filter({has:admin.page.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
-    await assignment.locator("select").first().selectOption(round.id);
+    const assignment = admin.page.locator("form").filter({has:admin.page.getByRole("button",{name:"Lưu phân công",exact:true})});
+    await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
     await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
     await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(lecturer.id);
     await assignment.getByLabel("Căn cứ phân công").fill("E2E SYNTHETIC ROUND COORDINATION");

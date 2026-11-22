@@ -546,8 +546,11 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     submission_path=archive+"/theses/"+thesis["thesis_id"]
     thesis_path = "/api/v1/theses/" + thesis["thesis_id"]
     assert "archive:view" in client.get(thesis_path, headers=hdr(users[0])).json()["actions"]
-    assert any("Nhóm có thể nộp bản hoàn thiện" in n["message"] for n in
-               client.get("/api/v1/notifications", headers=hdr(users[0])).json()["items"])
+    work_url = "/repository?mode=work&focus="+thesis["thesis_id"]
+    def archive_notices():
+        # The fixture keeps every savepoint in one outer transaction. DB timestamps can tie.
+        return client.get("/api/v1/notifications", headers=hdr(users[0]), params={"limit":100}).json()["items"]
+    assert any("Nhóm có thể nộp bản hoàn thiện" in n["message"] and n["url"]==work_url for n in archive_notices())
     work = client.get(archive+"/search", headers=hdr(users[0]), params={"mode":"work","state":"EMPTY"}).json()
     assert {s["code"] for s in work["items"][0]["snapshot"]["students"]} == {s.student_code for s in students[:2]}
     from test_participation_revocation import verifier
@@ -566,19 +569,30 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert client.post(submission_path,headers=upload_headers,content=synthetic_pdf()).status_code==409
     first_archive=archive+"/versions/"+sent.json()["id"]
     assert client.get(first_archive+"/file",headers=hdr(users[2])).status_code==404
+    original_student = next(row for row in sent.json()["snapshot"]["students"] if row["slot_id"]==slot)
+    mutate("PUT","/academic-profile/"+second,users[4],{**academic,"class_name":"ĐHCNTT22D"})
+    stale = client.get(submission_path,headers=hdr(users[4])).json()
+    assert stale["can_decide"] and not stale["can_approve"]
+    assert any(original_student["code"] in block["message"] and "lớp" in block["message"]
+               and block["url"]==f"/defense?slot={slot}&tab=results" for block in stale["blockers"])
+    assert client.post(first_archive+"/decision", headers={**hdr(users[4]),"If-Match":"1"},
+                       json={"decision":"ACCEPTED","reason":"Thử duyệt sau đính chính"}).status_code==409
     returned=client.post(first_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"RETURNED","reason":"Bổ sung kết luận theo biên bản"})
     assert returned.status_code==204,returned.text
     assert client.post(submission_path,headers={**upload_headers,"If-Match":"0"},content=synthetic_pdf()).status_code==409
     resubmitted=client.post(submission_path,headers=upload_headers,content=synthetic_pdf())
     assert resubmitted.status_code==201,resubmitted.text
+    assert client.post(first_archive+"/decision",headers={**hdr(users[4]),"If-Match":"2"},
+                       json={"decision":"ACCEPTED","reason":"Thử duyệt bản cũ"}).status_code==409
+    assert not client.get(submission_path,headers=hdr(users[0])).json()["can_approve"]
     latest_archive=archive+"/versions/"+resubmitted.json()["id"]
     accepted=client.post(latest_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"ACCEPTED","reason":"Đã đối chiếu bản hoàn thiện"})
     assert accepted.status_code==204,accepted.text
     assert client.get(thesis_path, headers=hdr(users[0])).json()["state"] == "COMPLETED"
     assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"NOT_SUBMITTED":1}
     assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"ACCEPTED":1}
-    inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
-    assert any("Đã đưa khóa luận vào kho nội bộ" in notice["message"] for notice in inbox)
+    assert any("Đã đưa khóa luận vào kho nội bộ" in n["message"] and n["url"]=="/repository?focus="+thesis["thesis_id"]
+               for n in archive_notices())
     assert client.get(latest_archive+"/file",headers=hdr(users[1])).status_code==200
     assert client.get(submission_path,headers=hdr(users[2])).status_code==404
     catalog=client.get(archive+"/search",headers=hdr(users[0]),params={"q":students[0].student_code})
@@ -602,14 +616,17 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     assert client.get(thesis_path, headers=hdr(users[0])).json()["state"] == "DEFENDED"
     assert client.get(archive+"/search",headers=hdr(users[0])).json()["total"]==0
     detail=client.get(submission_path,headers=hdr(users[0])).json()
+    def saved_class(version):
+        return next(row["class_name"] for row in version["snapshot"]["students"]
+                    if row["student_id"]==original_student["student_id"])
+    assert [saved_class(version) for version in detail["versions"]] == ["ĐHCNTT22D",original_student["class_name"]]
     assert detail["can_submit"] and detail["versions"][0]["state"]=="REOPENED"
     assert detail["versions"][0]["decision_note"]=="Đã đối chiếu bản hoàn thiện"
     assert detail["versions"][0]["reopened"]["reason"]==reopen_data["reason"]
     assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"REOPENED":1}
     assert client.get(latest_archive+"/file",headers=hdr(users[1])).content==synthetic_pdf()
     assert client.get(archive,headers=hdr(users[2])).json()==[]
-    inbox=client.get("/api/v1/notifications",headers=hdr(users[0])).json()["items"]
-    assert any("đã thu hồi bản lưu" in notice["message"] for notice in inbox)
+    assert any("đã thu hồi bản lưu" in n["message"] and n["url"]==work_url for n in archive_notices())
 
     # Closed records need an independently approved correction; never unlock.
     correction_path=endpoint+'/corrections'

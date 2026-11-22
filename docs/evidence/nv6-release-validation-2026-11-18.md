@@ -30,3 +30,9 @@ Phạm vi từ phản biện đến bảng điểm, kho nội bộ, báo cáo v�
 - Kiểm ở 320×568, 360×800, 375×812, 390×844, 430×932, 768×1024 và 844×390. Đối chiếu chiều rộng trang, khả năng tiếp cận nút và ô nhập, vị trí hộp thoại, bảng cuộn riêng và thao tác chạm mở hồ sơ GV. Các ca còn mở thông báo, hồ sơ cá nhân, biểu mẫu cập nhật GV, lập hội đồng và lịch bảo vệ. Đây là mô phỏng trình duyệt, chưa kiểm trên thiết bị Android/iOS vật lý.
 - Khắc phục bảng thông báo lệch mép, ô tìm tài khoản và nhập Excel tràn trên máy hẹp, nhãn bộ lọc đề tài bị khuất và danh sách chọn dài làm WebKit cuộn ngang ở trang chức vụ và thống kê. Danh bạ GV hiện từng thẻ trên điện thoại. Đã đối chiếu ảnh kết quả của nhật ký, danh bạ, quản trị tài khoản, hội đồng và kho.
 - 9 ca hồi quy liên quan đến nhật ký, tài khoản và hồ sơ GV, chức vụ, hội đồng, biểu mẫu và nộp lưu đạt. Build TypeScript/Vite đạt, còn cảnh báo dung lượng gói JavaScript đầu vào.
+
+## Kiểm tra kho và quy trình liên quan ngày 22/11/2026
+
+- 280 ca pytest đạt trên schema PostgreSQL kiểm thử. Ca tích hợp nhóm hai SV dùng API đính chính lớp sau khi nộp lưu. TBM có thể trả bản cũ, nhóm nộp bản thay thế và TBM duyệt đúng phiên bản. Kiểm tra lớp gắn với từng lần nộp, liên kết thông báo và việc bản đã thu hồi rời danh sách tra cứu.
+- 19 ca Playwright thuộc 6 tệp đạt qua các lượt chạy và chạy lại. Bao phủ đăng ký, nộp tài liệu, điều kiện bảo vệ, hội đồng và kho. Riêng luồng kho dùng API, PostgreSQL và ClamAV thật với tài khoản SV, GVHD, TBM và một SV ngoài nhóm. GVHD tìm được bản đã duyệt bằng tên lớp không dấu. Trình duyệt kiểm tra tám màn hình ở 320, 390, 768 và 1440 px.
+- Kiểm tra tra cứu PostgreSQL với mã lớp, mã ngành, tên ngành và từ khóa kết hợp, thứ tự ưu tiên mã chính xác, ký tự đặc biệt và bản lưu cũ thiếu tiêu đề. Build TypeScript/Vite và đối chiếu OpenAPI đạt. Vite còn cảnh báo dung lượng gói JavaScript và pytest ghi nhận sáu cảnh báo thư viện.
