@@ -1,7 +1,7 @@
 .withdrawal-page {max-width:1180px;margin:auto;color:#263e51;}
 .withdrawal-page .card {border:1px solid #dbe5e9;border-radius:14px;box-shadow:0 3px 14px rgb(24 57 71 / 4%);}
 .withdrawal-page .card-body {padding:24px;}
-.withdrawal-page h2 {font-size:20px;line-height:1.45;color:#173c46;font-weight:750;margin:0 0 8px;}
+.withdrawal-page h2 {font-size:20px;line-height:1.45;color:#173c46;font-weight:700;margin:0 0 8px;}
 .withdrawal-page h3 {font-size:17px;line-height:1.5;color:#204858;font-weight:700;}
 .withdrawal-page p {font-size:14px;line-height:1.75;}
 .withdrawal-page .text-muted,.withdrawal-page .text-caption {color:#506579;font-size:13px;line-height:1.65;}

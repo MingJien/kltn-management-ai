@@ -153,7 +153,7 @@ export default function WorkspacePage({context}: {context: Context}) {
           <Link to="/topics">Tất cả đề tài <ArrowRight size={13} aria-hidden="true" /></Link></div>
         {topics.length ? <ul className="overview-list">{topics.map((topic) => <li key={topic.id}>
           <span><span className="topic-code">{topic.code}</span>{topic.title}</span><ThesisStatusBadge state={topic.state} />
-        </li>)}</ul> : <p>{head ? "Không có đề tài chờ duyệt." : "Chưa có đề tài trong danh sách."}</p>}
+        </li>)}</ul> : <div className="overview-empty"><BookOpen size={24} aria-hidden="true" /><p>{head ? "Không có đề tài chờ duyệt." : "Chưa có đề tài trong danh sách."}</p></div>}
       </div></section>
       <section className="card overview-card"><div className="card-body stack">
         <div className="workspace-panel-heading"><h2><ClipboardList size={17} aria-hidden="true" />
@@ -162,7 +162,7 @@ export default function WorkspacePage({context}: {context: Context}) {
         {registrations.length ? <ul className="overview-list">{registrations.map((row) => <li key={row.id}>
           {context.base_role === "LECTURER" ? <Link to={"/registrations?focus=" + row.id}><span className="topic-code">{row.topic_code}</span>{row.topic_title}</Link>
             : <span><span className="topic-code">{row.topic_code}</span>{row.topic_title}</span>}<ThesisStatusBadge state={row.state} />
-        </li>)}</ul> : <p>{context.base_role === "LECTURER" ? "Không có hồ sơ cần xử lý." : "Chưa có đăng ký trong phạm vi của bạn."}</p>}
+        </li>)}</ul> : <div className="overview-empty"><ClipboardList size={24} aria-hidden="true" /><p>{context.base_role === "LECTURER" ? "Không có hồ sơ cần xử lý." : "Chưa có đăng ký trong phạm vi của bạn."}</p></div>}
       </div></section>
     </div> : null}
   </>;

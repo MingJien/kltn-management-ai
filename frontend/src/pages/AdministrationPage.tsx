@@ -360,7 +360,7 @@ export default function AdministrationPage({
                     <Shield size={18} aria-hidden="true" />
                   </div>
                   <div>
-                    <h2 className="admin-card__title">Phân công theo đợt</h2>
+                    <h2 className="admin-card__title">Giao nhiệm vụ theo đợt</h2>
                     <p className="admin-card__subtitle">Gán trách nhiệm quản trị đợt khóa luận cho cán bộ/GV</p>
                   </div>
                 </div>

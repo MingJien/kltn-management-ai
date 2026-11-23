@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import type { Context, Thesis } from "../api";
 import { request } from "../api";
 import PageHeader from "../components/layout/PageHeader";
+import EmptyState from "../components/ui/EmptyState";
 import { Status } from "../components/domain/CoreForms";
 
 type ThesisSection = "overview" | "proposal" | "progress" | "documents";
@@ -44,12 +45,11 @@ export default function ThesesPage({context, section = "overview"}: {context: Co
       : "Khóa luận chỉ được tạo khi giảng viên chấp nhận đăng ký; GV đó trở thành GVHD chính ngay."} />
     {section === "documents" && <Link className="btn btn-secondary" to="/forms">Mở kho biểu mẫu và tài liệu Khoa (không cần có khóa luận)</Link>}
     {error && <div className="alert alert-danger" role="alert">{error}</div>}
-    {loading ? <p role="status">Đang tải khóa luận…</p> : visibleRows.length === 0 ? <div className="card"><div className="card-body">
-      <h2>Chưa có khóa luận trong phạm vi của bạn</h2>
-      <p>{section === "progress" ? "Các mốc và báo cáo tiến độ xuất hiện trong hồ sơ sau khi GV chấp nhận đăng ký. GVHD quản lý mốc riêng của khóa luận. Điều phối viên quản lý mốc chung của đợt." : section === "documents" ? "Tài liệu được nộp trong hồ sơ sau khi GV chấp nhận đăng ký; mở hồ sơ để tạo loại tài liệu và nộp các phiên bản." : "Khi giảng viên chấp nhận đăng ký, hệ thống tạo khóa luận, ghi nhận nhóm và gán GV đó làm GVHD chính trong cùng thao tác."}</p>
-      {context.base_role === "STUDENT" && <Link className="btn btn-secondary" to="/registrations">Xem đăng ký của tôi</Link>}
-      {context.base_role === "LECTURER" && <Link className="btn btn-secondary" to="/registrations">Mở hồ sơ đăng ký</Link>}
-    </div></div> : <div className="stack">{visibleRows.map(row => <article className="card" key={row.id}><div className="card-body">
+    {loading ? <p role="status">Đang tải khóa luận…</p> : visibleRows.length === 0 ?
+      <EmptyState title="Chưa có khóa luận trong phạm vi của bạn" description={section === "progress" ? "Các mốc và báo cáo tiến độ xuất hiện trong hồ sơ sau khi GV chấp nhận đăng ký." : section === "documents" ? "Tài liệu được nộp trong hồ sơ sau khi GV chấp nhận đăng ký." : "Khi giảng viên chấp nhận đăng ký, hệ thống tạo khóa luận, ghi nhận nhóm và gán GV đó làm GVHD chính."}>
+        {context.base_role === "STUDENT" && <Link className="btn btn-secondary" to="/registrations">Xem đăng ký của tôi</Link>}
+        {context.base_role === "LECTURER" && <Link className="btn btn-secondary" to="/registrations">Mở hồ sơ đăng ký</Link>}
+      </EmptyState> : <div className="stack">{visibleRows.map(row => <article className="card" key={row.id}><div className="card-body">
       <div className="flex justify-between gap-3"><h2><Link className="core-thesis-link" to={`/theses/${row.id}?section=${section}`}>{row.title}</Link></h2><Status value={row.state} /></div>
       <p className="text-muted">{row.round_label} · GVHD chính thức: {row.advisor_name || "Chưa có"}</p>
       <p>{row.members.map(member => member.display_name).join(", ")}</p>

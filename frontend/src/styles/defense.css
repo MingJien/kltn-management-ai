@@ -95,11 +95,11 @@
 .archive-page .archive-heading > div { flex: 1 1 280px; min-width: 0; }
 .archive-page .archive-heading h2 { margin: 3px 0 0; font-size: clamp(1rem, 2.6vw, 1.25rem); line-height: 1.45; overflow-wrap: break-word; }
 .archive-page .archive-heading p, .archive-page .archive-list p { margin: 0; }
-.archive-page .archive-status { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: .875rem; font-weight: 650; background: #e8edf3; color: #334155; }
+.archive-page .archive-status { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: .875rem; font-weight: 600; background: #e8edf3; color: #334155; }
 .archive-page .archive-status[data-state="ACCEPTED"] { background: #d1fae5; color: #065f46; }
 .archive-page .archive-status:is([data-state="SUBMITTED"],[data-state="RETURNED"],[data-state="REOPENED"]) { background: #fef3c7; color: #78350f; }
 .archive-page .archive-facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,230px),1fr)); gap: 12px 24px; }
-.archive-page .archive-facts dt { color: #475569; font-weight: 650; }
+.archive-page .archive-facts dt { color: #475569; font-weight: 600; }
 .archive-page .archive-facts dd { margin: 4px 0 0; overflow-wrap: break-word; }
 .archive-page .archive-authors { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .archive-page .archive-authors small { display: block; color: #475569; }
