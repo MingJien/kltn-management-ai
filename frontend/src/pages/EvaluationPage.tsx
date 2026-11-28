@@ -114,23 +114,25 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
         ariaLabel="Lịch sử xét điều kiện"
       /></div></section>}
     </aside></div>
-    {operation&&<OperationDialog key={`${operation.kind}:${memberId}`} operation={operation} data={data} memberId={memberId} context={context} onClose={()=>setOperation(null)} onSaved={async result=>{await load();setMessage("Đã lưu thay đổi và thông báo đến tài khoản liên quan.");setOperation(null);if(result)setEditor(result);}}/>}
+    {operation&&<OperationDialog key={`${operation.kind}:${memberId}`} operation={operation} data={data} memberId={memberId} context={context} onClose={()=>setOperation(null)} onRefresh={load} onSaved={async result=>{await load();setMessage("Đã lưu thay đổi và thông báo đến tài khoản liên quan.");setOperation(null);if(result)setEditor(result);}}/>}
     {editor&&<ThesisReviewEditor key={editor.id} initial={editor} data={data} context={context} onClose={()=>setEditor(null)} onUpdated={load}/>}
     {preview&&<Dialog open size="lg" title="Xem tài liệu" onClose={()=>setPreview(null)}><Suspense fallback={<p role="status">Đang mở tài liệu…</p>}><Preview name={preview.name} endpoint={preview.path} label="Tài liệu phản biện" backLabel="Đóng xem trước" caption="Đúng phiên bản đã lưu trong hồ sơ." onBack={()=>setPreview(null)}/></Suspense></Dialog>}
   </div>;
 }
 
-function OperationDialog({operation:op,data,memberId,context,onClose,onSaved}:{operation:Operation;data:Evaluation;memberId:string;context:Context;onClose:()=>void;onSaved:(review?:Review)=>Promise<void>}) {
+function OperationDialog({operation:op,data,memberId,context,onClose,onRefresh,onSaved}:{operation:Operation;data:Evaluation;memberId:string;context:Context;onClose:()=>void;onRefresh:()=>Promise<void>;onSaved:(review?:Review)=>Promise<void>}) {
   const member=data.members.find(m=>m.id===memberId);
   const [reason,setReason]=useState(op.kind==="create"&&!data.reviews.some(r=>r.thesis_member_id===memberId&&r.kind===op.role)?"Nhận xét lần đầu cho bản báo cáo hiện hành":"");
   const [reference,setReference]=useState(""),[lecturer,setLecturer]=useState("");
   const [discipline,setDiscipline]=useState(member?.eligibility?.discipline_status||"UNKNOWN");
   const [due,setDue]=useState(()=>new Date((op.kind==="extend"&&op.due?Math.max(Date.now(),new Date(op.due).getTime()):Date.now())+7*86400000+7*3600000).toISOString().slice(0,16));
   const [busy,setBusy]=useState(false),[error,setError]=useState("");
+  const [needsRefresh,setNeedsRefresh]=useState(false);
+  const [refreshed,setRefreshed]=useState(false);
   const path=`/theses/${data.thesis_id}/evaluation`;
   const titles={assign:"Phân công GV phản biện",extend:"Gia hạn gửi nhận xét phản biện",revoke:"Thu hồi phân công phản biện",check:"Xét điều kiện dự bảo vệ",reopen:"Mở xét lại hồ sơ",create:"Lập phiếu nhận xét"};
   async function submit(e:React.FormEvent){
-    e.preventDefault();if(busy)return;setBusy(true);setError("");
+    e.preventDefault();if(busy||needsRefresh)return;setBusy(true);setError("");setRefreshed(false);
     try{
       let result:Review|undefined;
       if(op.kind==="assign")await mutate(path+"/reviewers",context.user_id,{lecturer_id:lecturer,due_at:new Date(due+":00+07:00").toISOString(),reason,source_reference:reference},data.row_version);
@@ -140,11 +142,28 @@ function OperationDialog({operation:op,data,memberId,context,onClose,onSaved}:{o
       else if(op.kind==="create")result=await mutate<Review>(path+"/reviews",context.user_id,{thesis_member_id:memberId,kind:op.role,report_version_id:data.report?.id,reason},data.row_version);
       else await mutate(path+"/eligibility",context.user_id,{thesis_member_id:memberId,report_version_id:data.report?.id||null,advisor_review_id:member?.eligibility?.advisor_review_id||null,discipline_status:discipline,source_reference:reference,reason},data.row_version);
       await onSaved(result);
-    }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
+    }catch(e){
+      setError(errorMessage(e));
+      setNeedsRefresh(e instanceof ApiError && e.status===409);
+    }finally{setBusy(false);}
   }
-  return <Dialog open title={titles[op.kind]} busy={busy} onClose={onClose} footer={<><button className="btn btn-secondary" disabled={busy} onClick={onClose}>Hủy</button><button className="btn btn-primary" type="submit" form="evaluation-operation" disabled={busy}>{busy?"Đang lưu…":op.kind==="create"?"Tạo phiếu nháp":"Xác nhận và lưu"}</button></>}>
+  async function refresh() {
+    setBusy(true);
+    try {
+      await onRefresh();
+      setError("");
+      setNeedsRefresh(false);
+      setRefreshed(true);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <Dialog open title={titles[op.kind]} busy={busy} onClose={onClose} footer={<><button className="btn btn-secondary" disabled={busy} onClick={onClose}>Hủy</button>{needsRefresh&&<button className="btn btn-secondary" disabled={busy} onClick={()=>void refresh()}>Tải lại hồ sơ</button>}<button className="btn btn-primary" type="submit" form="evaluation-operation" disabled={busy||needsRefresh}>{busy?"Đang xử lý…":op.kind==="create"?"Tạo phiếu nháp":"Xác nhận và lưu"}</button></>}>
     <form id="evaluation-operation" className="evaluation-form" onSubmit={e=>void submit(e)}>
       {error&&<p className="alert alert-danger" role="alert">{error}</p>}
+      {refreshed&&<p className="alert alert-info" role="status">Đã tải lại hồ sơ. Đối chiếu thông tin mới trước khi lưu.</p>}
       {op.kind==="assign"&&<><label className="evaluation-field">Giảng viên phản biện<select aria-label="Giảng viên phản biện" required value={lecturer} onChange={e=>setLecturer(e.target.value)}><option value="">Chọn GV đang hoạt động phù hợp</option>{data.candidates.filter(c=>!data.assignments.some(a=>a.lecturer_id===c.id&&a.state==="ACTIVE")).map(c=><option value={c.id} key={c.id}>{c.recommended?"★ Phù hợp theo hồ sơ · ":""}{c.name} · {c.code} · {c.department} · {c.active_load} phân công đang mở</option>)}</select></label>{data.candidates.find(c=>c.id===lecturer)?.recommendation_reasons?.length? <p className="alert alert-info">Chuyên môn đối chiếu: {data.candidates.find(c=>c.id===lecturer)?.recommendation_reasons?.join("; ")}</p>:null}<label className="evaluation-field">Hạn gửi nhận xét (giờ Việt Nam)<input type="datetime-local" required value={due} onChange={e=>setDue(e.target.value)}/></label><p className="text-caption">Bộ môn của hồ sơ: <strong>{data.reviewer_department}</strong>. Có thể chọn GV trong Khoa. Gợi ý ưu tiên dựa trên chuyên môn đã xác nhận; người phân công đối chiếu sự phù hợp trước khi quyết định. GVHD không được phản biện cùng đề tài. Tối đa hai GV phản biện đang được phân công.</p></>}
       {op.kind==="revoke"&&<p>Thu hồi phân công của <strong>{op.name}</strong>. GV này sẽ mất quyền xem hồ sơ phản biện; các phiếu đã gửi vẫn được giữ trong lịch sử.</p>}
       {op.kind==="extend"&&<><p>Gia hạn cho <strong>{op.name}</strong>. Hạn hiện tại: {when(op.due)}.</p><label className="evaluation-field">Hạn mới (giờ Việt Nam)<input type="datetime-local" required value={due} onChange={e=>setDue(e.target.value)}/></label></>}

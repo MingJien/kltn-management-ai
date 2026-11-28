@@ -1,21 +1,10 @@
-import {test, expect, type Browser, type Page} from '@playwright/test';
+import {test, expect, type Page} from '@playwright/test';
 import {execFileSync} from 'node:child_process';
+import {activateStudent, evaluateThesis, journeyTitle, registerTopic, signIn, submitDocuments} from './defense-journey';
 
 const accounts = JSON.parse(process.env.KLTN_E2E_ACCOUNTS_JSON || '{}');
-const thesis = process.env.KLTN_E2E_DEFENSE_THESIS!;
 const api = `http://127.0.0.1:${process.env.KLTN_E2E_API_PORT}/api/v1`;
 
-async function login(browser:Browser, key:string) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.setDefaultTimeout(12000);
-  await page.goto('/');
-  await page.getByLabel('Email',{exact:true}).fill(accounts[key].email);
-  await page.getByLabel('Mật khẩu',{exact:true}).fill(accounts[key].password);
-  await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Tổng quan',exact:true})).toBeVisible();
-  return {context,page};
-}
 async function workspace(page:Page) {
   const response=await page.request.get(api+'/defense');
   expect(response.status(),await response.text()).toBe(200);
@@ -23,16 +12,35 @@ async function workspace(page:Page) {
 }
 function localDate(date:Date) { return new Date(date.getTime()+7*3600000).toISOString().slice(0,16); }
 
-test('Hội đồng thật: lập, xếp lịch, điểm danh, chấm, chốt, khóa và nộp lưu', async ({browser})=>{
-  test.setTimeout(240000);
-  const chair=await login(browser,'tbm');
-  const secretary=await login(browser,'gv2');
-  const reviewer=await login(browser,'council1');
-  const student=await login(browser,'sv1');
-  const advisor=await login(browser,'gv');
-  const pages=[chair,secretary,reviewer,student,advisor];
-  const title='Hội đồng kiểm thử thực tế';
+test('NV6: từ hồ sơ kích hoạt đến bảo vệ, xuất mẫu và duyệt lưu trên cùng một hồ sơ', async ({browser})=>{
+  test.setTimeout(360000);
+  const pages=[];
+  const errors: string[] = [];
+  for (const key of ['admin','tbm','gv2','council1','gv','student']) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    page.setDefaultTimeout(20000);
+    page.on('pageerror', error => errors.push(error.message));
+    pages.push({context,page});
+    if (key !== 'student') await signIn(page, accounts[key]);
+  }
+  const [admin, chair, secretary, reviewer, advisor, student] = pages;
+  const title=journeyTitle;
   try {
+    await test.step('Admin nhập danh sách và SV kích hoạt qua thư thử cục bộ', async () => {
+      const chairContext = await (await chair.page.request.get(api+'/me/context')).json();
+      await activateStudent(admin.page, student.page, accounts.admin.email, chairContext.user_id);
+    });
+    const thesis=await test.step('Đề tài, đăng ký, Mẫu 1a và tiếp nhận', () =>
+      registerTopic(advisor.page, chair.page, student.page));
+    await test.step('Nộp và duyệt Mẫu 2, Mẫu 3 và cuốn báo cáo', () =>
+      submitDocuments(thesis, chair.page, student.page, advisor.page, localDate(new Date(Date.now()+90*86400000))));
+    await test.step('Phản biện, Mẫu 7/8 và xét điều kiện bảo vệ', async () => {
+      const evaluation=await (await chair.page.request.get(api+'/theses/'+thesis+'/evaluation')).json();
+      expect(evaluation.members).toHaveLength(1);
+      const reviewerContext=await (await reviewer.page.request.get(api+'/me/context')).json();
+      await evaluateThesis(thesis,chair.page,advisor.page,reviewer.page,reviewerContext.lecturer_id,evaluation.members[0].id);
+    });
     const submissions=`/theses/${thesis}?section=submissions&kind=SUPPORTING`;
     const claims=(page:Page)=>page.locator('section.card').filter({has:page.getByRole('heading',{name:'Minh chứng công bố khoa học · Xét điểm thưởng',exact:true})});
     await chair.page.goto(submissions);
@@ -118,6 +126,14 @@ test('Hội đồng thật: lập, xếp lịch, điểm danh, chấm, chốt, k
       const notices=await (await actor.page.request.get(api+'/notifications?limit=100')).json();
       expect(notices.items.some((n:any)=>n.message.includes('Lịch bảo vệ đã thay đổi')&&n.message.includes('E2E-202'))).toBe(true);
     }
+    const academic=chair.page.locator('section.defense-operation').filter({has:chair.page.getByRole('heading',{name:'Thông tin học vụ sinh viên',exact:true})});
+    await academic.locator('summary').click();
+    await academic.getByLabel('Khóa học',{exact:true}).fill('2022-2026');
+    await academic.getByLabel('Ngày sinh',{exact:true}).fill('2004-03-15');
+    await academic.getByLabel('Căn cứ đính chính',{exact:true}).fill('E2E-HOC-VU');
+    await academic.getByLabel('Lý do bổ sung / đính chính',{exact:true}).fill('Bổ sung dữ liệu học vụ cho bản xuất thử.');
+    await academic.getByRole('button',{name:'Lưu thông tin học vụ'}).click();
+    await expect.poll(async()=> (await workspace(chair.page)).slots.find((s:any)=>s.id===slot.id)?.roster[0]?.training_cohort).toBe('2022-2026');
 
     await secretary.page.goto(sessionUrl);
     await secretary.page.getByRole('button',{name:'Điểm danh',exact:true}).click();
@@ -214,13 +230,13 @@ from docx import Document
 from openpyxl import load_workbook
 score,minutes,register,grade,student_code,expected=sys.argv[1:]
 sheet=load_workbook(score,data_only=False).active
-assert 'LOP-E2E' in str(sheet['A7'].value)
+assert 'CNTT-E2E' in str(sheet['A7'].value)
 assert float(sheet['F29'].value)==float(expected)
 def text(path):
  d=Document(path)
  return '\\n'.join([p.text for p in d.paragraphs]+[cell.text for table in d.tables for row in table.rows for cell in row.cells])
 assert 'Nội dung cuộc họp kiểm thử' in text(minutes)
-assert student_code in text(register) and 'LOP-E2E' in text(register)
+assert student_code in text(register) and 'CNTT-E2E' in text(register)
 rows=load_workbook(grade,data_only=False).active.iter_rows()
 student_row=next(row for row in rows if str(row[1].value)==student_code)
 assert float(student_row[5].value)==float(expected)
@@ -257,5 +273,6 @@ assert float(student_row[5].value)==float(expected)
     await chair.page.getByLabel('Nhận xét và căn cứ',{exact:true}).fill('Đã kiểm tra đúng bản hoàn thiện thử nghiệm.');
     await chair.page.getByRole('button',{name:'Lưu quyết định',exact:true}).click();
     await expect(chair.page.getByText('Phiên bản 1 · Đã duyệt lưu',{exact:true})).toBeVisible();
+    expect(errors).toEqual([]);
   } finally { for(const actor of pages) await actor.context.close(); }
 });

@@ -10,6 +10,19 @@ from backend.services.passwords import hash_password
 from tools.seed_demo import uid
 
 
+def add_council_candidates(session, instant, accounts):
+    head = session.get(m.LecturerProfile, uid('lecturer-2'))
+    for index in range(3):
+        key = 'council' + str(index + 1)
+        password = secrets.token_urlsafe(20)
+        user = m.UserAccount(id=uuid4(), email=key+'@e2e.test', password_hash=hash_password(password),
+            email_verified_at=instant, base_role='LECTURER', status='ACTIVE')
+        session.add(user); session.flush()
+        session.add(m.LecturerProfile(id=uuid4(), user_id=user.id, department_id=head.department_id,
+            lecturer_code='E2E-HD-'+str(index+1), display_name='GV Hội đồng '+str(index+1)))
+        accounts[key] = {'email': user.email, 'password': password}
+
+
 def add_ready_thesis(session, instant, report_pdf, accounts):
     student = session.get(m.StudentProfile, uid('student-1'))
     advisor = session.get(m.LecturerProfile, uid('lecturer-1'))
@@ -23,15 +36,7 @@ def add_ready_thesis(session, instant, report_pdf, accounts):
     student.class_name, student.major_code, student.training_cohort = 'LOP-E2E', major.code, '2022-2026'
     from datetime import date
     student.birth_date = date(2004, 3, 15)
-    for index in range(3):
-        key = 'council' + str(index + 1)
-        password = secrets.token_urlsafe(20)
-        user = m.UserAccount(id=uuid4(), email=key+'@e2e.test', password_hash=hash_password(password),
-            email_verified_at=instant, base_role='LECTURER', status='ACTIVE')
-        session.add(user); session.flush()
-        session.add(m.LecturerProfile(id=uuid4(), user_id=user.id, department_id=student.department_id,
-            lecturer_code='E2E-HD-'+str(index+1), display_name='GV Hội đồng '+str(index+1)))
-        accounts[key] = {'email': user.email, 'password': password}
+    add_council_candidates(session, instant, accounts)
     topic = m.Topic(id=uuid4(), round_id=uid('round'), department_id=student.department_id,
         code='E2E-DEFENSE-LIVE', current_title='Hội đồng kiểm thử thực tế', proposer_type='LECTURER',
         proposer_user_id=advisor.user_id, receiving_lecturer_id=advisor.id, max_students=1, state='LOCKED')

@@ -168,7 +168,14 @@ def main() -> int:
                 assert session.scalar(text('select current_schema()')) == schema
                 add_report_pair(session, datetime.now(timezone.utc))
             private_engine.dispose()
-        if specs & {"defense-live.spec.ts", "defense-absence-live.spec.ts", "defense-batch-live.spec.ts"}:
+        if "defense-live.spec.ts" in specs:
+            from tools.e2e_defense_fixture import add_council_candidates
+            with Session(private_engine) as session, session.begin():
+                assert session.scalar(text('select current_schema()')) == schema
+                add_council_candidates(session, datetime.now(timezone.utc), accounts)
+            env['KLTN_E2E_ACCOUNTS_JSON'] = json.dumps(accounts)
+            private_engine.dispose()
+        if specs & {"defense-absence-live.spec.ts", "defense-batch-live.spec.ts"}:
             from tools.e2e_defense_fixture import add_ready_thesis
             with Session(private_engine) as session, session.begin():
                 assert session.scalar(text('select current_schema()')) == schema
