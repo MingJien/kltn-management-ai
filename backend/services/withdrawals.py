@@ -66,6 +66,17 @@ def output(session, user, item):
             "actor": notices.actor_name(session, h.actor_id)} for h in history]}
 
 
+def competing_request_message(session, thesis):
+    from backend.services.thesis_changes import open_request
+    from backend.services.thesis_extensions import pending as pending_extension
+
+    if open_request(session, thesis):
+        return "Hủy hoặc xử lý yêu cầu đổi đề tài trước khi gửi xin thôi"
+    if pending_extension(session, thesis.id):
+        return "Hủy hoặc xử lý yêu cầu gia hạn trước khi gửi xin thôi"
+    return None
+
+
 def workspace(session, user):
     if user.base_role not in {"STUDENT", "LECTURER"}:
         raise HTTPException(403, "Luồng xin thôi dành cho SV và điều phối KLTN được giao")
@@ -96,6 +107,9 @@ def workspace(session, user):
                 "Ngoài thời hạn 02 tuần; liên hệ đơn vị phụ trách. Hồ sơ KLTN chưa tự động bị hủy." if not in_window else
                 "Hồ sơ đã chốt đủ điều kiện bảo vệ; liên hệ TBM mở xét lại trước khi xử lý thay đổi thành viên." if thesis.state == "READY_FOR_DEFENSE" else
                 "Khóa luận hoặc quyền đăng ký không còn cho phép xin thôi theo luồng này")
+            if can_submit:
+                message = competing_request_message(session, thesis) or ""
+                can_submit = not message
             advisor = primary_advisor(session, thesis.id)
             lecturer = session.get(m.LecturerProfile, advisor.lecturer_id) if advisor else None
             theses.append({"id": thesis.id, "title": thesis.current_title, "round_id": round_.id,
@@ -153,12 +167,9 @@ def create(session, user, thesis_id, data):
         raise HTTPException(404, "Bạn không phải thành viên đang thực hiện khóa luận này")
     if thesis.state not in EDITABLE:
         raise HTTPException(409, "Khóa luận đã khóa hoặc đã chuyển sang giai đoạn bảo vệ")
-    from backend.services.thesis_changes import open_request
-    if open_request(session,thesis):
-        raise HTTPException(409, "Hủy hoặc xử lý yêu cầu đổi đề tài trước khi gửi xin thôi")
-    from backend.services.thesis_extensions import pending as pending_extension
-    if pending_extension(session,thesis.id):
-        raise HTTPException(409,"Hủy hoặc xử lý yêu cầu gia hạn trước khi gửi xin thôi")
+    conflict = competing_request_message(session, thesis)
+    if conflict:
+        raise HTTPException(409, conflict)
     round_ = session.scalar(select(m.ThesisRound).where(m.ThesisRound.id == thesis.round_id).with_for_update())
     if not round_.execution_starts_on:
         raise HTTPException(409, "Khoa chưa ghi nhận ngày bắt đầu thực hiện theo kế hoạch")
@@ -223,15 +234,16 @@ def record(session, user, identifier, data, expected):
         reg_member = session.scalar(select(m.RegistrationMember).where(
             m.RegistrationMember.registration_id == thesis.registration_id,
             m.RegistrationMember.student_id == item.student_id).with_for_update())
+        registration = session.get(m.TopicRegistration, thesis.registration_id)
         if reg_member:
             reg_member.active, reg_member.is_coordinator = False, False
-            registration = session.get(m.TopicRegistration, thesis.registration_id)
-            registration.row_version += 1
+        registration.row_version += 1
         session.flush()
         remaining = session.scalars(select(m.ThesisMember).where(m.ThesisMember.thesis_id == thesis.id,
             m.ThesisMember.active.is_(True)).order_by(m.ThesisMember.joined_at, m.ThesisMember.id).with_for_update()).all()
         peers = set(session.scalars(select(m.StudentProfile.user_id).where(m.StudentProfile.id.in_([r.student_id for r in remaining]))))
         if remaining:
+            registration.expected_member_count = len(remaining)
             from backend.services import evaluation
             academic = peers | notices.department_heads(session, thesis.department_id)
             academic |= {session.get(m.LecturerProfile, a.lecturer_id).user_id
@@ -269,8 +281,7 @@ def record(session, user, identifier, data, expected):
                 f"SV {item.student_id} xin thôi; nhóm còn lại phải nộp phiên bản đề cương mới để duyệt lại")
         else:
             thesis.state = "WITHDRAWN"
-            registration = session.get(m.TopicRegistration, thesis.registration_id)
-            registration.state, registration.row_version = "CANCELLED", registration.row_version + 1
+            registration.state = "CANCELLED"
             if advisor:
                 advisor.state, advisor.effective_to, advisor.row_version = "ENDED", now(), advisor.row_version + 1
             for assignment in session.scalars(select(m.ReviewerAssignment).where(

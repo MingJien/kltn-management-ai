@@ -118,7 +118,7 @@ test("Bốn SV demo kích hoạt, đăng ký đề tài GV1 và xử lý xin th�
         const page=outsider;
         expect((await read(page,`/me/eligibility?round_id=${round.id}`)).eligible).toBe(false);
         await page.goto("/topics");
-        await page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
+        await page.getByRole("button",{name:/^Đề tài có sẵn/}).click();
         await page.getByLabel("Tìm đề tài").fill(topic.title);
         const card=page.locator("article").filter({has:page.getByRole("heading",{name:topic.title,exact:true})});
         await card.getByRole("button",{name:"Đăng ký",exact:true}).click();
@@ -130,7 +130,7 @@ test("Bốn SV demo kích hoạt, đăng ký đề tài GV1 và xử lý xin th�
       for(let i=0;i<2;i++) {
         const page=students[group*2+i];
         await page.goto("/topics");
-        await page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
+        await page.getByRole("button",{name:/^Đề tài có sẵn/}).click();
         await page.getByLabel("Tìm đề tài").fill(topic.title);
         const card=page.locator("article").filter({has:page.getByRole("heading",{name:topic.title,exact:true})});
         await card.getByRole("button",{name:i ? "Tham gia" : "Đăng ký",exact:true}).click();

@@ -328,7 +328,7 @@ export default function SchoolFormsPage({context}:{context:Context}) {
                 <button type="button" className="btn btn-secondary school-form-action-button" title="Tải tệp nguồn của Khoa" aria-label={`Tải tệp nguồn ${source.title}`} disabled={busy}
                   onClick={()=>void downloadSource(source)}><Download size={17} aria-hidden="true"/></button>
               </>}
-              {item && published && source?.id !== "don-xin-thoi" && <>
+              {item && published && <>
                 {isPdf(published) && <button type="button" className="btn btn-secondary school-form-action-button" title="Xem PDF bản đang áp dụng" aria-label="Xem trực tiếp" disabled={busy || published.scan_state!=="CLEAN"} onClick={()=>showVersion(item,published)}><Eye size={17} aria-hidden="true"/></button>}
                 <button type="button" className="btn btn-secondary school-form-action-button" title="Tải tệp gốc bản đang áp dụng" aria-label="Tải tệp gốc" disabled={busy || published.scan_state!=="CLEAN"} onClick={()=>void downloadPublished(item,published)}><Download size={17} aria-hidden="true"/></button>
               </>}

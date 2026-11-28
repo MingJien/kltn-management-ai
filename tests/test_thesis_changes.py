@@ -88,6 +88,8 @@ def test_decline_cancel_duplicate_withdrawal_and_start_date_guards(workspace):
         "kind":"ADJUSTMENT","proposed_title":"Another synthetic title","proposed_description":"Synthetic amended scope and objectives",
         "reason":"Another synthetic academic reason","confirm_consequences":True})
     assert duplicate.status_code==409
+    withdrawal_options = client.get("/api/v1/withdrawals",headers=hdr(users[0])).json()["theses"]
+    assert not withdrawal_options[0]["can_submit"] and "đổi đề tài" in withdrawal_options[0]["message"]
     assert client.post(path+"/withdrawals",headers=hdr(users[0]),json={"reason":"Want to withdraw from the thesis","confirm_replacement":True}).status_code==409
     declined=act(ctx,item,"consent",1,{"decision":"DECLINE"})
     assert declined["state"]=="REJECTED"

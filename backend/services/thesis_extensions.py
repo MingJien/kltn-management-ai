@@ -245,10 +245,14 @@ def listing(session,user,thesis_ids):
     key=str(user.id)
     query=select(m.ThesisExtensionRequest).where((m.ThesisExtensionRequest.thesis_id.in_(thesis_ids)) |
         (m.ThesisExtensionRequest.requested_by==user.id) |
+        (m.ThesisExtensionRequest.snapshot['advisor_user_id'].astext==key) |
         (m.ThesisExtensionRequest.snapshot['members'].contains([{'user_id':key}])))
     items=[];changed=False
     for item in session.scalars(query.order_by(m.ThesisExtensionRequest.submitted_at.desc()).execution_options(populate_existing=True)):
         if not can_see(session,user,item):continue
+        if item.state not in {"SUBMITTED", "APPROVED"}:
+            items.append(output(session,user,item))
+            continue
         session.scalar(select(m.Thesis.id).where(m.Thesis.id == item.thesis_id).with_for_update())
         item=session.scalar(select(m.ThesisExtensionRequest).where(m.ThesisExtensionRequest.id == item.id)
             .with_for_update().execution_options(populate_existing=True))

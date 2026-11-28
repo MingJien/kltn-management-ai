@@ -85,9 +85,9 @@ def test_source_inventory_uses_exact_files_and_requires_catalog_access(forms, mo
     for user in (users[4], users[5]):
         response = client.get(path, headers=hdr(user))
         assert response.status_code == 200, response.text
-        assert [row["id"] for row in response.json()] == ["mau-02", "mau-04", "don-xin-thoi"]
-        assert [row["filename"] for row in response.json()] == [word.name, excel.name, withdrawal.name]
-        for row, original in zip(response.json(), (word, excel, withdrawal)):
+        assert [row["id"] for row in response.json()] == ["mau-02", "mau-04"]
+        assert [row["filename"] for row in response.json()] == [word.name, excel.name]
+        for row, original in zip(response.json(), (word, excel)):
             download = client.get(f"{path}/{row['id']}", headers=hdr(user))
             assert download.status_code == 200, download.text
             assert download.content == original.read_bytes()
@@ -97,7 +97,7 @@ def test_source_inventory_uses_exact_files_and_requires_catalog_access(forms, mo
         assert preview.content == pdf
         assert preview.headers["content-type"] == "application/pdf"
         assert preview.headers["content-disposition"].startswith("inline;")
-        assert client.get(path + "/don-xin-thoi/preview", headers=hdr(user)).content == pdf
+        assert client.get(path + "/don-xin-thoi/preview", headers=hdr(user)).status_code == 404
         assert client.get(path + "/hop-hoi-dong/preview", headers=hdr(user)).status_code == 404
     for user in (users[0], users[3]):
         assert client.get(path, headers=hdr(user)).status_code == 403

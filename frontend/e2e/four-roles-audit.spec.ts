@@ -311,7 +311,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
 
     // 2. SV1 đăng ký đề tài (trưởng nhóm)
     await sv1.page.goto(web + "/topics");
-    await sv1.page.getByRole("button", { name: "Đề tài có sẵn", exact: true }).click();
+    await sv1.page.getByRole("button", { name: /^Đề tài có sẵn/ }).click();
     await sv1.page.getByLabel("Tìm đề tài").fill(topicTitle);
     const sv1Card = sv1.page.locator("article").filter({ has: sv1.page.getByRole("heading", { name: topicTitle, exact: true }) });
     await sv1Card.getByRole("button", { name: "Đăng ký", exact: true }).click();
@@ -322,7 +322,7 @@ test("GV & SV: Đăng ký nhóm, chấp nhận chính thức tạo khóa luận 
 
     // SV2 tham gia nhóm (thành viên 2/2)
     await sv2.page.goto(web + "/topics");
-    await sv2.page.getByRole("button", { name: "Đề tài có sẵn", exact: true }).click();
+    await sv2.page.getByRole("button", { name: /^Đề tài có sẵn/ }).click();
     await sv2.page.getByLabel("Tìm đề tài").fill(topicTitle);
     const sv2Card = sv2.page.locator("article").filter({ has: sv2.page.getByRole("heading", { name: topicTitle, exact: true }) });
     await sv2Card.getByRole("button", { name: "Tham gia", exact: true }).click();

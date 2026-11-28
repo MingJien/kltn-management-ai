@@ -47,7 +47,7 @@ async function write(page: Page, path: string, options: {data?: unknown; headers
 function card(page: Page, title: string) {return page.locator("article").filter({has:page.getByRole("heading",{name:title,exact:true})});}
 async function find(page: Page, title: string) {
   await page.goto(web + "/topics");
-  await page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
+  await page.getByRole("button",{name:/^Đề tài có sẵn/}).click();
   await page.getByLabel("Tìm đề tài").fill(title);
   await expect(card(page,title)).toHaveCount(1);
   return card(page,title);
@@ -65,7 +65,8 @@ async function join(page: Page, title: string, second = false, withEvidence = fa
 async function proof(page: Page, title: string) {
   await card(page,title).locator('input[type="file"]').setInputFiles({name:"minh-chung-gia-lap.pdf",mimeType:"application/pdf",
     buffer:VALID_PDF});
-  await expect(card(page,title).getByRole("link",{name:/Tải minh chứng/}).last()).toBeVisible();
+  await card(page,title).getByRole("button",{name:"Tải lên",exact:true}).click();
+  await expect(card(page,title).getByRole("link",{name:"Tải minh chứng: minh-chung-gia-lap.pdf",exact:true})).toBeVisible();
 }
 async function review(page: Page, title: string, receiver?: string) {
   await page.goto(web + "/topics");
@@ -156,6 +157,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await expect(card(sv2.page,approved).getByText("2/2 SV",{exact:true})).toBeVisible();
     await proof(sv2.page,approved);
     await gv.page.getByRole("button",{name:"Làm mới",exact:true}).click();
+    await expect(card(gv.page,approved).getByRole("link",{name:/Tải minh chứng: minh-chung-gia-lap\.pdf/})).toBeVisible();
     await card(gv.page,approved).getByRole("button",{name:"Chấp nhận chính thức và tạo khóa luận",exact:true}).click();
     await expect(card(gv.page,approved).getByText("Đã tiếp nhận chính thức",{exact:false}).first()).toBeVisible();
     await sv1.page.reload();
@@ -164,7 +166,7 @@ test("GV tạo → TBM duyệt/sửa tên → nhóm đăng ký → GV nhận ch�
     await expect(card(sv2.page,approved).getByRole("button",{name:"Rút đăng ký",exact:true})).toHaveCount(0);
     const topic = (await read(gv.page,"/topics?view=mine&search=" + encodeURIComponent(approved)))[0];
     await sv3.page.goto(web + "/topics");
-    await sv3.page.getByRole("button",{name:"Đề tài có sẵn",exact:true}).click();
+    await sv3.page.getByRole("button",{name:/^Đề tài có sẵn/}).click();
     await sv3.page.getByLabel("Tìm đề tài").fill(approved);
     await expect(card(sv3.page,approved).getByRole("button",{name:/^(Đăng ký|Tham gia)$/})).toHaveCount(0);
     expect((await write(sv3.page,"/topic-registrations",{data:{topic_id:topic.id}})).status()).toBe(409);

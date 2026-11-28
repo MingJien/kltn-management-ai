@@ -89,19 +89,9 @@ OFFICIAL_FORMS = [
 
 STUDENT_FORM_IDS = {"mau-01a", "mau-01b", "mau-02", "mau-03", "mau-04", "mau-05"}
 
-SOURCE_FORMS = [
-    *OFFICIAL_FORMS,
-    {
-        "id": "don-xin-thoi",
-        "title": "Đơn xin thôi thực hiện KLTN",
-        "filename": "Don_xin_thoi_thuc_hien_KLTN.docx",
-    },
-]
-
-
 def list_sources() -> list[dict]:
     sources = []
-    for meta in SOURCE_FORMS:
+    for meta in OFFICIAL_FORMS:
         path = OFFICIAL_DIR / meta["filename"]
         if path.is_file():
             sources.append({**meta, "byte_size": path.stat().st_size, "extension": path.suffix.lower()})
@@ -109,9 +99,7 @@ def list_sources() -> list[dict]:
 
 
 def source_path(source_id: str) -> Path:
-    if source_id == "xin-thoi-kltn":
-        source_id = "don-xin-thoi"
-    for meta in SOURCE_FORMS:
+    for meta in OFFICIAL_FORMS:
         if meta["id"] == source_id:
             path = OFFICIAL_DIR / meta["filename"]
             if path.is_file():

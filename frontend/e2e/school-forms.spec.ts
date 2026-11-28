@@ -49,20 +49,15 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   const round=(await read(manager,"/rounds/open"))[0],managerId=(await read(manager,"/me/context")).user_id;
   const originalSources = await read(admin, `/school-forms/rounds/${round.id}/sources`);
   expect(originalSources.some((source: {id:string}) => source.id === "hop-hoi-dong")).toBe(false);
-  expect((await post(admin, "/school-forms", {
-    round_id:round.id, code:"don-xin-thoi", title:"Đơn xin thôi thực hiện KLTN", document_kind:"FORM",
-    audience:"STUDENT_AND_LECTURER", reason:"Synthetic existing withdrawal catalog entry",
-  })).status()).toBe(201);
+  expect(originalSources.some((source: {id:string}) => source.id === "don-xin-thoi")).toBe(false);
   await admin.goto(web+`/forms?round_id=${round.id}`);
   const adminRows = admin.getByRole("region", {name:"Danh mục biểu mẫu Khoa"}).locator("tbody tr");
   await expect(adminRows).toHaveCount(originalSources.length);
   await expect(adminRows.getByText("mau 2.Ke hoach thuc hien cua SV.docx", {exact:true})).toBeVisible();
   const withdrawalRow=adminRows.filter({hasText:"Đơn xin thôi thực hiện KLTN"});
-  await expect(withdrawalRow).toHaveCount(1);
-  await expect(withdrawalRow.getByText("Don_xin_thoi_thuc_hien_KLTN.docx", {exact:true})).toBeVisible();
-  await expect(withdrawalRow.getByRole("button", {name:"Lịch sử phiên bản",exact:true})).toBeVisible();
+  await expect(withdrawalRow).toHaveCount(0);
   const desktopViewport = admin.viewportSize();
-  for (const source of originalSources.filter((row: {id:string}) => ["mau-02", "mau-04", "don-xin-thoi"].includes(row.id))) {
+  for (const source of originalSources.filter((row: {id:string}) => ["mau-02", "mau-04"].includes(row.id))) {
     if (source.id === "mau-04") await admin.setViewportSize({width:390,height:900});
     const previewUrl = `**/school-forms/rounds/${round.id}/sources/${source.id}/preview`;
     await admin.route(previewUrl, route=>route.fulfill({contentType:"application/pdf",body:syntheticPdf(),headers:{

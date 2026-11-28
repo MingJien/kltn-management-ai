@@ -109,8 +109,13 @@ test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 
   let dialog=gv.getByRole("dialog");
   await dialog.getByLabel("Kết quả",{exact:true}).selectOption("CONFIRM");
   await dialog.getByLabel("Nhận xét tổng quát",{exact:true}).fill("GVHD xác nhận đề cương cập nhật thành viên còn lại");
-  await dialog.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click();
-  await expect(dialog).toHaveCount(0);
+  const [review] = await Promise.all([
+    gv.waitForResponse(response => response.url().endsWith(`/theses/${id}/proposal/reviews`) &&
+      response.request().method() === "POST"),
+    dialog.getByRole("button",{name:"Hoàn thành và gửi góp ý",exact:true}).click(),
+  ]);
+  expect(review.ok(), await review.text()).toBe(true);
+  await expect(dialog).toBeHidden({timeout:20000});
   await tbm.goto(`/theses/${id}?section=submissions&kind=PROPOSAL`);
   const finalize=tbm.locator(".card").filter({has:tbm.getByRole("heading",{name:"Trưởng bộ môn chốt đề cương",exact:true})});
   await finalize.getByLabel("Nhận xét / lý do",{exact:true}).fill("Bộ môn duyệt lại bản v2 theo thành viên hiện tại");

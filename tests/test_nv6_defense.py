@@ -372,6 +372,9 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     absent = client.get(base,headers=hdr(users[1])).json()["slots"][0]["results"]
     assert absent[second]["average"] is None
     assert client.get(endpoint+"/forms/9",headers=hdr(users[0])).status_code==403
+    for layout in ({"line_spacing":1.2}, {"paragraph_space":0}, {"break_recommendations":True}):
+        assert client.get(endpoint+"/forms/9",headers=hdr(users[4]),params=layout).status_code==403
+        assert client.get(endpoint+"/forms/9",headers=hdr(users[5]),params=layout).status_code==200
     minutes = client.get(endpoint+"/forms/9",headers=hdr(users[5]))
     assert minutes.status_code==200,minutes.text
     doc = Document(BytesIO(minutes.content))

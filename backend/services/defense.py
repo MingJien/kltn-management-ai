@@ -850,7 +850,9 @@ def workspace(session,user):
     return {"councils":[council_out(c, c.id in managed) for c in visible.values()],"slots":slots,"scopes":scopes,"scope_catalog":catalog,
         "export_rounds": [{"id": round_.id, "code": round_.code} for round_ in rounds_for_export(session,user)],
         "eligible":eligible,"planning_theses":planning_theses,"candidates":candidates,"criteria":CRITERIA,"roles":ROLES,
-        "academic_majors":[{"department_id":str(r.department_id),"code":r.code,"name":r.name} for r in session.scalars(select(m.DepartmentMajor).where(m.DepartmentMajor.active.is_(True)))]}
+        "academic_majors":[{"department_id":str(r.department_id),"code":r.code,"name":r.name} for r in session.scalars(
+            select(m.DepartmentMajor).where(m.DepartmentMajor.active.is_(True),
+                ~m.DepartmentMajor.name.startswith("Chưa xác minh")))]}
 
 
 def visible_academic_roster(session,slot,own,privileged):

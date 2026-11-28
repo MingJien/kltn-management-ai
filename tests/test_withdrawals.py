@@ -46,6 +46,7 @@ def test_group_withdrawal_keeps_thesis_and_requires_new_proposal(workspace):
     response=outcome(client,users[4],item)
     assert response.status_code==200,response.text
     assert response.json()["state"]=="RECORDED"
+    assert session.get(m.TopicRegistration,thesis.registration_id).expected_member_count==1
     forms=client.get(f"/api/v1/topic-registrations/{thesis.registration_id}/forms",headers=hdr(users[1])).json()
     assert forms["can_submit"] and forms["form_code"]=="1A"
     replacement=client.post(f"/api/v1/topic-registrations/{thesis.registration_id}/forms",

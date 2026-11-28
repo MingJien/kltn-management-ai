@@ -131,7 +131,7 @@ def export_slot(session,user,identifier,form,base_url,student_id=None,lecturer_i
     if own or not (member or manager):raise HTTPException(403,"Chỉ hội đồng và người phụ trách được tải mẫu")
     allowed={"note"} if form==6 else {"objectives","functions","achievements","discussion","conclusion","recommendations","reviewer_comments","member_comments"}
     if (set(layout.line_breaks)|set(layout.tabs)|set(layout.field_styles))-allowed:raise HTTPException(422,"Chỉ định dạng các phần diễn giải có trong biểu mẫu này")
-    if (layout_fields or layout.line_breaks or layout.tabs or layout.field_styles or layout.font_size or layout.narrative_bold is not None or layout.narrative_italic is not None) and (not member or member["role"]!="SECRETARY"):
+    if (layout_fields or layout.model_dump(exclude_defaults=True)) and (not member or member["role"]!="SECRETARY"):
         raise HTTPException(403,"Chỉ thư ký hội đồng được chỉnh trình bày bản xuất")
     blank=blank and form==6
     if record and (blank or not slot.finalized_at or layout_fields):

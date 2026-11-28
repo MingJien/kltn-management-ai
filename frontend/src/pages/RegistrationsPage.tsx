@@ -72,6 +72,13 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
     catch (cause) {setError(errorMessage(cause)); await reload().catch(() => undefined); return false;}
     finally {setBusy(false);}
   }
+  async function refresh() {
+    setBusy(true);
+    setError("");
+    try {await reload();}
+    catch (cause) {setError(errorMessage(cause));}
+    finally {setBusy(false);}
+  }
   async function upload(row: Registration, file?: File): Promise<boolean> {
     if (!file) return false;
     if (file.size === 0) {setError("Minh chứng đang rỗng (0 byte)."); return false;}
@@ -137,8 +144,8 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
       actions={
         <div className="flex flex-wrap gap-2">
           <button className="btn btn-secondary" disabled={busy || loading}
-            onClick={() => void reload().catch((cause) => setError(errorMessage(cause)))}>
-            <RefreshCw size={15} aria-hidden="true" />Làm mới
+            onClick={() => void refresh()}>
+            <RefreshCw size={15} aria-hidden="true" />{busy ? "Đang xử lý…" : "Làm mới"}
           </button>
           {context.base_role === "STUDENT" ? <Link className="btn btn-primary" to="/topics"><Compass size={15} aria-hidden="true" />Chọn đề tài</Link> : null}
           {focusedRegistrationId ? <Link className="btn btn-secondary" to="/registrations">Xem tất cả đăng ký</Link> : null}
