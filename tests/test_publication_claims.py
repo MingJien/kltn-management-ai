@@ -82,3 +82,23 @@ def test_revision_keeps_history_and_requires_new_submission(evaluation):
     session.commit()
     assert client.post(endpoint+'/'+made.json()['id']+'/decision',headers={**hdr(users[3]),'If-Match':'1'},
         json={'outcome':'CONFIRM','reason':'Synthetic confirm after file changed'}).status_code==422
+
+
+def test_withdrawn_publication_evidence_is_not_offered_to_council(evaluation):
+    from backend.services.defense import evidence_options
+    ctx, _ = evaluation
+    client, users, students, _, session, path = ctx
+    evidence = proof(ctx)
+    endpoint = path + '/publication-claims'
+    claim = client.post(endpoint, headers=hdr(users[0]), json=payload(ctx, evidence)).json()
+    decision = endpoint + '/' + claim['id'] + '/decision'
+    assert client.post(decision, headers={**hdr(users[3]), 'If-Match': '1'},
+        json={'outcome': 'CONFIRM', 'reason': 'Verified contribution'}).status_code == 200
+    assert client.post(decision, headers={**hdr(users[4]), 'If-Match': '2'},
+        json={'outcome': 'APPROVE', 'reason': 'Approved publication award', 'points': {str(students[0].id): '1'}}).status_code == 200
+    thesis_id = UUID(path.rsplit('/', 1)[1])
+    assert len(evidence_options(session, thesis_id)) == 1
+    version = session.get(m.DocumentVersion, UUID(evidence))
+    session.get(m.Document, version.document_id).state = 'REVOKED'
+    session.commit()
+    assert evidence_options(session, thesis_id) == []

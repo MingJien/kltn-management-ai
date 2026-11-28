@@ -50,6 +50,21 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await expect(sv).toHaveURL(new RegExp(reg.thesis_id+".*kind=REGISTRATION"));
     await expect(sv.getByRole("button",{name:"Tải đơn gốc v1",exact:true})).toBeEnabled({timeout:60000});
 
+    await sv.goto(base+"?section=overview#work-assignments");
+    const svWork=sv.locator("#work-assignments");
+    await svWork.getByLabel("Công việc",{exact:true}).fill("Thiết kế và triển khai chức năng tìm kiếm khóa luận.");
+    await svWork.getByLabel("Sản phẩm / kết quả dự kiến",{exact:true}).fill("Chức năng tìm kiếm và tài liệu kiểm thử tương ứng.");
+    await svWork.getByRole("button",{name:"Gửi phân công",exact:true}).click();
+    await expect(sv.getByRole("status").filter({hasText:"Đã gửi phân công công việc cho GVHD."})).toBeVisible();
+    await gv.goto(base+"?section=overview#work-assignments");
+    const gvWork=gv.locator("#work-assignments");
+    await expect(gvWork.getByText("Thiết kế và triển khai chức năng tìm kiếm khóa luận.")).toBeVisible();
+    await gvWork.getByLabel("Kết quả",{exact:true}).selectOption("APPROVE");
+    await gvWork.getByLabel("Nhận xét / lý do",{exact:true}).fill("Công việc phù hợp với đề tài và có sản phẩm cụ thể.");
+    await gvWork.getByRole("button",{name:"Gửi kết quả",exact:true}).click();
+    await expect.poll(async()=> (await get(gv,base+"/work-assignments"))[0]?.state).toBe("APPROVED");
+    await sv.goto(base+"?section=submissions&kind=REGISTRATION");
+
     if (!(await get(tbm,base)).actions.includes("milestone:manage")) {
       await post(admin,"/admin/round-assignments",{round_id:round.id,user_id:(await get(tbm,"/me/context")).user_id,assignment_type:"KLTN_COORDINATOR",basis_ref:"Khoa giao điều phối để kiểm thử hồ sơ"});
     }
@@ -121,6 +136,10 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await claims(tbm).getByRole("button",{name:"Lưu kết quả TBM",exact:true}).click();
     await expect(claims(tbm).getByText("TBM đã duyệt",{exact:true}).first()).toBeVisible();
     await expect(claims(tbm).getByText(/Được duyệt 1 \/ 1 điểm/)).toBeVisible();
+    await sv.goto("/activity");
+    await expect(sv.getByRole("heading",{name:"TBM duyệt điểm thưởng công bố",exact:true})).toBeVisible();
+    await expect(sv.getByRole("heading",{name:"GVHD xác nhận minh chứng công bố",exact:true})).toBeVisible();
+    await sv.goto(base+"?section=submissions&kind=SUPPORTING");
     await sv.reload();
     await expect(claims(sv).getByText("TBM đã duyệt",{exact:true}).first()).toBeVisible();
     await sv.setViewportSize({width:600,height:900});

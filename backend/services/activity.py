@@ -147,6 +147,21 @@ def visibility(session, user):
     docs = _ids(session, m.Document.id, m.Document.thesis_id.in_(full_theses))
     scopes["document"] |= docs
     scopes["document_version"] |= _ids(session, m.DocumentVersion.id, m.DocumentVersion.document_id.in_(docs))
+    # Publication decisions are recorded on the claim, not on the thesis itself.
+    # Restrict them to the same thesis audience that can read the claim.
+    scopes["publication_claim"] |= _ids(session, m.PublicationClaim.id,
+        m.PublicationClaim.thesis_id.in_(full_theses))
+    from backend.services import thesis_archive
+    coordinator_rounds = _ids(session, m.ResourceAssignment.round_id,
+        m.ResourceAssignment.user_id == user.id, m.ResourceAssignment.assignment_type == "KLTN_COORDINATOR",
+        effective(m.ResourceAssignment)) if user.base_role == "LECTURER" else set()
+    candidates = session.scalars(select(m.Thesis).join(m.ThesisArchiveVersion,
+        m.ThesisArchiveVersion.thesis_id == m.Thesis.id).where(or_(m.Thesis.id.in_(full_theses),
+        m.Thesis.round_id.in_(coordinator_rounds))).distinct())
+    archive_theses = {thesis.id for thesis in candidates
+        if thesis_archive.visible(session, thesis) and thesis_archive.access(session, user, thesis).can_view}
+    scopes["thesis_archive_version"] |= _ids(session, m.ThesisArchiveVersion.id,
+        m.ThesisArchiveVersion.thesis_id.in_(archive_theses))
     scopes["progress_report"] |= _ids(session, m.ProgressReport.id,
         m.ProgressReport.thesis_id.in_(
             full_theses if user.base_role == "STUDENT" else (advisor_theses | progress_theses)))
@@ -288,13 +303,28 @@ def resource_labels(session, events, viewer):
             .where(m.TopicRegistration.id.in_(ids["topic_registration"] | ids["registration"]))):
         result["topic_registration", row.id] = f"{row.code} · {row.current_title}"
         result["registration", row.id] = result["topic_registration", row.id]
+    for row in session.execute(select(m.PublicationClaim.id, m.Thesis.current_title)
+            .join(m.Thesis, m.Thesis.id == m.PublicationClaim.thesis_id)
+            .where(m.PublicationClaim.id.in_(ids["publication_claim"]))):
+        result["publication_claim", row.id] = f"Minh chứng công bố · {row.current_title}"
+    for row in session.execute(select(m.ThesisArchiveVersion.id, m.ThesisArchiveVersion.version_no, m.Thesis.current_title)
+            .join(m.Thesis, m.Thesis.id == m.ThesisArchiveVersion.thesis_id)
+            .where(m.ThesisArchiveVersion.id.in_(ids["thesis_archive_version"]))):
+        result["thesis_archive_version", row.id] = f"Bản lưu v{row.version_no} · {row.current_title}"
     accounts = ids["user_account"]
     names = _names(session, accounts)
     for row in session.scalars(select(m.UserAccount).where(m.UserAccount.id.in_(accounts))):
         result["user_account", row.id] = names.get(row.id, "Tài khoản") + (
             f" · {row.email}" if viewer.base_role == "ADMIN" and row.email else "")
-    for row in session.execute(select(m.PositionAssignment.id, m.LecturerProfile.display_name, m.Department.name).join(m.LecturerProfile, m.LecturerProfile.id == m.PositionAssignment.lecturer_id).join(m.Department, m.Department.id == m.PositionAssignment.department_id).where(m.PositionAssignment.id.in_(ids["position_assignment"]))):
-        result["position_assignment", row.id] = f"Trưởng bộ môn · {row.name} · {row.display_name}"
+    for row in session.execute(select(m.PositionAssignment.id, m.LecturerProfile.display_name,
+            m.OrganizationalPosition.name.label("position_name"), m.Department.name.label("department_name"),
+            m.Faculty.name.label("faculty_name"))
+            .join(m.LecturerProfile, m.LecturerProfile.id == m.PositionAssignment.lecturer_id)
+            .join(m.OrganizationalPosition, m.OrganizationalPosition.id == m.PositionAssignment.position_id)
+            .outerjoin(m.Department, m.Department.id == m.PositionAssignment.department_id)
+            .outerjoin(m.Faculty, m.Faculty.id == m.PositionAssignment.faculty_id)
+            .where(m.PositionAssignment.id.in_(ids["position_assignment"]))):
+        result["position_assignment", row.id] = f"{row.position_name} · {row.department_name or row.faculty_name} · {row.display_name}"
     for row in session.scalars(select(m.StudentProfile).where(m.StudentProfile.id.in_(ids["student_profile"]))):
         result["student_profile", row.id] = f"{row.student_code} · {row.display_name}"
     for row in session.execute(select(m.DocumentVersion.id, m.DocumentVersion.version_no, m.Document.title)

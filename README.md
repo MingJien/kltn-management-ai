@@ -39,4 +39,4 @@ Mở http://127.0.0.1:1573. Cấu hình và mật khẩu nằm trong `.env` cụ
     .\.venv\Scripts\python.exe -m tools.validate_official_database
     npm run build --prefix 'D:\KLTN\frontend'
 
-[Kiểm chứng NV6](docs/evidence/nv6-release-validation-2026-11-18.md) · [Hội đồng và bảo vệ](docs/design/nv6-defense-operations.md) · [Kho nội bộ và thống kê](docs/design/nv6-archive-reporting.md) · [Biểu mẫu](docs/design/defense-forms.md) · [AI thử nghiệm](docs/ai/prototype.md)
+[Kiểm chứng NV6](docs/evidence/nv6-release-validation-2026-11-18.md) · [Kiểm tra lại TC01–TC41](docs/evidence/nv6-retest-2026-11-28.md) · [Hội đồng và bảo vệ](docs/design/nv6-defense-operations.md) · [Kho nội bộ và thống kê](docs/design/nv6-archive-reporting.md) · [Biểu mẫu](docs/design/defense-forms.md) · [AI thử nghiệm](docs/ai/prototype.md)

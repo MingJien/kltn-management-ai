@@ -70,6 +70,11 @@ def test_academic_profile_before_schedule_uses_scope_and_revision(evaluation):
     assert client.get(endpoint, headers=hdr(users[0])).status_code == 404
     profile = client.get(endpoint, headers=hdr(users[4]))
     assert profile.status_code == 200, profile.text
+    summary_endpoint = f"/api/v1/nv6-reports/{thesis['round_id']}"
+    for params in ({}, {"department_id": str(student.department_id)}):
+        before = client.get(summary_endpoint, headers=hdr(users[4]), params=params)
+        assert before.status_code == 200
+        assert next(row for row in before.json()["rows"] if row["id"] == member)["class_name"] != "ĐHCNTT22A"
     data = {"class_name":"  ĐHCNTT22A ", "major_code":"SYN-CNTT", "training_cohort":"2022–2026",
             "birth_date":"2004-03-15", "source_reference":"Danh sách học vụ kiểm thử", "reason":"Đối chiếu thông tin học vụ"}
     headers = {**hdr(users[4]), "If-Match":profile.json()["revision"]}
@@ -77,9 +82,10 @@ def test_academic_profile_before_schedule_uses_scope_and_revision(evaluation):
     updated = client.put(endpoint, headers=headers, json=data)
     assert updated.status_code == 204, updated.text
     assert client.put(endpoint, headers=headers, json=data).status_code == 409
-    report = client.get(f"/api/v1/nv6-reports/{thesis['round_id']}",headers=hdr(users[4])).json()
-    row = next(row for row in report["rows"] if row["id"] == member)
-    assert row["class_name"] == "ĐHCNTT22A" and row["issues"] == []
+    for params in ({}, {"department_id": str(student.department_id)}):
+        report = client.get(summary_endpoint, headers=hdr(users[4]), params=params).json()
+        row = next(row for row in report["rows"] if row["id"] == member)
+        assert row["class_name"] == "ĐHCNTT22A" and row["issues"] == []
 
 
 def test_demo_council_accepts_head_and_newly_activated_guest(evaluation):
@@ -473,11 +479,16 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     old_marks=copy.deepcopy(record.marks)
     academic={"class_name":"ĐHCNTT22B","major_code":major_code,"birth_date":"2004-03-15",
         "training_cohort":"2022–2026","source_reference":"DS-TEST-2026","reason":"Correct class from verified student record"}
+    cached_report = f"/api/v1/nv6-reports/{thesis['round_id']}"
+    before_correction = client.get(cached_report,headers=hdr(users[4])).json()
+    assert next(row for row in before_correction["rows"] if row["id"]==first)["class_name"] != "ĐHCNTT22B"
     mutate("PUT","/academic-profile/"+first,users[5],academic,403)
     mutate("PUT","/academic-profile/"+first,users[4],{**academic,"major_code":"UNRELATED"},422)
     mutate("PUT","/academic-profile/"+first,users[4],{**academic,"birth_date":"2099-01-01"},422)
     mutate("PUT","/academic-profile/"+first,users[4],{**academic,"scores":[0]*12},422)
     mutate("PUT","/academic-profile/"+first,users[4],academic)
+    updated_report = client.get(cached_report,headers=hdr(users[4])).json()
+    assert next(row for row in updated_report["rows"] if row["id"]==first)["class_name"] == "ĐHCNTT22B"
     session.refresh(record)
     assert record.minutes["results_snapshot"]==snapshot and record.marks==old_marks
     corrected=client.get(register+"/forms/10",headers=hdr(users[4]))
@@ -592,7 +603,7 @@ def test_council_charts_marks_and_exports_use_one_frozen_record(evaluation, monk
     accepted=client.post(latest_archive+"/decision",headers={**hdr(users[4]),"If-Match":"1"},json={"decision":"ACCEPTED","reason":"Đã đối chiếu bản hoàn thiện"})
     assert accepted.status_code==204,accepted.text
     assert client.get(thesis_path, headers=hdr(users[0])).json()["state"] == "COMPLETED"
-    assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"NOT_SUBMITTED":1}
+    assert client.get(report_path,headers=hdr(users[4])).json()["archives"]=={"ACCEPTED":1}
     assert client.get(report_path,headers=hdr(users[4]),params={"refresh": True}).json()["archives"]=={"ACCEPTED":1}
     assert any("Đã đưa khóa luận vào kho nội bộ" in n["message"] and n["url"]=="/repository?focus="+thesis["thesis_id"]
                for n in archive_notices())

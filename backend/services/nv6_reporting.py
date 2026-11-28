@@ -17,7 +17,7 @@ from backend.services.theses import audit
 
 REPORT_CACHE_TTL_SECONDS = 15 * 60
 REPORT_CACHE_MAX_ENTRIES = 64
-_report_cache: OrderedDict[tuple[UUID, str, UUID, frozenset[UUID]], tuple[float, dict]] = OrderedDict()
+_report_cache: OrderedDict[tuple[UUID, str, UUID, frozenset[UUID]], tuple[float, int, dict]] = OrderedDict()
 _report_cache_lock = Lock()
 # Coalesce concurrent work for the same report without holding the cache lock during database I/O.
 _report_build_locks = tuple(Lock() for _ in range(16))
@@ -39,6 +39,11 @@ def scopes(session, user, *, round_id=None):
                 user.base_role == "ADMIN" or (round_.id, department.id) in managed)]
 
 
+def report_revision(session):
+    """Refresh all workers when a committed business operation writes its audit event."""
+    return session.scalar(select(func.count()).select_from(m.AuditEvent))
+
+
 def workspace(session, user, round_id, department_id, *, refresh=False):
     available = {scope["department_id"] for scope in scopes(session, user, round_id=round_id)}
     if not available or (department_id and department_id not in available):
@@ -47,18 +52,19 @@ def workspace(session, user, round_id, department_id, *, refresh=False):
     key = (user.id, user.base_role, round_id, frozenset(selected))
     requested_at = monotonic()
     with _report_build_locks[hash(key) % len(_report_build_locks)]:
+        revision = report_revision(session)
         with _report_cache_lock:
             cached = _report_cache.get(key)
             if cached:
-                generated_at, report = cached
-                if (monotonic() - generated_at < REPORT_CACHE_TTL_SECONDS
+                generated_at, cached_revision, report = cached
+                if (cached_revision == revision and monotonic() - generated_at < REPORT_CACHE_TTL_SECONDS
                         and (not refresh or generated_at > requested_at)):
                     _report_cache.move_to_end(key)
                     return report
 
         report = build_report(session, user, round_id, selected)
         with _report_cache_lock:
-            _report_cache[key] = (monotonic(), report)
+            _report_cache[key] = (monotonic(), revision, report)
             _report_cache.move_to_end(key)
             if len(_report_cache) > REPORT_CACHE_MAX_ENTRIES:
                 _report_cache.popitem(last=False)

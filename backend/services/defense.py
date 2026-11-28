@@ -902,7 +902,7 @@ def evidence_options(session,thesis_id):
     rows=session.execute(select(m.DocumentVersion,m.Document,m.StoredFile)
         .join(m.Document,m.Document.id==m.DocumentVersion.document_id)
         .join(m.StoredFile,m.StoredFile.id==m.DocumentVersion.stored_file_id)
-        .where(m.Document.thesis_id==thesis_id,m.Document.document_type.in_(["SUPPORTING"]),m.StoredFile.scan_state=="CLEAN",
+        .where(m.Document.thesis_id==thesis_id,m.Document.document_type.in_(["SUPPORTING"]),m.Document.state=="ACTIVE",m.StoredFile.scan_state=="CLEAN",
             m.DocumentVersion.id.in_(select(m.PublicationClaim.evidence_version_id).where(m.PublicationClaim.thesis_id==thesis_id,m.PublicationClaim.state=="APPROVED")))
         .order_by(m.DocumentVersion.created_at.desc())).all()
     return [{"id":v.id,"name":f"{d.title} · {f.original_name} · v{v.version_no}","filename":f.original_name} for v,d,f in rows]

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from backend.db.models import entities as m
 from backend.services.theses import now
 from test_core_workspace import workspace
+from test_nv6_evaluation import evaluation
 from test_registration import hdr, scenario
 
 
@@ -93,3 +94,73 @@ def test_account_reason_is_retrievable_after_admin_action(scenario):
     assert history["items"][0]["action"] == "ACCOUNT_LOCKED"
     assert history["items"][0]["reason"] == "Faculty confirmed temporary suspension"
     assert session.scalar(select(m.AuditEvent.id).where(m.AuditEvent.action == "ACCOUNT_LOCKED"))
+
+
+def test_publication_history_visible_only_to_the_thesis_team(evaluation):
+    from test_publication_claims import proof, payload
+
+    ctx, _ = evaluation
+    client, users, _, _, session, path = ctx
+    evidence = proof(ctx)
+    response = client.post(path + '/publication-claims', headers=hdr(users[0]), json=payload(ctx, evidence))
+    assert response.status_code == 201, response.text
+    claim = response.json()
+    response = client.post(path + '/publication-claims/' + claim['id'] + '/decision',
+        headers={**hdr(users[3]), 'If-Match': '1'},
+        json={'outcome': 'CONFIRM', 'reason': 'Verified publication contribution'})
+    assert response.status_code == 200, response.text
+
+    params = {'resource_type': 'publication_claim', 'resource_id': claim['id']}
+    for user in (users[0], users[1], users[3], users[4]):
+        history = client.get('/api/v1/activity', headers=hdr(user), params=params)
+        assert history.status_code == 200, history.text
+        assert {item['action'] for item in history.json()['items']} == {'PUBLICATION_SUBMITTED', 'PUBLICATION_ADVISOR_CONFIRMED'}
+    for user in (users[2], users[5]):
+        history = client.get('/api/v1/activity', headers=hdr(user), params=params)
+        assert history.status_code == 200 and history.json()['total'] == 0
+
+
+def test_faculty_level_assignment_has_a_readable_history_label(scenario):
+    client, users, _, lecturers, topic, session = scenario
+    position = session.scalar(select(m.OrganizationalPosition).where(m.OrganizationalPosition.code == 'FACULTY_DEAN'))
+    if not position:
+        position = m.OrganizationalPosition(id=uuid4(), code='FACULTY_DEAN', name='Trưởng khoa')
+        session.add(position)
+        session.flush()
+    department = session.get(m.Department, topic.department_id)
+    faculty = session.get(m.Faculty, department.faculty_id)
+    assignment = m.PositionAssignment(id=uuid4(), lecturer_id=lecturers[2].id,
+        position_id=position.id, faculty_id=faculty.id, state='ACTIVE', effective_from=now()-timedelta(days=1))
+    session.add(assignment)
+    session.flush()
+    add_event(session, users[3], 'position_assignment', assignment.id, 'POSITION_ASSIGNED', 'Faculty appointment')
+    session.commit()
+    response = client.get('/api/v1/activity', headers=hdr(users[5]), params={'resource_type': 'position_assignment', 'resource_id': str(assignment.id)})
+    assert response.status_code == 200 and response.json()['total'] == 1
+    label = response.json()['items'][0]['resource_label']
+    assert faculty.name in label and position.name in label and lecturers[2].display_name in label
+
+
+def test_archive_history_follows_archive_permissions(workspace):
+    client, users, _, _, session, path = workspace
+    thesis = session.get(m.Thesis, UUID(path.rsplit('/', 1)[1]))
+    thesis.state = 'DEFENDED'
+    file = m.StoredFile(id=uuid4(), storage_key='audit-' + uuid4().hex, original_name='demo.pdf',
+        media_type='application/pdf', byte_size=1, sha256='0'*64, scan_state='CLEAN')
+    session.add(file)
+    session.flush()
+    version = m.ThesisArchiveVersion(id=uuid4(), thesis_id=thesis.id, file_id=file.id,
+        submitted_by=users[0].id, version_no=1, state='SUBMITTED', snapshot={})
+    session.add(version)
+    session.flush()
+    add_event(session, users[4], 'thesis_archive_version', version.id, 'THESIS_ARCHIVE_REOPENED', 'Synthetic review')
+    session.add(m.ResourceAssignment(id=uuid4(), user_id=users[5].id, round_id=thesis.round_id,
+        assignment_type='KLTN_COORDINATOR', state='ACTIVE', effective_from=now()-timedelta(days=1)))
+    session.commit()
+    params = {'resource_type': 'thesis_archive_version', 'resource_id': str(version.id)}
+    for user in (users[0], users[1], users[3], users[4], users[5]):
+        response = client.get('/api/v1/activity', headers=hdr(user), params=params)
+        assert response.status_code == 200 and response.json()['total'] == 1, response.text
+        assert thesis.current_title in response.json()['items'][0]['resource_label']
+    response = client.get('/api/v1/activity', headers=hdr(users[2]), params=params)
+    assert response.status_code == 200 and response.json()['total'] == 0

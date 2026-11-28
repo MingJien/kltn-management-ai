@@ -97,6 +97,7 @@ def main() -> int:
             AUTH_SESSION_SECRET=secrets.token_urlsafe(48), PYTHONIOENCODING='utf-8',
             KLTN_ALLOW_SYNTHETIC_SEED='true', KLTN_PROPOSAL_DIR=str(directory / 'uploads' / 'proposals'),
             KLTN_DOCUMENT_DIR=str(directory / 'uploads' / 'documents'),
+            KLTN_E2E_PYTHON=sys.executable,
             KLTN_FRONTEND_URL=f'http://127.0.0.1:{web_port}', VITE_API_URL=f'http://127.0.0.1:{api_port}',
             KLTN_E2E_API_PORT=str(api_port), KLTN_E2E_WEB_PORT=str(web_port),
             KLTN_EVIDENCE_DIR=str(directory / 'uploads' / 'registration'), KLTN_E2E_RUN_DIR=str(directory),
@@ -161,6 +162,28 @@ def main() -> int:
         writer.write(synthetic_pdf)
         env['KLTN_E2E_NV6_FILE'] = str(synthetic_pdf)
         specs = {Path(arg).name for arg in sys.argv[1:]}
+        if "ai-report-live.spec.ts" in specs:
+            from tools.e2e_ai_fixture import add_report_pair
+            with Session(private_engine) as session, session.begin():
+                assert session.scalar(text('select current_schema()')) == schema
+                add_report_pair(session, datetime.now(timezone.utc))
+            private_engine.dispose()
+        if specs & {"defense-live.spec.ts", "defense-absence-live.spec.ts", "defense-batch-live.spec.ts"}:
+            from tools.e2e_defense_fixture import add_ready_thesis
+            with Session(private_engine) as session, session.begin():
+                assert session.scalar(text('select current_schema()')) == schema
+                instant = datetime.now(timezone.utc)
+                thesis_id = add_ready_thesis(session, instant, synthetic_pdf.read_bytes(), accounts)
+                env['KLTN_E2E_DEFENSE_THESIS'] = str(thesis_id)
+                if "defense-absence-live.spec.ts" in specs:
+                    from tools.e2e_absence_fixture import add_second_member
+                    add_second_member(session, instant, thesis_id)
+                if "defense-batch-live.spec.ts" in specs:
+                    from tools.e2e_batch_fixture import add_second_thesis
+                    env['KLTN_E2E_DEFENSE_SECOND_THESIS'] = str(add_second_thesis(
+                        session, instant, synthetic_pdf.read_bytes()))
+            env['KLTN_E2E_ACCOUNTS_JSON'] = json.dumps(accounts)
+            private_engine.dispose()
         if specs & {"archive-live.spec.ts", "mobile-layout.spec.ts"}:
             from tools.e2e_archive_fixture import add_defended_thesis
             with Session(private_engine) as session, session.begin():

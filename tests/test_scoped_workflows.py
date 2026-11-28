@@ -70,6 +70,26 @@ def test_declined_or_expired_extension_does_not_cancel_participation(workspace,m
     session.refresh(thesis);assert thesis.state=='ACTIVE'
     assert not session.scalar(select(m.ThesisExtension.id).where(m.ThesisExtension.thesis_id==thesis.id))
 
+
+def test_listing_unexpired_extension_does_not_take_write_locks(workspace):
+    from sqlalchemy import event
+    client, users, _, _, session, _ = workspace
+    item, _ = extension_request(workspace)
+    statements = []
+
+    def record_sql(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement.upper())
+
+    event.listen(session.bind, 'before_cursor_execute', record_sql)
+    try:
+        response = client.get('/api/v1/thesis-changes', headers=hdr(users[0]))
+    finally:
+        event.remove(session.bind, 'before_cursor_execute', record_sql)
+    assert response.status_code == 200
+    assert any(row['id'] == item['id'] for row in response.json()['extension_requests'])
+    assert any('THESIS_EXTENSION_REQUEST' in statement for statement in statements)
+    assert not any('FOR UPDATE' in statement for statement in statements)
+
 def split(ctx,finalize=True):
     client,users,_,lecturers,session,path=ctx
     original=session.get(m.Thesis,UUID(path.split('/')[-1]))

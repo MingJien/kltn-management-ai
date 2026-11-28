@@ -8,6 +8,23 @@ import pytest
 from backend.services.report_similarity import extract, ocr_command, text_matches
 
 
+def test_missing_ocr_language_does_not_count_as_success(monkeypatch):
+    from io import BytesIO
+    from types import SimpleNamespace
+    from backend.services.report_similarity import image_section
+
+    image = Image.new('RGB', (100, 100), 'white')
+    content = BytesIO()
+    image.save(content, format='PNG')
+    monkeypatch.setattr('backend.services.report_similarity.subprocess.run', lambda *args, **kwargs:
+        SimpleNamespace(stdout=b'misleading output', stderr=b"Failed loading language 'vie'"))
+    output = {'text': [], 'images': [], 'warnings': set(), 'images_seen': 0, 'images_ocr': 0}
+    image_section(content.getvalue(), 'scan', output, ['tesseract'], monotonic()+5)
+    assert output['images_ocr'] == 0
+    assert output['text'] == []
+    assert any('thiếu dữ liệu ngôn ngữ' in warning for warning in output['warnings'])
+
+
 def test_pdf_scan_matches_text_and_embedded_image_in_another_report(tmp_path):
     command = ocr_command()
     if not command:

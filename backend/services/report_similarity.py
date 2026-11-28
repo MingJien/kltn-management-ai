@@ -97,6 +97,12 @@ def image_section(raw, label, output, command, deadline):
             image.save(buffer,format="PNG")
             result = subprocess.run(command,input=buffer.getvalue(),capture_output=True,check=True,
                 timeout=min(5,remaining),creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            # Tesseract can exit 0 while silently falling back to another language.
+            # Do not report Vietnamese OCR as successful when a requested model is missing.
+            stderr = result.stderr.decode("utf-8", errors="replace").lower()
+            if "failed loading language" in stderr or "error opening data file" in stderr:
+                output["warnings"].add("OCR thiếu dữ liệu ngôn ngữ đã cấu hình; chưa dùng chữ nhận dạng từ ảnh")
+                return
             text = result.stdout.decode("utf-8",errors="replace").strip()
             output["images_ocr"] += 1
             if text:

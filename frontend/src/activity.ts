@@ -22,6 +22,9 @@ const actions: Record<string, string> = {
   PUBLICATION_CLAIM_SUBMITTED:"Nộp minh chứng công bố khoa học", PUBLICATION_CLAIM_CONFIRMED:"GVHD xác nhận minh chứng công bố",
   PUBLICATION_CLAIM_APPROVED:"TBM duyệt điểm thưởng công bố", PUBLICATION_CLAIM_REJECTED:"TBM không duyệt điểm thưởng công bố",
   PUBLICATION_CLAIM_REVISION_REQUIRED:"Yêu cầu bổ sung minh chứng công bố",
+  PUBLICATION_SUBMITTED:"Nộp minh chứng công bố khoa học", PUBLICATION_ADVISOR_CONFIRMED:"GVHD xác nhận minh chứng công bố",
+  PUBLICATION_APPROVED:"TBM duyệt điểm thưởng công bố", PUBLICATION_REJECTED:"TBM không duyệt điểm thưởng công bố",
+  PUBLICATION_REVISION_REQUIRED:"Yêu cầu bổ sung minh chứng công bố",
   ROUND_MAU04_EXPORTED:"Xuất danh sách theo Mẫu 4",
   THESIS_CREATED_FROM_TOPIC_CHANGE:"Khởi tạo khóa luận từ tách nhóm / đổi đề tài",
 

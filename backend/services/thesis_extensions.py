@@ -250,7 +250,12 @@ def listing(session,user,thesis_ids):
     items=[];changed=False
     for item in session.scalars(query.order_by(m.ThesisExtensionRequest.submitted_at.desc()).execution_options(populate_existing=True)):
         if not can_see(session,user,item):continue
-        if item.state not in {"SUBMITTED", "APPROVED"}:
+        extension = session.get(m.ThesisExtension, item.extension_id) if item.state == "APPROVED" and item.extension_id else None
+        # Ordinary reads do not lock active requests. Keep the locked, immediate
+        # expiry check only for requests whose actual deadline has passed.
+        due_for_expiry = (item.state == "SUBMITTED" and item.consent_due_at is not None and item.consent_due_at <= c.now()) or (
+            item.state == "APPROVED" and extension is not None and extension.until_at < c.now())
+        if not due_for_expiry:
             items.append(output(session,user,item))
             continue
         session.scalar(select(m.Thesis.id).where(m.Thesis.id == item.thesis_id).with_for_update())
