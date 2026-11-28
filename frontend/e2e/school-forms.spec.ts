@@ -1,4 +1,5 @@
 import {test, expect, type Page} from "@playwright/test";
+import {readFile} from "node:fs/promises";
 import path from "node:path";
 import JSZip from "jszip";
 
@@ -46,10 +47,41 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
  try {
   const admin=await login("admin"),manager=await login("tbm"),sv=await login("formStudent"),gv=await login("gv2");
   const round=(await read(manager,"/rounds/open"))[0],managerId=(await read(manager,"/me/context")).user_id;
+  const originalSources = await read(admin, `/school-forms/rounds/${round.id}/sources`);
+  expect(originalSources.some((source: {id:string}) => source.id === "hop-hoi-dong")).toBe(false);
+  expect((await post(admin, "/school-forms", {
+    round_id:round.id, code:"don-xin-thoi", title:"Đơn xin thôi thực hiện KLTN", document_kind:"FORM",
+    audience:"STUDENT_AND_LECTURER", reason:"Synthetic existing withdrawal catalog entry",
+  })).status()).toBe(201);
+  await admin.goto(web+`/forms?round_id=${round.id}`);
+  const adminRows = admin.getByRole("region", {name:"Danh mục biểu mẫu Khoa"}).locator("tbody tr");
+  await expect(adminRows).toHaveCount(originalSources.length);
+  await expect(adminRows.getByText("mau 2.Ke hoach thuc hien cua SV.docx", {exact:true})).toBeVisible();
+  const withdrawalRow=adminRows.filter({hasText:"Đơn xin thôi thực hiện KLTN"});
+  await expect(withdrawalRow).toHaveCount(1);
+  await expect(withdrawalRow.getByText("Don_xin_thoi_thuc_hien_KLTN.docx", {exact:true})).toBeVisible();
+  await expect(withdrawalRow.getByRole("button", {name:"Lịch sử phiên bản",exact:true})).toBeVisible();
+  const desktopViewport = admin.viewportSize();
+  for (const source of originalSources.filter((row: {id:string}) => ["mau-02", "mau-04", "don-xin-thoi"].includes(row.id))) {
+    if (source.id === "mau-04") await admin.setViewportSize({width:390,height:900});
+    const previewUrl = `**/school-forms/rounds/${round.id}/sources/${source.id}/preview`;
+    await admin.route(previewUrl, route=>route.fulfill({contentType:"application/pdf",body:syntheticPdf(),headers:{
+      "Access-Control-Allow-Origin":web,"Access-Control-Allow-Credentials":"true",
+    }}));
+    await admin.getByRole("button", {name:`Xem tệp nguồn ${source.title}`,exact:true}).click();
+    const preview=admin.getByRole("dialog", {name:"Xem tài liệu Khoa"});
+    await expect(preview.getByLabel("Nội dung PDF trang 1", {exact:true})).toBeVisible();
+    await preview.getByRole("button", {name:"Trang sau của tài liệu",exact:true}).click();
+    await expect(preview.getByLabel("Nội dung PDF trang 2", {exact:true})).toBeVisible();
+    await expect(preview.getByRole("button", {name:"Tải tệp gốc",exact:true})).toBeEnabled();
+    await preview.getByRole("button", {name:"Quay lại",exact:true}).click();
+    await admin.unroute(previewUrl);
+  }
+  if (desktopViewport) await admin.setViewportSize(desktopViewport);
   await manager.goto(web+"/forms");await expect(manager.getByText("Thêm biểu mẫu hoặc tài liệu công bố",{exact:true})).toHaveCount(0);
   expect((await post(manager,"/school-forms",{round_id:round.id,code:"test-no-right",title:"No assignment",document_kind:"FORM",audience:"LECTURER",reason:"Synthetic denied attempt"})).status()).toBe(403);
   await admin.goto(web+"/administration/assignments");
-  const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
+  const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Giao nhiệm vụ theo đợt",exact:true})});
   await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
   await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("FORM_MANAGER");
   await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(managerId);
@@ -59,10 +91,19 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await manager.bringToFront();await manager.evaluate(()=>window.dispatchEvent(new Event("focus")));
   await expect(manager.getByRole("link",{name:"Quản lý kho biểu mẫu Khoa",exact:true})).toBeVisible();
   await manager.reload();
-  await manager.getByText("Bổ sung bộ mẫu gốc Khoa cung cấp",{exact:true}).click();
+  const managerRows = manager.getByRole("region", {name:"Danh mục biểu mẫu Khoa"}).locator("tbody tr");
+  await expect(managerRows).toHaveCount(originalSources.length);
+  const originalPlan = managerRows.filter({hasText:"Mẫu 2 - Kế hoạch thực hiện của SV"});
+  await expect(originalPlan.getByText("Tệp nguồn của Khoa", {exact:true})).toBeVisible();
+  const sourceDownload = manager.waitForEvent("download");
+  await originalPlan.getByRole("button",{name:"Tải tệp nguồn Mẫu 2 - Kế hoạch thực hiện của SV",exact:true}).click();
+  expect((await sourceDownload).suggestedFilename()).toBe("mau 2.Ke hoach thuc hien cua SV.docx");
+  await manager.getByText("Bổ sung mẫu nguồn vào đợt",{exact:true}).click();
   await manager.getByLabel("Tôi đã đối chiếu bộ mẫu nguồn được Khoa chấp thuận.",{exact:true}).check();
   await manager.getByRole("button",{name:"Bổ sung các mẫu còn thiếu",exact:true}).click();
-  await expect(manager.locator(".table-container table tbody tr")).toHaveCount(12,{timeout:300000});
+  await expect(manager.getByRole("status").filter({hasText:"Đã bổ sung các mẫu gốc sẵn có"})).toBeVisible({timeout:300000});
+  await expect(managerRows).toHaveCount(originalSources.length);
+  await expect(originalPlan.getByRole("button",{name:"Lịch sử phiên bản",exact:true})).toBeVisible();
   await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
   await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption(managerId);
   await assignment.getByLabel("Căn cứ phân công",{exact:true}).fill("Khoa giao điều phối đợt DEMO");
@@ -77,20 +118,26 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await expect(admin.getByText("Đợt này chưa có sinh viên đang thực hiện khóa luận.",{exact:false})).toBeVisible();
   await expect(admin.getByRole("button",{name:"Xuất danh sách đã điền theo Mẫu 4",exact:true})).toBeDisabled();
   await manager.goto(web+`/forms?round_id=${round.id}`);
-  await sv.goto(web+`/forms?round_id=${round.id}`);await expect(sv.locator(".table-container table tbody tr")).toHaveCount(6);
+  const roundForms = `/forms?round_id=${round.id}`;
+  await sv.goto(web+roundForms);
+  await expect(sv.getByRole("heading",{name:"Tài liệu Khoa công bố",exact:true})).toBeVisible();
+  await expect(sv.getByRole("heading",{name:"Chưa có tài liệu trong phạm vi này",exact:true})).toBeVisible();
+  await gv.goto(web+roundForms);
+  await expect(gv.getByRole("heading",{name:"Chưa có tài liệu trong phạm vi này",exact:true})).toBeVisible();
+  const catalog = await read(manager,`/school-forms?round_id=${round.id}`);
+  const planForm = catalog.find((item:any)=>item.code==="mau-02");
+  await sv.goto(web+roundForms+`&form_id=${planForm.id}`);
+  await expect(sv.locator(".table-container table tbody tr")).toHaveCount(1);
   const directRow=sv.locator(".table-container table tbody tr").filter({hasText:"Mẫu 2 - Kế hoạch thực hiện của SV"});
   await expect(directRow.locator("td").nth(5)).toHaveCSS("white-space","nowrap");
   const studentActionsWidth=await directRow.locator("td").nth(5).evaluate(node=>node.getBoundingClientRect().width);
   expect(studentActionsWidth).toBeLessThan(195);
-  await directRow.getByRole("button",{name:"Xem trực tiếp",exact:true}).click();
-  await expect(sv.getByRole("dialog",{name:"Xem tài liệu Khoa"})).toBeVisible();
-  await sv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
+  await expect(directRow.getByRole("button",{name:"Xem trực tiếp",exact:true})).toHaveCount(0);
   const directDownload=sv.waitForEvent("download");
-  await directRow.getByRole("button",{name:"Tải xuống",exact:true}).click();
+  await directRow.getByRole("button",{name:"Tải tệp gốc",exact:true}).click();
   expect((await directDownload).suggestedFilename()).toMatch(/\.docx$/i);
   expect((await read(sv,"/theses")).length).toBe(0); // Forms work before a thesis exists.
-  await gv.goto(web+`/forms?round_id=${round.id}`);await expect(gv.locator(".table-container table tbody tr")).toHaveCount(12);
-  const lecturerForm=(await read(manager,`/school-forms?round_id=${round.id}`)).find((item:any)=>item.code==="mau-06");
+  const lecturerForm=catalog.find((item:any)=>item.code==="mau-06");
   expect((await sv.request.get(api+`/school-forms/${lecturerForm.id}/versions/${lecturerForm.versions[0].id}/download`)).status()).toBe(404);
   const title="Mẫu 2 - Kế hoạch thực hiện của SV";
   const card=(page:Page)=>page.locator(".school-form-card").filter({has:page.getByRole("heading",{name:title,exact:true})});
@@ -99,7 +146,7 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   const managerRow=manager.locator(".table-container table tbody tr").filter({hasText:title});
   await expect(managerRow.locator("td").nth(5)).toHaveCSS("white-space","nowrap");
   const managerActionsWidth=await managerRow.locator("td").nth(5).evaluate(node=>node.getBoundingClientRect().width);
-  expect(managerActionsWidth).toBeLessThan(205);
+  expect(managerActionsWidth).toBeLessThan(240);
   await managerRow.getByRole("button",{name:"Cập nhật tệp",exact:true}).click();
   await card(manager).getByLabel("Lý do thao tác / cập nhật phiên bản",{exact:true}).fill("Khoa điều chỉnh Mẫu 2 theo góp ý DEMO");
   await card(manager).getByLabel("Nguồn / văn bản áp dụng",{exact:true}).fill("Thông báo Khoa DEMO 28/10");
@@ -130,9 +177,11 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await sv.getByRole("button",{name:"Làm mới kho",exact:true}).click();
   await choose(sv,"Danh sách SV đã chốt DEMO");
   const studentList=sv.locator(".school-form-card").filter({has:sv.getByRole("heading",{name:"Danh sách SV đã chốt DEMO",exact:true})});
-  await studentList.getByRole("button",{name:"Xem trực tiếp",exact:true}).click();await expect(sv.getByRole("dialog").getByRole("cell",{name:"000123",exact:true})).toBeVisible();
+  await expect(studentList.getByRole("button",{name:"Xem trực tiếp",exact:true})).toHaveCount(0);
+  const excelDownload=sv.waitForEvent("download");
+  await studentList.getByRole("button",{name:"Tải tệp v1",exact:true}).click();
+  expect(await readFile(await (await excelDownload).path())).toEqual(xlsx);
   await sv.screenshot({path:path.join(process.env.KLTN_E2E_RUN_DIR!,"school-publication-excel.png")});
-  await sv.getByRole("dialog").getByRole("button",{name:"Quay lại",exact:true}).click();
   expect((await read(admin,"/admin/users/directory?search=000123&limit=10")).total).toBe(0);
   // No publication leak to a different, not-yet-enrolled round, including direct URLs.
   let response=await post(admin,"/admin/rounds",{academic_year_code:"2031-2032",year_starts_on:"2031-08-01",year_ends_on:"2032-07-31",code:"OTHER-DEMO",round_type:"MAIN",opens_at:"2031-08-15T00:00:00Z",closes_at:"2031-08-31T00:00:00Z",basis_ref:"Synthetic second round"});
@@ -182,16 +231,17 @@ test("Kho mẫu động: Admin cấp quyền, TBM cập nhật/phát hành, SV/G
   await expect(manager.getByRole("link",{name:"Quản lý kho biểu mẫu Khoa",exact:true})).toHaveCount(0);
   await expect(manager.getByText("Thêm biểu mẫu hoặc tài liệu công bố",{exact:true})).toHaveCount(0);
   // Both roster duties and student account management expose only their matching menu.
-  for (const [kind,label] of [["ELIGIBILITY_IMPORTER","Danh sách sinh viên"],["ELIGIBILITY_VERIFIER","Danh sách sinh viên"],["ACCOUNT_MANAGER","Tài khoản"]]) {
+  for (const [kind,label] of [["ELIGIBILITY_IMPORTER","Danh sách sinh viên"],["ELIGIBILITY_VERIFIER","Danh sách sinh viên"],["ACCOUNT_MANAGER","Quản lý tài khoản"]]) {
     const grant=await post(admin,"/admin/round-assignments",{round_id:round.id,user_id:managerId,assignment_type:kind,basis_ref:"Synthetic navigation permission check"});expect(grant.status()).toBe(201);
     const granted=await grant.json();
+    const link=manager.getByRole("navigation",{name:"Chức năng"}).getByRole("link",{name:label,exact:true});
     await manager.bringToFront();await manager.evaluate(()=>window.dispatchEvent(new Event("focus")));
-    await expect(manager.getByRole("link",{name:label,exact:true})).toBeVisible();
-    await manager.getByRole("link",{name:label,exact:true}).click();
+    await expect(link).toBeVisible();
+    await link.click();
     await expect(manager.getByRole("heading",{name:kind==="ACCOUNT_MANAGER"?"Tài khoản sinh viên theo đợt":"Danh sách đủ điều kiện",exact:false}).first()).toBeVisible();
     expect((await post(admin,`/admin/round-assignments/${granted.assignment_id}/revoke`,{reason:"End synthetic menu check"})).status()).toBe(204);
     await manager.bringToFront();await manager.evaluate(()=>window.dispatchEvent(new Event("focus")));
-    await expect(manager.getByRole("link",{name:label,exact:true})).toHaveCount(0);
+    await expect(link).toHaveCount(0);
   }
  } finally {for(const actor of actors)await actor.context.close();}
 });

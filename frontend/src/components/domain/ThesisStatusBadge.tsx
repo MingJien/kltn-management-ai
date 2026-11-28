@@ -1,7 +1,7 @@
+import Badge, { type BadgeVariant } from "../ui/Badge";
 import { stateLabel } from "./stateLabels";
 
-type BadgeVariant = "info" | "warning" | "success" | "danger" | "neutral" | "primary";
-
+/** Preserves E2E-verified registration & status wording while eliminating shadowed mismatches. */
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Bản nháp",
   SUBMITTED: "Đã gửi",
@@ -18,56 +18,87 @@ const STATUS_LABEL: Record<string, string> = {
   DECLINED: "Không tham gia",
 };
 
+/** Semantic Academic Blue mapping:
+ *  - neutral: Draft / Queued / Locked / Print Ready / Disabled / Ended
+ *  - info: Normal active progress / In-flight / Retrieved / Extended
+ *  - warning: Needs review or user revision (Submitted / Under review / Returned / Revision required / Pending)
+ *  - success: Approved / Accepted / Finalized / Completed / Clean / Eligible
+ *  - danger: Rejected / Cancelled / Withdrawn / Failed / Blocked / Void / Infected
+ */
 const STATE_VARIANT: Record<string, BadgeVariant> = {
-  DRAFT: "info",
-  SUBMITTED: "warning",
-  UNDER_REVIEW: "warning",
-  LECTURER_ACCEPTED: "warning",
-  LECTURER_REJECTED: "danger",
-  RETURNED: "info",
-  APPROVED: "success",
-  FINALIZED: "success",
-  CANCELLED: "danger",
-  REJECTED: "danger",
-  ADVISOR_CONFIRMED: "success",
-  DEPARTMENT_FINALIZED: "success",
-  PRINT_READY: "neutral",
-  DEAN_CONFIRMED: "success",
-  SIGNED: "success",
-  VOID: "danger",
-  IN_PROGRESS: "warning",
-  ACTIVE: "primary",
-  COMPLETED: "success",
+  DRAFT: "neutral",
   QUEUED: "neutral",
-  RUNNING: "warning",
-  FAILED: "danger",
-  NO_EVIDENCE: "neutral",
-  RETRIEVAL_ONLY: "info",
-  ANSWERED: "success",
-  ACCEPTED: "success",
-  PENDING: "warning",
-  DECLINED: "danger",
-  REVISION_REQUIRED: "warning",
-  REVISION_REQUESTED: "warning",
-  OPEN: "success",
-  CLOSED: "neutral",
-  CONFIRMED: "success",
-  PROPOSAL_APPROVED: "success",
-  EXTENDED: "info",
-  READY_FOR_DEFENSE: "info",
-  DEFENDED: "success",
-  ARCHIVED: "neutral",
-  WITHDRAWN: "danger",
-  REVOKED: "danger",
-  FINAL: "success",
-  SUPERSEDED: "neutral",
+  PRINT_READY: "neutral",
   LOCKED: "neutral",
-  DISABLED: "neutral",
-  ENDED: "neutral",
+  NOT_CHECKED: "neutral",
+  UNKNOWN: "neutral",
+
+  CLOSED: "muted",
+  ARCHIVED: "muted",
+  SUPERSEDED: "muted",
+  DISABLED: "muted",
+  ENDED: "muted",
+  NO_EVIDENCE: "muted",
+  EXPIRED: "muted",
+  NOT_GRANTED: "muted",
+
+  ACTIVE: "info",
+  IN_PROGRESS: "info",
+  LECTURER_ACCEPTED: "info",
+  READY_FOR_DEFENSE: "info",
+  EXTENDED: "info",
+  RUNNING: "info",
+  RETRIEVAL_ONLY: "info",
   COMMENT_ONLY: "info",
   COMMENT: "info",
   CONFIRM: "info",
+  ADVISOR_REVIEWED: "info",
+  RECORDED: "info",
+
+  SUBMITTED: "warning",
+  UNDER_REVIEW: "warning",
+  PENDING: "warning",
+  PENDING_ACTIVATION: "warning",
+  RETURNED: "warning",
+  REVISION_REQUIRED: "warning",
+  REVISION_REQUESTED: "warning",
+  REOPENED: "warning",
+  STALE: "warning",
+  QUARANTINED: "warning",
+  WARNING_OR_HIGHER: "warning",
+
+  APPROVED: "success",
+  FINALIZED: "success",
+  ADVISOR_CONFIRMED: "success",
+  DEPARTMENT_FINALIZED: "success",
+  DEAN_CONFIRMED: "success",
+  SIGNED: "success",
+  ANSWERED: "success",
+  ACCEPTED: "success",
+  OPEN: "success",
+  PUBLISHED: "success",
+  CONFIRMED: "success",
+  PROPOSAL_APPROVED: "success",
+  DEFENDED: "success",
+  COMPLETED: "success",
+  FINAL: "success",
   ACCEPT: "success",
+  ELIGIBLE: "success",
+  CLEAN: "success",
+  CLEAR: "success",
+  AGREE: "success",
+
+  LECTURER_REJECTED: "danger",
+  CANCELLED: "danger",
+  REJECTED: "danger",
+  VOID: "danger",
+  FAILED: "danger",
+  DECLINED: "danger",
+  WITHDRAWN: "danger",
+  REVOKED: "danger",
+  BLOCKED: "danger",
+  INFECTED: "danger",
+  DECLINE: "danger",
 };
 
 interface ThesisStatusBadgeProps {
@@ -84,12 +115,10 @@ export default function ThesisStatusBadge({
   label,
 }: ThesisStatusBadgeProps) {
   const variant = STATE_VARIANT[state] || "neutral";
-  const classes = ["badge", "badge-" + variant, className].filter(Boolean).join(" ");
-
+  const text = label || STATUS_LABEL[state] || stateLabel[state] || state;
   return (
-    <span className={classes}>
-      {showIcon ? <span className={"status-dot status-dot--" + variant} aria-hidden="true" /> : null}
-      {label || STATUS_LABEL[state] || stateLabel[state] || state}
-    </span>
+    <Badge variant={variant} dot={showIcon} className={className}>
+      {text}
+    </Badge>
   );
 }

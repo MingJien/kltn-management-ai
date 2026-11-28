@@ -1,11 +1,15 @@
 import {useCallback,useEffect,useState} from "react";
 import {Link,useSearchParams} from "react-router-dom";
-import {Eye,FileSpreadsheet,GraduationCap,PenLine,RefreshCw,Search,ShieldCheck,UserPlus} from "lucide-react";
+import {ChevronLeft,ChevronRight,Eye,FileSpreadsheet,GraduationCap,PenLine,RefreshCw,ShieldCheck,UserPlus} from "lucide-react";
 import {request,type Context} from "../api";
 import {errorMessage} from "../errors";
 import {degreeLabels,profileMutation,type Directory,type LecturerProfile} from "../lecturerProfiles";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import FilterBar, {type FilterChip} from "../components/ui/FilterBar";
+import EmptyState from "../components/ui/EmptyState";
+import {SkeletonTable} from "../components/ui/Skeleton";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import LecturerImport from "../components/domain/LecturerImport";
 import LecturerAvatar from "../components/domain/LecturerAvatar";
 import LecturerProfileLink,{LecturerProfileDialog} from "../components/domain/LecturerProfileDialog";
@@ -19,30 +23,56 @@ export default function LecturerDirectoryPage({context}:{context:Context}) {
   const load=useCallback(async(signal?:AbortSignal)=>{const result=await request<Directory>(`/lecturer-directory?q=${encodeURIComponent(query)}&offset=${offset}${department?`&department_id=${department}`:""}${status?`&status=${status}`:""}`,context.user_id,{signal});if(!signal?.aborted)setData(result);},[context.user_id,query,offset,department,status]);
   useEffect(()=>{const c=new AbortController();setLoading(true);setError("");const timer=setTimeout(()=>void load(c.signal).catch(e=>{if(!c.signal.aborted)setError(errorMessage(e));}).finally(()=>{if(!c.signal.aborted)setLoading(false);}),200);return()=>{clearTimeout(timer);c.abort();};},[load,revision]);
   async function edit(id:string){setError("");try{setIdentity(await request<LecturerProfile>(`/lecturer-profiles/${id}`,context.user_id));}catch(e){setError(errorMessage(e));}}
-  return <div className="lecturer-page"><PageHeader title="Danh sách giảng viên" description={admin?"Quản lý định danh, tài khoản và tra cứu hồ sơ chuyên môn đã được duyệt.":"Tra cứu giảng viên, lĩnh vực chuyên môn và thông tin liên hệ đã được Khoa duyệt."}>
+  const lecturerChips: FilterChip[] = [
+    ...(query.trim() ? [{key:"q",label:`Từ khóa: "${query.trim()}"`,onRemove:()=>{setQuery("");setOffset(0);}}] : []),
+    ...(department ? [{key:"dept",label:`Bộ môn: ${data.departments.find(d=>d.id===department)?.name||department}`,onRemove:()=>{setDepartment("");setOffset(0);}}] : []),
+    ...(status ? [{key:"status",label:`Tài khoản: ${({ACTIVE:"Đang hoạt động",LOCKED:"Đang khóa",DISABLED:"Ngừng hoạt động"} as Record<string,string>)[status]||status}`,onRemove:()=>{setStatus("");setOffset(0);}}] : []),
+  ];
+
+  return <div className="lecturer-page"><PageHeader title="Danh sách giảng viên" description={admin?"Quản lý định danh, tài khoản và tra cứu hồ sơ giảng viên.":"Tra cứu giảng viên, chuyên môn và thông tin liên hệ đã duyệt."}>
     {context.actions.includes("lecturer:profile_review")&&<Link className="btn btn-primary" to="/lecturer-profile-reviews"><ShieldCheck size={16} aria-hidden="true"/>Duyệt hồ sơ GV</Link>}
     {admin&&<Link className="btn btn-primary" to="/administration"><UserPlus size={16} aria-hidden="true"/>Mời GV / quản lý tài khoản</Link>}
     <button className="btn btn-secondary" disabled={loading} onClick={()=>setRevision(x=>x+1)}><RefreshCw size={16} aria-hidden="true"/>Làm mới danh sách</button>
   </PageHeader>
-  {admin&&<div className="lecturer-directory-tabs" role="tablist" aria-label="Quản lý giảng viên"><button role="tab" aria-selected={!activation} className={!activation?"is-active":""} onClick={()=>setParams({})}><GraduationCap size={17} aria-hidden="true"/>Danh sách và hồ sơ</button><button role="tab" aria-selected={activation} className={activation?"is-active":""} onClick={()=>setParams({tab:"activation"})}><FileSpreadsheet size={17} aria-hidden="true"/>Nhập Excel và kích hoạt</button></div>}
+  {admin&&<div className="lecturer-directory-tabs" role="tablist" aria-label="Quản lý giảng viên" onKeyDown={e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();setParams(activation?{}:{tab:"activation"});}}}><button id="lecturer-tab-list" role="tab" aria-selected={!activation} aria-controls="lecturer-panel-list" tabIndex={!activation?0:-1} className={!activation?"is-active":""} onClick={()=>setParams({})}><GraduationCap size={17} aria-hidden="true"/>Danh sách và hồ sơ</button><button id="lecturer-tab-activation" role="tab" aria-selected={activation} aria-controls="lecturer-panel-activation" tabIndex={activation?0:-1} className={activation?"is-active":""} onClick={()=>setParams({tab:"activation"})}><FileSpreadsheet size={17} aria-hidden="true"/>Nhập Excel và kích hoạt</button></div>}
   {error&&<p className="alert alert-danger" role="alert">{error}</p>}
+  <div role="tabpanel" id={activation?"lecturer-panel-activation":"lecturer-panel-list"} aria-labelledby={activation?"lecturer-tab-activation":"lecturer-tab-list"}>
   {activation?<LecturerImport directoryMode userId={context.user_id} departments={data.departments} refreshVersion={revision} onCreated={async()=>{setRevision(x=>x+1);}}/>:<>
-    <div className="lecturer-directory-toolbar"><label className="lecturer-search"><Search size={17} aria-hidden="true"/><input aria-label="Tìm giảng viên" placeholder={admin?"Tìm tên, mã GV hoặc email…":"Tìm tên hoặc mã giảng viên…"} maxLength={200} value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);}}/></label>
-      <label className="lecturer-field">Bộ môn<select aria-label="Lọc theo bộ môn" value={department} onChange={e=>{setDepartment(e.target.value);setOffset(0);}}><option value="">Tất cả bộ môn</option>{data.departments.map(d=><option value={d.id} key={d.id}>{d.name}</option>)}</select></label>
-      {admin&&<label className="lecturer-field">Tài khoản<select aria-label="Lọc trạng thái tài khoản" value={status} onChange={e=>{setStatus(e.target.value);setOffset(0);}}><option value="">Tất cả trạng thái</option><option value="ACTIVE">Đang hoạt động</option><option value="LOCKED">Đang khóa</option><option value="DISABLED">Ngừng hoạt động</option></select></label>}
-    </div>
-    {loading?<p role="status">Đang tải danh sách giảng viên…</p>:!data.items.length?<div className="lecturer-empty"><GraduationCap size={36} aria-hidden="true"/><h2>Chưa có giảng viên phù hợp</h2><p>Thử từ khóa hoặc bộ môn khác.{admin?" Có thể mời GV hoặc nhập danh sách Excel để tạo tài khoản.":" Chỉ tài khoản GV đang hoạt động được hiển thị trong danh bạ."}</p></div>:<>
+    <FilterBar
+      search={{
+        value:query,
+        onChange:v=>{setQuery(v);setOffset(0);},
+        placeholder:admin?"Tìm tên, mã GV hoặc email…":"Tìm tên hoặc mã giảng viên…",
+        ariaLabel:"Tìm giảng viên",
+      }}
+      chips={lecturerChips}
+      onClearAll={()=>{setQuery("");setDepartment("");setStatus("");setOffset(0);}}
+      summary={loading?undefined:`${data.total} giảng viên`}
+    >
+      <select className="input" aria-label="Lọc theo bộ môn" value={department} onChange={e=>{setDepartment(e.target.value);setOffset(0);}}>
+        <option value="">Tất cả bộ môn</option>
+        {data.departments.map(d=><option value={d.id} key={d.id}>{d.name}</option>)}
+      </select>
+      {admin&&<select className="input" aria-label="Lọc trạng thái tài khoản" value={status} onChange={e=>{setStatus(e.target.value);setOffset(0);}}>
+        <option value="">Tất cả trạng thái</option>
+        <option value="ACTIVE">Đang hoạt động</option>
+        <option value="LOCKED">Đang khóa</option>
+        <option value="DISABLED">Ngừng hoạt động</option>
+      </select>}
+    </FilterBar>
+    {loading?<SkeletonTable rows={6} cols={admin?6:5} />:!data.items.length?<EmptyState icon={<GraduationCap aria-hidden="true"/>} title="Chưa có giảng viên phù hợp" description={`Thử từ khóa hoặc bộ môn khác.${admin?" Có thể mời GV hoặc nhập danh sách Excel để tạo tài khoản.":" Chỉ tài khoản GV đang hoạt động được hiển thị trong danh bạ."}`} />:<>
       <p className="text-caption" role="status">{data.total} giảng viên phù hợp · Hiển thị {offset+1}–{Math.min(offset+20,data.total)}</p>
       <div className="table-scroll lecturer-directory-results" role="region" aria-label="Danh sách hồ sơ giảng viên" tabIndex={0}><table className="lecturer-directory-table"><thead><tr><th scope="col">Giảng viên</th><th scope="col">Bộ môn / Khoa</th><th scope="col">Trình độ, chuyên môn</th>{admin&&<th scope="col">Tài khoản</th>}<th scope="col">Hồ sơ</th><th scope="col">Xem chi tiết</th></tr></thead><tbody>{data.items.map(row=><tr key={row.id}>
-        <td><div className="lecturer-directory-person"><LecturerAvatar url={row.avatar_url} name={row.display_name} size="sm"/><div><LecturerProfileLink lecturerId={row.id} name={row.display_name} userId={context.user_id}/><small>{row.lecturer_code}</small></div></div></td>
-        <td><span className="lecturer-cell-label" aria-hidden="true">Bộ môn / Khoa</span>{row.department_name}<small>{row.faculty_name}</small></td><td><span className="lecturer-cell-label" aria-hidden="true">Trình độ, chuyên môn</span>{row.data.academic_degree?degreeLabels[row.data.academic_degree]:"Chưa cập nhật"}<small>{row.data.specializations.slice(0,2).join(" · ")||"Chưa bổ sung chuyên môn"}{row.data.specializations.length>2?` +${row.data.specializations.length-2}`:""}</small></td>
-        {admin&&<td><span className="lecturer-cell-label" aria-hidden="true">Tài khoản</span>{row.account_email||"Chưa có email"}<small>{({ACTIVE:"Đang hoạt động",LOCKED:"Đang khóa",DISABLED:"Ngừng hoạt động"} as Record<string,string>)[row.account_status||""]||"Chưa ghi nhận"}</small></td>}
-        <td><span className={`lecturer-verification ${row.verified_at?"is-verified":""}`}><ShieldCheck size={13} aria-hidden="true"/>{row.verified_at?"Đã duyệt":"Thông tin cơ bản"}</span></td>
-        <td><div className="lecturer-table-actions"><button className="btn btn-secondary btn-sm" onClick={()=>setPreview(row.id)} aria-label={`Xem chi tiết ${row.display_name}`}><Eye size={15} aria-hidden="true"/>Xem chi tiết</button>{admin&&<button className="btn btn-ghost btn-sm" onClick={()=>void edit(row.id)} aria-label={`Sửa định danh ${row.display_name}`}><PenLine size={14} aria-hidden="true"/>Sửa thông tin gốc</button>}</div></td>
+        <td data-label="Giảng viên"><div className="lecturer-directory-person"><LecturerAvatar url={row.avatar_url} name={row.display_name} size="sm"/><div><LecturerProfileLink lecturerId={row.id} name={row.display_name} userId={context.user_id}/><small>{row.lecturer_code}</small></div></div></td>
+        <td data-label="Bộ môn / Khoa"><span className="lecturer-cell-label" aria-hidden="true">Bộ môn / Khoa</span>{row.department_name}<small>{row.faculty_name}</small></td><td data-label="Trình độ, chuyên môn"><span className="lecturer-cell-label" aria-hidden="true">Trình độ, chuyên môn</span>{row.data.academic_degree?degreeLabels[row.data.academic_degree]:"Chưa cập nhật"}<small>{row.data.specializations.slice(0,2).join(" · ")||"Chưa bổ sung chuyên môn"}{row.data.specializations.length>2?` +${row.data.specializations.length-2}`:""}</small></td>
+        {admin&&<td data-label="Tài khoản"><span className="lecturer-cell-label" aria-hidden="true">Tài khoản</span>{row.account_email||"Chưa có email"}<small>{({ACTIVE:"Đang hoạt động",LOCKED:"Đang khóa",DISABLED:"Ngừng hoạt động"} as Record<string,string>)[row.account_status||""]||"Chưa ghi nhận"}</small></td>}
+        <td data-label="Hồ sơ"><ThesisStatusBadge state={row.verified_at?"APPROVED":"DRAFT"} label={row.verified_at?"Đã duyệt":"Thông tin cơ bản"}/></td>
+        <td data-label="Xem chi tiết"><div className="lecturer-table-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={()=>setPreview(row.id)} aria-label={`Xem chi tiết ${row.display_name}`}><Eye size={15} aria-hidden="true"/>Xem chi tiết</button>{admin&&<button type="button" className="btn btn-ghost btn-sm" onClick={()=>void edit(row.id)} aria-label={`Sửa định danh ${row.display_name}`}><PenLine size={14} aria-hidden="true"/>Sửa thông tin gốc</button>}</div></td>
       </tr>)}</tbody></table></div>
-      <nav className="lecturer-pagination" aria-label="Phân trang giảng viên"><button className="btn btn-secondary" disabled={!offset} onClick={()=>setOffset(v=>Math.max(0,v-20))}>Trang trước</button><span>Trang {Math.floor(offset/20)+1}/{Math.ceil(data.total/20)}</span><button className="btn btn-secondary" disabled={offset+20>=data.total} onClick={()=>setOffset(v=>v+20)}>Trang sau</button></nav>
+      <nav className="lecturer-pagination" aria-label="Phân trang giảng viên"><button type="button" className="btn btn-secondary" disabled={!offset} onClick={()=>setOffset(v=>Math.max(0,v-20))}><ChevronLeft size={15} aria-hidden="true"/>Trang trước</button><span>Trang {Math.floor(offset/20)+1}/{Math.max(1,Math.ceil(data.total/20))}</span><button type="button" className="btn btn-secondary" disabled={offset+20>=data.total} onClick={()=>setOffset(v=>v+20)}>Trang sau<ChevronRight size={15} aria-hidden="true"/></button></nav>
     </>}
   </>}
+  </div>
   {preview&&<LecturerProfileDialog lecturerId={preview} userId={context.user_id} onClose={()=>setPreview(null)}/>}
   {identity&&<IdentityDialog initial={identity} departments={data.departments} userId={context.user_id} onClose={()=>setIdentity(null)} onSaved={()=>{setIdentity(null);setRevision(v=>v+1);}}/>}
   </div>;

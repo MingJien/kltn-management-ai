@@ -1,8 +1,14 @@
 import {useCallback, useEffect, useState, type FormEvent} from "react";
+import {confirmAction} from "../components/ui/ConfirmDialog";
 import {Link, useSearchParams} from "react-router-dom";
+import {Calendar, Check, RotateCcw, Send} from "lucide-react";
 import {request, type Context} from "../api";
 import {errorMessage} from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import {SkeletonCard} from "../components/ui/Skeleton";
+import EmptyState from "../components/ui/EmptyState";
+import {ActivityTimeline, inferTimelineTone} from "../components/ui/Timeline";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import WorkflowSteps from "../components/domain/WorkflowSteps";
 import "../styles/withdrawals.css";
 
@@ -23,7 +29,7 @@ function RoundStart({row,run,userId,busy}:{row:Round;run:Run;userId:string;busy:
       <p className="text-muted">Ngày bắt đầu dùng tính 02 tuần xin thôi, khác thời gian mở đăng ký. Khi đã có đơn, ngày này được giữ nguyên.</p>
       {row.can_edit ? <><label>Ngày bắt đầu thực hiện<input className="input" type="date" required value={start} onChange={e=>setStart(e.target.value)}/></label>
         <label>Căn cứ kế hoạch Khoa<input className="input" required minLength={5} maxLength={500} value={reference} onChange={e=>setReference(e.target.value)}/></label>
-        <button className="btn btn-secondary" disabled={busy||reference.trim().length<5}>Lưu ngày bắt đầu</button></> : <p>Đã khóa ngày bắt đầu. Căn cứ: {row.reference}</p>}
+        <button className="btn btn-secondary" disabled={busy||reference.trim().length<5}><Calendar size={15} aria-hidden="true"/>Lưu ngày bắt đầu</button></> : <p>Đã khóa ngày bắt đầu. Căn cứ: {row.reference}</p>}
     </form></details>;
 }
 
@@ -38,11 +44,11 @@ function CreateRequest({thesis,run,userId,busy,focused}:{thesis:Thesis;run:Run;u
   return <section className="card" id={`withdrawal-thesis-${thesis.id}`}><div className="card-body stack"><h2>{thesis.title}</h2><p>SV · {thesis.student_name} · GVHD · {thesis.advisor_name||"Chưa ghi nhận"}</p><WorkflowSteps steps={["Gửi yêu cầu","Điều phối xử lý","Nhận kết quả"]} current={0}/>
     <p>{thesis.round_code} · Bắt đầu: <strong>{date(thesis.starts_on)}</strong> · Hạn gửi đơn: <strong>{thesis.last_request_on?`hết ngày ${date(thesis.last_request_on)}`:"Chưa thiết lập"}</strong></p>
     <Link to={`/theses/${thesis.id}`}>Mở hồ sơ khóa luận</Link>
-    {thesis.can_submit ? <details open={focused}><summary>Lập yêu cầu xin thôi KLTN</summary><form className="stack" onSubmit={e=>void submit(e)} style={{marginTop:16}}>
+    {thesis.can_submit ? <details open={focused}><summary>Lập yêu cầu xin thôi KLTN</summary><form className="stack mt-4" onSubmit={e=>void submit(e)}>
       <label>Lý do xin thôi<textarea className="input" rows={4} required minLength={10} maxLength={3000} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <label><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)} required/> Tôi đề nghị chuyển sang học phần thay thế và đã đọc hệ quả không được đăng ký lại KLTN sau khi hủy đăng ký chính thức (Điều 4 khoản 6, QĐ2919).</label>
+      <label className="checkbox-label"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)} required/> Tôi đề nghị chuyển sang học phần thay thế và đã đọc hệ quả không được đăng ký lại KLTN sau khi hủy đăng ký chính thức (Điều 4 khoản 6, QĐ2919).</label>
       <p className="text-muted">Đơn chỉ áp dụng cho bạn. Gửi đơn chưa có nghĩa đã được giải quyết cho thôi KLTN.</p>
-      <button className="btn btn-primary" disabled={busy||!confirm||reason.trim().length<10}>Gửi đơn đến điều phối đợt</button>
+      <button className="btn btn-primary" disabled={busy||!confirm||reason.trim().length<10}><Send size={15} aria-hidden="true"/>Gửi đơn đến điều phối đợt</button>
     </form></details> : <p className="alert alert-info">{thesis.message}</p>}
   </div></section>;
 }
@@ -60,27 +66,37 @@ function RequestCard({row,run,userId,busy}:{row:Withdrawal;run:Run;userId:string
     }),success);
   }
   return <article className="card" id={`withdrawal-${row.id}`}><div className="card-body stack">
-    <h3>{row.title}</h3><p><strong>{row.student_name}</strong> · {row.student_code} · GVHD · {row.advisor_name||"Chưa ghi nhận"} · <span>{status(row.state)}</span></p>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <h3>{row.title}</h3>
+      <ThesisStatusBadge state={row.state} label={status(row.state)}/>
+    </div>
+    <p><strong>{row.student_name}</strong> · {row.student_code} · GVHD · {row.advisor_name||"Chưa ghi nhận"}</p>
     <p className="text-muted">{row.code} · Gửi lúc {new Date(row.submitted_at).toLocaleString("vi-VN")}</p>
-    <p style={{whiteSpace:"pre-wrap"}}>{row.reason}</p>
+    <p className="whitespace-pre-wrap">{row.reason}</p>
     {row.outcome_note && <p><strong>Kết quả ngày {date(row.effective_on)}</strong> · {row.outcome_note}</p>}
-    {row.can_cancel && <button className="btn btn-secondary" disabled={busy}
-      onClick={()=>{if(window.confirm("Hủy yêu cầu và tiếp tục thực hiện KLTN?")) void send("cancel",{},"Đã hủy yêu cầu.");}}>Hủy yêu cầu</button>}
-    {row.can_record && <form className="stack" onSubmit={e=>{
+    {row.can_cancel && <button type="button" className="btn btn-secondary" disabled={busy}
+      onClick={async()=>{if(await confirmAction({title:"Hủy yêu cầu thôi KLTN",description:"Yêu cầu sẽ bị hủy và bạn tiếp tục thực hiện khóa luận như bình thường.",confirmLabel:"Hủy yêu cầu",cancelLabel:"Giữ yêu cầu",variant:"danger"})) void send("cancel",{},"Đã hủy yêu cầu.");}}><RotateCcw size={15} aria-hidden="true"/>Hủy yêu cầu</button>}
+    {row.can_record && <form className="stack" onSubmit={async e=>{
       e.preventDefault();
-      if(window.confirm(decision==="WITHDRAWN"?"Chấp thuận và cập nhật hồ sơ KLTN ngay?":"Xác nhận không chấp thuận?"))
+      if(await confirmAction(decision==="WITHDRAWN"?{title:"Chấp thuận cho thôi KLTN",description:"Hồ sơ khóa luận của sinh viên sẽ được cập nhật ngay sau khi chấp thuận.",confirmLabel:"Chấp thuận",variant:"warning"}:{title:"Không chấp thuận",description:"Xác nhận không chấp thuận yêu cầu thôi thực hiện KLTN này?",confirmLabel:"Xác nhận"}))
         void send("outcome",{outcome:decision,note},"Đã cập nhật kết quả xử lý.");
     }}>
       <label>Kết quả<select className="input" value={decision} onChange={e=>setDecision(e.target.value)}>
         <option value="WITHDRAWN">Chấp thuận cho thôi</option><option value="NOT_GRANTED">Không chấp thuận</option>
       </select></label>
       <label>Lý do xử lý<textarea className="input" value={note} onChange={e=>setNote(e.target.value)} required minLength={5} maxLength={3000}/></label>
-      <button className="btn btn-primary" disabled={busy||note.trim().length<5}>Xác nhận kết quả</button>
+      <button className="btn btn-primary" disabled={busy||note.trim().length<5}><Check size={15} aria-hidden="true"/>Xác nhận kết quả</button>
     </form>}
-    <details><summary>Lịch sử xử lý</summary><ul>{row.history.map((event,i)=>
-      <li key={i}>{new Date(event.at).toLocaleString("vi-VN")} · {event.actor} · {
-        ({WITHDRAWAL_SUBMITTED:"Gửi yêu cầu",WITHDRAWAL_RECORDED:"Chấp thuận",WITHDRAWAL_NOT_GRANTED:"Không chấp thuận",WITHDRAWAL_CANCELLED:"Hủy yêu cầu"} as Record<string,string>)[event.action] ?? "Cập nhật hồ sơ"
-      }</li>)}</ul></details>
+    <details><summary><span>Lịch sử xử lý</span> <span className="code-chip">{row.history.length}</span></summary><ActivityTimeline
+      items={row.history.map((event,i)=>({
+        id: `${row.id}-hist-${i}`,
+        title: ({WITHDRAWAL_SUBMITTED:"Gửi yêu cầu",WITHDRAWAL_RECORDED:"Chấp thuận",WITHDRAWAL_NOT_GRANTED:"Không chấp thuận",WITHDRAWAL_CANCELLED:"Hủy yêu cầu"} as Record<string,string>)[event.action] ?? "Cập nhật hồ sơ",
+        actor: event.actor,
+        timestamp: new Date(event.at).toLocaleString("vi-VN"),
+        tone: inferTimelineTone(event.action),
+      }))}
+      ariaLabel="Lịch sử xử lý xin thôi KLTN"
+    /></details>
   </div></article>;
 }
 
@@ -96,6 +112,7 @@ export default function WithdrawalsPage({context}:{context:Context}) {
   const focus=params.get("focus");
   useEffect(()=>{if(focus&&data)document.getElementById(`withdrawal-${focus}`)?.scrollIntoView({block:"start"});},[focus,data]);
   const run:Run=async(action,success)=>{
+    if (busy) return false;
     setBusy(true);setError("");setMessage("");
     try {await action();await load();setMessage(success);return true;}
     catch(e){setError(errorMessage(e));await load().catch(()=>undefined);return false;}
@@ -108,13 +125,13 @@ export default function WithdrawalsPage({context}:{context:Context}) {
       {error&&<p className="alert alert-danger" role="alert">{error}</p>}
       {message&&<p className="alert alert-success" role="status">{message}</p>}
       <p className="alert alert-info">Gửi trong 02 tuần đầu kể từ ngày bắt đầu thực hiện. Sinh viên tiếp tục làm KLTN trong khi chờ xử lý. Nếu nhóm còn thành viên sau khi chấp thuận, nhóm giữ đề tài và nộp lại Mẫu 1–3 theo thành viên hiện tại.</p>
-      {!data&&!error&&<p role="status">Đang tải…</p>}
+      {!data&&!error&&<div className="stack" role="status" aria-label="Đang tải dữ liệu"><SkeletonCard /><SkeletonCard /></div>}
       {!!data?.rounds.length&&<section className="stack"><h2>Ngày bắt đầu thực hiện</h2>{data.rounds.map(row=>
         <RoundStart key={row.id+row.row_version} row={row} run={run} userId={context.user_id} busy={busy}/>)}</section>}
       {data?.theses.map(thesis=><CreateRequest key={thesis.id} thesis={thesis} focused={params.get("thesis")===thesis.id}
         run={run} userId={context.user_id} busy={busy}/>)}
-      {data&&<section className="stack"><h2>Yêu cầu xin thôi</h2><label><input type="checkbox" checked={all} onChange={e=>setAll(e.target.checked)}/> Hiện cả yêu cầu đã xử lý</label>
-        {!rows.length&&<p>Không có yêu cầu trong bộ lọc này.</p>}
+      {data&&<section className="stack"><h2>Yêu cầu xin thôi</h2><label className="checkbox-label"><input type="checkbox" checked={all} onChange={e=>setAll(e.target.checked)}/> Hiện cả yêu cầu đã xử lý</label>
+        {!rows.length&&<EmptyState compact title="Không có yêu cầu trong bộ lọc này" />}
         {rows.map(row=><RequestCard key={row.id+row.row_version} row={row} run={run} userId={context.user_id} busy={busy}/>)}
       </section>}
     </div>

@@ -1,4 +1,5 @@
 import {useState,type FormEvent} from "react";
+import {Link} from "react-router-dom";
 type Council={id:string;name:string;round_id:string;department_id:string;closed_at:string|null;can_manage:boolean;members:{id:string}[]};
 type Thesis={id:string;title:string;round_id:string;department_id:string;advisor_ids?:string[];schedule_reason?:string|null;can_review_eligibility?:boolean};
 export default function BatchDefenseSchedule({data,save,busy}:{data:{councils:Council[];eligible:Thesis[];slots:{thesis_id:string}[];planning_theses?:Thesis[]};save:(body:unknown)=>Promise<boolean>;busy:boolean}) {
@@ -22,7 +23,7 @@ export default function BatchDefenseSchedule({data,save,busy}:{data:{councils:Co
   </fieldset>
   <details className="defense-wide"><summary>Vì sao đề tài chưa có trong danh sách?</summary><p>Cùng đợt và bộ môn; mọi SV đã đủ điều kiện trên đúng báo cáo, đủ Mẫu 8 của các phản biện đang được giao (nếu có), chưa có lịch và không có GVHD trong hội đồng. Khi lưu, hệ thống kiểm tra tiếp trùng giờ, phòng, giảng viên và hạn gia hạn.</p>
   {conflicts.map(t=><p key={t.id}><strong>{t.title}</strong> · GVHD đang có trong thành phần hội đồng; cần chọn hội đồng phù hợp khác.</p>)}
-  {pending.map(t=><p key={t.id}><strong>{t.title}</strong> · {t.schedule_reason} {t.can_review_eligibility&&<a href={`/evaluation/${t.id}`}>Mở xét điều kiện</a>}</p>)}</details>
+  {pending.map(t=><p key={t.id}><strong>{t.title}</strong> · {t.schedule_reason} {t.can_review_eligibility&&<Link to={`/evaluation/${t.id}`}>Mở xét điều kiện</Link>}</p>)}</details>
   <label>Bắt đầu (giờ Việt Nam)<input className="input" type="datetime-local" value={start} onChange={e=>setStart(e.target.value)} required/></label>
   <label>Phòng bảo vệ<input className="input" name="room" minLength={2} maxLength={200} required/></label>
   <label className="defense-check defense-wide"><input type="checkbox" checked={sharedArrival} onChange={e=>setSharedArrival(e.target.checked)}/>Áp dụng cùng giờ tập trung và phòng cho tất cả đề tài đã chọn</label>

@@ -10,6 +10,8 @@ interface DialogProps {
   onClose: () => void;
   title: string;
   size?: "sm" | "md" | "lg";
+  variant?: "modal" | "drawer";
+  headerMeta?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   busy?: boolean;
@@ -20,6 +22,8 @@ export default function Dialog({
   onClose,
   title,
   size = "sm",
+  variant = "modal",
+  headerMeta,
   children,
   footer,
   busy = false,
@@ -63,24 +67,48 @@ export default function Dialog({
 
   return createPortal(
     <div
-      className="dialog-overlay"
+      className={variant === "drawer" ? "dialog-overlay dialog-overlay--drawer" : "dialog-overlay"}
       onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget && !busy) onClose(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-busy={busy}
     >
-      <div className={`dialog dialog--${size}`} ref={dialogRef}>
-        <div className="dialog__header">
-          <h2 id={titleId}>{title}</h2>
-          <button
-            className="btn btn-ghost btn-icon btn-sm"
-            onClick={onClose}
-            disabled={busy}
-            aria-label="Đóng"
-          >
-            <X size={18} />
-          </button>
+      <div
+        className={`dialog dialog--${size}${variant === "drawer" ? " dialog--drawer" : ""}`}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-busy={busy}
+      >
+        <div className={variant === "drawer" ? "dialog__header dialog__header--drawer" : "dialog__header"}>
+          {variant === "drawer" ? (
+            <>
+              <div className="dialog__header-top">
+                <div className="dialog__header-meta">{headerMeta}</div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon btn-sm dialog__close-btn"
+                  onClick={onClose}
+                  disabled={busy}
+                  aria-label="Đóng"
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <h2 id={titleId}>{title}</h2>
+            </>
+          ) : (
+            <>
+              <h2 id={titleId}>{title}</h2>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                onClick={onClose}
+                disabled={busy}
+                aria-label="Đóng"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
         <div className="dialog__body">{children}</div>
         {footer && <div className="dialog__footer">{footer}</div>}

@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {Download, Eye, RotateCcw} from "lucide-react";
 import {downloadFile,request} from "../../api";
 import {errorMessage} from "../../errors";
 import {ReadOnlyFilePreview} from "./ReviewAttachmentPreview";
@@ -34,9 +35,9 @@ export default function DefensePrintPreview({endpoint,name,label,record=false,on
  const selectedStyle=layout.styles[selected]??{};
  return <details className="defense-operation defense-print"><summary>Xem trước & định dạng · {label}</summary>
   <p>{hasNarrative?"Mở bản xem theo mẫu gốc. Thư ký chọn phần diễn giải ngay trên bản xem để chỉnh trình bày; nội dung, thông tin và điểm được giữ nguyên.":"Đối chiếu bảng toàn đợt theo mẫu gốc trước khi lưu và tải."}</p>
-  <div className="button-row"><button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void preview()}>Áp dụng & xem trước</button>
-   <button type="button" className="btn btn-primary" disabled={busy||!revision||active!==path||(isWord&&!wordReady)} onClick={async()=>{setBusy(true);setError("");try{await downloadFile(path+"&expected_revision="+encodeURIComponent(revision),name,record?"POST":"GET");if(record)onRecord?.();}catch(e){setRevision("");setError(errorMessage(e));}finally{setBusy(false);}}}>{record?"Lưu và tải bản dùng để ký":"Tải bản theo định dạng đã chọn"}</button>
-   <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>{current.current=empty();setLayout(current.current);setActive("");setRevision("");setWordReady(false);setSheets([]);setSelected("");setHint("");}}>Khôi phục định dạng mẫu</button></div>
+  <div className="button-row"><button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>void preview()}><Eye size={15} aria-hidden="true"/>Áp dụng &amp; xem trước</button>
+   <button type="button" className="btn btn-primary" disabled={busy||!revision||active!==path||(isWord&&!wordReady)} onClick={async()=>{setBusy(true);setError("");try{await downloadFile(path+"&expected_revision="+encodeURIComponent(revision),name,record?"POST":"GET");if(record)onRecord?.();}catch(e){setRevision("");setError(errorMessage(e));}finally{setBusy(false);}}}><Download size={15} aria-hidden="true"/>{record?"Lưu và tải bản dùng để ký":"Tải bản theo định dạng đã chọn"}</button>
+   <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>{current.current=empty();setLayout(current.current);setActive("");setRevision("");setWordReady(false);setSheets([]);setSelected("");setHint("");}}><RotateCcw size={15} aria-hidden="true"/>Khôi phục định dạng mẫu</button></div>
   {error&&<p role="alert" className="alert alert-danger">{error}</p>}
   {active&&hasNarrative&&<div className="review-toolbar defense-layout-toolbar" role="toolbar" aria-label="Định dạng bản xuất">
    <span>{fields.find(f=>f.key===selected)?.label??"Bấm phần diễn giải có khung để định dạng"}</span>

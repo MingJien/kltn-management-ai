@@ -171,8 +171,8 @@ test("Bốn SV demo kích hoạt, đăng ký đề tài GV1 và xử lý xin th�
     const pending=(await read(students[0],"/withdrawals")).requests[0];
     await tbm.goto(`/withdrawals?focus=${pending.id}`);
     await tbm.getByLabel("Lý do xử lý").fill("Chấp thuận yêu cầu xin thôi của sinh viên giả lập.");
-    tbm.once("dialog", dialog=>dialog.accept());
     await tbm.getByRole("button",{name:"Xác nhận kết quả"}).click();
+    await tbm.getByRole("dialog",{name:"Chấp thuận cho thôi KLTN"}).getByRole("button",{name:"Chấp thuận",exact:true}).click();
     await expect(tbm.getByRole("status")).toContainText("Đã cập nhật kết quả xử lý");
     const item=(await read(students[0],"/withdrawals")).requests[0];
     expect(item.state).toBe("RECORDED");

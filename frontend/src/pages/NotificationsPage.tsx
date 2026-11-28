@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import type { Notice, NoticeSummary } from "../notifications";
 import PageHeader from "../components/layout/PageHeader";
+import Tabs from "../components/ui/Tabs";
+import Badge from "../components/ui/Badge";
+import { SkeletonCard } from "../components/ui/Skeleton";
+import EmptyState from "../components/ui/EmptyState";
 
 const PAGE_SIZE = 20;
 
@@ -26,7 +30,9 @@ function timeLabel(value: string) {
 export default function NotificationsPage({userId}: {userId: string}) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
@@ -36,16 +42,18 @@ export default function NotificationsPage({userId}: {userId: string}) {
     let active = true;
     setLoading(true);
     setError("");
-    request<NoticeSummary>(`/notifications?limit=${PAGE_SIZE + 1}&offset=${page * PAGE_SIZE}`, userId)
+    const query = `/notifications?limit=${PAGE_SIZE + 1}&offset=${page * PAGE_SIZE}${filter === "unread" ? "&unread_only=true" : ""}`;
+    request<NoticeSummary>(query, userId)
       .then((result) => {
         if (!active) return;
         setNotices(result.items.slice(0, PAGE_SIZE));
         setHasNext(result.items.length > PAGE_SIZE);
+        setUnreadTotal(result.unread_count);
       })
       .catch((cause) => {if (active) setError(errorMessage(cause));})
       .finally(() => {if (active) setLoading(false);});
     return () => {active = false;};
-  }, [page, userId]);
+  }, [page, filter, userId]);
 
   async function view(notice: Notice) {
     if (busyId) return;
@@ -56,6 +64,7 @@ export default function NotificationsPage({userId}: {userId: string}) {
         await request<void>(`/notifications/${notice.id}/read`, userId, {method: "POST"});
         setNotices((current) => current.map((item) => item.id === notice.id
           ? {...item, read_at: new Date().toISOString()} : item));
+        setUnreadTotal((c) => Math.max(0, c - 1));
         window.dispatchEvent(new Event("kltn:notifications-changed"));
       }
       navigate(notice.url,{state:{noticeId:notice.id}});
@@ -66,8 +75,9 @@ export default function NotificationsPage({userId}: {userId: string}) {
     }
   }
 
+  const displayedNotices = notices;
   const groups: {key: string; label: string; items: Notice[]}[] = [];
-  for (const notice of notices) {
+  for (const notice of displayedNotices) {
     const key = dateKey(notice.created_at);
     if (groups.at(-1)?.key !== key) groups.push({key, label: dayLabel(notice.created_at), items: []});
     groups[groups.length - 1].items.push(notice);
@@ -76,8 +86,24 @@ export default function NotificationsPage({userId}: {userId: string}) {
   return <>
     <PageHeader title="Tất cả thông báo" description="Xem lại các thông báo theo ngày và thời điểm gửi." />
     <div className="notification-history">
+      {!loading && (notices.length > 0 || unreadTotal > 0 || filter === "unread") && (
+        <div className="mb-4">
+          <Tabs
+            asButtons
+            variant="underline"
+            idPrefix="notifications-filter"
+            ariaLabel="Lọc thông báo"
+            items={[
+              { id: "all", label: "Tất cả" },
+              { id: "unread", label: "Chưa xem", count: unreadTotal },
+            ]}
+            activeId={filter}
+            onChange={(next) => { setFilter(next as "all" | "unread"); setPage(0); }}
+          />
+        </div>
+      )}
       {error ? <p className="alert alert-danger" role="alert">{error}</p> : null}
-      {loading ? <p role="status">Đang tải thông báo…</p> : groups.length ? groups.map((group) =>
+      {loading ? <div className="stack" role="status" aria-label="Đang tải thông báo"><SkeletonCard /><SkeletonCard /></div> : groups.length ? groups.map((group) =>
         <section className="notification-history__day" key={group.key}>
           <h2>{group.label}</h2>
           <ul>{group.items.map((notice) =>
@@ -90,16 +116,18 @@ export default function NotificationsPage({userId}: {userId: string}) {
                   <span className="notification-history__meta">
                     <time dateTime={notice.created_at}>{timeLabel(notice.created_at)}</time>
                     <span aria-hidden="true">·</span>
-                    <span>{notice.read_at ? "Đã xem" : "Chưa xem"}</span>
+                    <Badge variant={notice.read_at ? "neutral" : "info"} dot>{notice.read_at ? "Đã xem" : "Chưa xem"}</Badge>
                   </span>
                 </span>
               </button>
             </li>)}</ul>
-        </section>) : !error ? <div className="card notification-history__empty"><Bell size={28} aria-hidden="true" /><p>Chưa có thông báo.</p></div> : null}
+        </section>) : !error ? <EmptyState icon={<Bell aria-hidden="true" />} title={filter === "unread" ? "Không có thông báo chưa xem trên trang này" : "Chưa có thông báo"} description={filter === "unread" ? "Chuyển sang Tất cả hoặc sang trang khác để xem lại các thông báo cũ." : "Các thông báo hệ thống sẽ xuất hiện tại đây khi có cập nhật."}>
+          {filter === "unread" ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFilter("all")}>Xem tất cả trên trang</button> : null}
+        </EmptyState> : null}
       <nav className="pagination" aria-label="Phân trang thông báo">
-        <button className="btn btn-secondary" disabled={page === 0 || loading || !!busyId} onClick={() => setPage((value) => value - 1)}>Trang trước</button>
+        <button type="button" className="btn btn-secondary" disabled={page === 0 || loading || !!busyId} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} aria-hidden="true" />Trang trước</button>
         <span>Trang {page + 1}</span>
-        <button className="btn btn-secondary" disabled={!hasNext || loading || !!busyId} onClick={() => setPage((value) => value + 1)}>Trang sau</button>
+        <button type="button" className="btn btn-secondary" disabled={!hasNext || loading || !!busyId} onClick={() => setPage((value) => value + 1)}>Trang sau<ChevronRight size={15} aria-hidden="true" /></button>
       </nav>
     </div>
   </>;

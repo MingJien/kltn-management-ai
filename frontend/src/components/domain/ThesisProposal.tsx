@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import type { DocumentDeadline, Lecturer, Proposal, Thesis } from "../../api";
 import { downloadProposal, downloadProposalTemplate, request, uploadProposal } from "../../api";
+import { errorMessage } from "../../errors";
+import FileDropzone from "../ui/FileDropzone";
 import { scanLabel } from "./ThesisDocuments";
 import type { CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
@@ -37,11 +39,11 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
       {proposal.state === "REVISION_REQUIRED" && <p className="alert alert-warning">Đề cương cần nộp phiên bản mới để duyệt lại. Khi nhóm thay đổi thành viên, cập nhật danh sách và phân công công việc trong bản mới; các bản đã nộp và xác nhận cũ vẫn được lưu theo phiên bản.</p>}
       <p className="text-body-sm"><strong>Hạn đề cương:</strong> {deadline ? `${formatDate(deadline.due_at)} · ${deadline.state === "OPEN" ? "đang nhận" : "đã đóng"}` : "Khoa chưa thiết lập — chưa nhận tệp"}</p>
       <p className="text-caption">Có thể tự nộp bản sửa trước hạn khi GVHD chưa phản hồi; bản cũ vẫn lưu. Sau hạn hoặc khi đóng, chỉ nộp bản mới khi GVHD yêu cầu sửa.</p>
-      <button type="button" className="btn btn-secondary" disabled={downloading} onClick={async () => {
+      <button type="button" className="btn btn-soft" disabled={downloading} onClick={async () => {
         setDownloadError(""); setDownloading(true);
-        try {await downloadProposalTemplate(thesis.round_id);} catch (cause) {setDownloadError(String(cause));}
+        try {await downloadProposalTemplate(thesis.round_id);} catch (cause) {setDownloadError(errorMessage(cause));}
         finally {setDownloading(false);}
-      }}>Tải mẫu chính thức Mẫu 3</button>
+      }}><Download size={15} aria-hidden="true" />Tải mẫu chính thức Mẫu 3</button>
       {downloadError && <p role="alert" className="alert alert-danger">{downloadError}</p>}
       <div><Status value={proposal.state} />{proposal.current_version_no && <span className="text-muted"> · Bản hiện hành v{proposal.current_version_no}</span>}</div>
       <p className="text-body-sm text-muted">Sau khi Trưởng bộ môn chốt, có thể xuất đúng phiên bản PDF/DOCX hiện hành đã duyệt và quét sạch. Bản in ghi “Xuất tại”, địa chỉ hệ thống, mã số và thời gian ở góc dưới bên trái; tệp nộp gốc được giữ nguyên.</p>
@@ -53,19 +55,21 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
           setFile(null); form.reset();
         }
       }}>
-        <label htmlFor="proposal-file">Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)</label>
-        <input className="input" id="proposal-file" type="file" accept=".pdf,.docx" required disabled={busy}
-          onChange={event => setFile(event.target.files?.[0] || null)} />
-        {file && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
-          <span className="text-body-sm font-semibold">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-          <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
-            setFile(null);
-            const el = document.getElementById("proposal-file") as HTMLInputElement | null;
-            if (el) el.value = "";
-          }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
-        </div>}
-        <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>{busy ? "Đang tải lên và quét an toàn…" : "Nộp đề cương"}</button>
-        {file && file.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
+        <FileDropzone
+          id="proposal-file"
+          label="Nộp đề cương PDF hoặc DOCX (tối đa 10 MB)"
+          accept=".pdf,.docx"
+          maxBytes={10 * 1024 * 1024}
+          hint="Chỉ nhận định dạng .pdf hoặc .docx · Tối đa 10 MB"
+          file={file}
+          disabled={busy}
+          required
+          onChange={setFile}
+        />
+        <button className="btn btn-primary" disabled={busy || !file || file.size > 10*1024*1024}>
+          <Upload size={15} aria-hidden="true" />
+          {busy ? "Đang tải lên và quét an toàn…" : "Nộp đề cương"}
+        </button>
       </form>}
       {proposal.versions.length === 0 && <p className="text-muted">Chưa có bản đề cương.</p>}
     </div></div>
@@ -87,7 +91,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
           "Đã quét lại đề cương bằng ClamAV; xem trạng thái mới của phiên bản.")}>Quét lại tệp bằng ClamAV</button>}
       <button type="button" className="btn btn-secondary" disabled={downloading || !clean} title={!clean ? "Chưa thể tải khi tệp chưa được quét an toàn" : undefined} onClick={async () => {
         setDownloadError(""); setDownloading(true);
-        try {await downloadProposal(thesis.id, version, userId);} catch (cause) {setDownloadError(String(cause));}
+        try {await downloadProposal(thesis.id, version, userId);} catch (cause) {setDownloadError(errorMessage(cause));}
         finally {setDownloading(false);}
       }}>Tải bản nộp gốc v{version.version_no}</button>
       {clean && <p className="text-caption">Bản gốc giữ nguyên tệp đã nộp. Sau khi GVHD xác nhận và TBM chốt, dùng nút xuất bản có footer để in ký ngoài.</p>}
@@ -97,7 +101,7 @@ export default function ThesisProposal({thesis, proposal, deadline, lecturers, u
           await downloadProposal(thesis.id, version, userId, true);
           setPrintRefresh(value => value + 1);
           setPrintNotice("Đã tải bản PDF/DOCX để ký ngoài. Bản in có địa chỉ hệ thống, mã số và thời gian ở góc dưới bên trái; mã cũng có trong tên tệp. Bản nộp gốc không đổi.");
-        } catch (cause) {setDownloadError(String(cause));}
+        } catch (cause) {setDownloadError(errorMessage(cause));}
         finally {setDownloading(false);}
       }}>Xuất bản để ký ngoài (địa chỉ + mã số + giờ xuất)</button>}
       <PrintHistory endpoint={`/theses/${thesis.id}/proposal/versions/${version.id}/print-history`} userId={userId} version={version.version_no} refreshKey={printRefresh} />

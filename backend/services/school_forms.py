@@ -38,10 +38,15 @@ def round_row(session, round_id):
     return row
 
 
+def require_catalog_access(session, user, round_id):
+    row = round_row(session, round_id)
+    if not manages(session, user, round_id):
+        raise HTTPException(403, "Cần được giao quyền Quản lý biểu mẫu cho đợt này")
+    return row
+
+
 def require_manager(session,user,round_id):
-    row=round_row(session,round_id)
-    if not manages(session,user,round_id):
-        raise HTTPException(403,"Cần được giao quyền Quản lý biểu mẫu cho đợt này")
+    row = require_catalog_access(session, user, round_id)
     if row.state == "ARCHIVED":
         raise HTTPException(409,"Đợt đã lưu trữ, chỉ được xem lại")
     return row
@@ -96,7 +101,8 @@ def access(session,user):
             continue
         year=session.get(m.AcademicYear,row.academic_year_id)
         result.append(dict(id=row.id,label=f"{year.code} · {row.code}",state=row.state,
-            can_manage=manage and row.state!="ARCHIVED",can_view_publications=belongs(session,user,row.id),can_export_list=can_export))
+            can_manage=manage and row.state!="ARCHIVED",can_view_catalog=manage,
+            can_view_publications=belongs(session,user,row.id),can_export_list=can_export))
     return result
 
 
@@ -256,7 +262,7 @@ def publish(session,user,form_id,version_id,data,expected):
     round_ = session.get(m.ThesisRound, item.round_id)
     emit(session, user.id, recipients, "OFFICIAL_FORM_PUBLISHED", "official_form", item.id,
         f"Khoa đã phát hành {item.title} (v{version.version_no}) cho đợt {round_.code}.",
-        f"/forms?round_id={item.round_id}", include_actor=True)
+        f"/forms?round_id={item.round_id}&form_id={item.id}", include_actor=True)
     result = item_out(session, user, item)
     session.commit()
     return result

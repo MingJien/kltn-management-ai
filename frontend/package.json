@@ -7,7 +7,10 @@
     "dev": "vite --configLoader runner",
     "build": "tsc -p tsconfig.json --noEmit --incremental false && vite build --configLoader runner",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental false",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "qa:typecheck": "npm run typecheck",
+    "qa:build": "npm run build",
+    "qa:e2e:contracts": "playwright test ai-workspace.spec.ts qa-contracts-and-rbac.spec.ts"
   },
   "dependencies": {
     "docx-preview": "0.4.1",

@@ -1,10 +1,15 @@
 import {useEffect, useRef, useState} from "react";
 import {Link} from "react-router-dom";
+import {CalendarDays, GraduationCap, RefreshCw, ShieldCheck, UsersRound} from "lucide-react";
 import {request,type Context} from "../api";
 import {errorMessage} from "../errors";
 import {labels,when} from "../evaluation";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import FilterBar from "../components/ui/FilterBar";
+import {SkeletonCard} from "../components/ui/Skeleton";
+import EmptyState from "../components/ui/EmptyState";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import "../styles/defense.css";
 
 type Scope = {round_id:string;round_code:string;department_id:string;department:string};
@@ -115,12 +120,12 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
 
   return <div className="stack defense-page">
     <PageHeader title="Báo cáo và thống kê KLTN" description="Theo dõi điều kiện bảo vệ, kết quả và tiến độ nộp lưu theo đợt và bộ môn.">
-      <button className="btn btn-secondary" disabled={!round||(!data&&!error)} onClick={()=>{setError("");setRevision(value=>value+1);}}>Làm mới thống kê</button>
+      <button type="button" className="btn btn-secondary" disabled={!round||(!data&&!error)} onClick={()=>{setError("");setRevision(value=>value+1);}}><RefreshCw size={15} aria-hidden="true"/>Làm mới thống kê</button>
     </PageHeader>
     {error&&<p className="alert alert-danger" role="alert">{error}</p>}
     {notice&&<p className="alert alert-success" role="status">{notice}</p>}
-    {!scopes&&!error&&<p role="status">Đang tải phạm vi báo cáo…</p>}
-    {scopes?.length===0&&<p>Bạn chưa được giao xem báo cáo theo đợt hoặc bộ môn.</p>}
+    {!scopes&&!error&&<div className="stack" role="status" aria-label="Đang tải phạm vi báo cáo"><SkeletonCard /><SkeletonCard /></div>}
+    {scopes?.length===0&&<EmptyState title="Chưa được giao phạm vi báo cáo" description="Bạn chưa được giao xem báo cáo theo đợt hoặc bộ môn." />}
     {!!scopes?.length&&<div className="defense-form-grid">
       <label>Đợt KLTN<select className="input" value={round} onChange={event=>{setRound(event.target.value);setDepartment("");setFilter("");setError("");}}>
         {Array.from(rounds,([id,code])=><option key={id} value={id}>{code}</option>)}
@@ -129,9 +134,14 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
         <option value="">Tất cả bộ môn trong phạm vi</option>{scopes.filter(scope=>scope.round_id===round).map(scope=><option key={scope.department_id} value={scope.department_id}>{scope.department}</option>)}
       </select></label>
     </div>}
-    {round&&!data&&!error&&<p role="status">Đang tổng hợp số liệu…</p>}
+    {round&&!data&&!error&&<div className="dashboard-metrics" role="status" aria-label="Đang tổng hợp số liệu"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>}
     {data&&<>
-      <div className="dashboard-metrics">{[["Sinh viên",data.students],["Khóa luận",data.theses],["Hội đồng có lịch",data.councils],["Phiên bảo vệ",data.sessions]].map(([name,value])=><div className="card metric-card" key={name}><span>{name}</span><strong>{value}</strong></div>)}</div>
+      <div className="dashboard-metrics">{([
+        ["Sinh viên", data.students, UsersRound],
+        ["Khóa luận", data.theses, GraduationCap],
+        ["Hội đồng có lịch", data.councils, ShieldCheck],
+        ["Phiên bảo vệ", data.sessions, CalendarDays],
+      ] as const).map(([name,value,Icon])=><div className="card metric-card" key={name}><span className="flex items-center justify-between gap-2">{name}<Icon size={16} className="metric-card__icon" aria-hidden="true"/></span><strong>{value}</strong></div>)}</div>
       <div className="dashboard-breakdown">
         {breakdown("Điều kiện dự bảo vệ · theo SV",data.eligibility,labels,true)}
         {breakdown("Kết quả bảo vệ · theo SV",data.results,resultLabels,true)}
@@ -144,20 +154,35 @@ export default function Nv6ReportsPage({context}: {context:Context}) {
       <p className="text-muted">Số liệu cập nhật lúc {when(data.generated_at)} · {data.incomplete_profiles} sinh viên cần bổ sung dữ liệu học vụ.{rounds.get(round)==="SYN-DEMO"?" Đợt đang xem là dữ liệu giả lập.":""}</p>
       {context.base_role==="LECTURER"&&<section id="nv6-report-students" className="stack">
         <h2>Đối chiếu từng sinh viên</h2>
-        <div className="defense-form-grid">
-          <label>Tìm tên, MSSV hoặc đề tài<input className="input" value={search} onChange={event=>{setSearch(event.target.value);setLimit(25);}}/></label>
-          <label>Nhóm cần xem<select className="input" value={filter} onChange={event=>selectFilter(event.target.value)}><option value="">Tất cả</option><option value="issues">Dữ liệu học vụ cần đối chiếu</option>
-            {[...Object.keys(data.eligibility),...Object.keys(data.results)].map(key=><option key={key} value={key}>{labels[key]??resultLabels[key]}</option>)}</select></label>
-        </div>
+        <FilterBar
+          search={{
+            value: search,
+            onChange: (next) => { setSearch(next); setLimit(25); },
+            placeholder: "Tìm tên, MSSV hoặc đề tài…",
+            ariaLabel: "Tìm tên, MSSV hoặc đề tài",
+          }}
+          chips={[
+            ...(search.trim() ? [{ key: "q", label: `Từ khóa: "${search.trim()}"`, onRemove: () => setSearch("") }] : []),
+            ...(filter ? [{ key: "filter", label: `Nhóm: ${filter === "issues" ? "Dữ liệu học vụ cần đối chiếu" : labels[filter] ?? resultLabels[filter] ?? filter}`, onRemove: () => selectFilter("") }] : []),
+          ]}
+          onClearAll={() => { setSearch(""); selectFilter(""); }}
+          summary={`${visible.length} sinh viên · Hiển thị ${Math.min(visible.length,limit)}`}
+        >
+          <select aria-label="Nhóm cần xem" className="input" value={filter} onChange={event=>selectFilter(event.target.value)}>
+            <option value="">Tất cả</option>
+            <option value="issues">Dữ liệu học vụ cần đối chiếu</option>
+            {[...Object.keys(data.eligibility),...Object.keys(data.results)].map(key=><option key={key} value={key}>{labels[key]??resultLabels[key]}</option>)}
+          </select>
+        </FilterBar>
         <p role="status">{visible.length} sinh viên phù hợp · Hiển thị {Math.min(visible.length,limit)}</p>
-        <div className="defense-results" role="region" tabIndex={0} aria-label="Danh sách đối chiếu sinh viên"><table><thead><tr><th>Sinh viên và đề tài</th><th>Điều kiện</th><th>Kết quả</th><th>Dữ liệu học vụ</th></tr></thead><tbody>{visible.slice(0,limit).map(row=><tr key={row.id}>
-          <td><strong>{row.name}</strong><br/><small>{row.code} · {row.class_name||"Chưa có lớp"}</small><br/>{row.title}</td>
-          <td><Link to={`/evaluation/${row.thesis_id}`}>{labels[row.eligibility]??row.eligibility}</Link></td><td>{row.grade?.replace(".",",")??resultLabels[row.result]}{row.classification&&<><br/><small>{row.classification}</small></>}</td>
-          <td>{row.issues.length ? <>{row.issues.join(", ")}<br/>{row.slot_id?<Link to={`/defense?slot=${row.slot_id}&tab=results`}>Mở hồ sơ đối chiếu</Link>:
-            <button className="btn btn-secondary btn-sm" onClick={()=>{setNotice("");setEditing(row);}}>Bổ sung thông tin</button>}</>:"Đủ"}</td>
+        <div className="defense-results" role="region" tabIndex={0} aria-label="Danh sách đối chiếu sinh viên"><table className="table-responsive"><thead><tr><th>Sinh viên và đề tài</th><th>Điều kiện</th><th>Kết quả</th><th>Dữ liệu học vụ</th></tr></thead><tbody>{visible.slice(0,limit).map(row=><tr key={row.id}>
+          <td data-label="Sinh viên & đề tài"><strong>{row.name}</strong><br/><small>{row.code} · {row.class_name||"Chưa có lớp"}</small><br/>{row.title}</td>
+          <td data-label="Điều kiện"><Link to={`/evaluation/${row.thesis_id}`}><ThesisStatusBadge state={row.eligibility} label={labels[row.eligibility]??row.eligibility}/></Link></td><td data-label="Kết quả">{row.grade?.replace(".",",")??resultLabels[row.result]}{row.classification&&<><br/><small>{row.classification}</small></>}</td>
+          <td data-label="Dữ liệu học vụ">{row.issues.length ? <>{row.issues.join(", ")}<br/>{row.slot_id?<Link to={`/defense?slot=${row.slot_id}&tab=results`}>Mở hồ sơ đối chiếu</Link>:
+            <button type="button" className="btn btn-secondary btn-sm" onClick={()=>{setNotice("");setEditing(row);}}>Bổ sung thông tin</button>}</>:<ThesisStatusBadge state="CLEAR" label="Đủ"/>}</td>
         </tr>)}</tbody></table></div>
-        {!visible.length&&<p>Không có sinh viên phù hợp bộ lọc.</p>}
-        {visible.length>limit&&<button className="btn btn-secondary" onClick={()=>setLimit(v=>v+25)}>Xem thêm sinh viên</button>}
+        {!visible.length&&<EmptyState compact title="Không có sinh viên phù hợp bộ lọc" />}
+        {visible.length>limit&&<button type="button" className="btn btn-secondary" onClick={()=>setLimit(v=>v+25)}>Xem thêm sinh viên</button>}
       </section>}
     </>}
     {editing&&<ProfileCorrection row={editing} round={round} close={()=>setEditing(null)} saved={()=>{

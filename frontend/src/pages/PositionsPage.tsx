@@ -1,11 +1,16 @@
 import AssignmentTabs from "../components/layout/AssignmentTabs";
 import {useCallback,useEffect,useState} from "react";
 import {Link} from "react-router-dom";
-import {CalendarDays,RefreshCw,ShieldCheck,UserRoundPlus} from "lucide-react";
+import {CalendarDays,ChevronLeft,ChevronRight,RefreshCw,ShieldCheck,UserRoundPlus} from "lucide-react";
 import type {Context} from "../api";
 import {request} from "../api";
 import {errorMessage} from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import Tabs from "../components/ui/Tabs";
+import EmptyState from "../components/ui/EmptyState";
+import {SkeletonTable} from "../components/ui/Skeleton";
+import {ActivityTimeline,inferTimelineTone} from "../components/ui/Timeline";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import "../styles/positions.css";
 import {formatDate} from "../components/domain/CoreForms";
 
@@ -55,31 +60,39 @@ export default function PositionsPage({context}:{context:Context}){
       reset();await load();setNotice(message);
     }catch(cause){setError(errorMessage(cause));}finally{setBusy(false);}
   }
-  return <><PageHeader title="Chức vụ và phạm vi" description="Ghi nhận bổ nhiệm Trưởng bộ môn theo căn cứ của Khoa; quản lý thời gian hiệu lực, thay người và lịch sử."/>
+  return <><PageHeader title="Chức vụ và phạm vi" description="Quản lý bổ nhiệm Trưởng bộ môn, thời gian hiệu lực và lịch sử thay đổi."/>
     <AssignmentTabs />
     <div className="stack positions-page">
       <aside className="positions-info"><ShieldCheck size={20} aria-hidden="true"/><div><strong>Phạm vi của Trưởng bộ môn</strong><p>Được duyệt đề tài và hồ sơ giảng viên thuộc bộ môn. Quyền điều phối đợt và quản lý tài khoản được phân công riêng. TBM có thể tự xác nhận hồ sơ chuyên môn, hệ thống ghi rõ người xác nhận.</p></div></aside>
       {error&&<p className="alert alert-danger" role="alert">{error}</p>}{notice&&<p className="alert alert-success" role="status">{notice}</p>}
       <section className="card positions-card"><div className="card-body stack">
-        <div className="positions-section-heading"><div><h2><CalendarDays size={20}/> Quyết định và thời gian hiệu lực</h2><p>Theo dõi người được bổ nhiệm và lịch sử thay đổi theo bộ môn.</p></div>
-          <button className="btn btn-secondary" disabled={busy||loading} onClick={async()=>{setError("");setLoading(true);try{await load();}catch(cause){setError(errorMessage(cause));}finally{setLoading(false);}}}><RefreshCw size={16}/>Làm mới</button>
+        <div className="positions-section-heading"><div><h2><CalendarDays size={20} aria-hidden="true"/> Quyết định và thời gian hiệu lực</h2><p>Theo dõi người được bổ nhiệm và lịch sử thay đổi theo bộ môn.</p></div>
+          <button type="button" className="btn btn-secondary" disabled={busy||loading} onClick={async()=>{setError("");setLoading(true);try{await load();}catch(cause){setError(errorMessage(cause));}finally{setLoading(false);}}}><RefreshCw size={16} aria-hidden="true"/>Làm mới</button>
         </div>
         <div className="positions-filter"><label>Lọc theo bộ môn<select aria-label="Lọc theo bộ môn" className="input" value={filter} disabled={busy} onChange={event=>{setFilter(event.target.value);setPage(0);}}><option value="">Tất cả bộ môn</option>{catalog.departments.map(row=><option value={row.id} key={row.id}>{row.code} · {row.name}</option>)}</select></label><span>{total} quyết định</span></div>
         <p className="positions-scroll-hint">Kéo bảng sang ngang để xem thời gian, căn cứ và trạng thái.</p>
-        {loading?<p role="status">Đang tải chức vụ…</p>:!listLoaded?<p role="alert">Không tải được danh sách quyết định. Hãy kiểm tra kết nối và bấm Làm mới.</p>:<div className="table-container" role="region" aria-label="Danh sách bổ nhiệm Trưởng bộ môn" tabIndex={0}><table className="table positions-table"><thead><tr><th>Giảng viên</th><th>Chức vụ / phạm vi</th><th>Thời gian hiệu lực</th><th>Căn cứ bổ nhiệm</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}>
-          <td><strong>{row.lecturer_name}</strong><small>{row.lecturer_code}</small></td><td><strong>Trưởng bộ môn</strong><small>{row.department_name}</small></td>
-          <td><span>Từ {formatDate(row.effective_from)}</span><small>Đến {row.effective_to?formatDate(row.effective_to):"chưa ấn định"}</small></td>
-          <td className="positions-table__basis">{row.basis_ref||"Chưa ghi nhận căn cứ trên hệ thống"}</td>
-          <td><span className={"positions-status positions-status--"+row.status.toLowerCase()}>{statusLabels[row.status]||row.status}</span></td></tr>)}</tbody></table>{!rows.length&&<p className="positions-empty">Chưa có quyết định trong phạm vi đã chọn.</p>}</div>}
-        <div className="positions-pagination"><button className="btn btn-secondary" disabled={loading||busy||page===0} onClick={()=>setPage(value=>value-1)}>Trang trước</button><span>Trang {page+1} · {total} quyết định</span><button className="btn btn-secondary" disabled={loading||busy||(page+1)*SIZE>=total} onClick={()=>setPage(value=>value+1)}>Trang sau</button></div>
+        {loading?<SkeletonTable rows={4} cols={5} />:!listLoaded?<p role="alert">Không tải được danh sách quyết định. Hãy kiểm tra kết nối và bấm Làm mới.</p>:<div className="table-container" role="region" aria-label="Danh sách bổ nhiệm Trưởng bộ môn" tabIndex={0}><table className="table positions-table table-responsive"><thead><tr><th>Giảng viên</th><th>Chức vụ / phạm vi</th><th>Thời gian hiệu lực</th><th>Căn cứ bổ nhiệm</th><th>Trạng thái</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}>
+          <td data-label="Giảng viên"><strong>{row.lecturer_name}</strong><small>{row.lecturer_code}</small></td><td data-label="Chức vụ / phạm vi"><strong>Trưởng bộ môn</strong><small>{row.department_name}</small></td>
+          <td data-label="Thời gian hiệu lực"><span>Từ {formatDate(row.effective_from)}</span><small>Đến {row.effective_to?formatDate(row.effective_to):"chưa ấn định"}</small></td>
+          <td data-label="Căn cứ bổ nhiệm" className="positions-table__basis">{row.basis_ref||"Chưa ghi nhận căn cứ trên hệ thống"}</td>
+          <td data-label="Trạng thái"><ThesisStatusBadge state={row.status==="EFFECTIVE"?"APPROVED":row.status==="SCHEDULED"?"UNDER_REVIEW":row.status} label={statusLabels[row.status]||row.status}/></td></tr>)}</tbody></table>{!rows.length&&<EmptyState compact title="Chưa có quyết định trong phạm vi đã chọn."/>}</div>}
+        <div className="positions-pagination"><button type="button" className="btn btn-secondary" disabled={loading||busy||page===0} onClick={()=>setPage(value=>value-1)}><ChevronLeft size={15} aria-hidden="true"/>Trang trước</button><span>Trang {page+1} · {total} quyết định</span><button type="button" className="btn btn-secondary" disabled={loading||busy||(page+1)*SIZE>=total} onClick={()=>setPage(value=>value+1)}>Trang sau<ChevronRight size={15} aria-hidden="true"/></button></div>
       </div></section>
-      <nav className="positions-task-tabs" aria-label="Thao tác chức vụ">
-        <button type="button" className={mode==="grant"?"is-active":""} aria-current={mode==="grant"?"page":undefined} disabled={busy} onClick={()=>switchMode("grant")}>Bổ nhiệm</button>
-        <button type="button" className={mode==="replace"?"is-active":""} aria-current={mode==="replace"?"page":undefined} disabled={busy} onClick={()=>switchMode("replace")}>Thay người</button>
-        <button type="button" className={mode==="revoke"?"is-active":""} aria-current={mode==="revoke"?"page":undefined} disabled={busy} onClick={()=>switchMode("revoke")}>Thu hồi chức vụ</button>
-      </nav>
+      <Tabs
+        asButtons
+        variant="underline"
+        idPrefix="positions-task"
+        ariaLabel="Thao tác chức vụ"
+        items={[
+          {id:"grant",label:"Bổ nhiệm"},
+          {id:"replace",label:"Thay người"},
+          {id:"revoke",label:"Thu hồi chức vụ"},
+        ]}
+        activeId={mode}
+        onChange={(next)=>switchMode(next as "grant"|"replace"|"revoke")}
+      />
       <section className="card positions-card"><div className="card-body stack">
-        <div className="positions-section-heading"><div><h2><UserRoundPlus size={20}/>{mode==="grant"?"Ghi nhận bổ nhiệm Trưởng bộ môn":mode==="replace"?"Ghi nhận thay người giữ chức vụ":"Thu hồi bổ nhiệm"}</h2><p>Nhập thông tin theo căn cứ bổ nhiệm của Khoa hoặc Trường.</p></div></div>
+        <div className="positions-section-heading"><div><h2><UserRoundPlus size={20} aria-hidden="true"/>{mode==="grant"?"Ghi nhận bổ nhiệm Trưởng bộ môn":mode==="replace"?"Ghi nhận thay người giữ chức vụ":"Thu hồi bổ nhiệm"}</h2><p>Nhập thông tin theo căn cứ bổ nhiệm của Khoa hoặc Trường.</p></div></div>
         {mode!=="grant" && <label className="positions-decision-picker">Quyết định cần {mode==="replace"?"thay người":"thu hồi"}
           <select aria-label="Quyết định cần xử lý" className="input" value={selected?.id || ""} disabled={busy || loading} onChange={event=>choose(event.target.value)}>
             <option value="">Chọn quyết định đang hoặc sắp hiệu lực</option>
@@ -103,8 +116,20 @@ export default function PositionsPage({context}:{context:Context}){
         <div className="positions-section-heading"><div><h2>Lịch sử quyết định</h2><p>Các quyết định trên trang hiện tại theo bộ lọc và phân trang ở trên.</p></div></div>
         {rows.length ? rows.map(row=><details key={row.id}>
           <summary>{row.lecturer_name} · {row.department_name} · {statusLabels[row.status] || row.status} · từ {formatDate(row.effective_from)}</summary>
-          <div className="positions-history__body">{row.changes.length ? row.changes.map((change,index)=><p key={index}><strong>{actionLabels[change.action]||change.action}</strong> · {formatDate(change.at)}<br/>Căn cứ: {change.basis_ref || "Chưa ghi nhận"}<br/>{change.reason}</p>) : <p>Quyết định có trước chức năng này; chưa có lịch sử thao tác mới.</p>}
-          <Link to={"/activity?resource_type=position_assignment&resource_id="+row.id}>Xem nhật ký đầy đủ</Link></div>
+          <div className="positions-history__body">
+            <ActivityTimeline
+              items={row.changes.map((change,index)=>({
+                id: `${row.id}-ch-${index}`,
+                title: actionLabels[change.action]||change.action,
+                timestamp: formatDate(change.at),
+                note: [change.basis_ref ? `Căn cứ: ${change.basis_ref}` : "", change.reason].filter(Boolean).join(" — ") || undefined,
+                tone: inferTimelineTone(change.action),
+              }))}
+              emptyText="Quyết định có trước chức năng này; chưa có lịch sử thao tác mới."
+              ariaLabel={`Lịch sử quyết định ${row.lecturer_name}`}
+            />
+            <Link to={"/activity?resource_type=position_assignment&resource_id="+row.id}>Xem nhật ký đầy đủ</Link>
+          </div>
         </details>) : <p className="text-muted">{loading?"Đang tải lịch sử…":"Chưa có quyết định trong phạm vi đã chọn."}</p>}
       </div></section>
     </div></>;

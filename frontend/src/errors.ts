@@ -42,20 +42,18 @@ const messages: Record<string, string> = {
   "Use a PDF, PNG or JPEG with matching file content": "Chọn tệp PDF, PNG hoặc JPEG hợp lệ.",
   "Topic title is too short": "Tên đề tài cần ít nhất 5 ký tự có nội dung.",
   "Revised title is too short": "Tên đề tài sau duyệt cần ít nhất 5 ký tự có nội dung.",
+  "Qdrant is not configured": "Dịch vụ tra cứu AI chưa được cấu hình trên máy chủ. Vui lòng liên hệ quản trị viên.",
+  "Embedding or Qdrant dependency unavailable": "Dịch vụ tra cứu AI tạm thời không khả dụng. Vui lòng thử lại sau.",
 };
 
 export function apiMessage(status: number, detail: unknown, path = ""): string {
-  if ((path.startsWith("/nv6-reports/") || path.startsWith("/thesis-archive/")) && typeof detail === "string" &&
-      [403,409,422,503].includes(status) && /[^\x00-\x7F]/.test(detail)) return detail;
-  if (path.startsWith("/defense/") && typeof detail === "string" && [403, 409, 422].includes(status) && /[^\x00-\x7F]/.test(detail)) return detail;
-  // These workflows return actionable Vietnamese explanations for their business rules.
-  if (typeof detail === "string" && [403, 409, 422].includes(status) &&
-      (path.startsWith("/thesis-changes/") || path.startsWith("/thesis-extension-requests/") || /^\/theses\/[^/]+\/(change-requests|extension-requests|extension)(?:\/|$)/.test(path))) {
-    if (messages[detail]) return messages[detail];
-    if (/[^\x00-\x7F]/.test(detail)) return detail;
+  if (typeof detail === "string" && messages[detail]) return messages[detail];
+  if (typeof detail === "string" && [403, 409, 413, 422, 429, 503].includes(status) && /[^\x00-\x7F]/.test(detail) &&
+      !path.includes("/roster")) {
+    return detail;
   }
   if (path.startsWith("/admin/lecturers") && typeof detail === "string"
-      && [409, 413, 422, 429, 503].includes(status)) return messages[detail] || detail;
+      && [409, 413, 422, 429, 503].includes(status)) return detail;
   if (path.startsWith("/admin/rounds/") && path.endsWith("/extend") && typeof detail === "string" &&
       [409, 422].includes(status)) return detail;
   if (status === 409 && path.includes("/roster") && typeof detail === "string") {
@@ -101,7 +99,10 @@ export function apiMessage(status: number, detail: unknown, path = ""): string {
   if (status === 403) return "Tài khoản không có quyền thực hiện thao tác này.";
   if (status === 404) return "Không tìm thấy hồ sơ hoặc bạn không có quyền xem.";
   if (status === 409) return "Hồ sơ đã thay đổi hoặc không còn ở trạng thái cho phép. Hãy làm mới rồi kiểm tra lại.";
+  if (status === 413) return "Tệp tải lên vượt quá dung lượng cho phép.";
   if (status === 422) return "Thông tin chưa hợp lệ. Vui lòng kiểm tra nội dung đã nhập.";
+  if (status === 429) return "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.";
+  if (status === 503) return "Dịch vụ tạm thời gián đoạn hoặc chưa sẵn sàng. Vui lòng thử lại sau.";
   return "Chưa thực hiện được thao tác. Vui lòng thử lại hoặc liên hệ người quản lý hệ thống.";
 }
 

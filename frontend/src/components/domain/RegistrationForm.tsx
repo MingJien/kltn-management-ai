@@ -22,6 +22,7 @@ export default function RegistrationForm({ context, userId, roundId, busy, disab
   }, [roundId, userId]);
   function chooseEvidence(file?: File) {
     if (!file) return;
+    if (file.size === 0) { setEvidence(null); setEvidenceError("Tệp minh chứng đang rỗng (0 byte). Vui lòng chọn tệp có nội dung hợp lệ."); return; }
     if (file.size > 5 * 1024 * 1024) { setEvidence(null); setEvidenceError("Tệp minh chứng tối đa 5 MB."); return; }
     if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) {
       setEvidence(null); setEvidenceError("Chỉ nhận tệp PDF, PNG hoặc JPEG."); return;
@@ -61,7 +62,7 @@ export default function RegistrationForm({ context, userId, roundId, busy, disab
       </label>
       {evidence ? <div className="registration-evidence__selected"><span>{evidence.name}</span>
         <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => {setEvidence(null); setEvidenceError("");}}>
-          <X size={14} aria-hidden="true" style={{marginRight: 4, verticalAlign: "middle"}} /> Xóa tệp đã chọn
+          <X size={14} aria-hidden="true" /> Xóa tệp đã chọn
         </button></div> : null}
       {evidenceError ? <p className="alert alert-danger" role="alert">{evidenceError}</p> : null}
       <p className="text-caption text-muted">PDF, PNG hoặc JPEG, tối đa 5 MB. Nếu có nhiều giấy tờ, gộp thành một tệp PDF.</p>

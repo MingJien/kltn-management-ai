@@ -128,9 +128,10 @@ export function uploadRegistrationForm(registrationId:string,userId:string,forms
 }
 
 export async function downloadRegistrationForm(registrationId:string,version:RegistrationFormVersion,printCopy=false) {
-  const response=await fetch(`${baseUrl}/api/v1/topic-registrations/${registrationId}/forms/${version.id}/${printCopy?"print-copy":"download"}`,{
+  const path = `/topic-registrations/${registrationId}/forms/${version.id}/${printCopy?"print-copy":"download"}`;
+  const response=await fetch(`${baseUrl}/api/v1${path}`,{
     method:printCopy?"POST":"GET",credentials:"include",headers:{...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})}});
-  if(!response.ok) {const body=await response.json().catch(()=>null);throw new Error(body?.detail||`HTTP ${response.status}`);}
+  if(!response.ok) return throwResponseError(response, path);
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");link.href=url;
   link.download=responseFileName(response, "Ban-goc-v"+version.version_no+"-"+version.file_name);
   link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -141,6 +142,15 @@ const baseUrl = import.meta.env.VITE_API_URL
   || (import.meta.env.DEV ? "" : `${window.location.protocol}//${window.location.hostname}:8000`);
 export const apiAssetUrl = (path:string) => baseUrl + path;
 let sessionCsrfToken: string | null = null;
+
+async function throwResponseError(response: Response, path: string): Promise<never> {
+  const body = await response.json().catch(() => null);
+  if (response.status === 401 && path !== "/auth/login" && path !== "/me/context") {
+    sessionCsrfToken = null;
+    window.dispatchEvent(new Event("kltn:session-expired"));
+  }
+  throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
+}
 
 export function evidenceUrl(registrationId: string, studentId: string) {
   return `${baseUrl}/api/v1/topic-registrations/${registrationId}/members/${studentId}/evidence`;
@@ -205,24 +215,15 @@ export async function request<T>(
   }); } catch {
     throw new Error("Không kết nối được máy chủ hoặc yêu cầu quá lâu. Kiểm tra kết nối rồi thử lại.");
   } finally {window.clearTimeout(timer);}
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    if (response.status === 401 && path !== "/auth/login" && path !== "/me/context") {
-      sessionCsrfToken = null;
-      window.dispatchEvent(new Event("kltn:session-expired"));
-    }
-    throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
-  }
+  if (!response.ok) return throwResponseError(response, path);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export async function downloadLecturerImportTemplate() {
-  const response = await fetch(`${baseUrl}/api/v1/admin/lecturers/import-template`, {credentials: "include"});
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new ApiError(response.status, apiMessage(response.status, body?.detail));
-  }
+  const path = "/admin/lecturers/import-template";
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include"});
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url; link.download = "danh-sach-giang-vien-mau.xlsx"; link.click();
@@ -263,20 +264,14 @@ export function fetchProgressEvidence(thesisId: string, reportId: string, signal
 
 export async function fetchReviewFile(path: string, signal?: AbortSignal): Promise<ArrayBuffer> {
   const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include", signal});
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new ApiError(response.status, apiMessage(response.status, body?.detail));
-  }
+  if (!response.ok) return throwResponseError(response, path);
   return response.arrayBuffer();
 }
 
 export async function downloadFile(path: string, fallback: string, method: "GET" | "POST" = "GET"): Promise<void> {
   const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include", method,
     headers: method === "POST" && sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}});
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new ApiError(response.status, apiMessage(response.status, body?.detail, path));
-  }
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -301,11 +296,9 @@ export function submitProgress(thesisId: string, userId: string, data: object, f
 }
 
 export async function downloadProgressEvidence(thesisId: string, report: ProgressReport) {
-  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/progress-reports/${report.id}/evidence`, {credentials:"include"});
-  if (!response.ok) {
-    const body = await response.json().catch(()=>null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
-  }
+  const path = `/theses/${thesisId}/progress-reports/${report.id}/evidence`;
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials:"include"});
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a"); link.href=url; link.download=responseFileName(response, report.evidence_file_name || "minh-chung"); link.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -335,14 +328,12 @@ export function uploadProposal(thesisId: string, proposal: Proposal, userId: str
 }
 
 export async function downloadProposal(thesisId: string, version: Proposal["versions"][number], _userId: string, printCopy=false) {
-  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/proposal/versions/${version.id}/${printCopy ? "print-copy" : "download"}`, {
+  const path = `/theses/${thesisId}/proposal/versions/${version.id}/${printCopy ? "print-copy" : "download"}`;
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {
     method: printCopy ? "POST" : "GET", credentials: "include",
     headers: { ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
-  }
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
@@ -371,11 +362,9 @@ export async function listFormTemplates(userId?: string, roundId?: string): Prom
 }
 
 export async function downloadOfficialTemplate(templateId: string, filename: string, roundId?: string) {
-  const response = await fetch(`${baseUrl}/api/v1/form-templates/${templateId}/download${roundId ? `?round_id=${roundId}` : ""}`, {credentials: "include"});
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
-  }
+  const path = `/form-templates/${templateId}/download${roundId ? `?round_id=${roundId}` : ""}`;
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include"});
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
@@ -385,21 +374,20 @@ export async function downloadOfficialTemplate(templateId: string, filename: str
 }
 
 export async function exportThesisReview(thesisId:string, reviewId:string, version:number) {
-  const response=await fetch(`${baseUrl}/api/v1/theses/${thesisId}/evaluation/reviews/${reviewId}/print-copy`, {
+  const path = `/theses/${thesisId}/evaluation/reviews/${reviewId}/print-copy`;
+  const response=await fetch(`${baseUrl}/api/v1${path}`, {
     method:"POST",credentials:"include",headers:{"If-Match":String(version),...(sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{})},
   });
-  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  if(!response.ok) return throwResponseError(response, path);
   const url=URL.createObjectURL(await response.blob());const anchor=document.createElement("a");
   anchor.href=url;anchor.download=responseFileName(response,"Phieu-nhan-xet.docx");anchor.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 async function downloadFormTemplate(kind: "plan" | "proposal", name: string, roundId?: string) {
-  const response = await fetch(`${baseUrl}/api/v1/form-templates/${kind}${roundId ? `?round_id=${roundId}` : ""}`, {credentials: "include"});
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
-  }
+  const path = `/form-templates/${kind}${roundId ? `?round_id=${roundId}` : ""}`;
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {credentials: "include"});
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
@@ -412,14 +400,12 @@ export const downloadPlanTemplate = (roundId?: string) => downloadFormTemplate("
 export const downloadProposalTemplate = (roundId?: string) => downloadFormTemplate("proposal", "mau-03-de-cuong.docx", roundId);
 
 export async function downloadDocument(thesisId: string, doc: ThesisDocument, version: DocumentVersion, _userId: string, printCopy=false) {
-  const response = await fetch(`${baseUrl}/api/v1/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/${printCopy ? "print-copy" : "download"}`, {
+  const path = `/theses/${thesisId}/documents/${doc.id}/versions/${version.id}/${printCopy ? "print-copy" : "download"}`;
+  const response = await fetch(`${baseUrl}/api/v1${path}`, {
     method: printCopy ? "POST" : "GET", credentials: "include",
     headers: { ...(sessionCsrfToken ? {"X-CSRF-Token": sessionCsrfToken} : {}) },
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || `HTTP ${response.status}`);
-  }
+  if (!response.ok) return throwResponseError(response, path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = url;
@@ -439,13 +425,14 @@ export type ChatResult = {
   provider_status: "NOT_CONFIGURED";
 };
 
-export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_publications:boolean;can_export_list:boolean};
+export type SchoolFormRound = {id:string;label:string;state:string;can_manage:boolean;can_view_catalog?:boolean;can_view_publications:boolean;can_export_list:boolean};
 
 export async function exportRoundMau04(roundId:string) {
-  const response=await fetch(`${baseUrl}/api/v1/school-forms/rounds/${encodeURIComponent(roundId)}/mau-04`,{
+  const path = `/school-forms/rounds/${encodeURIComponent(roundId)}/mau-04`;
+  const response=await fetch(`${baseUrl}/api/v1${path}`,{
     method:"POST",credentials:"include",headers:sessionCsrfToken?{"X-CSRF-Token":sessionCsrfToken}:{},
   });
-  if(!response.ok){const data=await response.json().catch(()=>null);throw new ApiError(response.status,apiMessage(response.status,data?.detail));}
+  if(!response.ok) return throwResponseError(response, path);
   const url=URL.createObjectURL(await response.blob());const link=document.createElement("a");
   link.href=url;link.download=responseFileName(response,"Mau-04-Danh-sach-SV-GVHD.xlsx");link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

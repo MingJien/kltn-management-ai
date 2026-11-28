@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { ArrowLeft, KeyRound, Send } from "lucide-react";
 import { errorMessage } from "../errors";
 import { request } from "../api";
 import PasswordField from "../components/ui/PasswordField";
@@ -51,12 +52,18 @@ export default function AccountAccessPage({signedInAs, onPasswordUpdated}: {
   }
 
   return <div className="account-entry"><div className="card account-entry__card"><div className="card-body stack">
-    <div className="sidebar__brand-mark" aria-hidden="true">K</div>
+    <div className="flex items-center gap-3">
+      <img className="sidebar__brand-mark" src="/assets/dthu-logo.png" alt="Đại học Đồng Tháp" />
+      <div className="flex flex-col">
+        <span className="text-overline text-primary">DThU · KLTN</span>
+        <span className="text-caption">Khoa Công nghệ và Kỹ thuật</span>
+      </div>
+    </div>
     <h1>{title}</h1>
     <p className="text-muted">{settingPassword ? "Liên kết chỉ có hiệu lực một lần. Mật khẩu cần ít nhất 12 ký tự." :
       mode === "activation-request" ? "Chỉ tài khoản trong danh sách đã được Khoa xác nhận mới được kích hoạt." :
         "Nhập email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu."}</p>
-    {settingPassword && signedInAs ? <p className="alert">Bạn đang đăng nhập với tài khoản {signedInAs}. Sau khi lưu mật khẩu, hệ thống sẽ đăng xuất tài khoản này để bạn đăng nhập tài khoản vừa kích hoạt.</p> : null}
+    {settingPassword && signedInAs ? <p className="alert alert-info">Bạn đang đăng nhập với tài khoản {signedInAs}. Sau khi lưu mật khẩu, hệ thống sẽ đăng xuất tài khoản này để bạn đăng nhập tài khoản vừa kích hoạt.</p> : null}
     <form onSubmit={(event) => void submit(event)} className="stack">
       {mode === "activation-request" ? <label className="input-group">MSSV hoặc mã giảng viên
         <input className="input" required maxLength={32} value={identifier} onChange={e=>setIdentifier(e.target.value)} />
@@ -92,11 +99,17 @@ export default function AccountAccessPage({signedInAs, onPasswordUpdated}: {
       </> : null}
       {settingPassword && !token ? <p role="alert" className="alert alert-danger">Liên kết không hợp lệ hoặc đã được sử dụng.</p> : null}
       <button className="btn btn-primary" disabled={busy || (settingPassword && !token)}>
+        {settingPassword ? <KeyRound size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
         {busy ? "Đang xử lý…" : settingPassword ? "Lưu mật khẩu" : "Gửi hướng dẫn"}
       </button>
     </form>
     {notice ? <p role="status" className="alert alert-success">{notice}</p> : null}
     {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
-    <Link to="/">Quay lại đăng nhập</Link>
+    <div className="account-entry__links">
+      <Link className="inline-flex items-center gap-1" to="/">
+        <ArrowLeft size={14} aria-hidden="true" />
+        Quay lại đăng nhập
+      </Link>
+    </div>
   </div></div></div>;
 }

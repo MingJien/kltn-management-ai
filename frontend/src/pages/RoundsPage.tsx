@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import { CalendarPlus, CalendarRange, Check, Edit3, Lock, Plus, Unlock } from "lucide-react";
 import type { Context } from "../api";
 import { request } from "../api";
 import { ApiError, errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import EmptyState from "../components/ui/EmptyState";
+import { SkeletonCard } from "../components/ui/Skeleton";
+import { ActivityTimeline, inferTimelineTone } from "../components/ui/Timeline";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import "../styles/rounds.css";
 
 type Round = {
@@ -37,16 +42,24 @@ function RoundHistory({roundId,userId,version}:{roundId:string;userId:string;ver
     <summary>Lịch sử đợt</summary>
     {error&&<p role="alert">{error}</p>}
     {!rows&&!error&&<p role="status">Đang tải lịch sử…</p>}
-    {rows?.map(row=><div className="round-history__item" key={row.id}>
-      <strong>{labels[row.action]||"Cập nhật đợt"}</strong>
-      <small>{new Date(row.at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"})} · {row.actor}</small>
-      {row.reference&&<p>{row.reference}</p>}{row.reason&&<p>{row.reason}</p>}
-    </div>)}
+    {rows&&<ActivityTimeline
+      items={rows.map(row=>({
+        id: row.id,
+        title: labels[row.action]||"Cập nhật đợt",
+        actor: row.actor,
+        timestamp: new Date(row.at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"}),
+        badge: row.reference ? <span className="code-chip">{row.reference}</span> : undefined,
+        note: row.reason || undefined,
+        tone: inferTimelineTone(row.action),
+      }))}
+      ariaLabel="Lịch sử đợt KLTN"
+    />}
   </details>;
 }
 
 export default function RoundsPage({context}: {context: Context}) {
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [loading, setLoading] = useState(true);
   const [yearCode, setYearCode] = useState("");
   const [yearStart, setYearStart] = useState("");
   const [yearEnd, setYearEnd] = useState("");
@@ -69,7 +82,12 @@ export default function RoundsPage({context}: {context: Context}) {
   const reload = useCallback(async () => {
     setRounds(await request<Round[]>("/admin/rounds", context.user_id));
   }, [context.user_id]);
-  useEffect(() => { void reload().catch(cause => setError(errorMessage(cause))); }, [reload]);
+  useEffect(() => {
+    setLoading(true);
+    void reload()
+      .catch(cause => setError(errorMessage(cause)))
+      .finally(() => setLoading(false));
+  }, [reload]);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -140,9 +158,12 @@ export default function RoundsPage({context}: {context: Context}) {
       {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
       {notice ? <p role="status" className="alert alert-success">{notice}</p> : null}
       <section className="card"><div className="card-body stack"><h2>Các đợt đã tạo</h2>
-        {!rounds.length ? <p>Chưa có đợt nào.</p> : <div className="account-list">{rounds.map(row => <div className="account-list__row" key={row.id}>
-          <div><strong>{row.academic_year_code} · {row.code}</strong><br />
-            <span>{row.round_type === "MAIN" ? "Đợt chính" : "Đợt bổ sung"} · {row.state === "DRAFT" ? "Bản nháp" : row.state === "OPEN" ? "Đã mở" : row.state === "CLOSED" ? "Đã đóng" : "Lưu trữ"}</span><br />
+        {loading ? <div className="stack" role="status" aria-label="Đang tải danh sách đợt"><SkeletonCard /></div>
+          : !rounds.length ? <EmptyState icon={<CalendarRange aria-hidden="true" />} title="Chưa có đợt nào" description="Tạo đợt KLTN đầu tiên bằng biểu mẫu bên dưới." />
+          : <div className="account-list">{rounds.map(row => <div className="account-list__row" key={row.id}>
+          <div><div className="flex flex-wrap items-center gap-2"><strong>{row.academic_year_code} · {row.code}</strong>
+            <ThesisStatusBadge state={row.state} label={row.state === "DRAFT" ? "Bản nháp" : row.state === "OPEN" ? "Đã mở" : row.state === "CLOSED" ? "Đã đóng" : "Lưu trữ"} /></div>
+            <span className="text-body-sm text-muted">{row.round_type === "MAIN" ? "Đợt chính" : "Đợt bổ sung"}</span><br />
             <span className="text-caption">{new Date(row.opens_at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"})} – {new Date(row.closes_at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"})}</span>
           </div>
           <div className="rounds-row-actions">{row.state === "DRAFT" ? <button className="btn btn-secondary btn-sm" disabled={busy}
@@ -151,13 +172,13 @@ export default function RoundsPage({context}: {context: Context}) {
               setYearEnd(row.year_ends_on); setCode(row.code); setRoundType(row.round_type);
               setOpensAt(localDateTime(row.opens_at)); setClosesAt(localDateTime(row.closes_at));
               setBasis(""); setError(""); document.getElementById("round-editor")?.scrollIntoView({block: "start", behavior: "smooth"});
-            }}>Sửa bản nháp</button> : null}
+            }}><Edit3 size={14} aria-hidden="true" />Sửa bản nháp</button> : null}
           {["OPEN","CLOSED"].includes(row.state) && <button className="btn btn-secondary btn-sm" disabled={busy}
-            onClick={()=>{setExtension(row);setNewDeadline("");setExtensionBasis("");setExtensionReason("");setReopen(false);setError("");}}>{row.state==="CLOSED"?"Gia hạn và mở lại":"Gia hạn đăng ký"}</button>}
+            onClick={()=>{setExtension(row);setNewDeadline("");setExtensionBasis("");setExtensionReason("");setReopen(false);setError("");}}><CalendarPlus size={14} aria-hidden="true" />{row.state==="CLOSED"?"Gia hạn và mở lại":"Gia hạn đăng ký"}</button>}
           <RoundHistory roundId={row.id} userId={context.user_id} version={row.row_version}/>
           {row.state === "DRAFT" || row.state === "OPEN" ? <button className="btn btn-secondary btn-sm" disabled={busy}
             onClick={() => {setTarget({round: row, state: row.state === "DRAFT" ? "OPEN" : "CLOSED"}); setReason(""); setError("");}}>
-            {row.state === "DRAFT" ? "Mở đợt" : "Đóng đợt"}</button> : null}</div>
+            {row.state === "DRAFT" ? <><Unlock size={14} aria-hidden="true" />Mở đợt</> : <><Lock size={14} aria-hidden="true" />Đóng đợt</>}</button> : null}</div>
         </div>)}</div>}
       </div></section>
       <section className="card" id="round-editor"><div className="card-body stack"><h2>{editing ? "Sửa bản nháp " + editing.code : "Tạo đợt mới"}</h2>
@@ -186,6 +207,7 @@ export default function RoundsPage({context}: {context: Context}) {
               <input className="input" type="datetime-local" required min={opensAt || undefined} value={closesAt} onChange={e => setClosesAt(e.target.value)} /></label>
           </div>
           <div className="flex gap-2"><button className="btn btn-primary" disabled={busy || (!!opensAt && !!closesAt && closesAt <= opensAt)}>
+            {editing ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
             {busy ? "Đang lưu…" : editing ? "Lưu bản nháp" : "Tạo bản nháp"}</button>
             {editing ? <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => {
               setEditing(null); setCode(""); setOpensAt(""); setClosesAt(""); setBasis("");

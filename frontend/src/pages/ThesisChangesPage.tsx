@@ -6,6 +6,10 @@ import {errorMessage} from "../errors";
 import {downloadEvaluationFile,when} from "../evaluation";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import Tabs from "../components/ui/Tabs";
+import EmptyState from "../components/ui/EmptyState";
+import {SkeletonCard} from "../components/ui/Skeleton";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import ThesisExtensionRequests,{type ExtensionRequest} from "../components/domain/ThesisExtensionRequests";
 import "../styles/thesis-changes.css";
 import "../styles/assignment-tabs.css";
@@ -37,7 +41,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
   const completed=[groupReady,item.ready,item.state==="APPROVED",!pending(item)];
   return <article className="change-card card" id={"change-"+item.id}><div className="card-body stack">
     <div className="change-card__heading"><div><p className="change-eyebrow">{item.code} · {item.scope==="INDIVIDUAL"?"Tách cá nhân · ":""}{item.kind==="REPLACEMENT"?"Chuyển sang đề tài khác":"Điều chỉnh tên và phạm vi"}</p>
-      <h3>{item.proposed_title}</h3></div><span className={"change-status change-status--"+item.state.toLowerCase()}>{labels[item.state]}</span></div>
+      <h3>{item.proposed_title}</h3></div><ThesisStatusBadge className="change-status" state={item.state} label={labels[item.state]}/></div>
     <p>SV · {item.snapshot.members.map(m=>m.name).join(", ")} · GVHD · {item.advisor_name||"Chưa ghi nhận"}</p>
     <ol className="change-steps" aria-label="Tiến trình xét duyệt">
       {[item.scope==="INDIVIDUAL"?"Người đề nghị xác nhận":"Thành viên đồng ý","GVHD xem xét","Bộ môn quyết định","Kết quả"].map((text,index)=><li key={text} aria-current={pending(item)&&index===current?"step":undefined}
@@ -64,7 +68,7 @@ function ChangeCard({item,userId,open}:{item:Change;userId:string;open:(op:Opera
       {item.review_roles.map(role=><button key={role} className="btn btn-primary" disabled={!groupReady} onClick={()=>open({kind:"review",item,role})}>{labels[role]} xem xét</button>)}
       {item.can_decide&&<button className="btn btn-primary" onClick={()=>open({kind:"decision",item})}>Bộ môn xét duyệt</button>}
       {item.can_cancel&&<button className="btn btn-secondary" onClick={()=>open({kind:"cancel",item})}>Hủy yêu cầu</button>}
-      {item.state==="APPROVED"&&<Link to={`/theses/${item.scope==="INDIVIDUAL"&&item.requested_by===userId?item.result_thesis_id:item.thesis_id}?section=submissions`} className="btn btn-primary">Cập nhật hồ sơ <ChevronRight size={16}/></Link>}
+      {item.state==="APPROVED"&&<Link to={`/theses/${item.scope==="INDIVIDUAL"&&item.requested_by===userId?item.result_thesis_id:item.thesis_id}?section=submissions`} className="btn btn-primary">Cập nhật hồ sơ <ChevronRight size={16} aria-hidden="true"/></Link>}
     </div><p className="change-meta">Gửi lúc {when(item.submitted_at)} · Phiên bản {item.row_version}</p>
   </div></article>;
 }
@@ -79,7 +83,8 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
   const [confirmed,setConfirmed]=useState(false);
   const t="thesis" in op?op.thesis:null;
   const item="item" in op?op.item:null;
-  const candidate=t?.candidates.find(c=>c.id===target);
+  const visibleCandidates = t ? t.candidates.filter(c => scope === "INDIVIDUAL" ? c.individual_available : c.group_available) : [];
+  const candidate = visibleCandidates.find(c => c.id === target);
   const titles={create:"Đề nghị đổi đề tài",start:"Thiết lập ngày bắt đầu",
     consent:"Xác nhận của thành viên",review:"Ý kiến của giảng viên",decision:"Quyết định của bộ môn",cancel:"Hủy yêu cầu đổi đề tài"};
   async function save(e:FormEvent<HTMLFormElement>) {
@@ -117,8 +122,8 @@ function OperationDialog({operation,busy,error,close,submit}:{operation:Operatio
           <textarea id="change-description" name="description" className="input" required minLength={20} maxLength={10000} rows={5} defaultValue={t.description}/>
         </>:<>
           <label>Đề tài mới<select aria-label="Đề tài mới" className="input" required value={target} onChange={e=>setTarget(e.target.value)}><option value="">Chọn đề tài</option>
-            {t.candidates.filter(c=>scope==="INDIVIDUAL"?c.individual_available:c.group_available).map(c=><option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</select></label>
-          {!t.candidates.length&&<p className="alert alert-warning">Chưa có đề tài trống phù hợp. Liên hệ bộ môn để được hướng dẫn.</p>}
+            {visibleCandidates.map(c=><option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}</select></label>
+          {!visibleCandidates.length&&<p className="alert alert-warning">Chưa có đề tài trống phù hợp. Liên hệ bộ môn để được hướng dẫn.</p>}
           {candidate&&<div className="change-target"><strong>{candidate.title}</strong><p>GVHD · {candidate.advisor} · Tối đa {candidate.capacity} sinh viên</p><p className="change-prose">{candidate.description}</p></div>}
         </>}
         <label>Lý do thay đổi<textarea name="reason" className="input" required minLength={10} maxLength={3000} rows={3}/></label>
@@ -188,13 +193,13 @@ export default function ThesisChangesPage({context}:{context:Context}) {
       <button className="btn btn-secondary" disabled={busy} onClick={()=>{setError("");void load().catch(cause=>setError(errorMessage(cause)));}}><RefreshCw size={16} aria-hidden="true"/>Làm mới</button>
     </PageHeader>
     {error&&<p className="alert alert-danger" role="alert">{error}</p>}{notice&&<p className="alert alert-success" role="status">{notice}</p>}
-    {!data&&!error&&<div className="changes-empty" role="status"><Clock3/>Đang tải hồ sơ…</div>}
+    {!data&&!error&&<div className="stack" role="status" aria-label="Đang tải hồ sơ"><SkeletonCard /><SkeletonCard /></div>}
     {data&&<>
       <div className="changes-intro"><div className="changes-intro__icon"><FilePenLine aria-hidden="true"/></div>
         <div><strong>Theo dõi việc điều chỉnh KLTN</strong><p>Đề nghị trong 14 ngày đầu. Các bên xác nhận đúng nội dung trước khi bộ môn quyết định.</p></div>
         <span className="changes-count">{counts} yêu cầu đang xử lý</span></div>
-      {context.base_role==="ADMIN"&&<Link to="/rounds" className="change-link">Quản lý thời gian mở đợt đăng ký <ChevronRight size={15}/></Link>}
-      {!data.theses.length&&!data.requests.length?<div className="changes-empty"><FilePenLine aria-hidden="true"/><h2>Chưa có hồ sơ trong phạm vi của bạn</h2><p>Hồ sơ xuất hiện sau khi đăng ký được giảng viên tiếp nhận.</p><Link to="/registrations" className="btn btn-secondary">Mở hồ sơ đăng ký</Link></div>:<div className="changes-layout">
+      {context.base_role==="ADMIN"&&<Link to="/rounds" className="change-link">Quản lý thời gian mở đợt đăng ký <ChevronRight size={15} aria-hidden="true"/></Link>}
+      {!data.theses.length&&!data.requests.length?<EmptyState icon={<FilePenLine aria-hidden="true"/>} title="Chưa có hồ sơ trong phạm vi của bạn" description="Hồ sơ xuất hiện sau khi đăng ký được giảng viên tiếp nhận."><Link to="/registrations" className="btn btn-secondary">Mở hồ sơ đăng ký</Link></EmptyState>:<div className="changes-layout">
         <aside className="changes-sidebar">
           {!!data.theses.length&&<section className="card"><div className="card-body stack"><h2>Khóa luận</h2>
             <label>Chọn hồ sơ<select className="input" value={selectedId} onChange={e=>{setParams({thesis:e.target.value});setNotice("");}}>
@@ -204,7 +209,7 @@ export default function ThesisChangesPage({context}:{context:Context}) {
             {selected&&<>
               <p>SV · {selected.student_names?.join(", ")||"Chưa ghi nhận"} · GVHD · {selected.advisor_name||"Chưa ghi nhận"}</p>
               <p className="change-prose">{selected.description||"Xem chi tiết trong hồ sơ khóa luận."}</p>
-              <Link className="change-link" to={"/theses/"+selected.id}>Mở hồ sơ khóa luận <ChevronRight size={15}/></Link>
+              <Link className="change-link" to={"/theses/"+selected.id}>Mở hồ sơ khóa luận <ChevronRight size={15} aria-hidden="true"/></Link>
               <div className="changes-deadline"><CalendarClock size={19} aria-hidden="true"/><div><span>Hạn gửi đổi đề tài</span>
                 <strong>{selected.cutoff?"Hết ngày "+shortDate(new Date(Date.parse(selected.cutoff)-1).toISOString()):"Chưa có ngày bắt đầu"}</strong></div></div>
               {selected.message&&<p className="change-note">{selected.message}</p>}
@@ -213,7 +218,7 @@ export default function ThesisChangesPage({context}:{context:Context}) {
             </>}
           </div></section>}
           {selected&&<section className="card"><div className="card-body stack"><h2><CalendarClock size={19} aria-hidden="true"/> Gia hạn thực hiện</h2>
-            {selected.extension?<div className="extension-receipt"><span className="change-status change-status--approved">Đã ghi nhận một lần</span>
+            {selected.extension?<div className="extension-receipt"><ThesisStatusBadge className="change-status" state="APPROVED" label="Đã ghi nhận một lần"/>
               <p>Hạn được gia hạn<strong>{when(selected.extension.until_at)}</strong></p>
               <details><summary>Xem quyết định</summary><dl><dt>Số / căn cứ</dt><dd>{selected.extension.reference}</dd><dt>Ngày quyết định</dt><dd>{shortDate(selected.extension.decision_on)}</dd>
                 <dt>Bắt đầu theo quyết định</dt><dd>{when(selected.extension.extension_starts_at)}</dd><dt>Lý do</dt><dd>{selected.extension.reason}</dd><dt>Người ghi nhận</dt><dd>{selected.extension.recorded_by}</dd><dt>Thời điểm</dt><dd>{when(selected.extension.recorded_at)}</dd>
@@ -227,13 +232,24 @@ export default function ThesisChangesPage({context}:{context:Context}) {
           </div></section>}
         </aside>
         <section className="changes-main">
-          <nav className="assignment-tabs" aria-label="Nghiệp vụ thay đổi"><button type="button" className={"assignment-tabs__link "+(view==="CHANGE"?"is-active":"")} onClick={()=>setView("CHANGE")}>Đổi / tách đề tài</button><button type="button" className={"assignment-tabs__link "+(view==="EXTENSION"?"is-active":"")} onClick={()=>setView("EXTENSION")}>Xin gia hạn KLTN</button></nav>
-          {view==="EXTENSION"?<ThesisExtensionRequests userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load}/>:<>
+          <Tabs
+            asButtons
+            variant="underline"
+            idPrefix="changes-mode"
+            ariaLabel="Nghiệp vụ thay đổi"
+            items={[
+              {id:"CHANGE",label:"Đổi / tách đề tài"},
+              {id:"EXTENSION",label:"Xin gia hạn KLTN"},
+            ]}
+            activeId={view}
+            onChange={(next)=>setView(next as "CHANGE"|"EXTENSION")}
+          />
+          {view==="EXTENSION"?<ThesisExtensionRequests userId={context.user_id} thesis={selected} items={data.extension_requests||[]} reload={load} focusExtensionId={params.get("extension") || ""}/>:<>
           <div className="changes-toolbar"><h2><History size={19} aria-hidden="true"/>Yêu cầu đổi đề tài</h2><div className="changes-tools">
             <label className="changes-search"><span className="sr-only">Tìm yêu cầu</span><Search size={16} aria-hidden="true"/><input className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm đề tài hoặc mã…"/></label>
             <label><span className="sr-only">Trạng thái yêu cầu</span><select className="input" value={filter} onChange={e=>setFilter(e.target.value)}><option value="OPEN">Đang xử lý</option><option value="ALL">Tất cả và lịch sử</option></select></label>
           </div></div>
-          {!requests.length?<div className="changes-empty card"><CheckCircle2 size={32} aria-hidden="true"/><h3>Không có yêu cầu trong bộ lọc</h3><p>Yêu cầu mới và tiến trình xét duyệt sẽ hiển thị ở đây.</p></div>:
+          {!requests.length?<EmptyState compact icon={<CheckCircle2 aria-hidden="true"/>} title="Không có yêu cầu trong bộ lọc" description="Yêu cầu mới và tiến trình xét duyệt sẽ hiển thị ở đây." />:
             requests.map(item=><ChangeCard key={item.id+":"+item.row_version} item={item} userId={context.user_id} open={open}/>)}
           </>}
         </section>

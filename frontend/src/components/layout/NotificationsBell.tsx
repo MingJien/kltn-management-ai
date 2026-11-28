@@ -8,6 +8,7 @@ import type { Notice, NoticeSummary } from "../../notifications";
 export default function NotificationsBell({userId}: {userId: string}) {
   const navigate = useNavigate();
   const root = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState<NoticeSummary>({unread_count:0, items:[]});
   const [error, setError] = useState("");
@@ -18,11 +19,16 @@ export default function NotificationsBell({userId}: {userId: string}) {
 
   useEffect(() => {
     void refresh().catch(() => undefined);
-    const timer = window.setInterval(() => void refresh().catch(() => undefined), 30000);
+    const poll = () => {
+      if (document.visibilityState === "visible") void refresh().catch(() => undefined);
+    };
+    const timer = window.setInterval(poll, 30000);
     const onFocus = () => void refresh().catch(() => undefined);
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", poll);
     window.addEventListener("kltn:notifications-changed", onFocus);
     return () => {window.clearInterval(timer); window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", poll);
       window.removeEventListener("kltn:notifications-changed", onFocus);};
   }, [refresh]);
   useEffect(() => {
@@ -30,7 +36,12 @@ export default function NotificationsBell({userId}: {userId: string}) {
     const onPointer = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
-    const onKey = (event: KeyboardEvent) => {if (event.key === "Escape") setOpen(false);};
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
     return () => {document.removeEventListener("pointerdown", onPointer); document.removeEventListener("keydown", onKey);};
@@ -53,7 +64,7 @@ export default function NotificationsBell({userId}: {userId: string}) {
   }
 
   return <div className="notifications" ref={root}>
-    <button type="button" className="notifications__trigger" aria-label={`Thông báo, ${summary.unread_count} chưa xem`}
+    <button ref={triggerRef} type="button" className="notifications__trigger" aria-label={`Thông báo, ${summary.unread_count} chưa xem`}
       aria-expanded={open} aria-haspopup="dialog"
       onClick={() => {setOpen((value) => !value); setError(""); void refresh().catch((cause) => setError(errorMessage(cause)));}}>
       <Bell size={19} aria-hidden="true" />

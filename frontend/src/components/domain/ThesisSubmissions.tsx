@@ -41,7 +41,7 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
   const displayed = pendingOnly ? choices.filter(item => item.pending) : choices;
   const filter = canProcess && <label className="submission-filter"><input type="checkbox" checked={pendingOnly} onChange={event => setPendingOnly(event.target.checked)}/>Chờ tôi xử lý ({choices.filter(item => item.pending).length} loại hồ sơ)</label>;
   const current = displayed.find(item => item.kind === kind) || displayed.find(item => item.kind === "PLAN") || displayed[0];
-  if (!current) return <section className="stack submission-workspace" aria-label="Hồ sơ nộp và xét duyệt">{filter}<div className="card"><div className="card-body stack"><h2>Không có hồ sơ đang chờ bạn xử lý</h2><p>Các bản đã tiếp nhận và lịch sử vẫn được giữ.</p><button className="btn btn-secondary" onClick={() => setPendingOnly(false)}>Xem tất cả hồ sơ</button></div></div></section>;
+  if (!current) return <section className="stack submission-workspace" aria-label="Hồ sơ nộp và xét duyệt">{filter}<div className="card"><div className="card-body stack"><h2>Không có hồ sơ đang chờ bạn xử lý</h2><p>Các bản đã tiếp nhận và lịch sử vẫn được giữ.</p><div><button type="button" className="btn btn-secondary" onClick={() => setPendingOnly(false)}>Xem tất cả hồ sơ</button></div></div></div></section>;
   const selected = current.kind as SubmissionKind;
   return <section className="stack submission-workspace" aria-label="Hồ sơ nộp và xét duyệt">
     {filter}
@@ -68,6 +68,6 @@ export default function ThesisSubmissions({thesis, proposal, docs, deadlines, hi
           {canReadDocuments && <ThesisDocuments thesis={thesis} docs={docs} deadlines={effectiveDeadlines} reports={reports} userId={userId} busy={busy} run={run} kind={selected as "PLAN" | "REPORT" | "SUPPORTING"} pendingOnly={pendingOnly} />}
       </>}
     </div>
-    <p className="submission-help text-body-sm text-muted">Cần mẫu trắng hoặc tài liệu Khoa công bố? <Link to={"/forms?round_id=" + thesis.round_id}>Mở kho biểu mẫu & tài liệu Khoa</Link>. Báo cáo định kỳ nộp tại <Link to={"/theses/" + thesis.id + "?section=progress"}>Báo cáo tiến độ</Link>.</p>
+    <p className="submission-help text-body-sm text-muted">Nộp báo cáo định kỳ tại <Link to={"/theses/" + thesis.id + "?section=progress"}>Báo cáo tiến độ</Link>.</p>
   </section>;
 }

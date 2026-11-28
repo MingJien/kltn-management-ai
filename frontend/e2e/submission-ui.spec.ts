@@ -129,7 +129,7 @@ test("SV/GV use one submission hub: M1 before acceptance, M2 upload/review, M3, 
     await expect(sv.locator(".submission-kinds")).toHaveCount(0);
     await expect(sv.getByRole("heading",{name:"Báo cáo tiến độ",exact:true})).toBeVisible();
     await sv.goto("/forms?round_id="+round.id);
-    await expect(sv.getByRole("heading",{name:"Kho biểu mẫu & tài liệu Khoa",exact:true})).toBeVisible();
+    await expect(sv.getByRole("heading",{name:"Tài liệu Khoa công bố",exact:true})).toBeVisible();
     await expect(sv.locator('input[type="file"]')).toHaveCount(0);
     await sv.getByRole("link",{name:"Mở hồ sơ nộp & xét duyệt",exact:true}).click();
     await expect(sv.getByRole("heading",{name:"Hồ sơ nộp & xét duyệt",exact:true})).toBeVisible();

@@ -2,10 +2,12 @@
 from typing import Annotated, Literal
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, Header, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, StringConstraints
 from backend.api.dependencies import current_user, get_session
 from backend.services import school_forms as service
+from backend.services import form_templates
 
 router=APIRouter(prefix="/api/v1/school-forms",tags=["Faculty forms"])
 Reason=Annotated[str,StringConstraints(strip_whitespace=True,min_length=5,max_length=2000)]
@@ -64,8 +66,17 @@ class AccessOut(BaseModel):
     label:str
     state:str
     can_manage:bool
+    can_view_catalog:bool
     can_view_publications:bool
     can_export_list:bool
+
+
+class SourceOut(BaseModel):
+    id: str
+    title: str
+    filename: str
+    byte_size: int
+    extension: str
 
 
 class BootstrapOut(BaseModel):
@@ -90,6 +101,36 @@ class SpreadsheetOut(BaseModel):
 @router.get("/access",response_model=list[AccessOut])
 def access(user=Depends(current_user),session=Depends(get_session)):
     return service.access(session,user)
+
+
+@router.get("/rounds/{round_id}/sources", response_model=list[SourceOut])
+def sources(round_id: UUID, user=Depends(current_user), session=Depends(get_session)):
+    service.require_catalog_access(session, user, round_id)
+    return form_templates.list_sources()
+
+
+@router.get("/rounds/{round_id}/sources/{source_id}")
+def download_source(round_id: UUID, source_id: str, user=Depends(current_user), session=Depends(get_session)):
+    service.require_catalog_access(session, user, round_id)
+    path = form_templates.source_path(source_id)
+    return FileResponse(path, filename=path.name, headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
+@router.get("/rounds/{round_id}/sources/{source_id}/preview")
+def preview_source(round_id: UUID, source_id: str, user=Depends(current_user), session=Depends(get_session)):
+    service.require_catalog_access(session, user, round_id)
+    original = form_templates.source_path(source_id)
+    preview = form_templates.PREVIEW_DIR / f"{form_templates.source_hash(original)}.pdf"
+    if not preview.is_file():
+        raise HTTPException(409, "Chưa có bản xem PDF khớp với tệp nguồn hiện tại. Bạn có thể tải tệp gốc để mở và in.")
+    return FileResponse(preview, filename=original.with_suffix(".pdf").name,
+                        media_type="application/pdf", content_disposition_type="inline", headers={
+                            "Cache-Control": "private, no-store",
+                            "X-Content-Type-Options": "nosniff",
+                        })
 
 
 @router.get("/rounds/{round_id}/mau-04/preview")

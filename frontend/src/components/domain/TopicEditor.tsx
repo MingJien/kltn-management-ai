@@ -5,7 +5,7 @@ import RegistrationForm from "./RegistrationForm";
 
 export default function TopicEditor({topic, rounds, lecturers, context, busy, onSave, onPropose}: {
   topic?: Topic; rounds: OpenRound[]; lecturers: Lecturer[]; context: Context; busy: boolean;
-  onSave: (body: object) => Promise<void>; onPropose?: (body: object) => Promise<void>;
+  onSave: (body: object) => Promise<void>; onPropose?: (body: object, evidence?: File) => Promise<void>;
 }) {
   const student = context.base_role === "STUDENT";
   const [roundId, setRoundId] = useState(topic?.round_id || rounds[0]?.id || "");
@@ -116,7 +116,7 @@ export default function TopicEditor({topic, rounds, lecturers, context, busy, on
     {student && !topic && onPropose && roundId ? <>
       <p className="alert alert-info">Đề xuất bắt đầu bằng đăng ký cá nhân của bạn. Sau khi bộ môn duyệt, các SV khác có thể tự tham gia khi còn chỉ tiêu.</p>
       <RegistrationForm key={roundId} context={context} userId={context.user_id} roundId={roundId} busy={busy}
-        disabled={!valid} onSubmit={() => onPropose({...body(), confirm_creator: true})} />
+        disabled={!valid} onSubmit={(evidence) => onPropose({...body(), confirm_creator: true}, evidence)} />
     </> : null}
   </div>;
 }

@@ -8,7 +8,7 @@ export default function ReviewCommentText({text}: {text: string}) {
     let url = match[0].replace(/[.,;!?]+$/, "");
     while (url.endsWith(")") && (url.match(/\)/g)?.length || 0) > (url.match(/\(/g)?.length || 0)) url = url.slice(0,-1);
     parts.push(text.slice(cursor,start));
-    parts.push(<a key={start} href={url} target="_blank" rel="noopener noreferrer" style={{overflowWrap:"anywhere"}}>{url}</a>);
+    parts.push(<a key={start} href={url} target="_blank" rel="noopener noreferrer" className="overflow-wrap-anywhere">{url}</a>);
     cursor = start + url.length;
   }
   parts.push(text.slice(cursor));

@@ -29,8 +29,8 @@ html {
 body {
   font: var(--text-body);
   font-family: var(--font-sans);
-  color: var(--neutral-700);
-  background-color: var(--neutral-50);
+  color: var(--color-ink);
+  background-color: var(--color-canvas);
   min-height: 100dvh;
 }
 

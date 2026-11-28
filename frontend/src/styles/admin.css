@@ -4,10 +4,10 @@
    Centered, balanced, and ergonomically crafted for long sessions
    ═══════════════════════════════════════════════════════ */
 
-/* ── Admin Page Layout (Centered & Balanced Container) ── */
+/* ── Admin Page Layout (Balanced Task-Appropriate Container) ── */
 .admin-page {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1440px;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
@@ -38,7 +38,7 @@
   gap: 8px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1023px) {
   .admin-grid-top {
     grid-template-columns: 1fr;
   }
@@ -103,9 +103,9 @@
 }
 
 .admin-card__icon--info {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #bfdbfe;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: var(--info-border);
 }
 
 .admin-card__title {
@@ -204,23 +204,23 @@
 /* metric icon scale removed */
 
 .admin-metric-card--student .admin-metric-card__icon-box {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .admin-metric-card--lecturer .admin-metric-card__icon-box {
-  background: #f0fdfa;
-  color: #0d9488;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-hover);
 }
 
 .admin-metric-card--warning .admin-metric-card__icon-box {
-  background: #fffbeb;
-  color: #d97706;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .admin-metric-card--danger .admin-metric-card__icon-box {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .admin-metric-card__content {
@@ -302,8 +302,8 @@
 }
 
 .admin-search-wrap .input:focus {
-  border-color: var(--primary-600);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus-field);
 }
 
 .admin-search-wrap__clear {
@@ -446,21 +446,21 @@
 }
 
 .account-item__avatar--student {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
 }
 
 .account-item__avatar--lecturer {
-  background: #f0fdfa;
-  color: #0d9488;
-  border: 1px solid #99f6e4;
+  background: var(--color-primary-wash);
+  color: var(--color-primary-hover);
+  border: 1px solid var(--primary-200);
 }
 
 .account-item__avatar--admin {
-  background: #f8fafc;
-  color: #334155;
-  border: 1px solid #cbd5e1;
+  background: var(--neutral-badge-bg);
+  color: var(--neutral-badge-text);
+  border: 1px solid var(--neutral-badge-border);
 }
 
 .account-item__main {
@@ -504,7 +504,7 @@
 .account-item__code-label {
   color: var(--neutral-500);
   font-weight: 600;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .account-item__meta {
@@ -719,21 +719,21 @@
 
 /* Duty-specific badges */
 .assignment-item__duty--coordinator {
-  background: #f3e8ff;
-  color: #6b21a8;
-  border: 1px solid #d8b4fe;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-hover);
+  border: 1px solid var(--primary-200);
 }
 
 .assignment-item__duty--verifier {
-  background: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
 }
 
 .assignment-item__duty--manager {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
 }
 
 .assignment-item__duty--importer {
@@ -820,7 +820,7 @@
 }
 
 /* ── Responsive rules ── */
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .admin-metrics {
     grid-auto-flow: column;
     grid-auto-columns: minmax(160px, 1fr);
@@ -930,8 +930,11 @@
   align-items: center;
   gap: 6px;
   margin-top: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
+.account-item__duties .badge,
 .account-badge--extra {
   max-width: 100%;
   white-space: normal;
@@ -1189,7 +1192,7 @@
   font-weight: 500;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .import-step__body,
   .import-step__filters,
   .preview-box__confirm,
@@ -1224,7 +1227,7 @@
 
 /* ── Responsive Admin Metrics ── */
 
-@media (max-width: 860px) {
+@media (max-width: 767px) {
 
   .admin-metrics {
 
@@ -1238,7 +1241,7 @@
 
 
 
-@media (max-width: 480px) {
+@media (max-width: 639px) {
 
   .admin-metrics {
 
@@ -1267,7 +1270,7 @@
   min-width: 0;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 767px) {
   .assignment-details-grid {
     grid-template-columns: minmax(0, 1fr);
   }

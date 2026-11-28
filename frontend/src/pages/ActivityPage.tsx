@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { History, RefreshCw, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, History, RefreshCw, Search } from "lucide-react";
 import { request, type Context } from "../api";
 import { actionLabel, resourceLabel, activityReason, type ActivityResult } from "../activity";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import Badge from "../components/ui/Badge";
+import EmptyState from "../components/ui/EmptyState";
+import { SkeletonCard } from "../components/ui/Skeleton";
 
 const SIZE = 25;
 const empty: ActivityResult = {items: [], total: 0, actions: [], scope: ""};
@@ -42,7 +45,7 @@ export default function ActivityPage({context}: {context: Context}) {
   }, [context.user_id, filters, page, revision, resourceType, resourceId]);
   return <div className="stack">
     <PageHeader title={context.base_role === "ADMIN" ? "Nhật ký hệ thống" : "Lịch sử hoạt động"}
-      description={context.base_role === "ADMIN" ? "Tra cứu thao tác quản trị và nghiệp vụ, lý do và căn cứ đã ghi nhận." : "Xem lại thao tác trên tài khoản và các hồ sơ trong phạm vi được giao."} />
+      description={context.base_role === "ADMIN" ? "Tra cứu thao tác quản trị, lý do và căn cứ đã ghi nhận." : "Xem lại thao tác trên tài khoản và hồ sơ trong phạm vi."} />
     <form className="card" onSubmit={(event) => {event.preventDefault(); setPage(0); setFilters({search: search.trim(), action, from, to});}}>
       <div className="card-body stack">
         <div className="activity-filters">
@@ -64,13 +67,14 @@ export default function ActivityPage({context}: {context: Context}) {
     </form>
     {error && <p className="alert alert-danger" role="alert">{error}</p>}
     <p className="text-muted" aria-live="polite">{loading ? "Đang tải nhật ký…" : `${data.total} sự kiện · ${data.scope}`}</p>
-    {!loading && !error && !data.items.length && <div className="card"><div className="card-body"><p>Chưa có sự kiện phù hợp với phạm vi và bộ lọc đã chọn.</p></div></div>}
+    {loading && <div className="stack" role="status" aria-label="Đang tải nhật ký"><SkeletonCard /><SkeletonCard /></div>}
+    {!loading && !error && !data.items.length && <EmptyState icon={<History aria-hidden="true" />} title="Chưa có sự kiện phù hợp" description="Chưa có sự kiện phù hợp với phạm vi và bộ lọc đã chọn. Thử thay đổi khoảng ngày, loại thao tác hoặc xóa bộ lọc." />}
     <div className="activity-list" aria-busy={loading}>
       {!loading && data.items.map(item => <article className="card" key={item.id}>
         <div className="card-body stack">
           <div className="activity-item__header"><h2><History size={18} aria-hidden="true" />{actionLabel(item.action)}</h2>
             <time dateTime={item.occurred_at}>{new Date(item.occurred_at).toLocaleString("vi-VN", {timeZone: "Asia/Ho_Chi_Minh"})}</time></div>
-          <div><strong>{item.actor_name}</strong><span className="text-muted"> · {resourceLabel(item.resource_type)}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><strong>{item.actor_name}</strong><Badge variant="neutral">{resourceLabel(item.resource_type)}</Badge></div>
           {item.resource_label !== item.resource_type && <p>{item.resource_label}</p>}
           {item.reason && <p className="activity-item__text"><strong>Lý do / nội dung: </strong>{activityReason(item)}</p>}
           {item.source_reference && <p className="activity-item__text"><strong>Căn cứ / số văn bản: </strong>{item.source_reference}</p>}
@@ -79,9 +83,9 @@ export default function ActivityPage({context}: {context: Context}) {
       </article>)}
     </div>
     <nav className="pagination" aria-label="Phân trang nhật ký">
-      <button className="btn btn-secondary" disabled={loading || page === 0} onClick={() => setPage(value => value - 1)}>Trang trước</button>
+      <button type="button" className="btn btn-secondary" disabled={loading || page === 0} onClick={() => setPage(value => value - 1)}><ChevronLeft size={15} aria-hidden="true" />Trang trước</button>
       <span>Trang {page + 1}{data.total ? ` / ${Math.ceil(data.total / SIZE)}` : ""}</span>
-      <button className="btn btn-secondary" disabled={loading || (page + 1) * SIZE >= data.total} onClick={() => setPage(value => value + 1)}>Trang sau</button>
+      <button type="button" className="btn btn-secondary" disabled={loading || (page + 1) * SIZE >= data.total} onClick={() => setPage(value => value + 1)}>Trang sau<ChevronRight size={15} aria-hidden="true" /></button>
     </nav>
   </div>;
 }

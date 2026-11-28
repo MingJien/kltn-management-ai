@@ -1,44 +1,11 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Ref } from "react";
 import { Menu, LogOut } from "lucide-react";
-import { plannedPages, type PlannedPageId } from "../../plannedPages";
 import type { Context } from "../../api";
+import { getBreadcrumbs } from "../../routes";
+import { roleLabel } from "./roleLabel";
 import NotificationsBell from "./NotificationsBell";
 import ProfilePopup from "./ProfilePopup";
-
-/**
- * Route path → breadcrumb label mapping.
- * Only includes paths that are statically known.
- */
-const BREADCRUMB_MAP: Record<string, string> = {
-  "/reports": "Báo cáo và thống kê",
-  "/repository": "Kho khóa luận nội bộ",
-  "/": "Tổng quan",
-  "/topics": "Đề tài",
-  "/registrations": "Đăng ký",
-  "/withdrawals": "Xin thôi KLTN",
-  "/changes": "Đổi đề tài & gia hạn",
-  "/theses": "Khóa luận & GVHD",
-  "/proposals": "Đề cương",
-  "/progress": "Tiến độ",
-  "/documents": "Tài liệu",
-  "/forms": "Kho biểu mẫu & tài liệu Khoa",
-  "/submissions": "Hồ sơ nộp & xét duyệt",
-  "/account": "Tài khoản",
-  "/administration": "Tài khoản",
-  "/administration/assignments": "Phân công theo đợt",
-  "/positions": "Chức vụ và phạm vi",
-  "/rounds": "Đợt KLTN",
-  "/roster": "Danh sách sinh viên",
-  "/lecturers": "Danh sách giảng viên",
-  "/lecturer-profile-reviews": "Duyệt hồ sơ giảng viên",
-  "/ai": "Tra cứu thử nghiệm",
-  "/notifications": "Thông báo",
-  "/activity": "Nhật ký hoạt động",
-  "/review-records": "Tiếp nhận hồ sơ phản biện",
-  "/defense": "Hội đồng và bảo vệ",
-  "/evaluation": "Phản biện & điều kiện bảo vệ",
-};
 
 interface HeaderProps {
   menuButton: Ref<HTMLButtonElement>;
@@ -50,10 +17,7 @@ interface HeaderProps {
 
 export default function Header({ context, menuButton, menuOpen, onToggleSidebar, onLogout }: HeaderProps) {
   const location = useLocation();
-  const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
-  const currentLabel = plannedId && Object.hasOwn(plannedPages, plannedId)
-    ? plannedPages[plannedId as PlannedPageId].title
-    : BREADCRUMB_MAP[location.pathname] || (location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên" : location.pathname.startsWith("/evaluation/") ? "Hồ sơ phản biện & điều kiện" : location.pathname.startsWith("/theses/") ? (new URLSearchParams(location.search).get("section") === "progress" ? "Báo cáo tiến độ" : ["submissions","proposal","documents"].includes(new URLSearchParams(location.search).get("section") || "") ? "Hồ sơ nộp & xét duyệt" : "Khóa luận & GVHD") : "Trang");
+  const crumbs = getBreadcrumbs(location.pathname, location.search);
 
   return (
     <header className="app-shell__header">
@@ -61,23 +25,45 @@ export default function Header({ context, menuButton, menuOpen, onToggleSidebar,
         <div className="header__left">
           <button
             className="header__toggle"
-            ref={menuButton} aria-controls="main-sidebar" aria-expanded={menuOpen}
+            ref={menuButton}
+            aria-controls="main-sidebar"
+            aria-expanded={menuOpen}
             onClick={onToggleSidebar}
             aria-label="Mở hoặc đóng menu"
           >
-            <Menu size={20} />
+            <Menu size={20} aria-hidden="true" />
           </button>
           <nav className="header__breadcrumb" aria-label="Vị trí trang">
-            <span className="header__breadcrumb-root">KLTN</span>
-            <span className="header__breadcrumb-sep" aria-hidden="true">/</span>
-            <span>{currentLabel}</span>
+            {crumbs.map((crumb, index) => {
+              const isLast = index === crumbs.length - 1;
+              return (
+                <span key={`${crumb.label}-${index}`} className="flex items-center gap-2">
+                  {index > 0 && <span className="header__breadcrumb-sep" aria-hidden="true">/</span>}
+                  {crumb.to && !isLast ? (
+                    <Link className="header__breadcrumb-link" to={crumb.to}>
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    <span
+                      className={index === 0 && crumbs.length > 1 ? "header__breadcrumb-root" : undefined}
+                      aria-current={isLast ? "page" : undefined}
+                    >
+                      {crumb.label}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </nav>
         </div>
         <div className="header__right">
+          <span className="header__duty-pill" title="Vai trò làm việc hiện tại">
+            {roleLabel(context)}
+          </span>
           <NotificationsBell userId={context.user_id} />
           <ProfilePopup context={context} onLogout={onLogout} />
           <button className="btn btn-ghost btn-sm header__logout-standalone" onClick={onLogout} aria-label="Đăng xuất">
-            <LogOut size={18} aria-hidden="true"/> <span>Đăng xuất</span>
+            <LogOut size={18} aria-hidden="true" /> <span>Đăng xuất</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react';
+import {confirmAction} from "../ui/ConfirmDialog";
 import {request,downloadFile} from '../../api';
 import {when} from '../../evaluation';
 import {errorMessage} from '../../errors';
@@ -21,7 +22,7 @@ export function PublishDefenseSchedule({councilId,save,busy}:{councilId:string;s
  <p>Đối chiếu danh sách toàn hội đồng rồi công bố. Sinh viên cùng bộ môn/đợt được xem thứ tự, giờ tập trung, đề tài, GVHD và tải Excel; điểm và hồ sơ riêng không nằm trong danh sách.</p>
  <button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>{setError('');request<{snapshot:Snapshot;fingerprint:string}>(`/defense/councils/${councilId}/schedule-draft`,'').then(setDraft).catch(e=>setError(errorMessage(e)));}}>Xem trước danh sách cần công bố</button>
  {error&&<p role="alert">{error}</p>}
- {draft&&<><ScheduleTable snapshot={draft.snapshot}/><button type="button" className="btn btn-primary" disabled={busy||!draft.snapshot.rows.length} onClick={async()=>{if(window.confirm('Công bố danh sách này và gửi thông báo tới các tài khoản trong phạm vi?')){if(await save({fingerprint:draft.fingerprint}))setDraft(null);}}}>Công bố và thông báo danh sách</button></>}
+ {draft&&<><ScheduleTable snapshot={draft.snapshot}/><button type="button" className="btn btn-primary" disabled={busy||!draft.snapshot.rows.length} onClick={async()=>{if(await confirmAction({title:"Công bố lịch bảo vệ",description:"Danh sách sẽ được công bố và gửi thông báo tới các tài khoản trong phạm vi.",confirmLabel:"Công bố và gửi",variant:"warning"})){if(await save({fingerprint:draft.fingerprint}))setDraft(null);}}}>Công bố và thông báo danh sách</button></>}
  </details>;
 }
 

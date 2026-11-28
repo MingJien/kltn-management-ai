@@ -94,9 +94,9 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
       setReadOnlyReason(result.read_only_reason || "Chỉ giảng viên được phân công mới nhận xét bản hiện hành còn chờ phản hồi.");
       setLoaded(true);
       setStatus(result.can_edit ? "Nháp riêng · tự lưu khi nhập nhận xét" : "Chế độ chỉ xem · không sửa phản hồi đã gửi");
-    }).catch(cause => {if (!controller.signal.aborted) {setError(String(cause)); setStatus("Chưa tải được nhận xét");}});
+    }).catch(cause => {if (!controller.signal.aborted) {setError(errorMessage(cause)); setStatus("Chưa tải được nhận xét");}});
     void fetchReviewFile(target.downloadPath, controller.signal).then(buffer => {if (!controller.signal.aborted) setData(buffer);})
-      .catch(cause => {if (!controller.signal.aborted) setError(String(cause));});
+      .catch(cause => {if (!controller.signal.aborted) setError(errorMessage(cause));});
     return () => {controller.abort();};
   }, [target.annotationsPath, target.downloadPath, userId, cached]);
 
@@ -185,7 +185,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
       const saved=await request<ProgressAnnotation>(`${target.annotationsPath}/${crypto.randomUUID()}/attachment`,userId,{method:"POST",body:file,
         headers:{"Content-Type":"application/octet-stream","X-File-Name":encodeURIComponent(file.name),"If-Match":"0"}});
       changeNotes(current=>[...current,saved]); setStatus("Đã lưu tệp phản hồi nháp trên máy chủ"); input.value="";
-    } catch (cause) {setError(`${String(cause)} Nếu kết nối bị ngắt, mở lại hồ sơ để kiểm tra tệp đã lưu trước khi gửi lại.`);}
+    } catch (cause) {setError(`${errorMessage(cause)} Nếu kết nối bị ngắt, mở lại hồ sơ để kiểm tra tệp đã lưu trước khi gửi lại.`);}
     finally {setUploading(false);}
   }
   async function rescanFeedback(note: Note) {
@@ -194,7 +194,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
       const current=notesRef.current.find(item=>item.id === note.id)!;
       const saved=await request<ProgressAnnotation>(`${target.annotationsPath}/${note.id}/attachment/scan`,userId,{method:"POST",headers:{"If-Match":String(current.row_version)}});
       changeNotes(items=>items.map(item=>item.id === note.id ? saved : item));
-    } catch (cause) {setError(String(cause));}
+    } catch (cause) {setError(errorMessage(cause));}
   }
   function addNote(pageNumber: number | null = null, x: number | null = null, y: number | null = null, quotedText = "", locationLabel = "") {
     if (!canEdit || submitting) return;
@@ -220,14 +220,18 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
     changeNotes(current => current.map(note => note.id === id ? {...note, ...values, dirty: true} : note));
   }
   async function removeNote(id: string) {
-    if (!(await flush())) return;
     const note = notesRef.current.find(item => item.id === id);
     if (!note || note.state !== "DRAFT") return;
+    if (note.row_version === 0) {
+      changeNotes(current => current.filter(item => item.id !== id));
+      setSelectedId(""); setError("");
+      return;
+    }
     try {
       await request(`${target.annotationsPath}/${id}`, userId, {method: "DELETE", headers: {"If-Match": String(note.row_version)}});
       changeNotes(current => current.filter(item => item.id !== id));
       setSelectedId(""); setError("");
-    } catch (cause) {setError(String(cause));}
+    } catch (cause) {setError(errorMessage(cause));}
   }
   function selectNote(id: string) {
     const note = notesRef.current.find(item => item.id === id);
@@ -272,7 +276,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
               <button type="button" className="review-icon" aria-label="Trang sau" disabled={page >= pages} onClick={() => setPage(value => value + 1)}><ChevronRight size={18} /></button></div>
               <div className="review-zoom-controls"><button type="button" className="review-icon" aria-label="Thu nhỏ PDF" disabled={zoom <= .75} onClick={() => setZoom(value => Math.max(.75, value - .25))}><ZoomOut size={17} /></button>
                 <span>{Math.round(zoom * 100)}%</span><button type="button" className="review-icon" aria-label="Phóng to PDF" disabled={zoom >= 2} onClick={() => setZoom(value => Math.min(2, value + .25))}><ZoomIn size={17} /></button></div></>}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadFile(target.downloadPath, target.fileName).catch(cause => setError(String(cause)))}><Download size={16} /> Tải bản gốc</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadFile(target.downloadPath, target.fileName).catch(cause => setError(errorMessage(cause)))}><Download size={16} /> Tải bản gốc</button>
           </div>
           {loaded && <div className={`review-pin-hint${pinMode ? " review-pin-hint--active" : ""}`} role="note"><MapPin size={17} /><span>{canEdit ? pinMode ? "Bấm vào vị trí cần góp ý. Ô nhập nhận xét sẽ mở bên phải." : "Bôi chọn đoạn văn → ô Góp ý cần thực hiện tự mở bên phải. Hoặc bật Đặt ghim để chọn một vị trí." : readOnlyReason}</span></div>}
           <div className="review-document-scroll" ref={pane} onScroll={() => {if (pane.current) {scroll.current = pane.current.scrollTop / Math.max(1, pane.current.scrollHeight - pane.current.clientHeight); persist();}}}>
@@ -303,7 +307,7 @@ export default function FileReviewWorkspace({target, userId, run, onClose}: {
                 <strong>{note.attachment?.file_name}</strong><small>{note.reviewer_name} · {((note.attachment?.byte_size || 0)/1024).toFixed(1)} KB</small>
                 <span>{note.state === "DRAFT" ? "Nháp riêng — SV chưa thấy" : "Đã gửi cho SV"}</span>
                 <div><button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>setPreview(note)}>Xem bản GV nhận xét</button>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>void downloadFile(`${target.annotationsPath}/${note.id}/attachment`,note.attachment!.file_name).catch(cause=>setError(String(cause)))}>Tải tệp phản hồi</button></div>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={note.attachment?.scan_state !== "CLEAN"} onClick={()=>void downloadFile(`${target.annotationsPath}/${note.id}/attachment`,note.attachment!.file_name).catch(cause=>setError(errorMessage(cause)))}>Tải tệp phản hồi</button></div>
                 {note.attachment?.scan_state !== "CLEAN" && <p role="status">{note.attachment?.scan_state === "INFECTED" ? "Tệp có mã độc, không thể sử dụng." : "Tệp chưa quét sạch; chưa được xem hoặc gửi cho SV."}</p>}
                 {canEdit && note.state === "DRAFT" && <div>
                   {["QUARANTINED","FAILED"].includes(note.attachment?.scan_state || "") && <button type="button" className="btn btn-secondary btn-sm" disabled={submitting || uploading} onClick={()=>void rescanFeedback(note)}>Quét lại tệp phản hồi</button>}

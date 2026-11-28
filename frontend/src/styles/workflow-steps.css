@@ -1,9 +1,116 @@
-.workflow-steps {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;list-style:none;padding:0;margin:12px 0 18px;}
-.workflow-steps li {display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #d9e3e8;border-radius:10px;color:#52647b;background:#f7fafb;font-size:13px;font-weight:600;min-width:0;}
-.workflow-steps li small {display:block;font-size:11px;font-weight:400;line-height:1.5;margin-top:3px;}
-.workflow-steps__number {display:grid;place-items:center;flex:0 0 26px;height:26px;border-radius:50%;background:#e2eaf0;color:#37516a;}
-.workflow-steps li.is-complete {background:#effaf5;border-color:#b5dbcb;color:#176047;}
-.workflow-steps li.is-complete .workflow-steps__number {background:#d3eee0;color:#176047;}
-.workflow-steps li.is-current {border-color:#138679;background:#eaf8f6;color:#0e625a;box-shadow:inset 0 3px #16887b;}
-.workflow-steps li.is-current .workflow-steps__number {background:#127b70;color:#fff;}
-@media(max-width:560px){.workflow-steps {grid-template-columns:repeat(2,minmax(0,1fr));}.workflow-steps li {padding:10px;font-size:12px;}}
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 18px;
+}
+
+.workflow-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-secondary);
+  background: var(--color-surface-raised);
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.workflow-steps li small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+}
+
+.workflow-steps__number {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  border: 1.5px solid var(--color-border);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workflow-steps li.is-complete {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
+.workflow-steps li.is-complete .workflow-steps__number {
+  background: var(--success-solid);
+  border-color: var(--success-solid);
+  color: #FFFFFF;
+}
+
+.workflow-steps li.is-complete small {
+  color: var(--success-text);
+}
+
+.workflow-steps li.is-current {
+  border-color: var(--color-primary);
+  background: var(--color-primary-wash);
+  color: var(--color-ink);
+}
+
+.workflow-steps li.is-current .workflow-steps__number {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px var(--color-primary-subtle);
+}
+
+.workflow-steps li.is-current small {
+  color: var(--color-primary-hover);
+  font-weight: 600;
+}
+
+@media (max-width: 639px) {
+  .workflow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workflow-steps li {
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+.dialog--drawer .workflow-steps {
+  margin: 0 0 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dialog--drawer .workflow-steps li {
+  padding: 9px 10px;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 639px) {
+  .dialog--drawer .workflow-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .dialog--drawer .workflow-steps li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 8px;
+    font-size: 11.5px;
+  }
+}

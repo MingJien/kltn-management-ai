@@ -1,6 +1,7 @@
 """PostgreSQL integration for round-scoped, versioned institutional files."""
 from datetime import timedelta
 from io import BytesIO
+from urllib.parse import unquote
 from uuid import uuid4
 
 import pytest
@@ -56,6 +57,56 @@ def test_admin_manages_forms_and_lecturers_need_explicit_assignment(forms):
     users[5].base_role="ADMIN";session.commit()
     assert client.post("/api/v1/school-forms",headers=hdr(users[5]),json={**payload,"code":"admin-sample"}).status_code==201
     assert client.post("/api/v1/school-forms",headers=hdr(users[4]),json=payload).status_code==201
+
+
+def test_source_inventory_uses_exact_files_and_requires_catalog_access(forms, monkeypatch, tmp_path):
+    from backend.services import form_templates
+
+    client, users, _, _, session, round_id = forms
+    monkeypatch.setattr(form_templates, "OFFICIAL_DIR", tmp_path)
+    previews = tmp_path / "previews"
+    previews.mkdir()
+    monkeypatch.setattr(form_templates, "PREVIEW_DIR", previews)
+    word = tmp_path / "mau 2.Ke hoach thuc hien cua SV.docx"
+    excel = tmp_path / "mau 4.Mau DS SV THUC HIEN KLTN.xlsx"
+    withdrawal = tmp_path / "Don_xin_thoi_thuc_hien_KLTN.docx"
+    word.write_bytes(b"original Word fixture")
+    excel.write_bytes(b"original Excel fixture")
+    withdrawal.write_bytes(b"original withdrawal fixture")
+    (tmp_path / "Mẫu nd họp của 9.Bien ban hop hoi dong cham KLTN.docx").write_bytes(b"reference fixture")
+    pdf = synthetic_pdf()
+    (previews / f"{form_templates.source_hash(word)}.pdf").write_bytes(pdf)
+    (previews / f"{form_templates.source_hash(withdrawal)}.pdf").write_bytes(pdf)
+    (tmp_path / ("~$" + word.name)).write_bytes(b"temporary Office lock")
+    path = f"/api/v1/school-forms/rounds/{round_id}/sources"
+
+    users[5].base_role = "ADMIN"
+    session.commit()
+    for user in (users[4], users[5]):
+        response = client.get(path, headers=hdr(user))
+        assert response.status_code == 200, response.text
+        assert [row["id"] for row in response.json()] == ["mau-02", "mau-04", "don-xin-thoi"]
+        assert [row["filename"] for row in response.json()] == [word.name, excel.name, withdrawal.name]
+        for row, original in zip(response.json(), (word, excel, withdrawal)):
+            download = client.get(f"{path}/{row['id']}", headers=hdr(user))
+            assert download.status_code == 200, download.text
+            assert download.content == original.read_bytes()
+            assert unquote(download.headers["content-disposition"]).rstrip('"').endswith(original.name)
+        preview = client.get(path + "/mau-02/preview", headers=hdr(user))
+        assert preview.status_code == 200
+        assert preview.content == pdf
+        assert preview.headers["content-type"] == "application/pdf"
+        assert preview.headers["content-disposition"].startswith("inline;")
+        assert client.get(path + "/don-xin-thoi/preview", headers=hdr(user)).content == pdf
+        assert client.get(path + "/hop-hoi-dong/preview", headers=hdr(user)).status_code == 404
+    for user in (users[0], users[3]):
+        assert client.get(path, headers=hdr(user)).status_code == 403
+        assert client.get(path + "/mau-02", headers=hdr(user)).status_code == 403
+        assert client.get(path + "/mau-02/preview", headers=hdr(user)).status_code == 403
+    assert client.get(path + "/mau-03", headers=hdr(users[5])).status_code == 409
+    word.write_bytes(b"updated Word fixture")
+    assert client.get(path + "/mau-02/preview", headers=hdr(users[5])).status_code == 409
+    assert client.get(path + "/mau-02", headers=hdr(users[5])).content == word.read_bytes()
 
 
 def test_draft_not_visible_publish_versions_legacy_download_and_withdraw(forms):

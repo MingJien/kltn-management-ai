@@ -20,6 +20,7 @@ test("Tạo biểu mẫu kèm tệp nháp và phát hành cho sinh viên", async
     const form=admin.locator("form").filter({has:admin.getByRole("button",{name:"Tạo và lưu tệp nháp",exact:true})});
     await form.getByLabel("Mã tài liệu",{exact:true}).fill("don-thoi-demo");
     await form.getByLabel("Tên tài liệu",{exact:true}).fill("Đơn xin thôi KLTN DEMO");
+    await form.getByLabel("Phân loại",{exact:true}).selectOption("PUBLICATION");
     await form.getByLabel("Nguồn / văn bản áp dụng",{exact:true}).fill("Mẫu thử nghiệm của Khoa");
     await form.getByLabel("Lý do tạo danh mục",{exact:true}).fill("Thêm mẫu thử cho đợt demo");
     const upload=form.getByLabel("Tệp biểu mẫu hoặc tài liệu (PDF, DOCX, XLSX)",{exact:true});

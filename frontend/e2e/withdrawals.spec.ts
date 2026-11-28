@@ -28,7 +28,7 @@ test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 
   await admin.goto("/administration/assignments");
   await expect.poll(async()=>new URL(admin.url()).pathname==="/"||await admin.getByRole("combobox",{name:"Đợt",exact:true}).isVisible()).toBe(true);
   if(new URL(admin.url()).pathname==="/")await admin.goto("/administration");
-  const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Phân công theo đợt",exact:true})});
+  const assignment=admin.locator("section.card").filter({has:admin.getByRole("heading",{name:"Giao nhiệm vụ theo đợt",exact:true})});
   await assignment.getByRole("combobox",{name:"Đợt",exact:true}).selectOption(round.id);
   await assignment.getByRole("combobox",{name:"Nhiệm vụ",exact:true}).selectOption("KLTN_COORDINATOR");
   await assignment.getByRole("combobox",{name:"Người được giao",exact:true}).selectOption((await read(tbm,"/me/context")).user_id);
@@ -69,8 +69,8 @@ test("Xin thôi KLTN: xác nhận, ghi kết quả và cập nhật Mẫu 1–3 
   expect((await read(gv,"/withdrawals")).requests).toEqual([]);
   await tbm.goto(`/withdrawals?focus=${item.id}`);
   await tbm.getByLabel("Lý do xử lý").fill("Đã đối chiếu yêu cầu và chấp thuận cho sinh viên thôi.");
-  tbm.once("dialog", dialog=>dialog.accept());
   await tbm.getByRole("button",{name:"Xác nhận kết quả",exact:true}).click();
+  await tbm.getByRole("dialog",{name:"Chấp thuận cho thôi KLTN"}).getByRole("button",{name:"Chấp thuận",exact:true}).click();
   await expect(tbm.getByRole("status")).toContainText("Đã cập nhật kết quả xử lý");
   const remaining=await read(peer,`/theses/${id}`);expect(remaining.members).toHaveLength(1);expect(remaining.members[0].is_coordinator).toBe(true);
   await sv.goto(`/withdrawals?focus=${item.id}`);

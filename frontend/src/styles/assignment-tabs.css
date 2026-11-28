@@ -2,7 +2,7 @@
   display: flex;
   gap: 6px;
   margin-bottom: 24px;
-  border-bottom: 1px solid #dce6e3;
+  border-bottom: 1px solid var(--color-border);
   overflow-x: auto;
 }
 
@@ -10,19 +10,29 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 14px 18px;
-  border-bottom: 3px solid transparent;
-  color: #4d625d;
+  padding: 12px 16px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--color-ink-secondary);
   font-weight: 600;
+  font-size: 14px;
   text-decoration: none;
   white-space: nowrap;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 }
 
 .assignment-tabs__link:hover,
 .assignment-tabs__link.is-active {
-  color: #106351;
-  background: #f0f8f5;
+  color: var(--color-primary-hover);
+  background: var(--color-primary-wash);
 }
 
-.assignment-tabs__link.is-active { border-bottom-color: #147b6b; }
-.assignment-tabs__link:focus-visible { outline: 2px solid #147b6b; outline-offset: -3px; }
+.assignment-tabs__link.is-active {
+  border-bottom-color: var(--color-primary);
+}
+
+.assignment-tabs__link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -3px;
+}

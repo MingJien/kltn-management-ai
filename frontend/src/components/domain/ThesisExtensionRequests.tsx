@@ -1,8 +1,10 @@
-import {useState,type FormEvent} from "react";
+import {useEffect,useState,type FormEvent} from "react";
+import {CalendarPlus,Check,Clock3,RotateCcw} from "lucide-react";
 import {request} from "../../api";
 import {errorMessage} from "../../errors";
 import {when} from "../../evaluation";
 import Dialog from "../ui/Dialog";
+import ThesisStatusBadge from "./ThesisStatusBadge";
 
 export type ExtensionRequest={id:string;thesis_id:string;title:string;advisor_name?:string|null;state:string;row_version:number;reason:string;
   submitted_at:string;original_due_at:string;requested_until_at:string|null;extension_until_at:string|null;consent_due_at:string|null;
@@ -85,20 +87,26 @@ function ExtensionDialog({op,userId,close,saved}:{op:Operation;userId:string;clo
   </form></Dialog>;
 }
 
-export default function ThesisExtensionRequests({userId,thesis,items,reload}:{userId:string;thesis:Thesis|undefined;items:ExtensionRequest[];reload:()=>Promise<void>}) {
+export default function ThesisExtensionRequests({userId,thesis,items,reload,focusExtensionId=""}:{userId:string;thesis:Thesis|undefined;items:ExtensionRequest[];reload:()=>Promise<void>;focusExtensionId?:string}) {
   const [op,setOp]=useState<Operation|null>(null);
   const [history,setHistory]=useState(false);
-  const visible=items.filter(item=>(!thesis||item.thesis_id===thesis.id)&&(history||["SUBMITTED","ADVISOR_REVIEWED","APPROVED"].includes(item.state)||(item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED")));
+  useEffect(() => {
+    if (!focusExtensionId) return;
+    const target = items.find(item => item.id === focusExtensionId);
+    if (target && !["SUBMITTED","ADVISOR_REVIEWED","APPROVED"].includes(target.state)) setHistory(true);
+    document.getElementById(`extension-${focusExtensionId}`)?.scrollIntoView({block:"start",behavior:"smooth"});
+  }, [focusExtensionId, items]);
+  const visible=items.filter(item=>(!thesis||item.thesis_id===thesis.id)&&(history||item.id===focusExtensionId||["SUBMITTED","ADVISOR_REVIEWED","APPROVED"].includes(item.state)||(item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED")));
   return <div className="stack">
     <div className="changes-toolbar"><h2>Yêu cầu gia hạn thực hiện KLTN</h2><div className="change-actions">
-      {thesis?.can_request_extension&&<button className="btn btn-primary" onClick={()=>setOp({kind:"create",thesis})}>Xin gia hạn KLTN</button>}
+      {thesis?.can_request_extension&&<button type="button" className="btn btn-primary" onClick={()=>setOp({kind:"create",thesis})}><CalendarPlus size={15} aria-hidden="true"/>Xin gia hạn KLTN</button>}
       <label className="change-checkbox"><input type="checkbox" checked={history} onChange={e=>setHistory(e.target.checked)}/>Xem cả lịch sử</label>
     </div></div>
     {thesis?.extension_request_blocker&&<p className="change-note">{thesis.extension_request_blocker}</p>}
     <p className="change-note">Gia hạn thực hiện KLTN được xét theo hồ sơ, tách riêng hạn báo cáo tuần và hạn chung của đợt. Nhóm chỉ được xét khi tất cả thành viên đồng ý.</p>
     {!visible.length&&<div className="changes-empty card"><p>Chưa có yêu cầu trong bộ lọc. Chọn hồ sơ ở bên trái để xem thao tác phù hợp với quyền của bạn.</p></div>}
-    {visible.map(item=><article className="change-card card" key={item.id}><div className="card-body stack">
-      <div className="change-card__heading"><h3>{item.title}</h3><span className={"change-status change-status--"+item.state.toLowerCase()}>{item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED"?"Không đạt":labels[item.state]}</span></div>
+    {visible.map(item=><article id={`extension-${item.id}`} className="change-card card" key={item.id}><div className="card-body stack">
+      <div className="change-card__heading"><h3>{item.title}</h3><ThesisStatusBadge className="change-status" state={item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED"?"REJECTED":item.state} label={item.state==="EXPIRED"&&item.defense.status==="NOT_PASSED"?"Không đạt":labels[item.state]}/></div>
       <p>GVHD · <strong>{item.advisor_name||"Chưa ghi nhận"}</strong></p>
       <ol className="change-steps" aria-label="Tiến trình gia hạn">{["Thành viên đồng ý","GVHD cho ý kiến","TBM quyết định","Kết quả"].map((label,index)=>
         <li key={label} className={(index===0?item.all_agreed:index===1?!!item.advisor_reason:index===2?!!item.decided_at:!["SUBMITTED","ADVISOR_REVIEWED"].includes(item.state))?"is-done":""}><span>{index+1}</span>{label}</li>)}</ol>
@@ -112,11 +120,11 @@ export default function ThesisExtensionRequests({userId,thesis,items,reload}:{us
       {item.decision_reason&&<p className="change-result"><strong>Quyết định / ý kiến xử lý</strong><br/>{item.decision_reason}</p>}
       {item.state==="EXPIRED"&&<p className={"alert "+(item.defense.status==="NOT_PASSED"?"alert-danger":"alert-info")}>{item.defense.message||item.decision_reason||"Yêu cầu đã hết hạn xác nhận. Hồ sơ KLTN và quyền tham gia của các thành viên vẫn giữ nguyên."}</p>}
       <div className="change-actions">
-        {item.can_consent&&<button className="btn btn-primary" onClick={()=>setOp({kind:"consent",item})}>Ý kiến xác nhận</button>}
-        {item.can_review&&<button className="btn btn-primary" onClick={()=>setOp({kind:"review",item})}>GVHD cho ý kiến</button>}
-        {item.can_decide&&<button className="btn btn-primary" onClick={()=>setOp({kind:"decision",item})}>TBM xét gia hạn</button>}
-        {item.can_manage_consent&&<button className="btn btn-secondary" onClick={()=>setOp({kind:"deadline",item})}>Hạn lấy ý kiến / nhắc xác nhận</button>}
-        {item.can_cancel&&<button className="btn btn-secondary" onClick={()=>setOp({kind:"cancel",item})}>Hủy yêu cầu gia hạn</button>}
+        {item.can_consent&&<button type="button" className="btn btn-primary" onClick={()=>setOp({kind:"consent",item})}><Check size={15} aria-hidden="true"/>Ý kiến xác nhận</button>}
+        {item.can_review&&<button type="button" className="btn btn-primary" onClick={()=>setOp({kind:"review",item})}><Check size={15} aria-hidden="true"/>GVHD cho ý kiến</button>}
+        {item.can_decide&&<button type="button" className="btn btn-primary" onClick={()=>setOp({kind:"decision",item})}><Check size={15} aria-hidden="true"/>TBM xét gia hạn</button>}
+        {item.can_manage_consent&&<button type="button" className="btn btn-secondary" onClick={()=>setOp({kind:"deadline",item})}><Clock3 size={15} aria-hidden="true"/>Hạn lấy ý kiến / nhắc xác nhận</button>}
+        {item.can_cancel&&<button type="button" className="btn btn-secondary" onClick={()=>setOp({kind:"cancel",item})}><RotateCcw size={15} aria-hidden="true"/>Hủy yêu cầu gia hạn</button>}
       </div><small>Gửi lúc {when(item.submitted_at)} · phiên bản {item.row_version}</small>
     </div></article>)}
     {op&&<ExtensionDialog key={op.kind+("item" in op?op.item.id:op.thesis.id)} op={op} userId={userId} close={()=>setOp(null)} saved={reload}/>}

@@ -2,23 +2,70 @@ import WorkflowSteps from "../components/domain/WorkflowSteps";
 import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { CalendarDays, ClipboardCheck, FileText, Plus, UserRound, Users } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCheck, Download, Eye, FileText, LayoutGrid, List, Plus, RefreshCw, RotateCcw, Send, UserRound, Users, XCircle } from "lucide-react";
 import type { Context, Lecturer, OpenRound, Registration, SchoolFormRound, Topic } from "../api";
 import { exportRoundMau04, request, uploadEvidence } from "../api";
-import { errorMessage } from "../errors";
+import { ApiError, errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import TopicDescriptionPreview from "../components/domain/TopicDescriptionPreview";
 import { RequirementList } from "../components/domain/TopicRequirements";
 import RegistrationForm from "../components/domain/RegistrationForm";
 import TopicEditor from "../components/domain/TopicEditor";
 import PageHeader from "../components/layout/PageHeader";
+import { SkeletonCard } from "../components/ui/Skeleton";
 import Dialog from "../components/ui/Dialog";
+import FilterBar, { type FilterChip } from "../components/ui/FilterBar";
+import EmptyState from "../components/ui/EmptyState";
+import Tabs from "../components/ui/Tabs";
 import TopicLifecycle from "../components/domain/TopicLifecycle";
 
 const PAGE_SIZE = 9;
 function roundDisplay(label: string) {
   const match = /^Năm học\s+(.+?)(?:\s+\((đợt\s+\d+)\))?$/i.exec(label);
   return {year: match?.[1] || label, period: match?.[2] || ""};
+}
+
+function renderDescriptionContent(description: string | null) {
+  const raw = (description || "").trim();
+  if (!raw) return <p>Chưa có mô tả.</p>;
+  const lines = raw.split(/\r?\n/);
+  const nodes: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  let paragraph: string[] = [];
+
+  const flushParagraph = (key: string) => {
+    if (!paragraph.length) return;
+    nodes.push(<p key={key}>{paragraph.join("\n")}</p>);
+    paragraph = [];
+  };
+  const flushBullets = (key: string) => {
+    if (!bullets.length) return;
+    nodes.push(
+      <ul key={key} className="topic-drawer-bullets">
+        {bullets.map((item, idx) => <li key={idx}>{item}</li>)}
+      </ul>
+    );
+    bullets = [];
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    const bulletMatch = /^[-•*]\s+(.+)$/.exec(trimmed);
+    if (bulletMatch) {
+      flushParagraph(`p-${index}`);
+      bullets.push(bulletMatch[1]);
+    } else if (!trimmed) {
+      flushParagraph(`p-${index}`);
+      flushBullets(`b-${index}`);
+    } else {
+      flushBullets(`b-${index}`);
+      paragraph.push(line);
+    }
+  });
+  flushParagraph("p-end");
+  flushBullets("b-end");
+
+  return <div className="topic-drawer-prose">{nodes}</div>;
 }
 
 
@@ -43,6 +90,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const [createOpen, setCreateOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [drawerError, setDrawerError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
@@ -50,6 +98,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   const [page, setPage] = useState(0);
   const [view, setView] = useState(context.actions.includes("topic:department_decide") ? "pending" : "all");
   const [sort, setSort] = useState("newest");
+  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
   const [revisedTitle, setRevisedTitle] = useState("");
   const [reason, setReason] = useState("");
   const [receiver, setReceiver] = useState("");
@@ -125,21 +174,38 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   }, [focusedTopicId, userId]);
   function choose(topic: Topic, detail = true) {
     setSelected(topic); setRevisedTitle(topic.title); setReason("");
-    setReceiver(topic.receiving_lecturer_id || ""); setMessage(""); setDetailOpen(detail);
+    setReceiver(topic.receiving_lecturer_id || ""); setMessage(""); setDrawerError(""); setDetailOpen(detail);
   }
   function closeDetail() {
     setDetailOpen(false);
+    setDrawerError("");
     if (focusedTopicId) navigate("/topics", {replace:true});
   }
   async function mutate(endpoint: string, method: string, payload?: object, version?: number) {
     if (busy) return;
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setDrawerError("");
     try {
       const updated = await request<Topic>(endpoint, userId, {method,
         headers: version !== undefined ? {"If-Match":String(version)} : {},
         body: payload ? JSON.stringify(payload) : undefined});
       setCreateOpen(false); choose(updated); await reload(); setMessage("Đã lưu đề tài.");
-    } catch (cause) {setMessage(errorMessage(cause));}
+    } catch (cause) {
+      const msg = errorMessage(cause);
+      if (detailOpen) {
+        setDrawerError(msg);
+        if (cause instanceof ApiError && cause.status === 409 && selected) {
+          const fresh = await request<Topic>(`/topics/${selected.id}`, userId).catch(() => null);
+          if (fresh) {
+            setSelected(fresh);
+            setRevisedTitle(fresh.title);
+            setReceiver(fresh.receiving_lecturer_id || "");
+          }
+          await reload().catch(() => undefined);
+        }
+      } else {
+        setMessage(msg);
+      }
+    }
     finally {setBusy(false);}
   }
   async function register(payload: object, proposal = false, evidence?: File) {
@@ -154,7 +220,7 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
           await uploadEvidence(registration.id, userId, evidence);
           notice = "Đã lập đăng ký và lưu minh chứng của bạn.";
         } catch (cause) {
-          notice = "Đã lập đăng ký nhưng chưa tải được minh chứng. Hãy vào hồ sơ đăng ký để thử lại.";
+          notice = `Đã lập đăng ký nhưng chưa tải được minh chứng (${errorMessage(cause)}). Hãy vào hồ sơ đăng ký để thử lại.`;
         }
       }
       navigate("/registrations", {state:{notice}});
@@ -163,68 +229,123 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
   }
   const editable = selected?.proposer_user_id === userId && ["DRAFT","RETURNED"].includes(selected.state);
   const receiverReady = !lecturersLoading && !lecturersError && lecturers.some(item => item.id === receiver && item.available !== false);
+  const sortLabels: Record<string, string> = {
+    newest: "Mới nhất",
+    oldest: "Cũ nhất",
+    title_asc: "Tên A → Z",
+    title_desc: "Tên Z → A",
+  };
+  const topicTabs = [
+    ...(head ? [["pending", "Chờ duyệt"], ["archived", "Đã ngừng sử dụng"]] : []),
+    ["all", student ? "Đề tài có sẵn" : "Tất cả đề tài"],
+    ...(!student && !admin ? [["suggested", "SV đề xuất cho tôi"]] : []),
+    ...(!admin ? [["mine", student ? "Đề xuất của tôi" : "Đề tài của tôi"]] : []),
+  ].map(([id, label]) => ({ id, label }));
+  const topicChips: FilterChip[] = [
+    ...(filter.trim() ? [{ key: "q", label: `Từ khóa: "${filter.trim()}"`, onRemove: () => setFilter("") }] : []),
+    ...(sort !== "newest" ? [{ key: "sort", label: `Sắp xếp: ${sortLabels[sort] || sort}`, onRemove: () => { setSort("newest"); setPage(0); } }] : []),
+  ];
+
   return <>
     <PageHeader title={head ? "Đề tài và duyệt đề tài" : "Đề tài"}
-      description={admin ? "Danh sách đề tài đã công bố để tra cứu. Hồ sơ đăng ký, bài nộp và phản hồi riêng vẫn theo đúng quyền." : student ? "Tự đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Tạo đề tài, theo dõi bộ môn duyệt và xem các đề xuất sinh viên gửi cho bạn."} />
-    {exportRounds.length>0 && <section className="card" aria-label="Xuất danh sách KLTN"><div className="card-body stack">
+      description={admin ? "Danh sách đề tài đã công bố để tra cứu theo quyền được giao." : student ? "Đăng ký vào đề tài còn chỗ hoặc đề xuất đề tài để bộ môn xét duyệt." : "Quản lý, theo dõi và duyệt đề tài trong phạm vi bộ môn."} />
+    {exportRounds.length>0 && <section className="card mb-4" aria-label="Xuất danh sách KLTN"><div className="card-body stack">
       <h2>Danh sách sinh viên và GVHD thực hiện KLTN</h2>
-      <p>Xuất Excel theo khung “Nộp ds” của Mẫu 4, lấy thành viên đang tham gia và GVHD chính thức tại thời điểm tải. Đây là danh sách thực hiện KLTN, khác với danh mục đề tài chào đăng ký.</p>
-      <div className="flex gap-2" style={{flexWrap:"wrap",alignItems:"end"}}><label>Đợt xuất danh sách<select className="input" value={exportRoundId} disabled={busy} onChange={event=>setExportRoundId(event.target.value)}>{exportRounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
-      <button type="button" className="btn btn-secondary" disabled={busy || previewLoading || exportPreview?.round_id !== exportRoundId || !exportPreview?.students} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}>Xuất danh sách đã điền theo Mẫu 4</button></div>
+     
+      <div className="flex flex-wrap gap-2 items-center"><label>Đợt xuất danh sách<select className="input" value={exportRoundId} disabled={busy} onChange={event=>setExportRoundId(event.target.value)}>{exportRounds.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+      <button type="button" className="btn btn-soft" disabled={busy || previewLoading || exportPreview?.round_id !== exportRoundId || !exportPreview?.students} onClick={async()=>{setBusy(true);setMessage("");try{await exportRoundMau04(exportRoundId);setMessage("Đã xuất Mẫu 4 theo dữ liệu hiện tại; kiểm tra và ký ngoài hệ thống trước khi công bố.");}catch(cause){setMessage(errorMessage(cause));}finally{setBusy(false);}}}><Download size={15} aria-hidden="true" />Xuất danh sách đã điền theo Mẫu 4</button></div>
       {previewLoading && <p role="status">Đang kiểm tra dữ liệu của đợt…</p>}
       {previewError && <p role="alert" className="alert alert-danger">{previewError}</p>}
       {exportPreview?.round_id === exportRoundId && (exportPreview.students > 0
         ? <p role="status"><strong>{exportPreview.students} sinh viên · {exportPreview.theses} khóa luận</strong> sẽ được đưa vào danh sách.{exportPreview.missing_advisors > 0 && (" Có "+exportPreview.missing_advisors+" sinh viên chưa có GVHD chính thức; cột ghi chú sẽ đánh dấu.")}</p>
         : <p role="status" className="alert alert-info">Đợt này chưa có sinh viên đang thực hiện khóa luận. Hãy chọn đợt có hồ sơ đã được GV tiếp nhận.</p>)}
     </div></section>}
-    <div className="topic-toolbar">
-      <div className="topic-toolbar__search">
-        <input aria-label="Tìm đề tài" className="input" maxLength={200} placeholder="Tìm theo mã, tên đề tài hoặc GV..."
-          value={filter} onChange={(event) => setFilter(event.target.value)} />
-      </div>
-      <div className="topic-toolbar__actions">
-        <div className="topic-sort-control">
-          <span>Sắp xếp:</span>
-          <select
-            aria-label="Thứ tự sắp xếp"
-            className="input topic-sort-select"
-            value={sort}
-            onChange={(e) => { setSort(e.target.value); setPage(0); }}
-          >
-            <option value="newest">Mới nhất</option>
-            <option value="oldest">Cũ nhất</option>
-            <option value="title_asc">Tên A → Z</option>
-            <option value="title_desc">Tên Z → A</option>
-          </select>
+    <FilterBar
+      search={{
+        value: filter,
+        onChange: setFilter,
+        placeholder: "Tìm theo mã, tên đề tài hoặc GV...",
+        ariaLabel: "Tìm đề tài",
+      }}
+      chips={topicChips}
+      onClearAll={() => { setFilter(""); setSort("newest"); setPage(0); }}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-secondary" disabled={loading || busy} onClick={() => void reload().catch((cause) => setMessage(errorMessage(cause)))}>
+            <RefreshCw size={15} aria-hidden="true" />Làm mới
+          </button>
+          {(student ? context.actions.includes("registration:create") : context.actions.includes("topic:create")) ?
+            <button className="btn btn-primary" disabled={!rounds.length || busy}
+              onClick={() => {setDetailOpen(false); setCreateOpen(true); setMessage("");}}>
+              <Plus size={16} aria-hidden="true" />{student ? "Tự đề xuất đề tài" : "Tạo đề tài"}
+            </button> : null}
         </div>
-        <button className="btn btn-secondary" disabled={loading || busy} onClick={() => void reload().catch((cause) => setMessage(errorMessage(cause)))}>Làm mới</button>
-        {(student ? context.actions.includes("registration:create") : context.actions.includes("topic:create")) ?
-          <button className="btn btn-primary" disabled={!rounds.length || busy}
-            onClick={() => {setDetailOpen(false); setCreateOpen(true); setMessage("");}}>
-            <Plus size={16} aria-hidden="true" />{student ? "Tự đề xuất đề tài" : "Tạo đề tài"}
-          </button> : null}
+      }
+    >
+      <div className="topic-sort-control">
+        <span>Sắp xếp:</span>
+        <select
+          aria-label="Thứ tự sắp xếp"
+          className="input topic-sort-select"
+          value={sort}
+          onChange={(e) => { setSort(e.target.value); setPage(0); }}
+        >
+          <option value="newest">Mới nhất</option>
+          <option value="oldest">Cũ nhất</option>
+          <option value="title_asc">Tên A → Z</option>
+          <option value="title_desc">Tên Z → A</option>
+        </select>
       </div>
-    </div>
-    {!admin && roundsLoaded && !rounds.length ? <p className="text-caption">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
-    <div className="tabs" aria-label="Lọc đề tài">
-      {[...(head ? [["pending","Chờ duyệt"],["archived","Đã ngừng sử dụng"]] : []), ["all",student ? "Đề tài có sẵn" : "Tất cả đề tài"],
-        ...(!student && !admin ? [["suggested","SV đề xuất cho tôi"]] : []),
-        ...(!admin ? [["mine",student ? "Đề xuất của tôi" : "Đề tài của tôi"]] : [])].map(([key,label]) =>
-        <button key={key} aria-pressed={view === key} className={"tabs__tab " + (view === key ? "tabs__tab--active" : "")}
-          onClick={() => {setView(key); setPage(0);}}>{label}</button>)}
+    </FilterBar>
+    {!admin && roundsLoaded && !rounds.length ? <p className="text-caption mb-2">Không có đợt đang mở để tạo hoặc đăng ký đề tài mới.</p> : null}
+    <div className="topics-subbar">
+      <Tabs
+        variant="underline"
+        asButtons
+        idPrefix="topic-view"
+        ariaLabel="Lọc đề tài"
+        items={topicTabs}
+        activeId={view}
+        onChange={(next) => { setView(next); setPage(0); }}
+      />
+      <div className="topic-view-toggle" role="group" aria-label="Chế độ hiển thị danh sách đề tài">
+        <button
+          type="button"
+          className={`topic-view-toggle__btn${layoutMode === "grid" ? " topic-view-toggle__btn--active" : ""}`}
+          aria-pressed={layoutMode === "grid"}
+          onClick={() => setLayoutMode("grid")}
+        >
+          <LayoutGrid size={14} aria-hidden="true" />
+          Dạng thẻ
+        </button>
+        <button
+          type="button"
+          className={`topic-view-toggle__btn${layoutMode === "list" ? " topic-view-toggle__btn--active" : ""}`}
+          aria-pressed={layoutMode === "list"}
+          onClick={() => setLayoutMode("list")}
+        >
+          <List size={14} aria-hidden="true" />
+          Dạng danh sách
+        </button>
+      </div>
     </div>
     {message && !detailOpen && !createOpen && !registerOpen ? <p className="alert alert-info" role="status">{message}</p> : null}
-    {loading ? <p role="status">Đang tải đề tài…</p> : !topics.length ?
-      <div className="card empty-state"><FileText aria-hidden="true" /><h2>Chưa có đề tài trong danh sách này</h2><p>Thử đổi mục hoặc từ khóa tìm kiếm.</p></div> :
-      <div className="grid topic-grid">{topics.map((topic) => {
+    {loading ? <div className="topic-grid" role="status" aria-label="Đang tải đề tài"><SkeletonCard /><SkeletonCard /><SkeletonCard /></div> : !topics.length ?
+      <EmptyState icon={<FileText aria-hidden="true" />} title="Chưa có đề tài trong danh sách này" description="Thử đổi mục hoặc từ khóa tìm kiếm để xem thêm đề tài.">
+        {!topicChips.length && (filter || sort !== "newest") && <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setFilter(""); setSort("newest"); setPage(0); }}>Xóa bộ lọc</button>}
+      </EmptyState> :
+      <div className={layoutMode === "list" ? "topic-grid--list" : "grid topic-grid"}>{topics.map((topic) => {
         const round = roundDisplay(topic.round_label);
         const full = topic.registered_member_count >= topic.max_students;
         const canRegister = topic.available && !full && topic.department_id === context.department_id;
-        return <article key={topic.id} className="card topic-card">
+        return <article key={topic.id} className={`card topic-card${layoutMode === "list" ? " topic-card--list" : ""}`}>
           <div className="card-body topic-card__body">
             <div className="topic-card__top">
-              <span className="topic-code">{topic.code}</span>
-              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+              <div className="topic-card__top-left">
+                <span className="topic-code">{topic.code}</span>
+                <span className={"topic-card__proposer " + (topic.proposer_type === "STUDENT" ? "topic-card__proposer--student" : "topic-card__proposer--lecturer")}>{topic.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
+              </div>
+              <div className="topic-card__top-right">
                 {topic.proposer_type === "STUDENT" && topic.state === "SUBMITTED" ? (
                   <span className="badge badge-warning">Chờ bộ môn duyệt</span>
                 ) : (
@@ -237,108 +358,192 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
                 )}
               </div>
             </div>
-            <h2 className="topic-card-title" title={topic.title}>{topic.title}</h2>
-            <div className="topic-card__identity">
-              <div className="topic-card__year"><CalendarDays size={17} aria-hidden="true" />
-                <span><small>Năm học</small><strong>{round.year}</strong>{round.period ? <em>{round.period}</em> : null}</span>
-              </div>
-              <span className={"topic-card__proposer " + (topic.proposer_type === "STUDENT" ? "topic-card__proposer--student" : "topic-card__proposer--lecturer")}>{topic.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
-            </div>
+            <h2 className="topic-card-title" title={topic.title}>
+              <button type="button" className="topic-card__title-btn" onClick={() => choose(topic)}>
+                {topic.title}
+              </button>
+            </h2>
+            <TopicDescriptionPreview description={topic.description} />
+            {topic.requirements.length > 0 && <RequirementList items={topic.requirements} preview />}
             {!student && topic.proposer_type === "STUDENT" && topic.state === "SUBMITTED" ?
               <p className="topic-card__pending-note">Chờ bộ môn duyệt. GV được đề xuất có thể xem nội dung, chưa xét tiếp nhận.</p> : null}
             {!student && topic.proposer_type === "STUDENT" && topic.state === "RETURNED" ?
               <p className="topic-card__pending-note">Bộ môn đã trả đề xuất để SV chỉnh sửa. GV chưa xét tiếp nhận.</p> : null}
-            <div className="topic-card__summary">
-              <h3>Mô tả đề tài</h3>
-              <TopicDescriptionPreview description={topic.description} />
-            </div>
-            <div className="topic-card__facts">
-              <div className="topic-card__fact"><UserRound size={17} aria-hidden="true" /><span><small>{topic.proposer_type === "STUDENT" && topic.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</small>
-                <LecturerProfileLink userId={userId} lecturerId={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} /></span></div>
-              <div className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
-                <Users size={17} aria-hidden="true" /><span><small>Sinh viên</small><strong>{topic.registered_member_count}/{topic.max_students} SV</strong></span>
+            <div className="topic-card__footer">
+              <div className="topic-card__meta-inline">
+                <span className="topic-card__fact">
+                  <UserRound size={15} aria-hidden="true" />
+                  <span>
+                    <small>{topic.proposer_type === "STUDENT" && topic.state !== "APPROVED" ? "GV được SV đề xuất" : "GV tiếp nhận"}</small>{" "}
+                    <LecturerProfileLink userId={userId} lecturerId={topic.receiving_lecturer_id} name={topic.receiving_lecturer_name} />
+                  </span>
+                </span>
+                <span className="topic-card__year">
+                  <CalendarDays size={15} aria-hidden="true" />
+                  <span><small>Năm học</small> <strong>{round.year}</strong>{round.period ? <em>{round.period}</em> : null}</span>
+                </span>
+                <span className={"topic-card__fact topic-card__capacity" + (full ? " topic-card__capacity--full" : "")}>
+                  <Users size={14} aria-hidden="true" />
+                  <strong>{topic.registered_member_count}/{topic.max_students} SV</strong>
+                </span>
               </div>
-            </div>
-            <div className="topic-card__requirements"><h3>Kỹ năng và yêu cầu</h3>
-              <RequirementList items={topic.requirements} preview /></div>
-            <div className="topic-card__actions">
-              <button className="btn btn-secondary" onClick={() => choose(topic)}>{head && topic.state === "SUBMITTED" ? "Xem và duyệt" : "Xem chi tiết"}</button>
-              {student && topic.state === "APPROVED" ? <button className="btn btn-primary" disabled={!canRegister}
-                title={full ? `Đề tài đã nhận đủ ${topic.max_students} sinh viên tối đa.` : undefined}
-                onClick={() => {choose(topic,false); setRegisterOpen(true);}}>
-                {canRegister ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : full ? "Đã đủ số lượng" : topic.department_id !== context.department_id ? "Đề tài bộ môn khác" : "Đã đóng đăng ký"}
-              </button> : null}
+              <div className="topic-card__actions">
+                <button type="button" className={head && topic.state === "SUBMITTED" ? "btn btn-soft btn-sm" : "btn btn-secondary btn-sm"} onClick={() => choose(topic)}>
+                  {head && topic.state === "SUBMITTED" ? <ClipboardCheck size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+                  {head && topic.state === "SUBMITTED" ? "Xem và duyệt" : "Xem chi tiết"}
+                </button>
+                {student && topic.state === "APPROVED" ? <button type="button" className="btn btn-primary btn-sm" disabled={!canRegister}
+                  title={full ? `Đề tài đã nhận đủ ${topic.max_students} sinh viên tối đa.` : undefined}
+                  onClick={() => {choose(topic,false); setRegisterOpen(true);}}>
+                  <Send size={13} aria-hidden="true" />
+                  {canRegister ? topic.registered_member_count ? "Tham gia" : "Đăng ký" : full ? "Đã đủ số lượng" : topic.department_id !== context.department_id ? "Đề tài bộ môn khác" : "Đã đóng đăng ký"}
+                </button> : null}
+              </div>
             </div>
           </div>
         </article>;
       })}</div>}
     <nav className="pagination" aria-label="Phân trang đề tài">
-      <button className="btn btn-secondary" disabled={!page || loading} onClick={() => setPage(page - 1)}>Trang trước</button>
+      <button className="btn btn-secondary" disabled={!page || loading} onClick={() => setPage(page - 1)}>
+        <ChevronLeft size={15} aria-hidden="true" />Trang trước
+      </button>
       <span>Trang {page + 1}</span>
-      <button className="btn btn-secondary" disabled={topics.length < PAGE_SIZE || loading} onClick={() => setPage(page + 1)}>Trang sau</button>
+      <button className="btn btn-secondary" disabled={topics.length < PAGE_SIZE || loading} onClick={() => setPage(page + 1)}>
+        Trang sau<ChevronRight size={15} aria-hidden="true" />
+      </button>
     </nav>
 
-    <Dialog open={detailOpen && !!selected} onClose={closeDetail} busy={busy}
-      title={selected ? selected.code + " · " + selected.title : "Chi tiết đề tài"} size="lg">
+    <Dialog
+      open={detailOpen && !!selected}
+      onClose={closeDetail}
+      busy={busy}
+      variant="drawer"
+      size="lg"
+      title={selected ? selected.title : "Chi tiết đề tài"}
+      headerMeta={selected ? <>
+        <span className="topic-code">{selected.code}</span>
+        <span className={selected.proposer_type === "STUDENT" ? "topic-card__proposer topic-card__proposer--student" : "topic-card__proposer topic-card__proposer--lecturer"}>
+          {selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}
+        </span>
+        <ThesisStatusBadge state={selected.state} />
+      </> : null}
+      footer={selected ? (
+        head && selected.state === "SUBMITTED" && selected.proposer_user_id !== userId ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy || !reason.trim()}
+              onClick={() => void mutate("/topics/" + selected.id + "/department-decision", "POST", { decision: "RETURN", reason }, selected.row_version)}
+            >
+              <RotateCcw size={15} aria-hidden="true" />Trả lại để sửa
+            </button>
+            <button
+              type="button"
+              className="btn btn-destructive"
+              disabled={busy || !reason.trim()}
+              onClick={() => void mutate("/topics/" + selected.id + "/department-decision", "POST", { decision: "REJECT", reason }, selected.row_version)}
+            >
+              <XCircle size={15} aria-hidden="true" />Từ chối đề tài
+            </button>
+            <button
+              type="submit"
+              form="topic-dept-review-form"
+              className="btn btn-primary"
+              disabled={busy || (selected.proposer_type === "STUDENT" && !receiverReady)}
+            >
+              <Check size={15} aria-hidden="true" />Duyệt đề tài
+            </button>
+          </>
+        ) : editable && !student ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={() => void mutate("/topics/" + selected.id + "/submit", "POST", undefined, selected.row_version)}
+          >
+            <Send size={14} aria-hidden="true" />Gửi bộ môn duyệt
+          </button>
+        ) : student && selected.state === "APPROVED" ? (() => {
+          const full = selected.registered_member_count >= selected.max_students;
+          const canRegister = selected.available && !full && selected.department_id === context.department_id;
+          return (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!canRegister || busy}
+              title={full ? `Đề tài đã nhận đủ ${selected.max_students} sinh viên tối đa.` : undefined}
+              onClick={() => { setDetailOpen(false); setRegisterOpen(true); }}
+            >
+              <Send size={14} aria-hidden="true" />
+              {canRegister ? selected.registered_member_count ? "Tham gia" : "Đăng ký" : full ? "Đã đủ số lượng" : selected.department_id !== context.department_id ? "Đề tài bộ môn khác" : "Đã đóng đăng ký"}
+            </button>
+          );
+        })() : null
+      ) : null}
+    >
       {selected ? <div className="stack topic-detail-content">
-        <div className="topic-detail-content__intro"><span>{selected.round_label}</span>
-          <span className={selected.proposer_type === "STUDENT" ? "topic-card__proposer topic-card__proposer--student" : "topic-card__proposer topic-card__proposer--lecturer"}>
-            {selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</span>
-          <ThesisStatusBadge state={selected.state} /></div><WorkflowSteps steps={["Soạn đề xuất","TBM xét duyệt","Mở đăng ký"]} current={["APPROVED","LOCKED"].includes(selected.state)?2:selected.state==="SUBMITTED"?1:0}/>
+        <WorkflowSteps steps={["Soạn đề xuất","TBM xét duyệt","Mở đăng ký"]} current={["APPROVED","LOCKED"].includes(selected.state)?2:selected.state==="SUBMITTED"?1:0}/>
         {selected.archived_at && <p className="alert alert-warning">Đề tài đã ngừng sử dụng: {selected.archive_reason}. Hồ sơ đã liên kết vẫn được giữ nguyên.</p>}
-        <TopicLifecycle key={selected.id+"-"+selected.row_version} topic={selected} context={context} onChanged={async()=>{closeDetail();setSelected(null);await reload();setMessage("Đã cập nhật đề tài và ghi nhật ký.");}}/>
-        <section className="topic-detail-content__section"><h3>Mô tả đề tài</h3>
-          <p>{selected.description || "Chưa có mô tả."}</p></section>
-        <div className="topic-detail-content__facts">
-          <div><span>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</span><LecturerProfileLink userId={userId} lecturerId={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></div>
-          <div><span>Sinh viên</span><strong>{selected.registered_member_count}/{selected.max_students} SV</strong></div>
-        </div>
-        <section className="topic-detail-content__section"><h3>Kỹ năng và yêu cầu</h3>
-          <RequirementList items={selected.requirements} /></section>
+        <section className="topic-detail-content__section">
+          <h3>Mô tả đề tài</h3>
+          {renderDescriptionContent(selected.description)}
+        </section>
+        <dl className="topic-drawer-meta">
+          <div>
+            <dt>{selected.proposer_type === "STUDENT" && selected.state !== "APPROVED" ? "GV được SV đề xuất" : "Giảng viên tiếp nhận"}</dt>
+            <dd><LecturerProfileLink userId={userId} lecturerId={selected.receiving_lecturer_id} name={selected.receiving_lecturer_name} /></dd>
+          </div>
+          <div>
+            <dt>Chỉ tiêu sinh viên</dt>
+            <dd>{selected.registered_member_count}/{selected.max_students} SV</dd>
+          </div>
+          <div>
+            <dt>Đợt khóa luận</dt>
+            <dd>{selected.round_label}</dd>
+          </div>
+          <div>
+            <dt>Nguồn đề xuất</dt>
+            <dd>{selected.proposer_type === "STUDENT" ? "Sinh viên đề xuất" : "Giảng viên đề xuất"}</dd>
+          </div>
+        </dl>
+        <section className="topic-detail-content__section">
+          <h3>Kỹ năng và yêu cầu đối với sinh viên</h3>
+          <RequirementList items={selected.requirements} />
+        </section>
         <section className="topic-detail-content__section topic-registered-students">
           <div className="topic-registered-students__header">
             <Users size={16} aria-hidden="true" />
             <h3>Sinh viên đã đăng ký ({selected.registered_member_count}/{selected.max_students} SV)</h3>
           </div>
           {selected.registered_students && selected.registered_students.length > 0 ? (
-            <div className="table-scroll" tabIndex={0} role="region" aria-label="Sinh viên đã đăng ký đề tài">
-              <table className="topic-registered-table">
-                <thead>
-                  <tr>
-                    <th>MSSV</th>
-                    <th>Họ và tên</th>
-                    <th>Lớp</th>
-                    <th>Vai trò</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.registered_students.map((st) => (
-                    <tr key={st.student_id}>
-                      <td><span className="topic-code" style={{ padding: "2px 6px", fontSize: "11px" }}>{st.student_code}</span></td>
-                      <td><strong>{st.display_name}</strong></td>
-                      <td>{st.class_name || "—"}</td>
-                      <td>
-                        {st.is_coordinator ? (
-                          <span className="badge badge-primary">Nhóm trưởng</span>
-                        ) : (
-                          <span className="badge badge-neutral">Thành viên</span>
-                        )}
-                      </td>
-                      <td>
-                        {st.registration_state === "LECTURER_ACCEPTED" || st.registration_state === "FINALIZED" ? (
-                          <span className="badge badge-success">Đã tiếp nhận</span>
-                        ) : st.registration_state === "SUBMITTED" ? (
-                          <span className="badge badge-info">Chờ GV duyệt</span>
-                        ) : (
-                          <span className="badge badge-warning">Đang đăng ký</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="topic-drawer-students" aria-label="Sinh viên đã đăng ký đề tài">
+              {selected.registered_students.map((st) => (
+                <li key={st.student_id} className="topic-drawer-student">
+                  <div className="topic-drawer-student__ident">
+                    <strong>{st.display_name}</strong>
+                    <span className="topic-drawer-student__sub">
+                      <span className="code-chip">{st.student_code}</span>
+                      {st.class_name ? <span>· {st.class_name}</span> : null}
+                    </span>
+                  </div>
+                  <div className="topic-drawer-student__badges">
+                    {st.is_coordinator ? (
+                      <span className="badge badge-primary">Nhóm trưởng</span>
+                    ) : (
+                      <span className="badge badge-neutral">Thành viên</span>
+                    )}
+                    {st.registration_state === "LECTURER_ACCEPTED" || st.registration_state === "FINALIZED" ? (
+                      <span className="badge badge-success">Đã tiếp nhận</span>
+                    ) : st.registration_state === "SUBMITTED" ? (
+                      <span className="badge badge-info">Chờ GV duyệt</span>
+                    ) : (
+                      <span className="badge badge-warning">Đang đăng ký</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           ) : selected.registered_member_count > 0 ? (
             <p className="text-body-sm text-muted">Đã có {selected.registered_member_count} sinh viên đăng ký tham gia đề tài này.</p>
           ) : (
@@ -355,12 +560,10 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
           <TopicEditor key={selected.id + "-" + selected.row_version} topic={selected} rounds={rounds}
             lecturers={lecturers} context={context} busy={busy}
             onSave={(payload) => mutate("/topics/" + selected.id,"PATCH",payload,selected.row_version)} />
-          {!student ? <button className="btn btn-primary" disabled={busy}
-            onClick={() => void mutate("/topics/" + selected.id + "/submit","POST",undefined,selected.row_version)}>Gửi bộ môn duyệt</button>
-            : <p>Chỉnh sửa xong, mở Đăng ký để gửi đề xuất cho bộ môn.</p>}
+          {student ? <p className="text-body-sm text-muted">Chỉnh sửa xong, mở Đăng ký để gửi đề xuất cho bộ môn.</p> : null}
         </> : null}
         {head && selected.state === "SUBMITTED" && selected.proposer_user_id !== userId ?
-          <form className="review-panel" onSubmit={(event) => {event.preventDefault(); if (selected.proposer_type === "STUDENT" && !receiverReady) return; void mutate("/topics/" + selected.id + "/department-decision","POST",
+          <form id="topic-dept-review-form" className="review-panel" onSubmit={(event) => {event.preventDefault(); if (selected.proposer_type === "STUDENT" && !receiverReady) return; void mutate("/topics/" + selected.id + "/department-decision","POST",
             {decision:"APPROVE",revised_title:revisedTitle,reason:reason || null,
               ...(selected.proposer_type === "STUDENT" ? {receiving_lecturer_id:receiver} : {})},selected.row_version);}}>
             <div className="review-panel__head"><ClipboardCheck size={16} aria-hidden="true" /><h3>Bộ môn xét duyệt</h3></div>
@@ -385,27 +588,20 @@ export default function TopicsPage({userId, context}: {userId: string; context: 
                 <textarea className="input" rows={3} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)} />
               </label>
             </div>
-            <div className="review-panel__actions">
-              <button className="btn btn-primary" disabled={busy || (selected.proposer_type === "STUDENT" && !receiverReady)}>Duyệt đề tài</button>
-              {(["RETURN","REJECT"] as const).map((decision) => <button key={decision} type="button"
-                className={"btn " + (decision === "RETURN" ? "btn-secondary" : "btn-destructive")} disabled={busy || !reason.trim()}
-                onClick={() => void mutate("/topics/" + selected.id + "/department-decision","POST",{decision,reason},selected.row_version)}>
-                {decision === "RETURN" ? "Trả lại để sửa" : "Từ chối đề tài"}
-              </button>)}
-            </div>
           </form> : null}
-        {selected.title_versions.length > 1 ? <details><summary>Lịch sử đổi tên đề tài ({selected.title_versions.length - 1} lần)</summary>
+        <TopicLifecycle key={selected.id+"-"+selected.row_version} topic={selected} context={context} onChanged={async()=>{closeDetail();setSelected(null);await reload();setMessage("Đã cập nhật đề tài và ghi nhật ký.");}}/>
+        {selected.title_versions.length > 1 ? <details className="topic-drawer-accordion"><summary>Lịch sử đổi tên đề tài ({selected.title_versions.length - 1} lần)</summary>
           <ol className="requirement-list">{selected.title_versions.map((version) => <li key={version.version_no}>
             Phiên bản {version.version_no}: {version.title} — {new Date(version.created_at).toLocaleString("vi-VN")}
           </li>)}</ol>
         </details> : null}
       </div> : null}
-      {message ? <p className="alert alert-info" role="status">{message}</p> : null}
+      {drawerError ? <p className="alert alert-danger" role="alert">{drawerError}</p> : message ? <p className="alert alert-info" role="status">{message}</p> : null}
     </Dialog>
     <Dialog open={createOpen} onClose={() => setCreateOpen(false)} busy={busy}
       title={student ? "Tự đề xuất và lập đăng ký" : "Tạo đề tài mới"} size="lg">
       {createOpen ? <TopicEditor rounds={rounds} lecturers={lecturers} context={context} busy={busy}
-        onSave={(payload) => mutate("/topics","POST",payload)} onPropose={(payload) => register(payload,true)} /> : null}
+        onSave={(payload) => mutate("/topics","POST",payload)} onPropose={(payload, evidence) => register(payload, true, evidence)} /> : null}
       {message ? <p className="alert alert-danger" role="alert">{message}</p> : null}
     </Dialog>
     <Dialog open={registerOpen && !!selected} onClose={() => setRegisterOpen(false)} busy={busy} title="Đăng ký đề tài" size="lg">

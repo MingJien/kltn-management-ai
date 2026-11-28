@@ -1,12 +1,15 @@
 import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import {lazy,Suspense,useCallback,useEffect,useState} from "react";
 import {Link,useParams} from "react-router-dom";
-import {ArrowLeft,CheckCircle2,ClipboardCheck,Download,Eye,FileText,Plus,RefreshCw,ShieldCheck,Users,XCircle} from "lucide-react";
+import {ArrowLeft,Ban,CalendarClock,Check,CheckCircle2,ClipboardCheck,Download,Edit3,Eye,FileText,Plus,RefreshCw,RotateCcw,ShieldCheck,Users,XCircle} from "lucide-react";
 import {exportThesisReview,request,type Context} from "../api";
-import {errorMessage} from "../errors";
+import {ApiError,errorMessage} from "../errors";
 import {downloadEvaluationFile,labels,mutate,when,type Evaluation,type Kind,type Review} from "../evaluation";
 import PageHeader from "../components/layout/PageHeader";
 import Dialog from "../components/ui/Dialog";
+import {SkeletonCard} from "../components/ui/Skeleton";
+import {ActivityTimeline,inferTimelineTone} from "../components/ui/Timeline";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import ThesisReviewEditor from "../components/domain/ThesisReviewEditor";
 const Preview=lazy(()=>import("../components/domain/ReviewAttachmentPreview").then(module=>({default:module.ReadOnlyFilePreview})));
 type Operation={kind:"assign"}|{kind:"extend";id:string;name:string;due:string|null}|{kind:"revoke";id:string;name:string}|{kind:"check"}|{kind:"reopen"}|{kind:"create";role:Kind};
@@ -28,10 +31,15 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
   useEffect(()=>{const controller=new AbortController();void load(controller.signal).catch(e=>{if(!controller.signal.aborted)setError(errorMessage(e));});return()=>controller.abort();},[load]);
   async function run(action:()=>Promise<unknown>,success:string){
     if(busy)return;setBusy(true);setError("");setMessage("");
-    try{await action();await load();setMessage(success);return true;}catch(e){setError(errorMessage(e));return false;}finally{setBusy(false);}
+    try{await action();await load();setMessage(success);return true;}
+    catch(e){
+      setError(errorMessage(e));
+      if(e instanceof ApiError && e.status===409) await load().catch(()=>undefined);
+      return false;
+    }finally{setBusy(false);}
   }
   const fileAction=(name:string,url:string)=>void run(()=>downloadEvaluationFile(url,name),"Đã tải tệp.");
-  if(!data)return <div className="evaluation-page"><Link to="/evaluation">← Danh sách hồ sơ</Link>{error?<div className="alert alert-danger" role="alert">{error}<button className="btn btn-secondary" disabled={busy} onClick={()=>void run(()=>load(),"Đã tải dữ liệu.")}>Thử lại</button></div>:<p role="status">Đang tải hồ sơ phản biện…</p>}</div>;
+  if(!data)return <div className="evaluation-page"><Link className="workspace-back-link" to="/evaluation">← Danh sách hồ sơ</Link>{error?<div className="alert alert-danger" role="alert">{error}<button className="btn btn-secondary" disabled={busy} onClick={()=>void run(()=>load(),"Đã tải dữ liệu.")}>Thử lại</button></div>:<div className="stack mt-4" role="status" aria-label="Đang tải hồ sơ phản biện"><SkeletonCard /><SkeletonCard /></div>}</div>;
   const can=(action:string)=>data.actions.includes(`evaluation:${action}`);
   const member=data.members.find(m=>m.id===memberId),eligibility=member?.eligibility;
   const active=data.assignments.filter(a=>a.state==="ACTIVE");
@@ -43,15 +51,15 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
   const oldReviews=reviews.filter(r=>r.report_version_id!==data.report?.id);
   function reviewCard(review:Review){
     const current=review.report_version_id===data!.report?.id;
-    return <article className="evaluation-review" key={review.id}><div className="evaluation-card-heading"><strong>Mẫu {review.kind==="ADVISOR"?"7 · GVHD":"8 · Phản biện"} · Phiếu v{review.version_no}</strong><span className={`evaluation-badge ${review.state==="SUBMITTED"?"is-success":""}`}>{labels[review.state]}</span></div>
+    return <article className="evaluation-review" key={review.id}><div className="evaluation-card-heading"><strong>Mẫu {review.kind==="ADVISOR"?"7 · GVHD":"8 · Phản biện"} · Phiếu v{review.version_no}</strong><ThesisStatusBadge state={review.state} label={labels[review.state]}/></div>
       <p>{review.lecturer_name} · {current?`Báo cáo v${data!.report?.version_no}`:"Bản báo cáo trước"}{review.submitted_at?` · ${when(review.submitted_at)}`:""}</p>
-      {review.can_edit?<button className="btn btn-primary btn-sm" disabled={busy} onClick={()=>setEditor(review)}>Tiếp tục viết phiếu</button>:review.state==="DRAFT"?<p className="text-muted">Phiếu nháp thuộc bản báo cáo hoặc phân công cũ, giữ để đối chiếu.</p>:null}
+      {review.can_edit?<button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={()=>setEditor(review)}><Edit3 size={14} aria-hidden="true"/>Tiếp tục viết phiếu</button>:review.state==="DRAFT"?<p className="text-muted">Phiếu nháp thuộc bản báo cáo hoặc phân công cũ, giữ để đối chiếu.</p>:null}
       <details><summary>Xem nội dung phiếu</summary><dl className="evaluation-review-content">{data!.form_fields[review.kind].map(f=><div key={f.key}><dt>{f.label}</dt><dd>{review.sections[f.key]||"Chưa nhập"}</dd></div>)}</dl>
         {review.kind==="ADVISOR"&&<p><strong>{review.thesis_completed?"Đã hoàn thành KLTN":"Chưa hoàn thành KLTN"} · {review.allow_defense?"Đồng ý cho bảo vệ":"Không đồng ý cho bảo vệ"}</strong></p>}
         <p>Lý do lập phiếu: {review.revision_reason}</p>{review.source_reference&&<p>Căn cứ: {review.source_reference}</p>}
       </details>
       {review.state==="SUBMITTED"&&<div className="evaluation-note"><strong>Đã xác nhận và gửi nhận xét trên hệ thống</strong>
-        {(can("record")||review.lecturer_id===context.lecturer_id)&&<button className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void run(()=>exportThesisReview(thesisId,review.id,review.row_version),"Đã tải phiếu nhận xét.")}>Tải phiếu nhận xét (tùy chọn)</button>}
+        {(can("record")||review.lecturer_id===context.lecturer_id)&&<button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>void run(()=>exportThesisReview(thesisId,review.id,review.row_version),"Đã tải phiếu nhận xét.")}><Download size={14} aria-hidden="true"/>Tải phiếu nhận xét (tùy chọn)</button>}
       </div>}
       {!!review.export_history.length&&<details><summary>Lịch sử xuất phiếu ({review.export_history.length})</summary>{review.export_history.map(e=><p key={e.code}><strong>{e.code}</strong> · {when(e.at)}</p>)}</details>}
       {review.signed_file&&<div className="evaluation-file-actions"><span>{review.signed_file.name} · {labels[review.signed_file.scan_state]}</span><button className="btn btn-secondary btn-sm" disabled={busy||review.signed_file.scan_state!=="CLEAN"} onClick={()=>setPreview({name:review.signed_file!.name,path:`${path}/reviews/${review.id}/signed-copy`})}><Eye size={15} aria-hidden="true"/>Xem bản ký</button><button className="btn btn-secondary btn-sm" disabled={busy||review.signed_file.scan_state!=="CLEAN"} onClick={()=>fileAction(review.signed_file!.name,`${path}/reviews/${review.id}/signed-copy`)}><Download size={15} aria-hidden="true"/>Tải bản ký</button></div>}
@@ -70,8 +78,8 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
         {data.report?<><strong>{data.report.name}</strong><p>Bản v{data.report.version_no} · {labels[data.report.scan_state]}</p><div className="flex gap-2"><button className="btn btn-secondary" disabled={busy||data.report.scan_state!=="CLEAN"} onClick={()=>setPreview({name:data.report!.name,path:`${path}/reports/${data.report!.id}`})}><Eye size={16} aria-hidden="true"/>Đọc báo cáo</button><button className="btn btn-secondary" disabled={busy||data.report.scan_state!=="CLEAN"} onClick={()=>fileAction(data.report!.name,`${path}/reports/${data.report!.id}`)}><Download size={16} aria-hidden="true"/>Tải báo cáo</button></div></>:<div className="evaluation-note"><strong>Chưa có cuốn báo cáo</strong><p>Sinh viên nộp tại Hồ sơ nộp & xét duyệt → Cuốn báo cáo KLTN. Khi có bản đã quét an toàn, GV bắt đầu viết phiếu.</p>{context.base_role==="STUDENT"&&<Link className="btn btn-secondary" to={`/theses/${thesisId}?section=submissions&kind=REPORT`}>Đến nơi nộp báo cáo</Link>}</div>}
       </section>
       <section className="evaluation-panel" aria-labelledby="assignment-heading"><div className="evaluation-panel-title"><Users size={20} aria-hidden="true"/><h2 id="assignment-heading">Phân công phản biện</h2>{can("manage")&&reviewOpen&&<button className="btn btn-primary btn-sm" disabled={busy||active.length>=2} onClick={()=>setOperation({kind:"assign"})}><Plus size={16} aria-hidden="true"/>Phân công GV</button>}</div>
-        {!active.length?<p className="text-muted">Bộ môn chưa phân công GV phản biện cho khóa luận này.</p>:active.map(a=><div className="evaluation-assignment" key={a.id}><div><strong><LecturerProfileLink userId={context.user_id} lecturerId={a.lecturer_id} name={a.name}/></strong><p>Đã gửi {a.submitted_count??0}/{a.expected_count??data.members.length} phiếu Mẫu 8 cho bản báo cáo hiện tại.</p><p>Hạn phản biện: {when(a.due_at)} (giờ Việt Nam)</p>{a.overdue&&<span className="evaluation-badge is-warning">Quá hạn, vẫn nhận phiếu và ghi thời điểm gửi</span>}<p className="text-caption">{a.source_reference} · {a.reason}</p></div>{can("manage")&&reviewOpen&&<div className="evaluation-assignment-actions"><button className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setOperation({kind:"extend",id:a.id,name:a.name,due:a.due_at})}>Gia hạn phản biện</button><button className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setOperation({kind:"revoke",id:a.id,name:a.name})}>Thu hồi phân công</button></div>}</div>)}
-        {data.assignments.some(a=>a.state==="REVOKED")&&<details><summary>Lịch sử phân công đã thu hồi</summary>{data.assignments.filter(a=>a.state==="REVOKED").map(a=><p key={a.id}>{a.name} · Đã thu hồi · {a.source_reference}</p>)}</details>}
+        {!active.length?<p className="text-muted">Bộ môn chưa phân công GV phản biện cho khóa luận này.</p>:active.map(a=><div className="evaluation-assignment" key={a.id}><div><strong><LecturerProfileLink userId={context.user_id} lecturerId={a.lecturer_id} name={a.name}/></strong><p>Đã gửi {a.submitted_count??0}/{a.expected_count??data.members.length} phiếu Mẫu 8 cho bản báo cáo hiện tại.</p><p>Hạn phản biện: {when(a.due_at)} (giờ Việt Nam)</p>{a.overdue&&<span className="evaluation-badge is-warning">Quá hạn, vẫn nhận phiếu và ghi thời điểm gửi</span>}<p className="text-caption">{a.source_reference} · {a.reason}</p></div>{can("manage")&&reviewOpen&&<div className="evaluation-assignment-actions"><button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={()=>setOperation({kind:"extend",id:a.id,name:a.name,due:a.due_at})}><CalendarClock size={14} aria-hidden="true"/>Gia hạn phản biện</button><button type="button" className="btn btn-destructive btn-sm" disabled={busy} onClick={()=>setOperation({kind:"revoke",id:a.id,name:a.name})}><Ban size={14} aria-hidden="true"/>Thu hồi phân công</button></div>}</div>)}
+        {data.assignments.some(a=>a.state==="REVOKED")&&<details><summary>Lịch sử phân công đã thu hồi</summary>{data.assignments.filter(a=>a.state==="REVOKED").map(a=><p key={a.id}>{a.name} · Đã thu hồi{a.source_reference?` · ${a.source_reference}`:""}{a.revoked_reason?` · Lý do: ${a.revoked_reason}`:""}</p>)}</details>}
       </section>
       <section className="evaluation-panel" aria-labelledby="reviews-heading"><div className="evaluation-panel-title"><ClipboardCheck size={20} aria-hidden="true"/><h2 id="reviews-heading">Nhận xét cho từng sinh viên</h2></div>
         <label className="evaluation-field">Sinh viên trong hồ sơ<select aria-label="Sinh viên trong hồ sơ" value={memberId} onChange={e=>setMemberId(e.target.value)}>{data.members.map(m=><option key={m.id} value={m.id}>{m.name} · {m.student_code}</option>)}</select></label>
@@ -83,17 +91,28 @@ function Workspace({context,thesisId}:{context:Context;thesisId:string}) {
       </section>
     </div><aside className="evaluation-aside">
       <section className="evaluation-panel" aria-labelledby="eligibility-heading"><div className="evaluation-panel-title"><ShieldCheck size={20} aria-hidden="true"/><h2 id="eligibility-heading">Điều kiện dự bảo vệ</h2></div><div className="evaluation-student-identity"><span>Hồ sơ đang xét</span><strong>{member?.name}</strong><b>MSSV: {member?.student_code}</b></div>
-        {eligibility?<><span className={`evaluation-badge ${eligibility.state==="ELIGIBLE"?"is-success":"is-warning"}`}>{labels[eligibility.state]}</span><ul className="evaluation-checklist">{eligibility.conditions.map(c=><li key={c.key}>{c.met?<CheckCircle2 aria-label="Đã có căn cứ"/>:<XCircle aria-label="Thiếu hoặc chưa đạt"/>}<span>{c.label}{!c.met&&<small className="text-caption" style={{display:"block"}}>{{
+        {eligibility?<><ThesisStatusBadge state={eligibility.state==="ELIGIBLE"?"ELIGIBLE":eligibility.state} label={labels[eligibility.state]||eligibility.state}/><ul className="evaluation-checklist">{eligibility.conditions.map(c=><li key={c.key}>{c.met?<CheckCircle2 aria-label="Đã có căn cứ"/>:<XCircle aria-label="Thiếu hoặc chưa đạt"/>}<span>{c.label}{!c.met&&<small className="text-caption block">{{
             discipline:"TBM đối chiếu hồ sơ kỷ luật, chọn tình trạng phù hợp và lưu lần xét.",
             completion:"GVHD chọn đúng SV và bản báo cáo đã quét an toàn, đánh dấu hoàn thành rồi gửi Mẫu 7.",
             consent:"GVHD chọn đồng ý bảo vệ và xác nhận gửi Mẫu 7 bằng tài khoản được phân công.",
           }[c.key]}</small>}</span></li>)}</ul><p className="text-caption">{eligibility.checked_at?`Xét gần nhất: ${when(eligibility.checked_at)}`:"Bộ môn chưa ghi nhận kết quả xét."}</p>{eligibility.source_reference&&<p className="evaluation-reference">Căn cứ: {eligibility.source_reference}</p>}{eligibility.reason&&<p>{eligibility.reason}</p>}
-          {can("eligibility")&&reviewOpen&&<button className="btn btn-primary" disabled={busy} onClick={()=>setOperation({kind:"check"})}>Xét và lưu điều kiện</button>}
+          {can("eligibility")&&reviewOpen&&<button type="button" className="btn btn-primary" disabled={busy} onClick={()=>setOperation({kind:"check"})}><Check size={16} aria-hidden="true"/>Xét và lưu điều kiện</button>}
         </>:<p>Chỉ sinh viên liên quan, GVHD và người xét có quyền xem căn cứ điều kiện cá nhân.</p>}
         <div className="evaluation-policy"><strong>Điều kiện cấp Trường</strong><p>Ba căn cứ theo quy định hiện hành của dự án. Nhận xét phản biện và kết quả tương đồng không tự tạo điều kiện chặn bổ sung.</p><p>Báo cáo hoặc Mẫu 7 thay đổi thì kết quả cũ cần được xét lại.</p></div>
-        {can("eligibility")&&data.state==="READY_FOR_DEFENSE"&&<button className="btn btn-secondary" disabled={busy} onClick={()=>setOperation({kind:"reopen"})}>Mở xét lại hồ sơ</button>}
+        {can("eligibility")&&data.state==="READY_FOR_DEFENSE"&&<button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>setOperation({kind:"reopen"})}><RotateCcw size={15} aria-hidden="true"/>Mở xét lại hồ sơ</button>}
       </section>
-      {!!data.eligibility_history.filter(h=>h.thesis_member_id===memberId).length&&<section className="evaluation-panel"><h2>Lịch sử xét điều kiện</h2><ol className="evaluation-history">{data.eligibility_history.filter(h=>h.thesis_member_id===memberId).map(h=><li key={h.id}><strong>Lần {h.version_no} · {labels[h.state]}</strong><small>{when(h.checked_at)} · {h.checked_by}</small><p>{h.source_reference}</p><p>{h.reason}</p></li>)}</ol></section>}
+      {!!data.eligibility_history.filter(h=>h.thesis_member_id===memberId).length&&<section className="evaluation-panel"><h2>Lịch sử xét điều kiện</h2><div className="evaluation-history"><ActivityTimeline
+        items={data.eligibility_history.filter(h=>h.thesis_member_id===memberId).map(h=>({
+          id: h.id,
+          title: `Lần ${h.version_no} · ${labels[h.state]||h.state}`,
+          actor: h.checked_by,
+          timestamp: when(h.checked_at),
+          note: [h.source_reference ? `Căn cứ: ${h.source_reference}` : "", h.reason].filter(Boolean).join(" — ") || undefined,
+          tone: inferTimelineTone(h.state),
+        }))}
+        initialLimit={5}
+        ariaLabel="Lịch sử xét điều kiện"
+      /></div></section>}
     </aside></div>
     {operation&&<OperationDialog key={`${operation.kind}:${memberId}`} operation={operation} data={data} memberId={memberId} context={context} onClose={()=>setOperation(null)} onSaved={async result=>{await load();setMessage("Đã lưu thay đổi và thông báo đến tài khoản liên quan.");setOperation(null);if(result)setEditor(result);}}/>}
     {editor&&<ThesisReviewEditor key={editor.id} initial={editor} data={data} context={context} onClose={()=>setEditor(null)} onUpdated={load}/>}

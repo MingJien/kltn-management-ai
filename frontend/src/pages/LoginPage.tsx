@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { BookOpen, FileText, GraduationCap, LogIn, ShieldCheck } from "lucide-react";
 import { listDemoAccounts, type DemoAccount } from "../api";
 import PasswordField from "../components/ui/PasswordField";
+import { LoginCampusArt } from "../components/ui/CampusArtwork";
 import "../styles/login.css";
 
 interface LoginPageProps {
@@ -18,9 +19,9 @@ interface LoginPageProps {
 
 const FEATURES = [
   { icon: GraduationCap, title: "Quản lý đề tài", description: "Đăng ký, xét duyệt và phân công hướng dẫn" },
-  { icon: BookOpen, title: "Theo dõi tiến độ", description: "Đề cương, bản thảo và nhận xét" },
-  { icon: FileText, title: "Hồ sơ tài liệu", description: "Lưu phiên bản, nhận xét và lịch sử xử lý" },
-  { icon: ShieldCheck, title: "Minh bạch & Truy vết", description: "Lịch sử thao tác, phân quyền theo vai trò" },
+  { icon: BookOpen, title: "Theo dõi tiến độ", description: "Đề cương, bản thảo và nhận xét theo phiên bản" },
+  { icon: FileText, title: "Hồ sơ & bảo vệ", description: "Phản biện, hội đồng, điểm số và kho lưu trữ nội bộ" },
+  { icon: ShieldCheck, title: "Minh bạch & Truy vết", description: "Lịch sử thao tác, phân quyền theo vai trò và đợt" },
 ];
 
 export default function LoginPage({
@@ -48,19 +49,23 @@ export default function LoginPage({
     <main className="login-page">
       <section className="login-page__left" aria-label="Giới thiệu hệ thống">
         <div className="login-brand">
-          <div className="login-brand__shape login-brand__shape--1" aria-hidden="true" />
-          <div className="login-brand__shape login-brand__shape--2" aria-hidden="true" />
-          <div className="login-brand__shape login-brand__shape--3" aria-hidden="true" />
+          <LoginCampusArt className="login-brand__artwork" />
 
           <div className="login-brand__content">
-            <img className="login-brand__logo" src="/assets/dthu-logo.png" alt="" />
-            <p className="login-brand__title">Hệ thống Quản lý<br />Khóa luận Tốt nghiệp</p>
-            <p className="login-brand__subtitle">Khoa Công Nghệ và Kỹ thuật — Đại học Đồng Tháp</p>
+            <div className="login-brand__crest-row">
+              <img className="login-brand__logo" src="/assets/dthu-logo.png" alt="" />
+              <div className="login-brand__university">
+                <span>Trường Đại học Đồng Tháp</span>
+                <strong>Khoa Công nghệ và Kỹ thuật</strong>
+              </div>
+            </div>
+            <h2 className="login-brand__title">Hệ thống Quản lý<br />Khóa luận Tốt nghiệp</h2>
+            <p className="login-brand__subtitle">Nền tảng điều phối học thuật và lưu trữ hồ sơ khóa luận thống nhất theo từng đợt.</p>
 
             <div className="login-brand__features">
               {FEATURES.map(({ icon: Icon, title, description }) => (
                 <div className="login-brand__feature" key={title}>
-                  <div className="login-brand__feature-icon"><Icon size={20} aria-hidden="true" /></div>
+                  <div className="login-brand__feature-icon"><Icon size={18} aria-hidden="true" /></div>
                   <div><strong>{title}</strong><span>{description}</span></div>
                 </div>
               ))}
@@ -73,7 +78,13 @@ export default function LoginPage({
         <div className="login-card-wrapper">
           <div className="login-card">
             <div className="login-card__header">
-              <img className="login-card__logo" src="/assets/dthu-logo.png" alt="Logo Đại học Đồng Tháp" />
+              <div className="login-card__emblem-row">
+                <img className="login-card__logo" src="/assets/dthu-logo.png" alt="Logo Đại học Đồng Tháp" />
+                <div className="login-card__school">
+                  <span>DThU · KLTN</span>
+                  <small>Khoa Công nghệ và Kỹ thuật</small>
+                </div>
+              </div>
               <h1>Đăng nhập hệ thống</h1>
               <p>Sử dụng tài khoản được cấp để truy cập</p>
             </div>
@@ -110,9 +121,10 @@ export default function LoginPage({
               <Link to="/account/forgot-password">Quên mật khẩu?</Link>
             </div>
 
-            {error && <div className="alert alert-danger" role="alert" style={{ marginTop: 16 }}>{error}</div>}
+            {error && <div className="alert alert-danger mt-4" role="alert">{error}</div>}
 
             {demoAccounts.length > 0 && <section className="login-demo" aria-labelledby="login-demo-heading">
+              <span className="login-demo__kicker">Môi trường thử nghiệm</span>
               <h3 id="login-demo-heading">Dùng tài khoản demo</h3>
               <p>Chọn vai trò giả lập để thử chức năng trên máy này.</p>
               <label htmlFor="login-demo-account">Tài khoản thử nghiệm</label>
@@ -122,15 +134,16 @@ export default function LoginPage({
                   {account.label} · {account.email}
                 </option>)}
               </select>
-              <button type="button" className="btn btn-secondary login-demo__submit"
+              <button type="button" className="btn btn-soft login-demo__submit"
                 disabled={loading || !demoKey} onClick={() => onDemoSignIn(demoKey)}>
+                <LogIn size={15} aria-hidden="true" />
                 {loading ? "Đang mở…" : "Vào bản demo"}
               </button>
             </section>}
           </div>
 
           <footer className="login-footer">
-            <p>© 2026 Khoa Công Nghệ và Kỹ thuật — Đại học Đồng Tháp</p>
+            <p>© 2026 Khoa Công nghệ và Kỹ thuật — Trường Đại học Đồng Tháp</p>
           </footer>
         </div>
       </section>

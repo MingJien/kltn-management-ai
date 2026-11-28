@@ -1,36 +1,39 @@
-import PositionsPage from "./pages/PositionsPage";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorMessage } from "./errors";
 import { Context, demoLogin, emailLogin, logout, request, setSessionCsrfToken } from "./api";
 import AppShell from "./components/layout/AppShell";
 import WorkspacePage from "./pages/WorkspacePage";
-import TopicsPage from "./pages/TopicsPage";
-import RegistrationsPage from "./pages/RegistrationsPage";
-import ThesisViewPage from "./pages/ThesisViewPage";
-import AccountAccessPage from "./pages/AccountAccessPage";
-import AccountPage from "./pages/AccountPage";
-import NotificationsPage from "./pages/NotificationsPage";
-import ActivityPage from "./pages/ActivityPage";
-import SchoolFormsPage from "./pages/SchoolFormsPage";
-import AdministrationPage from "./pages/AdministrationPage";
-import LecturersPage from "./pages/LecturersPage";
-import RosterPage from "./pages/RosterPage";
-import RoundsPage from "./pages/RoundsPage";
-import LecturerProfilePage from "./pages/LecturerProfilePage";
-import LecturerProfileReviewsPage from "./pages/LecturerProfileReviewsPage";
-import ThesesPage from "./pages/ThesesPage";
-import SubmissionsPage from "./pages/SubmissionsPage";
 import WithdrawalsPage from "./pages/WithdrawalsPage";
-import ComingSoonPage from "./pages/ComingSoonPage";
 import LoginPage from "./pages/LoginPage";
+import { SkeletonCard } from "./components/ui/Skeleton";
+import { plannedPages, type PlannedPageId } from "./plannedPages";
+import { getPageTitle } from "./routes";
+
+const TopicsPage = lazy(() => import("./pages/TopicsPage"));
+const RegistrationsPage = lazy(() => import("./pages/RegistrationsPage"));
+const ThesisViewPage = lazy(() => import("./pages/ThesisViewPage"));
+const AccountAccessPage = lazy(() => import("./pages/AccountAccessPage"));
+const AccountPage = lazy(() => import("./pages/AccountPage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const ActivityPage = lazy(() => import("./pages/ActivityPage"));
+const SchoolFormsPage = lazy(() => import("./pages/SchoolFormsPage"));
+const AdministrationPage = lazy(() => import("./pages/AdministrationPage"));
+const LecturersPage = lazy(() => import("./pages/LecturersPage"));
+const RosterPage = lazy(() => import("./pages/RosterPage"));
+const RoundsPage = lazy(() => import("./pages/RoundsPage"));
+const PositionsPage = lazy(() => import("./pages/PositionsPage"));
+const LecturerProfilePage = lazy(() => import("./pages/LecturerProfilePage"));
+const LecturerProfileReviewsPage = lazy(() => import("./pages/LecturerProfileReviewsPage"));
+const ThesesPage = lazy(() => import("./pages/ThesesPage"));
+const SubmissionsPage = lazy(() => import("./pages/SubmissionsPage"));
+const ComingSoonPage = lazy(() => import("./pages/ComingSoonPage"));
 const EvaluationsPage = lazy(() => import("./pages/EvaluationsPage"));
 const EvaluationPage = lazy(() => import("./pages/EvaluationPage"));
 const DefensePage = lazy(() => import("./pages/DefensePage"));
 const Nv6ReportsPage = lazy(() => import("./pages/Nv6ReportsPage"));
 const ThesisArchivePage = lazy(() => import("./pages/ThesisArchivePage"));
 const ThesisChangesPage = lazy(() => import("./pages/ThesisChangesPage"));
-import { plannedPages, type PlannedPageId } from "./plannedPages";
 const AIPage = lazy(() => import("./pages/AIPage"));
 
 function App() {
@@ -44,22 +47,9 @@ function App() {
   const [restoring, setRestoring] = useState(true);
   const [noticeRevision,setNoticeRevision] = useState("");
   useEffect(() => {
-    const labels: Record<string,string> = {"/":"Tổng quan", "/topics":"Đề tài", "/registrations":"Đăng ký", "/theses":"Khóa luận & GVHD", "/proposals":"Đề cương", "/progress":"Tiến độ", "/documents":"Tài liệu", "/ai":"Tra cứu thử nghiệm", "/notifications":"Thông báo"};
-    labels["/changes"] = "Đổi đề tài & gia hạn";
-    labels["/defense"] = "Hội đồng và bảo vệ";
-    labels["/reports"] = "Báo cáo và thống kê KLTN";
-    labels["/repository"] = "Kho khóa luận nội bộ";
-    labels["/withdrawals"] = "Xin thôi KLTN";
-    labels["/forms"] = "Kho biểu mẫu & tài liệu Khoa";
-    labels["/submissions"] = "Hồ sơ nộp & xét duyệt";
-    labels["/positions"] = "Chức vụ và phạm vi";
-    labels["/activity"] = "Nhật ký hoạt động";
-    const plannedId = location.pathname.startsWith("/planned/") ? location.pathname.slice("/planned/".length) : "";
-    const page = location.pathname.startsWith("/lecturers/") ? "Hồ sơ giảng viên"
-      : plannedId && Object.hasOwn(plannedPages, plannedId) ? plannedPages[plannedId as PlannedPageId].title
-      : labels[location.pathname] || "Khóa luận";
+    const page = getPageTitle(location.pathname, location.search);
     document.title = `${context ? page : "Đăng nhập"} · KLTN`;
-  }, [location.pathname, context]);
+  }, [location.pathname, location.search, context]);
 
   const restore = useCallback(async () => {
     setError("");
@@ -102,7 +92,10 @@ function App() {
         }
       } catch (cause) {
         if (!controller.signal.aborted && cause instanceof ApiError && cause.status === 401) {
-          setSessionCsrfToken(null); setContext(null);
+          setSessionCsrfToken(null);
+          setContext(null);
+          setPassword("");
+          setError("Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.");
         }
       } finally { pending = false; }
     };
@@ -178,7 +171,7 @@ function App() {
   return (
     <AppShell context={context} onLogout={() => void signOut()}>
       {error ? <p role="alert" className="alert alert-danger">{error}</p> : null}
-      <Suspense fallback={<p role="status">Đang tải trang…</p>}><Routes key={noticeRevision}>
+      <Suspense fallback={<div className="stack" role="status" aria-busy="true"><SkeletonCard /><SkeletonCard /></div>}><Routes key={noticeRevision}>
         <Route
           path="/"
           element={<WorkspacePage context={context} />}

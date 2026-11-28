@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseAsync, renderDocument } from "docx-preview";
 import DOMPurify from "dompurify";
 import type { ProgressAnnotation } from "../../api";
+import { errorMessage } from "../../errors";
 import ReviewCommentText from "./ReviewCommentText";
 
 type WordNode = {type?:string; id?:string; text?:string; children?:WordNode[]};
@@ -31,10 +32,10 @@ const previewStyles = `
 .review-word-wrapper { padding:12px !important; background:transparent !important; }
 section.review-word { margin:0 auto 18px; flex-shrink:0; box-shadow:0 3px 18px #1c354018; }
 [data-review-block] { position:relative; }
-.review-block--selected { outline:2px solid #81c8b7; background-color:#e8f8ef !important; }
-.pinning [data-review-block]:hover { outline:2px dashed #59a59a; cursor:crosshair; }
-.review-text-pin { position:absolute; right:-25px; top:0; display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; padding:0; border:1px solid white; border-radius:50%; background:#117b70; color:white; cursor:pointer; font:600 11px system-ui; }
-.review-text-pin:focus-visible { outline:3px solid #e4a331; }
+.review-block--selected { outline:2px solid #8BC1E8; background-color:#EAF4FB !important; }
+.pinning [data-review-block]:hover { outline:2px dashed #246B96; cursor:crosshair; }
+.review-text-pin { position:absolute; right:-25px; top:0; display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; padding:0; border:1px solid white; border-radius:50%; background:#1976B8; color:white; cursor:pointer; font:600 11px system-ui; }
+.review-text-pin:focus-visible { outline:3px solid #D7A348; }
 .review-txt { white-space:pre-wrap; font:14px/1.7 ui-monospace,monospace; background:white; padding:28px; }
 .review-txt p { min-height:1.7em; margin:0; padding-right:25px; overflow-wrap:anywhere; }
 `;
@@ -132,7 +133,7 @@ export default function ReviewTextDocument({data, fileName, notes, selectedId, p
       requestAnimationFrame(() => rendered.current());
     };
     const observer = new ResizeObserver(fit); observer.observe(host.current!);
-    void load().then(() => {if (active) fit();}).catch(cause => {if (active) setError(`Không mở được bản xem: ${String(cause)}`);});
+    void load().then(() => {if (active) fit();}).catch(cause => {if (active) setError(`Không mở được bản xem: ${errorMessage(cause)}`);});
     return () => {active = false; observer.disconnect(); root.removeEventListener("pointerup",point);};
   }, [data,fileName,showEmbeddedReviews]);
 

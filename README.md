@@ -6,6 +6,7 @@
 
 - Quản lý tài khoản, phân quyền theo đợt, hồ sơ sinh viên và giảng viên, đề tài, đăng ký cá nhân hoặc nhóm và tiếp nhận khóa luận.
 - Theo dõi đề cương, tiến độ, tài liệu và phản hồi theo phiên bản; thông báo hạn nộp và kết quả xử lý. Hỗ trợ đổi đề tài, gia hạn và xin thôi KLTN trên hệ thống.
+- Quản lý phiên bản biểu mẫu và tài liệu công bố theo đợt. Người quản lý có thể đối chiếu tệp nguồn trong `docs/BieuMau`. SV và GV tải mẫu tại nghiệp vụ tương ứng và mở tệp gốc bằng Word hoặc Excel để xem và in.
 - Phân công phản biện, nhận xét Mẫu 7/8, xác nhận điều kiện bảo vệ và xét điểm thưởng công bố khoa học theo từng sinh viên.
 - Lập hội đồng, xếp và đổi lịch, điểm danh, chấm điểm, lập biên bản, chốt kết quả và xuất Mẫu 6, 9, 10, 11 từ biểu mẫu gốc. Có xử lý bảo vệ bổ sung, đính chính sau khóa và lịch sử phát hành bản in.
 - Sau bảo vệ, nhóm nộp bản hoàn thiện và TBM duyệt đúng phiên bản. Kho nội bộ giữ lịch sử từng lần nộp, hỗ trợ tìm không dấu theo đề tài, MSSV, tên SV, GVHD, lớp và ngành. Từ thống kê có thể mở danh sách nộp lưu đúng đợt và bộ môn.
@@ -28,6 +29,10 @@ Mở hai cửa sổ PowerShell:
     npm --prefix 'D:\KLTN\frontend' run dev -- --host 127.0.0.1 --port 1573 --strictPort
 
 Mở http://127.0.0.1:1573. Cấu hình và mật khẩu nằm trong `.env` cục bộ.
+
+Để cập nhật bản xem trong kho biểu mẫu, chạy lệnh sau trên Windows có Word, Excel và `pywin32` trong môi trường Python của dự án. Bản xem dùng bố cục in của tệp nguồn và được lưu trong `local/school-form-previews/`. Khi tệp nguồn thay đổi, chạy lại lệnh để tạo bản xem tương ứng.
+
+    .\.venv\Scripts\python.exe -m tools.render_school_form_previews
 
 ## Kiểm tra và tài liệu
 

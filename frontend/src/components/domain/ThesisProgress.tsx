@@ -1,8 +1,11 @@
 import EmptyState from "../ui/EmptyState";
+import FileDropzone from "../ui/FileDropzone";
+import { ActivityTimeline, inferTimelineTone } from "../ui/Timeline";
 import { lazy, Suspense, useState } from "react";
-import { MessageSquare, X } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react";
 import type { AuditEvent, Milestone, ProgressReport, Thesis, ThesisDocument } from "../../api";
 import { downloadProgressEvidence, request, uploadProgressEvidence, submitProgress } from "../../api";
+import { errorMessage } from "../../errors";
 import { scanLabel, type CoreRun } from "./ThesisDocuments";
 import { formatDate, ReviewForm, Reviews, Status } from "./CoreForms";
 
@@ -39,14 +42,14 @@ function ProgressEvidence({report, thesis, userId, busy, run, readOnly = false}:
   const clean = report.evidence_scan_state === "CLEAN";
   return <div className="stack">
     <div className="progress-evidence-row">
-      <p className="text-body-sm" style={{margin: 0}}>Minh chứng của báo cáo: <strong>{report.evidence_file_name}</strong> · {scanLabel(report.evidence_scan_state || "QUARANTINED")}.</p>
-      <div className="progress-evidence-actions" style={{flexWrap: "wrap", flexShrink: 1, minWidth: 0}}>
-        {clean && <button type="button" className="btn btn-primary btn-sm" style={{whiteSpace: "normal", maxWidth: "100%"}} onClick={() => setViewing(true)}><MessageSquare size={16} /> {readOnly || !thesis.actions.some(action => ["progress:review", "progress:comment"].includes(action)) ? "Xem tệp & nhận xét" : "Mở tệp và phản hồi theo vị trí"}</button>}
+      <p className="text-body-sm m-0">Minh chứng của báo cáo: <strong>{report.evidence_file_name}</strong> · {scanLabel(report.evidence_scan_state || "QUARANTINED")}.</p>
+      <div className="progress-evidence-actions">
+        {clean && <button type="button" className="btn btn-primary btn-sm" onClick={() => setViewing(true)}><MessageSquare size={15} aria-hidden="true" /> {readOnly || !thesis.actions.some(action => ["progress:review", "progress:comment"].includes(action)) ? "Xem tệp & nhận xét" : "Mở tệp và phản hồi theo vị trí"}</button>}
         {viewing && <Suspense fallback={<p role="status">Đang mở không gian nhận xét…</p>}><ProgressReviewWorkspace thesis={thesis} report={report} userId={userId} run={run} onClose={() => setViewing(false)} /></Suspense>}
         <button type="button" className="btn btn-secondary btn-sm" disabled={!clean || downloading}
           title={!clean ? "Tệp chưa được quét an toàn" : undefined} onClick={async () => {
             setError(""); setDownloading(true);
-            try {await downloadProgressEvidence(thesis.id, report);} catch (cause) {setError(String(cause));}
+            try {await downloadProgressEvidence(thesis.id, report);} catch (cause) {setError(errorMessage(cause));}
             finally {setDownloading(false);}
           }}>Tải minh chứng của báo cáo</button>
         {!readOnly && ["QUARANTINED","FAILED"].includes(report.evidence_scan_state || "") && <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
@@ -153,12 +156,19 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
     </div></div>}
     <div className="card"><div className="card-body stack"><h2>Lịch sử mốc trong phạm vi của bạn</h2>
       <p className="text-body-sm text-muted">Người thực hiện, thời điểm và lý do mở, gia hạn hoặc đóng mốc. Mốc nội bộ chỉ áp dụng cho khóa luận này; mốc chung áp dụng cho toàn đợt. Báo cáo cũ giữ nguyên hạn tại thời điểm nộp.</p>
-      {milestoneAudit.length
-        ? milestoneAudit.map((event, index) => <p key={`${event.occurred_at}-${index}`} className="text-body-sm">
-            <strong>{event.actor_name}</strong> · {milestoneAction[event.action] || event.action} · {formatDate(event.occurred_at)}
-            {event.reason ? <><br /><span className="text-muted">{event.reason}</span></> : null}
-          </p>)
-        : <p className="text-muted">Chưa có thay đổi mốc nào được ghi nhận.</p>}
+      <ActivityTimeline
+        items={milestoneAudit.map((event, index) => ({
+          id: `${event.occurred_at}-${index}`,
+          title: milestoneAction[event.action] || event.action,
+          actor: event.actor_name,
+          timestamp: formatDate(event.occurred_at),
+          note: event.reason || undefined,
+          tone: inferTimelineTone(event.action),
+        }))}
+        initialLimit={5}
+        emptyText="Chưa có thay đổi mốc nào được ghi nhận."
+        ariaLabel="Lịch sử mốc tiến độ"
+      />
     </div></div>
     {thesis.actions.includes("progress:submit") && active && available.length === 0 && milestones.length > 0 && (
       <div className="card"><div className="card-body">
@@ -198,23 +208,21 @@ export default function ThesisProgress({thesis, milestones, reports, docs, miles
       <div className="input-group"><label htmlFor="report-summary">Kết quả, khó khăn và kế hoạch</label><textarea className="input" id="report-summary" value={summary} onChange={event => setSummary(event.target.value)} required maxLength={10000} disabled={busy} /></div>
       <div className="progress-form-row">
         <div className="input-group"><label htmlFor="report-ratio">Tiến độ tự báo cáo (%)</label><input className="input" id="report-ratio" type="number" min={0} max={100} step="0.01" placeholder="0" value={ratio} onChange={event => setRatio(event.target.value)} required disabled={busy} /></div>
-        <div className="input-group"><label htmlFor="report-evidence-file">Minh chứng tiến độ từ máy (không bắt buộc; PDF, DOCX, TXT; tối đa 10 MB)</label>
-          <input className="input" id="report-evidence-file" type="file" accept=".pdf,.docx,.txt" disabled={busy}
-            onChange={event => setEvidenceFile(event.target.files?.[0] || null)} />
-          {evidenceFile && <div className="flex items-center gap-2" style={{margin: "var(--space-1) 0"}}>
-            <span className="text-body-sm font-semibold">{evidenceFile.name} ({(evidenceFile.size / 1024).toFixed(1)} KB)</span>
-            <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
-              setEvidenceFile(null);
-              const el = document.getElementById("report-evidence-file") as HTMLInputElement | null;
-              if (el) el.value = "";
-            }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
-          </div>}
-          <p className="text-caption">Có thể để trống. Tệp gắn trực tiếp với báo cáo ở dưới. Khi còn cách ly, GVHD có thể yêu cầu nộp lại nhưng chưa thể tải hoặc xác nhận.</p>
-          {evidenceFile && evidenceFile.size > 10*1024*1024 && <p role="alert">Tệp vượt quá 10 MB.</p>}
+        <div className="input-group">
+          <FileDropzone
+            id="report-evidence-file"
+            label="Minh chứng tiến độ từ máy (không bắt buộc; PDF, DOCX, TXT; tối đa 10 MB)"
+            accept=".pdf,.docx,.txt"
+            maxBytes={10 * 1024 * 1024}
+            hint="Có thể để trống. Tệp gắn trực tiếp với báo cáo ở dưới."
+            file={evidenceFile}
+            disabled={busy}
+            onChange={setEvidenceFile}
+          />
         </div>
       </div>
       {evidenceNotice && <p role="status" className="alert alert-info">{evidenceNotice}</p>}
-      <button className="btn btn-primary" disabled={busy || !selected || !summary.trim() || !!(evidenceFile && evidenceFile.size > 10*1024*1024)}>Gửi báo cáo</button>
+      <button className="btn btn-primary" disabled={busy || !selected || !summary.trim() || !!(evidenceFile && evidenceFile.size > 10*1024*1024)}><Send size={15} aria-hidden="true" />Gửi báo cáo</button>
     </div></form>}
     {thesis.actions.includes("progress:view") ? <>
     <h2>Báo cáo tiến độ và nhận xét</h2>

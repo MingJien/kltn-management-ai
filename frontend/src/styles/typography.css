@@ -40,19 +40,19 @@ h3, .text-h3 {
 
 .text-caption {
   font: var(--text-caption);
-  color: var(--neutral-500);
+  color: var(--color-ink-muted);
 }
 
 .text-overline {
   font: var(--text-overline);
   letter-spacing: var(--ls-overline);
   text-transform: uppercase;
-  color: var(--neutral-400);
+  color: var(--color-ink-muted);
 }
 
 /* ── Text utilities ── */
 .text-muted {
-  color: var(--neutral-500);
+  color: var(--color-ink-muted);
 }
 
 .text-primary {

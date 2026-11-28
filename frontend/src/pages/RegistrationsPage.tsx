@@ -2,12 +2,16 @@ import WorkflowSteps from "../components/domain/WorkflowSteps";
 import LecturerProfileLink from "../components/domain/LecturerProfileDialog";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, Info, X } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, ClipboardList, Compass, FileText, Info, RefreshCw, RotateCcw, Send, UserCheck, XCircle } from "lucide-react";
 import type { Context, Lecturer, Registration } from "../api";
 import { evidenceUrl, request, uploadEvidence } from "../api";
 import { errorMessage } from "../errors";
 import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import Dialog from "../components/ui/Dialog";
+import FilterBar, { type FilterChip } from "../components/ui/FilterBar";
+import EmptyState from "../components/ui/EmptyState";
+import FileDropzone from "../components/ui/FileDropzone";
+import { SkeletonCard } from "../components/ui/Skeleton";
 import PageHeader from "../components/layout/PageHeader";
 import { scanLabel } from "../components/domain/ThesisDocuments";
 
@@ -31,6 +35,8 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [withdrawTarget, setWithdrawTarget] = useState<Registration | null>(null);
   const [stagedFiles, setStagedFiles] = useState<Record<string, File | null>>({});
+  const [search, setSearch] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
   useEffect(() => {
     const notice = (location.state as {notice?: string} | null)?.notice;
     if (!notice) return;
@@ -66,10 +72,11 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
     catch (cause) {setError(errorMessage(cause)); await reload().catch(() => undefined); return false;}
     finally {setBusy(false);}
   }
-  async function upload(row: Registration, file?: File) {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {setError("Minh chứng tối đa 5 MB."); return;}
-    await operate(() => uploadEvidence(row.id,userId,file), "Đã lưu minh chứng của bạn.");
+  async function upload(row: Registration, file?: File): Promise<boolean> {
+    if (!file) return false;
+    if (file.size === 0) {setError("Minh chứng đang rỗng (0 byte)."); return false;}
+    if (file.size > 5 * 1024 * 1024) {setError("Minh chứng tối đa 5 MB."); return false;}
+    return operate(() => uploadEvidence(row.id,userId,file), "Đã lưu minh chứng của bạn.");
   }
   async function groupAction(row: Registration, action: "confirm" | "submit") {
     return operate(() => request<Registration>("/topic-registrations/" + row.id + "/" + (action === "confirm" ? "member-response" : action),userId,{
@@ -94,20 +101,63 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
     }), resolutionChoice === "REASSIGN" ? "Đã chuyển hồ sơ cho GV mới tiếp nhận; nhóm SV được giữ nguyên." :
       "Đã trả hồ sơ về nhóm SV để sửa, chọn GV đề xuất và xác nhận lại trước khi gửi.");
   }
+  const stateLabels: Record<string, string> = {
+    DRAFT: "Bản nháp",
+    RETURNED: "Trả lại sửa",
+    SUBMITTED: "Đã gửi",
+    LECTURER_ACCEPTED: "GV chấp nhận",
+    LECTURER_REJECTED: "GV từ chối",
+    FINALIZED: "Đã lập khóa luận",
+  };
+  const qNorm = search.trim().toLocaleLowerCase("vi");
+  const visibleRows = rows.filter((row) => {
+    if (stateFilter && row.state !== stateFilter) return false;
+    if (!qNorm) return true;
+    const hay = `${row.topic_code} ${row.topic_title} ${row.receiving_lecturer_name || ""} ${row.members.map((m) => `${m.display_name} ${m.student_code}`).join(" ")}`.toLocaleLowerCase("vi");
+    return hay.includes(qNorm);
+  });
+  const filterChips: FilterChip[] = [
+    ...(search.trim() ? [{ key: "q", label: `Từ khóa: "${search.trim()}"`, onRemove: () => setSearch("") }] : []),
+    ...(stateFilter ? [{ key: "state", label: `Trạng thái: ${stateLabels[stateFilter] || stateFilter}`, onRemove: () => setStateFilter("") }] : []),
+  ];
+
   return <>
     <PageHeader title="Đăng ký đề tài" description={context.base_role === "STUDENT"
-      ? "Bổ sung minh chứng, gửi đăng ký và theo dõi kết quả xét duyệt." : "Xem hồ sơ đã gửi và quyết định tiếp nhận trong phạm vi được giao."} />
-    <div className="flex gap-2" style={{marginBottom:"var(--space-4)"}}>
-      <button className="btn btn-secondary" disabled={busy || loading}
-        onClick={() => void reload().catch((cause) => setError(errorMessage(cause)))}>Làm mới</button>
-      {context.base_role === "STUDENT" ? <Link className="btn btn-primary" to="/topics">Chọn đề tài</Link> : null}
-      {focusedRegistrationId ? <Link className="btn btn-secondary" to="/registrations">Xem tất cả đăng ký</Link> : null}
-    </div>
+      ? "Nộp minh chứng, gửi đăng ký và theo dõi kết quả xét duyệt." : "Xem hồ sơ đã gửi và quyết định tiếp nhận trong phạm vi được giao."} />
+    <FilterBar
+      search={{
+        value: search,
+        onChange: setSearch,
+        placeholder: "Tìm theo mã, tên đề tài, SV hoặc GV…",
+        ariaLabel: "Tìm hồ sơ đăng ký",
+      }}
+      chips={filterChips}
+      onClearAll={() => { setSearch(""); setStateFilter(""); }}
+      summary={`${visibleRows.length} hồ sơ`}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-secondary" disabled={busy || loading}
+            onClick={() => void reload().catch((cause) => setError(errorMessage(cause)))}>
+            <RefreshCw size={15} aria-hidden="true" />Làm mới
+          </button>
+          {context.base_role === "STUDENT" ? <Link className="btn btn-primary" to="/topics"><Compass size={15} aria-hidden="true" />Chọn đề tài</Link> : null}
+          {focusedRegistrationId ? <Link className="btn btn-secondary" to="/registrations">Xem tất cả đăng ký</Link> : null}
+        </div>
+      }
+    >
+      <select aria-label="Lọc trạng thái đăng ký" className="input" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+        <option value="">Tất cả trạng thái</option>
+        {Object.entries(stateLabels).map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
+      </select>
+    </FilterBar>
     {message ? <p className="alert alert-info" role="status">{message}</p> : null}
-    {error && !rejectTarget && !withdrawTarget ? <p className="alert alert-danger" role="alert">{error}</p> : null}
-    {loading ? <p role="status">Đang tải đăng ký…</p> : !rows.length ?
-      <div className="card empty-state"><ClipboardList aria-hidden="true" /><h2>Chưa có đăng ký</h2><p>Chưa có đăng ký trong phạm vi của bạn.</p></div> :
-      <div className="stack">{rows.map((row) => {
+    {error && !rejectTarget && !withdrawTarget && !resolutionTarget ? <p className="alert alert-danger" role="alert">{error}</p> : null}
+    {loading ? <div className="stack" role="status" aria-label="Đang tải đăng ký"><SkeletonCard /><SkeletonCard /></div> : !visibleRows.length ?
+      <EmptyState icon={<ClipboardList aria-hidden="true" />} title={rows.length ? "Không có hồ sơ khớp bộ lọc" : "Chưa có đăng ký"} description={rows.length ? "Thử xóa bộ lọc hoặc đổi từ khóa tìm kiếm." : "Chưa có đăng ký trong phạm vi của bạn."}>
+        {rows.length > 0 ? (!filterChips.length ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setSearch(""); setStateFilter(""); }}>Xóa bộ lọc</button> : null)
+          : context.base_role === "STUDENT" ? <Link className="btn btn-primary btn-sm" to="/topics">Chọn đề tài</Link> : null}
+      </EmptyState> :
+      <div className="stack">{visibleRows.map((row) => {
         const me = row.members.find((member) => member.student_id === context.student_id);
         const activeCount = row.members.filter((member) => member.active).length;
         const draft = ["DRAFT","RETURNED"].includes(row.state);
@@ -154,53 +204,49 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
           {row.proposer_type === "STUDENT" && row.state === "LECTURER_REJECTED" ?
             <p className="registration-card__stage" role="status"><strong>GV đã từ chối tiếp nhận</strong>
               <span>Nhóm vẫn giữ đăng ký; Trưởng bộ môn sẽ chọn GV khác hoặc trả hồ sơ về SV để sửa và đề xuất lại.</span></p> : null}
-          {(row.state === "FINALIZED" || row.state === "LECTURER_ACCEPTED") ? <p className="alert alert-success">GV đã chấp nhận chính thức. Khóa luận và phân công GVHD chính đã được tạo; nhóm có thể mở hồ sơ để nộp đề cương, tiến độ và tài liệu.</p> : null}
+          {row.state === "FINALIZED" ? <p className="alert alert-success">GV đã chấp nhận chính thức. Khóa luận và phân công GVHD chính đã được tạo; nhóm có thể mở hồ sơ để nộp đề cương, tiến độ và tài liệu.</p> : null}
+          {row.state === "LECTURER_ACCEPTED" ? <p className="alert alert-info">GV đã tiếp nhận đăng ký. Hệ thống đang hoàn tất xác nhận cuối và khởi tạo hồ sơ khóa luận.</p> : null}
           {me?.active && activeCount < row.expected_member_count && row.topic_state === "APPROVED" && row.state !== "FINALIZED" && row.state !== "LECTURER_ACCEPTED" ?
             <p className="text-caption">Các SV khác có thể tự tham gia từ danh sách đề tài khi còn hạn đăng ký. Nếu thêm thành viên, nhóm sẽ chờ GV xét lại.</p> : null}
-          {me?.can_upload_evidence && context.base_role === "STUDENT" ? <div className="evidence-upload stack" style={{gap: "var(--space-1)"}}>
-            <label htmlFor={`evidence-${row.id}`}>Minh chứng của tôi (tùy chọn) — PDF, PNG, JPEG, tối đa 5 MB</label>
-            <input id={`evidence-${row.id}`} type="file" accept=".pdf,.png,.jpg,.jpeg" disabled={busy}
-              onChange={(event) => setStagedFiles(prev => ({...prev, [row.id]: event.target.files?.[0] || null}))} />
-            {stagedFiles[row.id] && <div className="flex items-center gap-2">
-              <span className="text-body-sm font-semibold">{stagedFiles[row.id]?.name} ({(stagedFiles[row.id]!.size / 1024).toFixed(1)} KB)</span>
-              <button type="button" className="btn btn-ghost btn-sm" title="Hủy chọn tệp" onClick={() => {
-                setStagedFiles(prev => ({...prev, [row.id]: null}));
-                const el = document.getElementById(`evidence-${row.id}`) as HTMLInputElement | null;
-                if (el) el.value = "";
-              }}><X size={14} aria-hidden="true" style={{marginRight: 4}} /> Xóa tệp đã chọn</button>
+          {me?.can_upload_evidence && context.base_role === "STUDENT" ? <div className="evidence-upload stack gap-2">
+            <FileDropzone
+              id={`evidence-${row.id}`}
+              label="Minh chứng của tôi (tùy chọn)"
+              accept=".pdf,.png,.jpg,.jpeg"
+              maxBytes={5 * 1024 * 1024}
+              hint="PDF, PNG hoặc JPEG · Tối đa 5 MB"
+              file={stagedFiles[row.id] || null}
+              disabled={busy}
+              onChange={(picked) => setStagedFiles(prev => ({...prev, [row.id]: picked}))}
+            />
+            {stagedFiles[row.id] && <div>
               <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={async () => {
                 const f = stagedFiles[row.id];
-                if (f) {
-                  await upload(row, f);
+                if (f && await upload(row, f)) {
                   setStagedFiles(prev => ({...prev, [row.id]: null}));
-                  const el = document.getElementById(`evidence-${row.id}`) as HTMLInputElement | null;
-                  if (el) el.value = "";
                 }
               }}>Tải lên</button>
             </div>}
-
-
-
             <span className="text-caption">{draft ? "Tệp mới thay minh chứng đang gắn. Sau gửi hồ sơ, minh chứng được khóa."
               : "Bạn vừa tham gia nhóm đã gửi: có thể bổ sung minh chứng lần đầu trước khi GV xét."}</span>
           </div> : null}
-          {(me?.active || context.base_role === "LECTURER") && <Link className="btn btn-secondary" to={row.thesis_id ? "/theses/" + row.thesis_id + "?section=submissions&kind=REGISTRATION" : "/submissions?registration=" + row.id}>Mở đơn Mẫu 1a/1b · nộp, tải & lịch sử</Link>}
           <div className="registration-card__actions">
+            {(me?.active || context.base_role === "LECTURER") && <Link className="btn btn-soft" to={row.thesis_id ? "/theses/" + row.thesis_id + "?section=submissions&kind=REGISTRATION" : "/submissions?registration=" + row.id}><FileText size={15} aria-hidden="true" />Mở đơn Mẫu 1a/1b · nộp, tải &amp; lịch sử</Link>}
             {draft && me?.active ? <>
               {me.consent_status === "PENDING" ? <button className="btn btn-secondary" disabled={busy}
-                onClick={() => void groupAction(row,"confirm")}>Xác nhận đăng ký cũ của tôi</button> : null}
+                onClick={() => void groupAction(row,"confirm")}><UserCheck size={15} aria-hidden="true" />Xác nhận đăng ký cũ của tôi</button> : null}
               {me.is_coordinator ? <>
                 <button className="btn btn-primary" disabled={busy || !row.members.filter((member) => member.active).every((member) => member.consent_status === "ACCEPTED")}
-                  onClick={() => void groupAction(row,"submit")}>{row.proposer_type === "STUDENT" ? "Gửi đề xuất cho bộ môn" : "Gửi đăng ký cho GV"}</button>
+                  onClick={() => void groupAction(row,"submit")}><Send size={15} aria-hidden="true" />{row.proposer_type === "STUDENT" ? "Gửi đề xuất cho bộ môn" : "Gửi đăng ký cho GV"}</button>
               </> : <p className="text-caption">Đại diện sẽ gửi đăng ký sau khi nhóm kiểm tra thông tin.</p>}
             </> : null}
             {row.state === "SUBMITTED" && row.topic_state === "APPROVED" && row.receiving_lecturer_user_id === context.user_id ? <>
-              <button className="btn btn-primary" disabled={busy} onClick={() => void decide(row,"ACCEPT")}>Chấp nhận chính thức và tạo khóa luận</button>
-              <button className="btn btn-destructive" disabled={busy} onClick={() => {setRejectTarget(row); setRejectReason(""); setError("");}}>Từ chối</button>
+              <button className="btn btn-primary" disabled={busy} onClick={() => void decide(row,"ACCEPT")}><Check size={15} aria-hidden="true" />Chấp nhận chính thức và tạo khóa luận</button>
+              <button className="btn btn-destructive" disabled={busy} onClick={() => {setRejectTarget(row); setRejectReason(""); setError("");}}><XCircle size={15} aria-hidden="true" />Từ chối</button>
             </> : null}
             {row.state === "LECTURER_REJECTED" && row.proposer_type === "STUDENT" && context.actions.includes("topic:department_decide") ?
-              <button className="btn btn-secondary" disabled={busy} onClick={() => {setResolutionTarget(row); setResolutionChoice("REASSIGN"); setResolutionLecturerId(""); setResolutionReason(""); setError("");}}>Xử lý GV từ chối</button> : null}
-            {row.thesis_id ? <Link className="btn btn-primary" to={"/theses/" + row.thesis_id}>Mở hồ sơ khóa luận</Link> : null}
+              <button className="btn btn-soft" disabled={busy} onClick={() => {setResolutionTarget(row); setResolutionChoice("REASSIGN"); setResolutionLecturerId(""); setResolutionReason(""); setError("");}}><RotateCcw size={15} aria-hidden="true" />Xử lý GV từ chối</button> : null}
+            {row.thesis_id ? <Link className="btn btn-primary" to={"/theses/" + row.thesis_id}>Mở hồ sơ khóa luận<ArrowRight size={15} aria-hidden="true" /></Link> : null}
             {me?.can_withdraw ? <>
               <p className="registration-card__hint"><Info size={15} aria-hidden="true" />
                 {row.state === "SUBMITTED" ? "GV chưa chấp nhận — có thể rút để chọn đề tài khác khi đợt còn mở."
@@ -211,9 +257,9 @@ export default function RegistrationsPage({userId, context}: {userId: string; co
         </div></article>;
       })}</div>}
     {!focusedRegistrationId ? <nav className="pagination" aria-label="Phân trang đăng ký">
-      <button className="btn btn-secondary" disabled={!page || loading || busy} onClick={() => setPage(page - 1)}>Trang trước</button>
+      <button className="btn btn-secondary" disabled={!page || loading || busy} onClick={() => setPage(page - 1)}><ChevronLeft size={15} aria-hidden="true" />Trang trước</button>
       <span>Trang {page + 1}</span>
-      <button className="btn btn-secondary" disabled={rows.length < PAGE_SIZE || loading || busy} onClick={() => setPage(page + 1)}>Trang sau</button>
+      <button className="btn btn-secondary" disabled={rows.length < PAGE_SIZE || loading || busy} onClick={() => setPage(page + 1)}>Trang sau<ChevronRight size={15} aria-hidden="true" /></button>
     </nav> : null}
     <Dialog open={!!rejectTarget} busy={busy} onClose={() => setRejectTarget(null)} title="Từ chối đăng ký" footer={<>
       <button className="btn btn-secondary" disabled={busy} onClick={() => setRejectTarget(null)}>Quay lại</button>

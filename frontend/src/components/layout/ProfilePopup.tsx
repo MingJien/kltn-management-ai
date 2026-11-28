@@ -13,6 +13,7 @@ interface ProfilePopupProps {
 
 export default function ProfilePopup({ context, onLogout }: ProfilePopupProps) {
   const root = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,10 @@ export default function ProfilePopup({ context, onLogout }: ProfilePopupProps) {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
@@ -34,6 +38,7 @@ export default function ProfilePopup({ context, onLogout }: ProfilePopupProps) {
   return (
     <div className="header__profile" ref={root}>
       <button
+        ref={triggerRef}
         type="button"
         className={`header__icon-btn ${open ? "header__icon-btn--active" : ""}`}
         aria-label="Xem hồ sơ cá nhân"

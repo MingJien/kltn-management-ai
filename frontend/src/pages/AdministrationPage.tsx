@@ -6,6 +6,8 @@ import type { Context } from "../api";
 import { request } from "../api";
 import { errorMessage } from "../errors";
 import PageHeader from "../components/layout/PageHeader";
+import EmptyState from "../components/ui/EmptyState";
+import { type FilterChip } from "../components/ui/FilterBar";
 
 import {
   AlertTriangle,
@@ -15,6 +17,8 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   GraduationCap,
   Info,
@@ -216,10 +220,11 @@ export default function AdministrationPage({
     }
   }
 
-  // Statistics for quick glance
-  const totalAccounts = accounts.length;
-  const studentCount = accounts.filter((a) => a.base_role === "STUDENT").length;
-  const lecturerCount = accounts.filter((a) => a.base_role === "LECTURER").length;
+  // Statistics for quick glance (global totals when directory counts available)
+  const hasDirectoryTotals = isAdmin && directoryCounts.ALL !== undefined;
+  const totalAccounts = directoryCounts.ALL ?? accounts.length;
+  const studentCount = directoryCounts.STUDENT ?? accounts.filter((a) => a.base_role === "STUDENT").length;
+  const lecturerCount = directoryCounts.LECTURER ?? accounts.filter((a) => a.base_role === "LECTURER").length;
   const unverifiedCount = accounts.filter((a) => !a.verified).length;
   const lockedOrDisabledCount = accounts.filter((a) => a.status === "LOCKED" || (a.status === "DISABLED" && a.verified)).length;
 
@@ -228,8 +233,8 @@ export default function AdministrationPage({
       <PageHeader
         title={section === "accounts" ? (isAdmin ? "Quản lý tài khoản" : "Tài khoản sinh viên theo đợt") : "Phân công theo đợt"}
         description={section === "accounts"
-          ? "Tìm kiếm tài khoản, theo dõi trạng thái và xử lý hỗ trợ truy cập."
-          : "Giao hoặc thu hồi nhiệm vụ KLTN theo từng đợt, kèm căn cứ và lịch sử."}
+          ? "Tìm kiếm tài khoản, theo dõi trạng thái và hỗ trợ truy cập."
+          : "Giao hoặc thu hồi nhiệm vụ KLTN theo từng đợt."}
       />
 
       {section === "assignments" && isAdmin && <AssignmentTabs />}
@@ -244,12 +249,12 @@ export default function AdministrationPage({
           </>}
         </nav>}
         {error ? (
-          <p role="alert" className="alert alert-danger" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <p role="alert" className="alert alert-danger alert-icon-row">
             <AlertTriangle size={18} aria-hidden="true" /> {error}
           </p>
         ) : null}
         {notice ? (
-          <p role="status" className="alert alert-success" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <p role="status" className="alert alert-success alert-icon-row">
             <CheckCircle2 size={18} aria-hidden="true" /> {notice}
           </p>
         ) : null}
@@ -445,7 +450,7 @@ export default function AdministrationPage({
                       </select>
                     </div>
                     <span className="text-caption">{matchingStaff.length} tài khoản phù hợp. Tìm bằng mã/tên, rồi chọn email bên phải.</span>
-                    {selectedStaff ? <p role="status" className="text-caption" style={{ color: "var(--primary-800)", fontWeight: 500 }}>Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
+                    {selectedStaff ? <p role="status" className="text-caption text-primary-800">Đã chọn: {selectedStaff.display_name || selectedStaff.email}{selectedStaff.lecturer_code ? " · " + selectedStaff.lecturer_code : ""} · {selectedStaff.email}.</p> : null}
                   </div>
                   <div className="assignment-details-grid">
                   <label className="input-group">
@@ -479,7 +484,7 @@ export default function AdministrationPage({
                     </div>
                   ) : null}
                   {assignmentHint ? (
-                    <p id="assignment-hint" role="status" className="text-caption" style={{ color: "var(--neutral-600)" }}>
+                    <p id="assignment-hint" role="status" className="text-caption text-muted">
                       {assignmentHint}
                     </p>
                   ) : null}
@@ -511,7 +516,7 @@ export default function AdministrationPage({
               <div className="admin-revoke-bar">
                 <label className="input-group">
                   <span className="admin-reason-label">
-                    <Shield size={14} aria-hidden="true" style={{ color: "var(--primary-600)" }} />
+                    <Shield size={14} aria-hidden="true" className="admin-shield-icon" />
                     <span>Lý do thu hồi (nếu cần)</span>
                     <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để kích hoạt nút Thu hồi)</small>
                   </span>
@@ -558,7 +563,7 @@ export default function AdministrationPage({
                           <Calendar size={13} aria-hidden="true" /> {a.round_code}
                         </span>
                         <span className="assignment-item__email">
-                          <Mail size={13} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px", color: "var(--neutral-400)" }} />
+                          <Mail size={13} aria-hidden="true" className="admin-mail-icon" />
                           {a.email}
                         </span>
                         <span className={`badge ${dutyClass} assignment-item__duty`}>
@@ -627,7 +632,7 @@ export default function AdministrationPage({
                   <Users size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">Tổng trên trang</span>
+                  <span className="admin-metric-card__label">{hasDirectoryTotals ? "Tổng tài khoản" : "Tổng trên trang"}</span>
                   <span className="admin-metric-card__value">{totalAccounts}</span>
                 </div>
               </div>
@@ -636,7 +641,7 @@ export default function AdministrationPage({
                   <GraduationCap size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">SV trên trang</span>
+                  <span className="admin-metric-card__label">{hasDirectoryTotals ? "Sinh viên" : "SV trên trang"}</span>
                   <span className="admin-metric-card__value">{studentCount}</span>
                 </div>
               </div>
@@ -645,7 +650,7 @@ export default function AdministrationPage({
                   <BookOpen size={18} aria-hidden="true" />
                 </div>
                 <div className="admin-metric-card__content">
-                  <span className="admin-metric-card__label">GV trên trang</span>
+                  <span className="admin-metric-card__label">{hasDirectoryTotals ? "Giảng viên" : "GV trên trang"}</span>
                   <span className="admin-metric-card__value">{lecturerCount}</span>
                 </div>
               </div>
@@ -665,7 +670,7 @@ export default function AdministrationPage({
                   </div>
                   <div className="admin-metric-card__content">
                     <span className="admin-metric-card__label">Khóa / Vô hiệu trên trang</span>
-                    <span className="admin-metric-card__value" style={{ color: "var(--danger-text)" }}>
+                    <span className="admin-metric-card__value text-danger-val">
                       {lockedOrDisabledCount}
                     </span>
                   </div>
@@ -762,11 +767,50 @@ export default function AdministrationPage({
                   <button className="btn btn-secondary">Tìm</button>
                 </form>
               </div>
+              {(() => {
+                const statusLabels: Record<string, string> = {
+                  PENDING: "Chờ kích hoạt",
+                  ACTIVE: "Hoạt động",
+                  LOCKED: "Bị khóa",
+                  DISABLED: "Vô hiệu hóa trước đây",
+                };
+                const chips: FilterChip[] = [
+                  ...(term ? [{ key: "term", label: `Từ khóa: "${term}"`, onRemove: () => { setSearch(""); setTerm(""); setPage(0); } }] : []),
+                  ...(accountStatus !== "ALL" ? [{ key: "status", label: `Trạng thái: ${statusLabels[accountStatus] || accountStatus}`, onRemove: () => { setAccountStatus("ALL"); setPage(0); } }] : []),
+                  ...(additionalRole ? [{ key: "role", label: `Quyền: ${roleCatalog.find((r) => r.code === additionalRole)?.label || additionalRole}`, onRemove: () => { setAdditionalRole(""); setPage(0); } }] : []),
+                ];
+                if (!chips.length) return null;
+                return (
+                  <div className="filter-bar__chips" aria-label="Bộ lọc tài khoản đang áp dụng">
+                    {chips.map((chip) => (
+                      <span className="filter-chip" key={chip.key}>
+                        <span>{chip.label}</span>
+                        <button type="button" className="filter-chip__remove" aria-label={`Bỏ lọc ${chip.label}`} onClick={chip.onRemove}>
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setSearch("");
+                        setTerm("");
+                        setAccountStatus("ALL");
+                        setAdditionalRole("");
+                        setPage(0);
+                      }}
+                    >
+                      Xóa bộ lọc
+                    </button>
+                  </div>
+                );
+              })()}
 
               <div className="admin-reason-field">
                 <label className="input-group">
                   <span className="admin-reason-label">
-                    <Shield size={14} aria-hidden="true" style={{ color: "var(--primary-600)" }} />
+                    <Shield size={14} aria-hidden="true" className="admin-shield-icon" />
                     <span>Lý do thao tác tài khoản</span>
                     <small className="text-muted">(yêu cầu tối thiểu 5 ký tự để Khóa, Mở khóa hoặc Cấp lại)</small>
                   </span>
@@ -878,7 +922,6 @@ export default function AdministrationPage({
                                 <UserCog size={12} aria-hidden="true" />
                               )}
                               {roleTitle}
-                              <span className="account-badge__sub">({a.base_role})</span>
                             </span>
 
                             {/* Account Status Badge */}
@@ -909,7 +952,7 @@ export default function AdministrationPage({
                             {/* Verification Badge */}
                             {!a.verified ? (
                               <span className="badge badge-warning badge-outline account-badge--verification">
-                                <Clock size={12} aria-hidden="true" /> chưa kích hoạt
+                                <Clock size={12} aria-hidden="true" /> Chưa kích hoạt
                               </span>
                             ) : (
                               <span className="badge badge-success badge-subtle account-badge--verification">
@@ -936,12 +979,11 @@ export default function AdministrationPage({
 
                     {/* Actions Toolbar */}
                     <div className="account-list__actions">
-                      <Link className="btn btn-ghost btn-sm" style={{gridColumn: "1 / -1"}}
+                      <Link className="btn btn-ghost btn-sm col-span-full"
                         to={`/activity?resource_type=user_account&resource_id=${a.id}`}>Lịch sử tài khoản</Link>
                       {isSelf ? (
                         <span
-                          className="account-current-badge text-caption"
-                          style={{ gridColumn: "1 / -1", textAlign: "right" }}
+                          className="account-current-badge text-caption col-span-full-right"
                         >
                           <CheckCircle2 size={13} aria-hidden="true" /> Tài khoản hiện tại
                         </span>
@@ -1051,23 +1093,28 @@ export default function AdministrationPage({
 
             {/* Empty State */}
             {!accounts.length ? (
-              <div className="admin-empty-state">
-                <Users size={32} aria-hidden="true" />
-                <p>Không có tài khoản khớp tìm kiếm.</p>
-                {search && (
+              <EmptyState
+                compact
+                icon={<Users size={24} aria-hidden="true" />}
+                title="Không có tài khoản khớp tìm kiếm"
+                description="Thử thay đổi từ khóa hoặc xóa bộ lọc để xem lại danh sách."
+              >
+                {(search || term || accountStatus !== "ALL" || additionalRole) && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => {
                       setSearch("");
                       setTerm("");
+                      setAccountStatus("ALL");
+                      setAdditionalRole("");
                       setPage(0);
                     }}
                   >
-                    Xóa bộ lọc tìm kiếm
+                    Xóa bộ lọc
                   </button>
                 )}
-              </div>
+              </EmptyState>
             ) : null}
 
             {/* Pagination Controls */}
@@ -1078,6 +1125,7 @@ export default function AdministrationPage({
                   disabled={busy || page === 0}
                   onClick={() => setPage(page - 1)}
                 >
+                  <ChevronLeft size={15} aria-hidden="true" />
                   Trang trước
                 </button>
                 <span>Trang {page + 1}</span>
@@ -1087,6 +1135,7 @@ export default function AdministrationPage({
                   onClick={() => setPage(page + 1)}
                 >
                   Trang sau
+                  <ChevronRight size={15} aria-hidden="true" />
                 </button>
               </nav>
             ) : null}
@@ -1138,7 +1187,7 @@ export default function AdministrationPage({
                         }, "Đã sửa email.");
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                      <div className="modal-header-row">
                         <h3>{isStudent ? "Sửa email sinh viên trên tài khoản hiện có" : "Sửa email trên tài khoản hiện có"}</h3>
                         <button
                           type="button"
@@ -1223,7 +1272,7 @@ export default function AdministrationPage({
                           : "Đã đủ lý do sửa email."}
                       </p>
 
-                      <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                      <div className="modal-footer-row">
                         <button
                           className="btn btn-primary"
                           disabled={

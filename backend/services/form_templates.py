@@ -7,6 +7,7 @@ possible instead of inventing a look-alike form.
 """
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 import os
 
@@ -14,6 +15,7 @@ from fastapi import HTTPException
 
 ROOT = Path(__file__).resolve().parents[2]
 OFFICIAL_DIR = Path(os.getenv("KLTN_OFFICIAL_TEMPLATE_DIR", str(ROOT / "docs" / "BieuMau"))).resolve()
+PREVIEW_DIR = Path(os.getenv("KLTN_FORM_PREVIEW_DIR", str(ROOT / "local" / "school-form-previews"))).resolve()
 
 TEMPLATES = {
     "plan": OFFICIAL_DIR / "mau 2.Ke hoach thuc hien cua SV.docx",
@@ -86,6 +88,44 @@ OFFICIAL_FORMS = [
 ]
 
 STUDENT_FORM_IDS = {"mau-01a", "mau-01b", "mau-02", "mau-03", "mau-04", "mau-05"}
+
+SOURCE_FORMS = [
+    *OFFICIAL_FORMS,
+    {
+        "id": "don-xin-thoi",
+        "title": "Đơn xin thôi thực hiện KLTN",
+        "filename": "Don_xin_thoi_thuc_hien_KLTN.docx",
+    },
+]
+
+
+def list_sources() -> list[dict]:
+    sources = []
+    for meta in SOURCE_FORMS:
+        path = OFFICIAL_DIR / meta["filename"]
+        if path.is_file():
+            sources.append({**meta, "byte_size": path.stat().st_size, "extension": path.suffix.lower()})
+    return sources
+
+
+def source_path(source_id: str) -> Path:
+    if source_id == "xin-thoi-kltn":
+        source_id = "don-xin-thoi"
+    for meta in SOURCE_FORMS:
+        if meta["id"] == source_id:
+            path = OFFICIAL_DIR / meta["filename"]
+            if path.is_file():
+                return path
+            raise HTTPException(409, UNAVAILABLE)
+    raise HTTPException(404, "Không tìm thấy tệp nguồn này")
+
+
+def source_hash(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def allowed_form(meta: dict, role: str) -> bool:

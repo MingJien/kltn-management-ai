@@ -1,6 +1,8 @@
-import {useEffect,useState,type FormEvent} from "react";
+import {useEffect,useId,useState,type FormEvent} from "react";
+import {FileCheck2} from "lucide-react";
 import {request} from "../../api";
 import {errorMessage} from "../../errors";
+import EmptyState from "../ui/EmptyState";
 
 type Report={title:string;version_id:string;version_no:number};
 type Result={
@@ -10,6 +12,7 @@ type Result={
 };
 
 export default function ReportSimilarity({userId}:{userId:string}) {
+  const leftId=useId(), rightId=useId();
   const [reports,setReports]=useState<Report[]>();
   const [left,setLeft]=useState("");
   const [right,setRight]=useState("");
@@ -23,7 +26,9 @@ export default function ReportSimilarity({userId}:{userId:string}) {
     return ()=>{active=false;};
   },[userId]);
   async function submit(e:FormEvent) {
-    e.preventDefault();setBusy(true);setError("");setResult(undefined);
+    e.preventDefault();
+    if (busy || !left || !right || left === right) return;
+    setBusy(true);setError("");setResult(undefined);
     try {
       const query=new URLSearchParams({left_version_id:left,right_version_id:right});
       setResult(await request<Result>("/ai/compare-reports?"+query,userId,{method:"POST"}));
@@ -38,10 +43,10 @@ export default function ReportSimilarity({userId}:{userId:string}) {
     <p>Đối chiếu hai báo cáo bằng văn bản, chữ nhận dạng trong ảnh và dấu hiệu ảnh giống nhau. Dùng các vị trí trùng để kiểm tra thủ công.</p>
     {error&&<p role="alert" className="alert alert-danger">{error}</p>}
     {!reports&&!error&&<p role="status">Đang tải danh sách báo cáo…</p>}
-    {reports&&reports.length<2&&<p>Cần ít nhất hai báo cáo Word/PDF đã qua kiểm tra tệp trong phạm vi được giao.</p>}
+    {reports&&reports.length<2&&<EmptyState compact icon={<FileCheck2 aria-hidden="true"/>} title="Chưa đủ báo cáo để đối chiếu" description="Cần ít nhất hai báo cáo Word/PDF đã qua kiểm tra tệp trong phạm vi được giao."/>}
     {!!reports&&reports.length>=2&&<form className="stack" onSubmit={submit}>
-      <label>Đề tài thứ nhất<select className="input" value={left} disabled={busy} required onChange={e=>{setLeft(e.target.value);setResult(undefined);}}>{options(right)}</select></label>
-      <label>Đề tài thứ hai<select className="input" value={right} disabled={busy} required onChange={e=>{setRight(e.target.value);setResult(undefined);}}>{options(left)}</select></label>
+      <div className="input-group"><label htmlFor={leftId}>Đề tài thứ nhất</label><select id={leftId} className="input" value={left} disabled={busy} required onChange={e=>{setLeft(e.target.value);setResult(undefined);}}>{options(right)}</select></div>
+      <div className="input-group"><label htmlFor={rightId}>Đề tài thứ hai</label><select id={rightId} className="input" value={right} disabled={busy} required onChange={e=>{setRight(e.target.value);setResult(undefined);}}>{options(left)}</select></div>
       <button className="btn btn-primary" disabled={busy||!left||!right}>{busy?"Đang đọc và đối chiếu…":"Đối chiếu báo cáo"}</button>
     </form>}
     {result&&<>

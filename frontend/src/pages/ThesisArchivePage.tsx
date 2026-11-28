@@ -1,10 +1,17 @@
 import {useEffect, useState, type FormEvent} from "react";
 import {Link, useLocation, useNavigate, useSearchParams} from "react-router-dom";
+import {ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, Download, Eye, RefreshCw, RotateCcw, Upload} from "lucide-react";
 import {downloadFile, request, type Context} from "../api";
 import {ApiError, errorMessage} from "../errors";
 import {when} from "../evaluation";
 import {ReadOnlyFilePreview} from "../components/domain/ReviewAttachmentPreview";
 import PageHeader from "../components/layout/PageHeader";
+import Tabs from "../components/ui/Tabs";
+import FilterBar from "../components/ui/FilterBar";
+import FileDropzone from "../components/ui/FileDropzone";
+import EmptyState from "../components/ui/EmptyState";
+import {SkeletonCard} from "../components/ui/Skeleton";
+import ThesisStatusBadge from "../components/domain/ThesisStatusBadge";
 import "../styles/defense.css";
 import "../styles/review-workspace.css";
 
@@ -46,6 +53,7 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
   const [message,setMessage] = useState("");
+  const [uploadFile,setUploadFile] = useState<File|null>(null);
   const latest = item.versions[0];
   const title = item.snapshot?.title || item.title;
   const status = latest ? labels[latest.state] : item.waiting ? "Chờ chốt bảo vệ" : "Chưa nộp";
@@ -73,14 +81,17 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
 
   function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const file = new FormData(event.currentTarget).get("file");
+    const raw = new FormData(event.currentTarget).get("file");
+    const file = uploadFile || (raw instanceof File ? raw : null);
     if (!(file instanceof File) || !file.size || file.size > 10*1024*1024 || !/\.(pdf|docx)$/i.test(file.name)) {
       setError("Chọn tệp PDF hoặc DOCX có nội dung và dung lượng tối đa 10 MB.");
       return;
     }
-    void action(() => request(`/thesis-archive/theses/${item.id}`,userId,{method:"POST",body:file,
-      headers:{"Content-Type":"application/octet-stream","X-File-Name":encodeURIComponent(file.name),"If-Match":String(latest?.number??0)}}),
-      "Đã nộp bản hoàn thiện. Bộ môn sẽ duyệt lưu và gửi thông báo.");
+    void action(async () => {
+      await request(`/thesis-archive/theses/${item.id}`,userId,{method:"POST",body:file,
+        headers:{"Content-Type":"application/octet-stream","X-File-Name":encodeURIComponent(file.name),"If-Match":String(latest?.number??0)}});
+      setUploadFile(null);
+    }, "Đã nộp bản hoàn thiện. Bộ môn sẽ duyệt lưu và gửi thông báo.");
   }
 
   function decide(event:FormEvent<HTMLFormElement>, reopening = false) {
@@ -110,8 +121,8 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
       {version.decided_by && <p className="archive-note">{version.decided_by} · {when(version.decided_at)}<br/>{version.decision_note}</p>}
       {version.reopened && <p className="alert alert-warning">Thu hồi bởi {version.reopened.by} · {when(version.reopened.at)}<br/>{version.reopened.reason}</p>}
       <div className="button-row">
-        <button type="button" className="btn btn-secondary" onClick={()=>setPreview(version)}>Xem nhanh v{version.number}</button>
-        <button type="button" className="btn btn-secondary" onClick={()=>void downloadFile(versionPath(version)+"/file",version.filename).catch(cause=>setError(errorMessage(cause)))}>Tải phiên bản {version.number}</button>
+        <button type="button" className="btn btn-secondary" onClick={()=>setPreview(version)}><Eye size={15} aria-hidden="true"/>Xem nhanh v{version.number}</button>
+        <button type="button" className="btn btn-secondary" onClick={()=>void downloadFile(versionPath(version)+"/file",version.filename).catch(cause=>setError(errorMessage(cause)))}><Download size={15} aria-hidden="true"/>Tải phiên bản {version.number}</button>
       </div>
       {preview?.id===version.id && <ReadOnlyFilePreview key={version.id} name={version.filename}
         endpoint={versionPath(version)+"/file"} label={`Xem nhanh bản khóa luận v${version.number}`}
@@ -121,9 +132,9 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
 
   return <section className="card"><div className="card-body stack">
     <div className="archive-heading"><div><p className="text-muted">{[item.topic_code,item.round,item.snapshot?.academic_year&&`Năm học ${item.snapshot.academic_year}`,item.department].filter(Boolean).join(" · ")}</p>
-      <h2>{title}</h2></div><span className="archive-status" data-state={latest?.state??"EMPTY"}>{status}</span></div>
+      <h2>{title}</h2></div><ThesisStatusBadge className="archive-status" state={latest?.state??"DRAFT"} label={status}/></div>
     <AcademicFacts identity={item.snapshot}/>
-    <Link to={`/theses/${item.id}`}>Mở hồ sơ khóa luận</Link>
+    <Link className="inline-flex items-center gap-1" to={`/theses/${item.id}`}><BookOpen size={15} aria-hidden="true"/>Mở hồ sơ khóa luận</Link>
     {error && <p className="alert alert-danger" role="alert">{error}</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     {item.submission_suspended && <p className="alert alert-warning">Quyền nộp trong đợt của bạn đã bị thu hồi. Bạn vẫn có thể xem hồ sơ và kết quả xử lý.</p>}
@@ -133,15 +144,26 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
     {latest?.state==="SUBMITTED" && !item.can_decide && <p>Bản đã gửi đến bộ môn. Nhóm sẽ nhận thông báo khi có kết quả duyệt.</p>}
     {latest && versionCard(latest)}
     {item.can_submit && <form className="archive-action stack" key={`submit-${latest?.id??"first"}`} onSubmit={submit}>
-      <label>Bản khóa luận hoàn thiện sau bảo vệ (PDF/DOCX, tối đa 10 MB)<input required className="input" type="file" name="file" accept=".pdf,.docx" disabled={locked}/></label>
-      <button className="btn btn-primary" disabled={locked}>{busy?"Đang tải và quét tệp…":latest?"Nộp bản thay thế":"Nộp bản hoàn thiện"}</button>
+      <FileDropzone
+        id="archive-upload-file"
+        name="file"
+        label="Bản khóa luận hoàn thiện sau bảo vệ (PDF/DOCX, tối đa 10 MB)"
+        accept=".pdf,.docx"
+        maxBytes={10 * 1024 * 1024}
+        hint="PDF hoặc DOCX · Tối đa 10 MB"
+        file={uploadFile}
+        required
+        disabled={locked}
+        onChange={setUploadFile}
+      />
+      <button className="btn btn-primary" disabled={locked || !uploadFile}><Upload size={15} aria-hidden="true"/>{busy?"Đang tải và quét tệp…":latest?"Nộp bản thay thế":"Nộp bản hoàn thiện"}</button>
     </form>}
     {item.can_decide && latest && <form className="archive-action stack" key={`decision-${latest.id}-${latest.revision}`} onSubmit={event=>decide(event)}>
       <label>Kết quả kiểm tra<select className="input" required value={decision} onChange={event=>setDecision(event.target.value)}>
         <option value="">Chọn kết quả</option><option value="ACCEPTED" disabled={item.can_approve===false}>Duyệt lưu nội bộ</option>
         <option value="RETURNED">Yêu cầu nộp lại</option></select></label>
       <label>Nhận xét và căn cứ<textarea className="input" name="reason" required minLength={5} maxLength={2000} rows={3}/></label>
-      <button className="btn btn-primary" disabled={locked}>{busy?"Đang xử lý…":"Lưu quyết định"}</button>
+      <button className="btn btn-primary" disabled={locked}><Check size={15} aria-hidden="true"/>{busy?"Đang xử lý…":"Lưu quyết định"}</button>
     </form>}
     {item.can_reopen && latest && <details className="defense-operation" open={reopen} onToggle={event=>setReopen(event.currentTarget.open)}>
       <summary>Thu hồi bản lưu và yêu cầu nộp lại</summary>
@@ -149,7 +171,7 @@ function ArchiveDetail({item, userId, refresh, loading}: {item:Entry; userId:str
         <p>Bản này sẽ rời danh sách tra cứu. Tệp và quyết định duyệt cũ vẫn có trong lịch sử để đối chiếu.</p>
         <label>Lý do thu hồi<textarea className="input" name="reason" required minLength={5} maxLength={2000} rows={3}/></label>
         <label className="defense-check"><input type="checkbox" required/>Tôi đã đối chiếu đúng bản cần thu hồi.</label>
-        <button className="btn btn-destructive" disabled={locked}>{busy?"Đang xử lý…":"Thu hồi và thông báo nhóm"}</button>
+        <button className="btn btn-destructive" disabled={locked}><RotateCcw size={15} aria-hidden="true"/>{busy?"Đang xử lý…":"Thu hồi và thông báo nhóm"}</button>
       </form>
     </details>}
     {item.versions.length>1 && <details className="defense-operation"><summary>Lịch sử bản nộp ({item.versions.length-1} bản trước)</summary>
@@ -227,54 +249,77 @@ export default function ThesisArchivePage({context}: {context:Context}) {
   }
   const pageCount = list ? Math.max(1,Math.ceil(list.total/list.limit)) : 1;
   const filtering = search.trim()!==debounced;
-  const filtered = Boolean(search||round||department||(mode==="work"&&state));
+  const filtered = Boolean(search.trim()||round||department||(mode==="work"&&state));
   return <div className="stack defense-page archive-page">
     <PageHeader title="Kho khóa luận nội bộ" description="Tra cứu bản đã duyệt và theo dõi việc nộp lưu theo phạm vi được giao.">
-      <button className="btn btn-secondary" disabled={loading} onClick={refresh}>Làm mới</button>
+      <button type="button" className="btn btn-secondary" disabled={loading} onClick={refresh}><RefreshCw size={15} aria-hidden="true"/>Làm mới</button>
     </PageHeader>
     {error && <p className="alert alert-danger" role="alert">{error}</p>}
     {focus ? <>
-      <div className="button-row"><button type="button" className="btn btn-secondary" onClick={closeDetail}>Quay về danh sách</button></div>
-      {loading && detail?.id!==focus && <p role="status">Đang mở hồ sơ nộp lưu…</p>}
+      <div className="button-row"><button type="button" className="btn btn-secondary" onClick={closeDetail}><ArrowLeft size={15} aria-hidden="true"/>Quay về danh sách</button></div>
+      {loading && detail?.id!==focus && <div className="stack" role="status" aria-label="Đang mở hồ sơ nộp lưu"><SkeletonCard /><SkeletonCard /></div>}
       {!error && detail?.id===focus && <ArchiveDetail key={focus} item={detail} userId={context.user_id} refresh={refresh} loading={loading}/>}
     </> : <>
-      <nav className="defense-tabs" aria-label="Kho khóa luận">
-        <button className={`btn ${mode==="catalog"?"btn-primary":"btn-secondary"}`} aria-pressed={mode==="catalog"} onClick={()=>changeMode("catalog")}>Tra cứu bản đã lưu</button>
-        <button className={`btn ${mode==="work"?"btn-primary":"btn-secondary"}`} aria-pressed={mode==="work"} onClick={()=>changeMode("work")}>Hồ sơ nộp lưu</button>
-      </nav>
-      <section className="card"><div className="card-body stack">
-        <div className="defense-form-grid archive-filters" data-mode={mode}>
-          <label className="archive-search">Tìm khóa luận<input className="input" type="search" value={search} maxLength={150}
-            placeholder="Mã đề tài, tiêu đề, SV, GVHD, lớp, mã ngành…" onChange={e=>changeFilters({q:e.target.value},true)}/></label>
-          <label>Đợt KLTN<select className="input" value={round} onChange={e=>changeFilters({round_id:e.target.value,department_id:""})}>
-            <option value="">Tất cả đợt</option>{round&&!rounds.has(round)&&<option value={round}>{loading?"Đang tải đợt…":"Đợt đã chọn ngoài danh sách hiện tại"}</option>}{Array.from(rounds,([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
-          <label>Bộ môn<select className="input" value={department} onChange={e=>changeFilters({department_id:e.target.value})}>
-            <option value="">Tất cả bộ môn</option>{department&&!departments.has(department)&&<option value={department}>{loading?"Đang tải bộ môn…":"Bộ môn đã chọn ngoài danh sách hiện tại"}</option>}{Array.from(departments,([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
-          {mode==="work" && <label>Trạng thái<select aria-label="Trạng thái" className="input" value={state} onChange={e=>changeFilters({state:e.target.value})}>
-            <option value="">Tất cả trạng thái</option><option value="SUBMITTED">Chờ bộ môn duyệt</option><option value="EMPTY">Chưa có bản nộp</option>
-            <option value="RETURNED">Cần nộp lại</option><option value="REOPENED">Đã thu hồi bản lưu</option><option value="ACCEPTED">Đã duyệt lưu</option></select></label>}
-        </div>
-        {filtered && <button className="btn btn-secondary archive-reset" onClick={()=>{setDebounced("");setParams(mode==="work"?{mode}:{});}}>Xóa bộ lọc</button>}
-      </div></section>
-      {(loading||filtering) && <p role="status">Đang tải danh sách khóa luận…</p>}
+      <Tabs
+        asButtons
+        variant="underline"
+        idPrefix="archive-mode"
+        ariaLabel="Kho khóa luận"
+        items={[
+          {id:"catalog",label:"Tra cứu bản đã lưu"},
+          {id:"work",label:"Hồ sơ nộp lưu"},
+        ]}
+        activeId={mode}
+        onChange={changeMode}
+      />
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (next) => changeFilters({ q: next }, true),
+          placeholder: "Mã đề tài, tiêu đề, SV, GVHD, lớp, mã ngành…",
+          ariaLabel: "Tìm khóa luận",
+        }}
+        chips={[
+          ...(search.trim() ? [{ key: "q", label: `Từ khóa: "${search.trim()}"`, onRemove: () => changeFilters({ q: "" }, true) }] : []),
+          ...(round ? [{ key: "round", label: `Đợt: ${rounds.get(round) || round}`, onRemove: () => changeFilters({ round_id: "", department_id: "" }) }] : []),
+          ...(department ? [{ key: "dept", label: `Bộ môn: ${departments.get(department) || department}`, onRemove: () => changeFilters({ department_id: "" }) }] : []),
+          ...(mode === "work" && state ? [{ key: "state", label: `Trạng thái: ${labels[state as State] || (state === "EMPTY" ? "Chưa có bản nộp" : state)}`, onRemove: () => changeFilters({ state: "" }) }] : []),
+        ]}
+        onClearAll={() => { setDebounced(""); setParams(mode === "work" ? { mode } : {}); }}
+      >
+        <select aria-label="Đợt KLTN" className="input" value={round} onChange={e=>changeFilters({round_id:e.target.value,department_id:""})}>
+          <option value="">Tất cả đợt</option>{round&&!rounds.has(round)&&<option value={round}>{loading?"Đang tải đợt…":"Đợt đã chọn ngoài danh sách hiện tại"}</option>}{Array.from(rounds,([id,label])=><option key={id} value={id}>{label}</option>)}
+        </select>
+        <select aria-label="Bộ môn" className="input" value={department} onChange={e=>changeFilters({department_id:e.target.value})}>
+          <option value="">Tất cả bộ môn</option>{department&&!departments.has(department)&&<option value={department}>{loading?"Đang tải bộ môn…":"Bộ môn đã chọn ngoài danh sách hiện tại"}</option>}{Array.from(departments,([id,label])=><option key={id} value={id}>{label}</option>)}
+        </select>
+        {mode==="work" && <select aria-label="Trạng thái" className="input" value={state} onChange={e=>changeFilters({state:e.target.value})}>
+          <option value="">Tất cả trạng thái</option><option value="SUBMITTED">Chờ bộ môn duyệt</option><option value="EMPTY">Chưa có bản nộp</option>
+          <option value="RETURNED">Cần nộp lại</option><option value="REOPENED">Đã thu hồi bản lưu</option><option value="ACCEPTED">Đã duyệt lưu</option>
+        </select>}
+      </FilterBar>
+      {(loading||filtering) && <div className="stack" role="status" aria-label="Đang tải danh sách khóa luận"><SkeletonCard /><SkeletonCard /></div>}
       {!loading && !filtering && !error && list && <>
         <p role="status">{list.total} khóa luận · Trang {list.page}/{pageCount}</p>
-        {!list.items.length && <div className="card"><div className="card-body stack">
-          <p>{filtered?"Không có khóa luận khớp với bộ lọc. Hãy thử MSSV, mã đề tài hoặc xóa bộ lọc.":mode==="catalog"?"Chưa tìm thấy bản khóa luận đã duyệt trong phạm vi đang xem.":"Chưa có hồ sơ sau bảo vệ trong phạm vi của bạn."}</p>
-          {mode==="catalog" && !filtered && <div><button className="btn btn-secondary" onClick={()=>changeMode("work")}>Mở hồ sơ nộp lưu</button></div>}
-        </div></div>}
+        {!list.items.length && <EmptyState
+          title={filtered?"Không có khóa luận khớp bộ lọc":"Chưa có khóa luận trong phạm vi"}
+          description={filtered?"Thử tìm theo MSSV, mã đề tài hoặc xóa bộ lọc.":mode==="catalog"?"Chưa tìm thấy bản khóa luận đã duyệt trong phạm vi đang xem.":"Chưa có hồ sơ sau bảo vệ trong phạm vi của bạn."}
+        >
+          {mode==="catalog" && !filtered && <button type="button" className="btn btn-secondary btn-sm" onClick={()=>changeMode("work")}>Mở hồ sơ nộp lưu</button>}
+        </EmptyState>}
         <ul className="archive-list">{list.items.map(item=><li className="card" key={item.id}><div className="card-body stack">
           <div className="archive-heading"><div>
             <p className="text-muted">{item.topic_code} · {item.round} · {item.department}</p>
             <h2><Link to={resultPath(item.id)} state={{fromArchiveList:true}}>{item.snapshot?.title||item.current_title}</Link></h2>
-          </div><span className="archive-status" data-state={item.state??"EMPTY"}>{item.state?labels[item.state]:"Chưa có bản nộp"}</span></div>
+          </div><ThesisStatusBadge className="archive-status" state={item.state??"DRAFT"} label={item.state?labels[item.state]:"Chưa có bản nộp"}/></div>
           <dl className="archive-facts"><div><dt>Giảng viên hướng dẫn</dt><dd>{item.snapshot?.advisor||item.advisor||"Chưa ghi nhận"}</dd></div>
             <div><dt>Sinh viên</dt><dd>{item.snapshot?.students.map(student=>`${student.name} (${student.code})`).join(", ")||"Chưa ghi nhận"}</dd></div></dl>
           {item.version_no && <p className="text-muted">Phiên bản {item.version_no}{item.state==="ACCEPTED" && item.approved_at ? ` · Duyệt ${when(item.approved_at)}`:""}</p>}
         </div></li>)}</ul>
-        {pageCount>1 && <nav className="button-row" aria-label="Trang kết quả tìm kiếm">
-          <button className="btn btn-secondary" disabled={list.page<=1} onClick={()=>changeFilters({page:String(list.page-1)})}>Trang trước</button>
-          <button className="btn btn-secondary" disabled={list.page>=pageCount} onClick={()=>changeFilters({page:String(list.page+1)})}>Trang sau</button>
+        {pageCount>1 && <nav className="pagination" aria-label="Trang kết quả tìm kiếm">
+          <button type="button" className="btn btn-secondary" disabled={list.page<=1} onClick={()=>changeFilters({page:String(list.page-1)})}><ChevronLeft size={15} aria-hidden="true"/>Trang trước</button>
+          <span>Trang {list.page}/{pageCount}</span>
+          <button type="button" className="btn btn-secondary" disabled={list.page>=pageCount} onClick={()=>changeFilters({page:String(list.page+1)})}>Trang sau<ChevronRight size={15} aria-hidden="true"/></button>
         </nav>}
       </>}
     </>}
